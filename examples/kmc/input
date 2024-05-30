@@ -1,0 +1,16 @@
+! Time
+Max run time : 600
+
+! Reaction rates [macroscopic]
+Number of reactions : 2
+Reaction rates : 0.01 0.2
+Reaction orders : 1 1
+Reaction type : 1 1
+
+! Initial concentrations
+Number of species : 3
+Initial concentrations : 1e4 0 0
+Init names : A B C
+
+! Parameters
+KMC volume : 3.32e-17
