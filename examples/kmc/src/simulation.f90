@@ -14,11 +14,10 @@ module simulation
    !> Private work arrays and variables
    ! Reactor characteristics
    real(WP) :: tend,vol,time,tau
-   integer :: ntmax = 1e11
-   integer :: niter
+   integer :: niter,nout
 
    ! Current number of molecules
-   real(WP), dimension(:), allocatable :: N,RR,RP
+   real(WP), dimension(:), allocatable :: N,C,RR,RP
 
    ! Reaction stoichiometry
    real(WP), dimension(:,:), allocatable :: stoic
@@ -62,6 +61,7 @@ contains
          allocate(nor(nreac))
          allocate(Cinit(nspec))
          allocate(N(nspec))
+         allocate(C(nspec))
          allocate(RR(nreac))
          allocate(RP(nreac))
          allocate(tmpR(nreac),itmpR(nreac))
@@ -73,18 +73,20 @@ contains
       call param_read('Reaction type',delta)
       call param_read('Initial concentrations',Cinit)
       call param_read('Max run time',tend)
+      call param_read('Output iteration period',nout)
 
       ! Allocate reaction stoichiometry array
       allocate(stoic(nreac,nspec))
       stoic(1,1) = -1
       stoic(1,2) = 1
       stoic(1,3) = 0
-      stoic(2,1) = -1
-      stoic(2,2) = 0
+      stoic(2,1) = 0
+      stoic(2,2) = -1
       stoic(2,3) = 1
 
       ! Calculate number of molecules
       N = Cinit*vol*NA
+      C = Cinit
 
       ! Convert macro reaction rates to micro ones
       do i=1,nreac
@@ -104,9 +106,9 @@ contains
          call mfile%add_column(niter,'Timestep number')
          call mfile%add_column(time,'Time')
          call mfile%add_column(tau,'Timestep size')
-         call mfile%add_column(N(1),'N1')
-         call mfile%add_column(N(2),'N2')
-         call mfile%add_column(N(3),'N3')
+         call mfile%add_column(C(1),'N1')
+         call mfile%add_column(C(2),'N2')
+         call mfile%add_column(C(3),'N3')
          call mfile%write()
       end block create_monitor
       
@@ -124,11 +126,11 @@ contains
 
       ! Loop in time
       niter = 0
-      do while (niter.lt.ntmax .and. time<tend .and. N(1)>0)
+      do while (time<tend .and. N(1)>0)
   
          ! Calculate current reaction rates
          RR(1) = k(1)*N(1)
-         RR(2) = k(2)*N(1)
+         RR(2) = k(2)*N(2)
          RRsum = sum(RR)
          RP = RR/RRsum
 
@@ -157,17 +159,18 @@ contains
          ! Save selected channel
          ir = itmpR(i)
 
-         ! Advance reactor one step
+         ! Advance reactor one step following selected reaction
          time = time + tau
          do i=1,nspec
             N(i) = N(i)+stoic(ir,i)
          end do
+         C = N/(vol*NA)
 
          ! Increment number of iteration
          niter = niter+1
 
-         ! Update monitor file every 1000 iterations
-         if (modulo(niter,100000) == 0) call mfile%write()
+         ! Update monitor file every nout iterations
+         if (modulo(niter,nout) == 0) call mfile%write()
          
       end do
       

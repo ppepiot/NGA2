@@ -1,5 +1,6 @@
 ! Time
 Max run time : 600
+Output iteration period : 1
 
 ! Reaction rates [macroscopic]
 Number of reactions : 2
@@ -13,4 +14,4 @@ Initial concentrations : 1e4 0 0
 Init names : A B C
 
 ! Parameters
-KMC volume : 3.32e-17
+KMC volume : 8.31e-26 !3.32e-17
