@@ -967,8 +967,8 @@ class Parser(object):
                 continue
             try:
                 count = int(float(count))
-                if count:
-                    composition[symbol.capitalize()] = count
+                # if count:
+                composition[symbol.capitalize()] = count
             except ValueError:
                 pass
         return composition
@@ -1011,6 +1011,7 @@ class Parser(object):
         elemental composition of the species, and the comment/note associated with
         the thermo entry.
         """
+        
         identifier = lines[0][0:24].split()
         species = identifier[0].strip()
 
@@ -1019,8 +1020,15 @@ class Parser(object):
         else:
             note = ''
 
+        ele = lines[0][23:44]
+        if ele[0] not in self.elements:
+            ele = ele[1:]
+        else:
+            ele = ele[:-1]
+        print(ele)
         # Normal method for specifying the elemental composition
-        composition = self.parseComposition(lines[0][24:44], 4, 5)
+        composition = self.parseComposition(ele, 4, 5)
+        print(composition)
 
         # Chemkin-style extended elemental composition: additional lines
         # indicated by '&' continuation character on preceding lines. Element
@@ -1140,7 +1148,8 @@ class Parser(object):
         self.other_tokens = {'M': 'third-body', 'm': 'third-body',
                              '(+M)': 'falloff3b', '(+m)': 'falloff3b',
                              '<=>': 'equal', '=>': 'equal', '=': 'equal',
-                             'HV': 'photon', 'hv': 'photon'}
+                             'HV': 'photon', 'hv': 'photon',
+                             }
         self.other_tokens.update(('(+%s)' % k, 'falloff3b: %s' % k) for k in self.speciesDict)
         self.Slen = max(map(len, self.other_tokens))
 
@@ -1175,6 +1184,7 @@ class Parser(object):
 
         lines = entry.strip().splitlines()
 
+
         # The first line contains the reaction equation and a set of modified Arrhenius parameters
         tokens = lines[0].split()
         A = float(tokens[-3])
@@ -1182,6 +1192,10 @@ class Parser(object):
         Ea = float(tokens[-1])
         reaction = ''.join(tokens[:-3]) + '\n'
         original_reaction = reaction # for use in error messages
+
+        print(tokens)
+        print(reaction)
+        print(self.speciesDict)
 
         # Identify tokens in the reaction expression in order of
         # decreasing length
@@ -1195,6 +1209,8 @@ class Parser(object):
                 elif test in self.other_tokens:
                     reaction = reaction[:j] + '\n'*i + reaction[j+i:]
                     locs[j] = test, self.other_tokens[test]
+        
+        print(locs)
 
         # Anything that's left should be a stoichiometric coefficient or a '+'
         # between species
@@ -1557,7 +1573,7 @@ class Parser(object):
                             break
                         self.addElement(token)
 
-                elif tokens[0].upper().startswith('SPEC'):
+                elif tokens[0].upper().startswith('SPEC') or tokens[0].upper().startswith('LIQU'):
                     # List of species identifiers
                     tokens = tokens[1:]
                     inHeader = False

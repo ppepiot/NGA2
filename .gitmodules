@@ -1,0 +1,3 @@
+[submodule "examples/pe_homogeneous/Kinetic-Mechanisms"]
+	path = examples/pe_homogeneous/Kinetic-Mechanisms
+	url = https://github.com/CRECKMODELING/Kinetic-Mechanisms.git
