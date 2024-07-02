@@ -37,7 +37,7 @@ module mod_pyrolysis
   integer, parameter :: nreac_reverse = 0
   
   ! Actual expression of each reaction
-  character(len=65), dimension(nreac + nreac_reverse) :: reacexp
+  character(len=330), dimension(nreac + nreac_reverse) :: reacexp
   
   ! Number of thirdbodies
   integer, parameter :: nTB = 0
@@ -756,69 +756,6 @@ contains
     reacexp(293) = "P-C16H14(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H15(L)"
 
   end subroutine reaction_expressions
-
-  ! ----------------------------------------------- !
-  ! Subroutine for pressure dependent coefficients  !
-  ! ----------------------------------------------- !
-  real(WP) function getlindratecoeff(Tloc,k0,kinf,fc,concin,Ploc)
-    implicit none
-
-    real(WP) ::  Tloc,k0,kinf,fc,redP,Ploc
-    real(WP) :: ntmp,ccoeff,dcoeff,lgknull
-    real(WP) :: f
-    real(WP) :: conc, concin
-
-    if (concin.gt.0.0_WP) then
-       conc = concin
-    else
-       conc = Ploc / ( Rcst * Tloc )
-    end if
-    
-    redP = abs(k0) * conc / max(abs(kinf), tiny(1.0_WP)) + tiny(1.0_WP)
-
-    ntmp = 0.75_WP - 1.27_WP * log10( fc )
-    ccoeff = - 0.4_WP - 0.67_WP * log10( fc )
-    dcoeff = 0.14_WP
-    lgknull = log10(redP)
-    f = (lgknull+ccoeff)/(ntmp-dcoeff*(lgknull+ccoeff))
-    f = fc**(1.0_WP / ( f * f + 1.0_WP ))
-    
-    getlindratecoeff = kinf * f * redP / ( 1.0_WP + redP )
-
-  end function getlindratecoeff
-
-  ! ----------------------------------------------- !
-  ! Evaluate thirdbodies                            !
-  ! ----------------------------------------------- !
-  subroutine get_thirdbodies(M,c)
-    implicit none
-
-    real(WP), dimension(nspec) :: c
-    real(WP), dimension(nTB + nFO) :: M
-
-  end subroutine get_thirdbodies
-  
-  ! ----------------------------------------------- !
-  ! Subroutine for pressure dependent coefficients  !
-  ! with logarithmic interpolation                  !
-  ! ----------------------------------------------- !
-  subroutine get_pdep_rate_coefficients(k, Tloc, Ploc)
-    implicit none
-
-    real(WP), dimension(nreac + nreac_reverse) :: k
-    real(WP), dimension(nPlog + nPlog_reverse) :: log_k_pdep, P_pdep
-    real(WP) :: Tloc, Ploc, R_T_inv, T_log, P_log, P_inf, P_sup, a, b, log_P_sup, log_P_inf
-
-    integer :: index_inf, index_sup, i
-
-    ! Shorthands
-    R_T_inv = 1.0_WP/(Rcst*Tloc)
-    T_log = log(Tloc)
-    P_log = log(Ploc)
-
-
-
-    end subroutine get_pdep_rate_coefficients
 
   ! ----------------------------------------------- !
   ! Evaluate rate coefficients                      !
