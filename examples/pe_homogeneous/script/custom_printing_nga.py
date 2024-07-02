@@ -168,10 +168,14 @@ def print_declarations(print_variables, constants, mech_variables, qss_variables
 
     if use == 'AVBP':
         text += '  use mod_param_defs\n'
+    if use == 'NGA2':
+        text += '  use precision,         only:{0}\n'
+
     text += '  implicit none\n\n'
 
     if use in ['Cantera', 'YALES2', 'NTMIX']:
         text += '  integer, parameter :: {0} = selected_real_kind(15,307)\n\n'
+
 
     text += '  ! Ideal gas constant\n'
     # Potential problem with units

@@ -186,7 +186,7 @@ Usage:
             'note': 'This is a generated file.'
         }
     }
-    use = 'Cantera'
+    use = 'NGA2'
 
     print_header(print_variables, use)
 

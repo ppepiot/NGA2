@@ -1392,7 +1392,7 @@ contains
     integer :: k
     
     ! Gas molecular weight inverse
-    inv_W_g = 0.0__WP
+    inv_W_g = 0.0_WP
     do k =1, nspec
       inv_W_g = inv_W_g + y(k) / W_sp(k)
     end do
