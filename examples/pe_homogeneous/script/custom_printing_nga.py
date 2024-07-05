@@ -57,7 +57,7 @@ def print_header(print_variables, use):
     if 'ARCANE_AUTHOR' in os.environ and not supplementary_info['authors']:
         supplementary_info['authors'] = os.environ.get('ARCANE_AUTHOR')
 
-    if use in ['Cantera', 'AVBP', 'YALES2', 'NTMIX']:
+    if use in ['Cantera', 'AVBP', 'YALES2', 'NTMIX', 'NGA2']:
 
         if not supplementary_info['since']:
             version_getter = 'ARCANE_' + use + '_version'
@@ -105,6 +105,7 @@ def print_header(print_variables, use):
            routine_name, supplementary_authors, last_modified))
 
     else:
+
         logger.warning("Need to code proper header for fortran file for target", use)
 
 
@@ -348,6 +349,42 @@ def print_reaction_expressions(print_variables, constants, reactions_variables):
 
     f.write(text)
 
+def print_species_names(print_variables,use, mech_variables):
+    """Prints the explicit name of the species.
+
+    Parameters
+    ----------
+    print_variables :
+        dictionary containing the f90 file to write in and code specific infos
+    mech_variables :
+        dictionary of mechanism related parameters needed for computation
+
+    """
+    f = print_variables['f']
+    species = mech_variables['species']
+    if use == 'NGA2':
+        charDecl = 'use string, only: str_medium'
+        charlen = 'str_medium'
+    else:
+        charDecl = ''
+        charlen = 20
+    text = """\
+  ! ----------------------------------------------- !
+  !     Subroutine for explicit species names       !
+  ! ----------------------------------------------- !
+  subroutine get_species_names(names)
+    {0}
+    implicit none
+    character(len={1}), dimension(nspec) :: names
+    """.format(charDecl, charlen)
+    text += '\n'
+
+    for i, mys in enumerate(species):
+        text += '    names(s' + mys + ')= "' + str(mys) + '"\n'
+    text += '\n    return\n'
+    text += '  end subroutine get_species_names\n\n'
+
+    f.write(text)
 
 def print_lindemann(print_variables):
     """Prints the pressure dependent coefficients handeling in the f90 file
@@ -990,14 +1027,14 @@ def print_mass_to_concentration(print_variables,use):
     text_sup = """\
 
     ! Gas molecular weight inverse
-    inv_W_g = 0.0_pr
+    inv_W_g = 0.0_{0}
     do k =1, nspec
       inv_W_g = inv_W_g + y(k) / W_sp(k)
     end do
 
     ! Gas density
     rho = P / (Rcst * inv_W_g * T)
-"""
+""".format(precision)
 
     if end_module_flag:
         end_module = 'end module mod_' + routine_name
@@ -2318,3 +2355,153 @@ end subroutine {1}
 
     internal_yales2(print_variables)
     yales2_interface(print_variables)
+
+def convert2fvar(name):
+    names = [name]
+    names = tools.convert_to_valid_fortran_var(names)
+    return names[0]
+
+def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reactions_variables):
+    """Prints the routine to fill the Rhs and Jacobian matrix for the reaction ODEs
+
+    Parameters
+    ----------
+    print_variables :
+        dictionary containing the f90 file to write in and code specific infos
+
+    """
+
+    f = print_variables['f']
+    precision = print_variables['precision']
+
+    reac_label = reactions_variables['reac_label']
+
+    species = mech_variables['species']
+    mech = mech_variables['mech']
+    reactions = mech.reaction
+
+    text = """\
+  ! ----------------------------------------------- !
+  ! Fill the Rhs martrix for ODE solver             !
+  ! ----------------------------------------------- !
+  subroutine fill_rhs_matrix(rhs, w)
+    implicit none
+    real({0}), dimension(nreac + nreac_reverse) :: w     ! kinetics frequency and reaction rate
+
+    real({0}), dimension(nspec) :: rhs
+
+""".format(precision)
+
+    # From the reactions, get the RHS of each species
+    for i, species_name in enumerate(species):
+        line_head = '    rhs(s' + species_name + ') = '
+        line = "0.0_" + precision
+        for j, reaction in enumerate(reactions):
+            reactants = reaction.reactants
+            products = reaction.products
+            if species_name in reactants:
+                stoich = reactants[species_name]
+                if stoich != 1:
+                    token = '+' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + '_f)'
+                else:
+                    token = '+w(r' + str(reac_label[j]) + '_f)'
+                if (len(line.split("\n")[-1])>80):
+                    line += '&\n            &'
+                line += token
+            if species_name in products:
+                stoich = products[species_name]
+                if stoich != 1:
+                    token = '-' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + '_f)'
+                else:
+                    token = '-w(r' + str(reac_label[j]) + '_f)'
+                if (len(line.split("\n")[-1])>80):
+                    line += '&\n            &'
+                line += token
+
+        text += (line_head + line + '\n')
+
+
+
+    text += """\
+    
+    return
+  end subroutine fill_rhs_matrix
+
+   
+"""
+
+    # for Jac
+    text += """\
+  ! ----------------------------------------------- !
+  ! Fill the Jacobian matrix for ODE solver         !
+  ! ----------------------------------------------- !
+  subroutine fill_jac_matrix(jac, c, k)
+    implicit none
+    real({0}), dimension(nspec) :: c                        ! concentrations
+    real({0}), dimension(nreac + nreac_reverse) :: k     ! kinetics frequency
+
+    real({0}), dimension(nspec,nspec) :: jac
+""".format(precision)
+    
+    for i, species_i in enumerate(species):
+        for j, species_j in enumerate(species):
+            #rhs is the change rate of species_i 
+            #now we need to get its derivative with respect to species_j
+            #its position is in Jac(i,j)
+
+            # for change rate of i, first look over all reactions
+            # for each reaction, do derivative of rhs_i with respect to species_j
+            # at last, linear combination of all reactions
+            line_head = '        jac(s' + species_i + ',s' + species_j + ') = '
+            line = "0.0_" + precision
+            for k, reaction in enumerate(reactions):
+                reactants = reaction.reactants
+                products = reaction.products
+                order = reaction.orders
+
+                # if species_i is not in reactants or products, then the rhs is 0 and its derivative to j is 0
+                if species_i not in reactants.keys() and species_i not in products.keys():
+                    continue
+
+                # if species_i is in reactants or products, and species_j is in reaction rate calculation
+                # if j is not in reaction rate calculation, then the derivative is 0
+                # else do derivative to j
+                else:
+                    # know how to calculate the reaction rate
+                    rate = {}
+                    if len(order) > 0:
+                        rate = order
+                    else:
+                        rate = reactants
+                    if species_j not in rate.keys():
+                        continue
+                    else:
+                        # Get the constant term based on species_i
+                        if species_i in reactants.keys():
+                            token = ' -'+str(float(reactants[species_i])) + '_'+precision
+                        else:
+                            token = ' +'+str(float(products[species_i])) + '_'+precision
+                        token += '*k(r' + str(reac_label[k]) + '_f)'
+                        for spec in rate.keys():
+                            if spec != species_j:
+                                token += '*c(s' + spec + ')**' + str(float(rate[spec]))+'_'+precision
+                            else:
+                                stoich = rate[spec]
+                                if float(stoich) != 1.0:
+                                    token += '*'+str(float(rate[spec]))+'_'+precision+'*c(s' + spec + ')**' + str(float(stoich-1))+'_'+precision
+
+                        if (len(line.split("\n")[-1])>80):
+                            line += '&\n            &'
+                        line += token
+            text += (line_head + line + '\n')
+
+
+    text += """\
+
+    return
+  end subroutine fill_jac_matrix
+
+
+"""
+    
+    f.write(text)

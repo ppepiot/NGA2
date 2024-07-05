@@ -186,7 +186,8 @@ Usage:
             'note': 'This is a generated file.'
         }
     }
-    use = 'NGA2'
+
+    use = "NGA2"
 
     print_header(print_variables, use)
 
@@ -217,6 +218,8 @@ Usage:
             else:
                 mw += weights[j]*composition[j]
         mech_variables['mech'].molecular_weights[i] = mw
+        if 'P' in parser.speciesList[i].label:
+            mech_variables['mech'].molecular_weights[i] = -1.0
     
     # Correct species names in f90 
     mech_variables['species'] = tools.convert_to_valid_fortran_var(mech_variables['species'])
@@ -251,6 +254,9 @@ Usage:
         count += 1
 
     print_declarations(print_variables, constants, mech_variables, qss_variables, reactions_variables, use, semi_implicit_bool=False)
+    
+    print_species_names(print_variables,use, mech_variables)
+    
     print_reaction_expressions(print_variables, constants,reactions_variables)
 
     # Following 3 functions are not used
@@ -296,15 +302,35 @@ Usage:
         for j in range(len(reac.products)):
             reaction.products[reac.products[j][1].label] = reac.products[j][0]
         reaction.orders = reac.fwdOrders
+        # convert all keys into valid fortran variables
         kys = list(reaction.orders.keys())
         for j in kys:
-            reaction.orders[modify_species_name(j)] = float(reaction.orders[j])
-            del reaction.orders[j]
+            if j == convert2fvar(j):
+                reaction.orders[j] = float(reaction.orders[j])
+            else:
+                reaction.orders[convert2fvar(j)] = float(reaction.orders[j])
+                del reaction.orders[j]
+        kys = list(reaction.reactants.keys())
+        for j in kys:
+            if j == convert2fvar(j):
+                pass
+            else:
+                reaction.reactants[convert2fvar(j)] = float(reaction.reactants[j])
+                del reaction.reactants[j]
+        kys = list(reaction.products.keys())
+        for j in kys:
+            if j == convert2fvar(j):
+                pass
+            else:
+                reaction.products[convert2fvar(j)] = float(reaction.products[j])
+                del reaction.products[j]
         mech.reaction.append(reaction)
 
     print_reaction_rates(print_variables, constants, mech_variables, qss_variables, reactions_variables)
 
     print_variables['EM_flag'] = True
+
+    print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reactions_variables)
 
     print_mass_to_concentration(print_variables,use)
 
