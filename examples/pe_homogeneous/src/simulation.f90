@@ -10,6 +10,7 @@ module simulation
    use fsundials_matrix_mod       ! Fortran interface to generic SUNMatrix
    use fsundials_nvector_mod      ! Fortran interface to generic N_Vector
    use mod_pyrolysis
+   use temperature_mod
    use monitor_class,     only: monitor
    use string, only: str_medium
    use param, only: param_read
@@ -284,7 +285,7 @@ contains
       ! Time loop
       do while (tcur < t_end)
          ! Update Temperature
-         Tloc = 600.0_WP
+         call get_temperature(T = Tloc, time = tcur)
 
          ! Update kinetics coefficients
          call get_rate_coefficients(k,M,Tloc,Ploc)
