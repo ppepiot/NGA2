@@ -902,6 +902,7 @@ def print_rate_coeff(print_variables, constants, arrhenius_constants, mech_varia
     f.write(text)
 
 # NOTE: This function is modified to avoid usage of canterea
+# And transfer the concentration units to mol/cm3 to fit data from chemkin format
 def print_reaction_rates(print_variables, constants, mech_variables, qss_variables, reactions_variables):
     """Prints the reaction rates expressions in the f90 file
 
@@ -943,7 +944,7 @@ def print_reaction_rates(print_variables, constants, mech_variables, qss_variabl
   subroutine get_reaction_rates(w,k,m,c,cqss)
     implicit none
 
-    real({0}), dimension(nspec) :: c
+    real({0}), dimension(nspec) :: c        ! Concentrations in mol/m^3
     real({0}), dimension(nqss) :: cqss
     real({0}), dimension(nreac + nreac_reverse) :: w,k
     real({0}), dimension(nTB + nFO) :: m
@@ -959,19 +960,19 @@ def print_reaction_rates(print_variables, constants, mech_variables, qss_variabl
     nu_prod[nu_prod < 0] = 0
 
     for i in range(nr + nr_reverse):
-        orders = mech.reaction[reac_label[i] - 1].orders
+        orders = mech.reaction[reac_label[i]].orders
         if i < nr:
-            reactants = mech.reaction[reac_label[i] - 1].reactants
+            reactants = mech.reaction[reac_label[i]].reactants
             nu = nu_reac
         else:
-            reactants = mech.reaction[reac_label[i] - 1].products
+            reactants = mech.reaction[reac_label[i]].products
             nu = nu_prod
 
         reactants_keys = list(reactants.keys())
         reactants_keys = tools.convert_to_valid_fortran_var(reactants_keys)
         reactants_values = list(reactants.values())
         text += '    w(r' + str(reac_label[i]) + reac_direction[i] + ') = k(r' + str(reac_label[i]) + reac_direction[
-            i] + ') '
+            i] + ')*1.0E6_{0} '
         for j in range(len(reactants_keys)):
             c_name = 'c'
             s_name = 's'
@@ -979,10 +980,10 @@ def print_reaction_rates(print_variables, constants, mech_variables, qss_variabl
                 c_name = 'cqss'
                 s_name = 'sqss'
             if reactants_keys[j] in list(orders.keys()):
-                text += '* ' + c_name + '(' + s_name + reactants_keys[j] + ')**' + str(
+                text += '* (' + c_name + '(' + s_name + reactants_keys[j] + ')*1.0E-6_{0})**' + str(
                         orders[reactants_keys[j]]) + '_' + precision + ' '
             elif reactants_values[j] != 1:
-                text += '* ' + c_name + '(' + s_name + reactants_keys[j] + ')**' + str(
+                text += '* (' + c_name + '(' + s_name + reactants_keys[j] + ')*1.0E-6_{0})**' + str(
                         reactants_values[j]) + '_' + precision + ' '
 
             # Default Cantera setting that can be wrong if not cautious
@@ -990,7 +991,7 @@ def print_reaction_rates(print_variables, constants, mech_variables, qss_variabl
             #     text += '* ' + c_name + '(' + s_name + reactants_keys[j] + ')**' + str(
             #         reactants_values[j]) + '_' + precision + ' '
             else:
-                text += '* ' + c_name + '(' + s_name + reactants_keys[j] + ') '
+                text += '* (' + c_name + '(' + s_name + reactants_keys[j] + ')*1.0E-6_{0}) '
         if reac_type[i] == 2:
             text += '* m(mM' + str(reac_label[i]) + ')'
         text += '\n'
@@ -2481,14 +2482,16 @@ def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reacti
                             token = ' -'+str(float(reactants[species_i])) + '_'+precision
                         else:
                             token = ' +'+str(float(products[species_i])) + '_'+precision
-                        token += '*k(r' + str(reac_label[k]) + '_f)'
+                        token += '*k(r' + str(reac_label[k]) + '_f)*1.0E6_{0}'
                         for spec in rate.keys():
                             if spec != species_j:
-                                token += '*c(s' + spec + ')**' + str(float(rate[spec]))+'_'+precision
+                                token += '*(c(s' + spec + ')*1.0E-6_{0})**' + str(float(rate[spec]))+'_'+precision
                             else:
                                 stoich = rate[spec]
                                 if float(stoich) != 1.0:
-                                    token += '*'+str(float(rate[spec]))+'_'+precision+'*c(s' + spec + ')**' + str(float(stoich-1))+'_'+precision
+                                    token += '*'+str(float(rate[spec]))+'_'+precision+'*1.0E-6_{0}*(c(s' + spec + ')*1.0E-6_{0})**' + str(float(stoich-1))+'_'+precision
+                                else:
+                                    token += '*1.0E-6_{0}'
 
                         if (len(line.split("\n")[-1])>80):
                             line += '&\n            &'
@@ -2503,5 +2506,6 @@ def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reacti
 
 
 """
+    text = text.format(precision)
     
     f.write(text)

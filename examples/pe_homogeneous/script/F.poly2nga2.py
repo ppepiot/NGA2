@@ -194,7 +194,7 @@ Usage:
     # prepare infomation for declaration
     print_variables['precision'] = 'WP'
 
-    constants = {'Rcst': 8.314,'ns': 0,'nr': 0,'nr_reverse': 0,'nFO': 0,
+    constants = {'Rcst': 1.98718,'ns': 0,'nr': 0,'nr_reverse': 0,'nFO': 0,
     'nFO_reverse': 0,'nTB': 0,'nTB_reverse': 0,'nPlog': 0,'nPlog_reverse': 0,'nqss': 0,'ne': 0}
     constants['ns']=len(parser.speciesList)
     constants['nr']=len(parser.reactions)
