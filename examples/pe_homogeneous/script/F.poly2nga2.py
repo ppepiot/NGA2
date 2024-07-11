@@ -218,8 +218,6 @@ Usage:
             else:
                 mw += weights[j]*composition[j]
         mech_variables['mech'].molecular_weights[i] = mw
-        if 'P' in parser.speciesList[i].label:
-            mech_variables['mech'].molecular_weights[i] = -1.0
     
     # Correct species names in f90 
     mech_variables['species'] = tools.convert_to_valid_fortran_var(mech_variables['species'])

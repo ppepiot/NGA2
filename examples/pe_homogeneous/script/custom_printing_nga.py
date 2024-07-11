@@ -164,6 +164,8 @@ def print_declarations(print_variables, constants, mech_variables, qss_variables
     Plogindex = reactions_variables['Plogindex']
     Plog_pressures = reactions_variables['Plog_pressures']
 
+    integer_kind = ''
+
     # Declaration of all variables of modules
     text = 'module mod_' + routine_name + '\n'
 
@@ -171,6 +173,8 @@ def print_declarations(print_variables, constants, mech_variables, qss_variables
         text += '  use mod_param_defs\n'
     if use == 'NGA2':
         text += '  use precision,         only:{0}\n'
+        text += '  use,intrinsic :: iso_c_binding\n'
+        integer_kind = '(c_long)'
 
     text += '  implicit none\n\n'
 
@@ -189,7 +193,7 @@ def print_declarations(print_variables, constants, mech_variables, qss_variables
     text += '  integer, parameter :: ne = ' + str(ne) + '\n'
     text += '  \n'
     text += '  ! Number of non-qss and qss species and reactions' + '\n'
-    text += '  integer, parameter :: nspec = ' + str(ns - nqss) + '\n'
+    text += '  integer{1}, parameter :: nspec = ' + str(ns - nqss) + '\n'
     text += '  integer, parameter :: nqss = ' + str(nqss) + '\n'
     text += '  integer, parameter :: nreac = ' + str(nr) + '\n'
     text += '  integer, parameter :: nreac_reverse = ' + str(nr_reverse) + '\n'
@@ -208,7 +212,7 @@ def print_declarations(print_variables, constants, mech_variables, qss_variables
         text += '  integer, parameter :: nPlog_reverse = ' + str(nPlog_reverse) + '\n'
     text += '  \n'
 
-    text = text.format(precision)
+    text = text.format(precision,integer_kind)
 
     # Elements
     text += '  ! Index of elements' + '\n'

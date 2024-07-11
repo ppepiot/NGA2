@@ -20,15 +20,16 @@ module simulation
    ! Polymer infomation
    real(WP) :: rho_0           ! initial polymer density
    real(WP) :: diameter_0      ! diameter of the polymer
+   real(WP) :: mMW_0          ! initial monomer molecular weight of the polymer
    real(WP) :: MW_n_0          ! initial number average molecular weight of the polymer
    real(WP) :: MW_w_0          ! initial weight average molecular weight of the polymer
-   real(WP) :: DP_0            ! initial degree of polymerization
+   real(WP) :: DP_0         ! initial degree of polymerization
 
 
    ! Time infomation
    real(WP) :: t_start = 0.0_WP         ! start time
-   real(WP) :: t_end = 900.0_WP                    ! end time
-   real(WP) :: dt = 1e-2_WP                      ! time step
+   real(WP) :: t_end = 20732.0_WP                    ! end time
+   real(WP) :: dt = 1e-1_WP                      ! time step
    real(WP) :: tcur               ! current time
    real(WP) :: tret(1)           ! return time
 
@@ -182,13 +183,68 @@ contains
    end function JacFn
 
 
+   function schultz_dis(l,DP) result(res)
+      implicit none
+      integer, intent(in) :: l
+      real(WP), intent(in) :: DP
+      real(WP) :: res
+
+      res = 4.0_WP*l/(DP-1.0_WP)**2*((DP-1.0_WP)/(DP+1.0_WP))**l
+
+   end function schultz_dis
+
+
    subroutine simulation_init
       implicit none
       integer :: i
-      
+
 
       init_concentration: block
-         c = 0.0_WP
+         real(WP) :: vol, chain_number, Nec, Nmc
+
+         integer :: l
+
+         ! read polymer information
+         call param_read('Density', rho_0)
+         call param_read('Particle diameter', diameter_0)
+         call param_read('Number Average Molecular weight', MW_n_0)
+         call param_read('Monomer Molecular weight', mMW_0)
+         call param_read('Degree of polymerization', DP_0)
+
+         ! Calcute volume
+         vol = 4.0_WP/3.0_WP*3.1415926_WP*(diameter_0/2.0_WP)**3
+
+         ! Calculate chain number
+         chain_number = vol*rho_0/(MW_n_0/1000.0_WP)     ! in mol
+
+         l = 4
+         Nec = 0.0_WP
+         do while (l < 5*DP_0)
+            Nec = Nec + schultz_dis(l,DP_0)
+            l = l + 1
+         end do
+         print *, 'Nec = ', Nec
+
+         l = 4
+         Nmc = 0.0_WP
+         do while (l < 5*DP_0)
+            Nmc = Nmc + schultz_dis(l,DP_0)*(mMW_0*l)
+            l = l + 1
+         end do
+         print *, 'Nmc = ', Nmc
+
+         Nmc = Nmc-Nec*mMW_0*4.0_WP       ! 2 end-groups in each chain, each end-group contains 2 monomers
+         Nmc = Nmc/(mMW_0*2.0_WP)         ! each MC contains 2 monomers
+
+         ! till now, Nec and Nmc are the number fraction of end-chains and MCs, respect to chain number
+         ! True MC and EC number need to be multiplied by chain number
+         Nec = Nec*chain_number
+         Nmc = Nmc*chain_number
+
+         ! Initialize concentration
+         c(sPXC16H16XPGLG) = Nmc/vol
+         c(sPXC16H17GLG) = Nec/vol
+         c(sPXC16H15GLG) = Nec/vol
 
 
       end block init_concentration
@@ -254,11 +310,11 @@ contains
          end if
 
          ! set Jacobian routine
-         ierr = FCVodeSetJacFn(cvode_mem, c_funloc(JacFn))
-         if (ierr /= 0) then
-            print *, 'ERROR: FCVodeInit failed'
-            stop 1
-         end if
+         ! ierr = FCVodeSetJacFn(cvode_mem, c_funloc(JacFn))
+         ! if (ierr /= 0) then
+         !    print *, 'ERROR: FCVodeInit failed'
+         !    stop 1
+         ! end if
 
 
       end block init_CVODE
@@ -267,7 +323,7 @@ contains
       call get_species_names(names)
 
       ! Create Monitor file
-      mfile=monitor(.true.,'simulation')
+      mfile=monitor(.true.,'concentration')
       do i=1,nspec
          call mfile%add_column(c(i), names(i))
       end do
@@ -284,8 +340,10 @@ contains
 
       ! Time loop
       do while (tcur < t_end)
+         print *, '[Solving] Time: ', tcur, 's'
          ! Update Temperature
          call get_temperature(T = Tloc, time = tcur)
+         print *, 'Temperature: ', Tloc
 
          ! Update kinetics coefficients
          call get_rate_coefficients(k,M,Tloc,Ploc)
@@ -299,8 +357,6 @@ contains
 
          ! Write to monitor file
          call mfile%write()
-
-         print *, '[Solving] Time: ', tcur, 's'
 
          ! Update time
          tcur = tcur + dt

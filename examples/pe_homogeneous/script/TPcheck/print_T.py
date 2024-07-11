@@ -73,13 +73,16 @@ contains
         real(WP) :: frac
 
         ! use binary search to find the time index
-        index = 1
-        do while (time .le. times(index))
-            index = index + 1
+        do index = 1, size(times)-1
+            if (time >= times(index) .and. time < times(index+1)) exit
         end do
-        frac = (time - times(index-1)) / (times(index) - times(index-1))
-        T = Ts(index-1) + frac * (Ts(index) - Ts(index-1))
+
+        frac = (time - times(index)) / (times(index+1) - times(index))
+        T = Ts(index) + frac * (Ts(index+1) - Ts(index))
+
+
     end subroutine get_temperature
+    
 end module temperature_mod
 
 """.format(len(Times), timelines, Temperaturelines)
