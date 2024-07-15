@@ -97,6 +97,40 @@ def modify_species_name(name):
         name = name.replace(')','G')
     return name
 
+def print_isrealspecies(print_variables,mech_variables):
+    f = print_variables['f']
+    precision = print_variables['precision']
+    species = mech_variables['species']
+
+    text = """
+    ! ----------------------------------------------- !
+    ! Tell if the species is a real species           !
+    ! ----------------------------------------------- !
+    subroutine isRealSpecies(irs)
+
+        implicit none
+
+        logical, dimension(nspec) :: irs
+        integer :: k
+
+        ! Initialize
+        irs = .false.
+
+{0}
+
+        return
+    end subroutine isRealSpecies
+"""
+    lines = ''
+    for i in range(len(species)):
+        if 'P' not in species[i]:
+            lines += '        irs(s{0}) = .true.\n'.format(species[i])
+        else:
+            lines += '        irs(s{0}) = .false.\n'.format(species[i])
+    f.write(text.format(lines))
+
+    
+
 def main(argv):
 
     print("\n\n\n\n\n\n")
@@ -164,6 +198,29 @@ Usage:
     parser.convertPoly(liquidFile, gasFile, thermoFile,permissive=True, ctiName=ctiName)
 
     print("\n\n\n\n\n\n")
+
+    # Check reactions mass balance
+    for count,i in enumerate(parser.reactions):
+        reac = i.reactants
+        prod = i.products
+        eles = {}
+        for i in parser.elements:
+            eles[i] = 0.0
+        for i in reac:
+            for j in i[1].composition.keys():
+                eles[j] -= i[0]*i[1].composition[j]
+        for i in prod:
+            for j in i[1].composition.keys():
+                eles[j] += i[0]*i[1].composition[j]
+        balance = True
+        for i in eles.keys():
+            if eles[i] < -1e-5 or eles[i] > 1e-5:
+                balance = False
+        if not balance:
+            print('Reaction '+str(count+1)+' is not mass balanced')
+            print(eles)
+
+                
 
     # for reac in parser.reactions:
     #     a = [(reac.reactants[i][0],reac.reactants[i][1].label) for i in range(len(reac.reactants))]
@@ -238,12 +295,12 @@ Usage:
 
     count = 0
     for i in parser.reactions:
-        reac_label = count
+        reac_label = count+1
         reac_direction = ''
         if i.reversible:
-            reac_direction = '_r'
+            reac_direction = ''
         else:
-            reac_direction = '_f'
+            reac_direction = ''
         reactions_variables['reac_label'].append(reac_label)
         reactions_variables['reac_direction'].append(reac_direction)
         reactions_variables['reac_names'].append(str(i))
@@ -254,6 +311,8 @@ Usage:
     print_declarations(print_variables, constants, mech_variables, qss_variables, reactions_variables, use, semi_implicit_bool=False)
     
     print_species_names(print_variables,use, mech_variables)
+
+    print_isrealspecies(print_variables,mech_variables)
     
     print_reaction_expressions(print_variables, constants,reactions_variables)
 

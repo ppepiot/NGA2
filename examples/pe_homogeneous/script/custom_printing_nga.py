@@ -964,12 +964,12 @@ def print_reaction_rates(print_variables, constants, mech_variables, qss_variabl
     nu_prod[nu_prod < 0] = 0
 
     for i in range(nr + nr_reverse):
-        orders = mech.reaction[reac_label[i]].orders
+        orders = mech.reaction[reac_label[i]-1].orders
         if i < nr:
-            reactants = mech.reaction[reac_label[i]].reactants
+            reactants = mech.reaction[reac_label[i]-1].reactants
             nu = nu_reac
         else:
-            reactants = mech.reaction[reac_label[i]].products
+            reactants = mech.reaction[reac_label[i]-1].products
             nu = nu_prod
 
         reactants_keys = list(reactants.keys())
@@ -2407,18 +2407,18 @@ def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reacti
             if species_name in reactants:
                 stoich = reactants[species_name]
                 if stoich != 1:
-                    token = '-' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + '_f)'
+                    token = '-' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
                 else:
-                    token = '-w(r' + str(reac_label[j]) + '_f)'
+                    token = '-w(r' + str(reac_label[j]) + ')'
                 if (len(line.split("\n")[-1])>80):
                     line += '&\n            &'
                 line += token
             if species_name in products:
                 stoich = products[species_name]
                 if stoich != 1:
-                    token = '+' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + '_f)'
+                    token = '+' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
                 else:
-                    token = '+w(r' + str(reac_label[j]) + '_f)'
+                    token = '+w(r' + str(reac_label[j]) + ')'
                 if (len(line.split("\n")[-1])>80):
                     line += '&\n            &'
                 line += token
@@ -2486,7 +2486,7 @@ def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reacti
                             token = ' -'+str(float(reactants[species_i])) + '_'+precision
                         else:
                             token = ' +'+str(float(products[species_i])) + '_'+precision
-                        token += '*k(r' + str(reac_label[k]) + '_f)*1.0E6_{0}'
+                        token += '*k(r' + str(reac_label[k]) + ')*1.0E6_{0}'
                         for spec in rate.keys():
                             if spec != species_j:
                                 token += '*(c(s' + spec + ')*1.0E-6_{0})**' + str(float(rate[spec]))+'_'+precision
