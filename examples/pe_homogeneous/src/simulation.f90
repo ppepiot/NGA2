@@ -28,11 +28,11 @@ module simulation
    real(WP) :: vol_0         ! initial volume of the polymer
 
    ! Time infomation
-   ! real(WP) :: t_start = 5000.0_WP         ! start time
-   ! real(WP) :: t_end = 20732.0_WP                    ! end time
-   real(WP) :: t_start = 0.0_WP         ! start time
-   real(WP) :: t_end = 10.0_WP                    ! end time
-   real(WP) :: dt = 1e-4_WP                      ! time step
+   real(WP) :: t_start = 5000.0_WP         ! start time
+   real(WP) :: t_end = 20732.0_WP                    ! end time
+   ! real(WP) :: t_start = 0.0_WP         ! start time
+   ! real(WP) :: t_end = 10.0_WP                    ! end time
+   real(WP) :: dt = 1e-2_WP                      ! time step
    real(WP) :: tcur               ! current time
    real(WP) :: tret(1)           ! return time
 
@@ -66,6 +66,7 @@ module simulation
    real(WP), dimension(4) :: frac
    real(WP), dimension(nspec) :: mass_fractions
    real(WP) :: total_mass_ratio
+   real(WP) :: rhsp_mass_sum
 
 
    public :: simulation_init,simulation_run,simulation_final
@@ -226,6 +227,24 @@ contains
 
    end subroutine get_product_mass_fraction
 
+   subroutine check_rhs_mass_balance()
+      implicit none
+      integer :: i
+      real(WP) :: sum
+
+      call get_reaction_rates(w,k,m,c,cqss)
+      call fill_rhs_matrix(rhsp, w)
+
+      sum = 0.0_WP
+      do i=1,nspec
+         sum = sum + rhsp(i)*W_sp(i)*vol_0
+      end do
+
+      print *, 'Mass balance: ', sum
+      rhsp_mass_sum = sum
+
+   end subroutine check_rhs_mass_balance
+
 
    subroutine simulation_init
       implicit none
@@ -287,6 +306,7 @@ contains
          c(sPXC16H17GLG) = Nec/vol_0
          c(sPXC16H15GLG) = Nec/vol_0
 
+         call get_product_mass_fraction()
 
       end block init_concentration
 
@@ -379,6 +399,7 @@ contains
       fracfile=monitor(.true.,'mass_fraction')
       call fracfile%add_column(tcur, 'Time')
       call fracfile%add_column(total_mass_ratio, 'total mass ratio')
+      call fracfile%add_column(rhsp_mass_sum, 'rhs mass sum [kg]')
       call fracfile%add_column(frac(1), 'C8H8')
       call fracfile%add_column(frac(2), 'C8H10')
       call fracfile%add_column(frac(3), 'C9H10')
@@ -401,12 +422,15 @@ contains
       do while (tcur < t_end)
          print *, '[Solving] Time: ', tcur, 's'
          ! Update Temperature
-         ! call get_temperature(T = Tloc, time = tcur)
-         Tloc = (750.0_WP+273.15_WP)
+         call get_temperature(T = Tloc, time = tcur)
+         ! Tloc = (750.0_WP+273.15_WP)
          print *, 'Temperature: ', Tloc
 
          ! Update kinetics coefficients
          call get_rate_coefficients(k,M,Tloc,Ploc)
+
+         ! Check residual mass balance
+
 
          ! ! Update CVODE
          ierr = FCVode(cvode_mem, (tcur+dt), sunvec_y, tret, CV_NORMAL)
@@ -417,7 +441,7 @@ contains
 
          print *, 'Returned Time: ', tret(1), 's'
 
-
+         call check_rhs_mass_balance()
          call get_product_mass_fraction()
 
          ! ! The following part is to garantee the mass balance
@@ -440,6 +464,8 @@ contains
          ! ! re-init cvode
          ! ierr = FCVodeReInit(cvode_mem, tcur + dt , sunvec_y)
 
+         ! Update time
+         tcur = tcur + dt
 
          if (mod(count,100) == 0) then
             ! Write to monitor file
@@ -447,9 +473,6 @@ contains
             call fracfile%write()
          end if
          count = count + 1
-
-         ! Update time
-         tcur = tcur + dt
 
 
 

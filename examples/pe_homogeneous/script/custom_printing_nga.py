@@ -2406,19 +2406,19 @@ def print_reaction_rate_rhs_Jac(print_variables,constants, mech_variables,reacti
             products = reaction.products
             if species_name in reactants:
                 stoich = reactants[species_name]
-                if stoich != 1:
-                    token = '-' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
-                else:
+                if 1-1e-10 < stoich < 1+1e-10:
                     token = '-w(r' + str(reac_label[j]) + ')'
+                else:
+                    token = '-' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
                 if (len(line.split("\n")[-1])>80):
                     line += '&\n            &'
                 line += token
             if species_name in products:
                 stoich = products[species_name]
-                if stoich != 1:
-                    token = '+' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
-                else:
+                if 1-1e-10 < stoich < 1+1e-10:
                     token = '+w(r' + str(reac_label[j]) + ')'
+                else:
+                    token = '+' + str(stoich) + '_'+precision+'*w(r' + str(reac_label[j]) + ')'
                 if (len(line.split("\n")[-1])>80):
                     line += '&\n            &'
                 line += token

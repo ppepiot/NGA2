@@ -199,6 +199,18 @@ Usage:
 
     print("\n\n\n\n\n\n")
 
+    species = parser.speciesList
+    sp_wt = {}
+    weights = {'H':1.00794,'C':12.011,'N':14.00674,'O':15.9994,'He':4.002602}
+    for i in species:
+        for j in i.composition.keys():
+            if j not in weights.keys():
+                print('Error: Element '+j+' is not in the list of weights')
+            else:
+                if i.label not in sp_wt.keys():
+                    sp_wt[i.label] = 0
+                sp_wt[i.label] += weights[j]*i.composition[j]
+
     # Check reactions mass balance
     for count,i in enumerate(parser.reactions):
         reac = i.reactants
@@ -219,6 +231,27 @@ Usage:
         if not balance:
             print('Reaction '+str(count+1)+' is not mass balanced')
             print(eles)
+    
+    # Check reactions mass balance
+    for count,i in enumerate(parser.reactions):
+        reac = i.reactants
+        prod = i.products
+        ws = 0.0
+        for j in reac:
+            ws -= j[0]*sp_wt[j[1].label]
+        for j in prod:
+            ws += j[0]*sp_wt[j[1].label]
+        if ws < -1e-5 or ws > 1e-5:
+            print('Reaction '+str(count+1)+' is not mass balanced')
+            print(ws)
+
+    for count,i in enumerate(parser.reactions):
+        reac = i.reactants
+        prod = i.products
+        for j,reactant in enumerate(reac):
+            if reactant[1].label in [k[1].label for k in prod]:
+                print('Reaction '+str(count+1)+' has the same species in reactants and products')
+
 
                 
 
