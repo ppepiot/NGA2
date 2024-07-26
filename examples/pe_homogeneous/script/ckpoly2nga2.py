@@ -1238,11 +1238,27 @@ class Parser(object):
             elif kind == 'coeff':
                 stoichiometry = token
             elif lhs:
-                reactants.append((stoichiometry, token, kind))
-                stoichiometry = 1
+                if token in [aa[1] for aa in reactants]:
+                    for aa in reactants:
+                        if aa[1] == token:
+                            bb = (aa[0]+stoichiometry, token, kind)
+                            reactants.remove(aa)
+                            reactants.append(bb)
+                    stoichiometry = 1
+                else:
+                    reactants.append((stoichiometry, token, kind))
+                    stoichiometry = 1
             else:
-                products.append((stoichiometry, token, kind))
-                stoichiometry = 1
+                if token in [aa[1] for aa in products]:
+                    for aa in products:
+                        if aa[1] == token:
+                            bb = (aa[0]+stoichiometry, token, kind)
+                            products.remove(aa)
+                            products.append(bb)
+                    stoichiometry = 1
+                else:
+                    products.append((stoichiometry, token, kind))
+                    stoichiometry = 1
 
         if lhs is True:
             raise InputParseError("Failed to find reactant/product delimiter in reaction string.")

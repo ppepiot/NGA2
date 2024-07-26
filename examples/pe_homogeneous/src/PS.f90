@@ -6,7 +6,7 @@
 !!    Module for calculating the analytical source terms in NGA2
 !!    @details None
 !!    @authors None
-!!    @date    2024/07/17
+!!    @date    2024/07/26
 !!    @since   None
 !!    @note    This is a generated file.
 !--------------------------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ module mod_pyrolysis
   ! Number of non-qss and qss species and reactions
   integer(c_long), parameter :: nspec = 62
   integer, parameter :: nqss = 0
-  integer, parameter :: nreac = 510
+  integer, parameter :: nreac = 512
   integer, parameter :: nreac_reverse = 0
   
   ! Actual expression of each reaction
@@ -628,6 +628,8 @@ module mod_pyrolysis
   integer, parameter :: r508 = 508
   integer, parameter :: r509 = 509
   integer, parameter :: r510 = 510
+  integer, parameter :: r511 = 511
+  integer, parameter :: r512 = 512
   
   ! Molar mass
   real(WP), parameter, dimension(nspec) :: W_sp =(/ &
@@ -934,18 +936,18 @@ contains
     reacexp(75) = "C24H24(L) + C24H22(L) -> C24H23(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L) + C16H15_T(L)"
     reacexp(76) = "P-C16H16-P(L) + P-C16H15-P(L) -> P-C16H16_T(L) + P-C16H15(L)"
     reacexp(77) = "0.5 P-C16H15(L) + 0.5 P-C16H17(L) + P-C16H15-P(L) -> P-C16H16_T(L) + P-C16H15(L)"
-    reacexp(78) = "6.95 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H15-P(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(79) = "1.45 P-C16H17(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H16(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(80) = "1.45 P-C16H15(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H14(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(81) = "1.45 C16H18(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C16H17(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(82) = "1.45 C24H26(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C24H25(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(83) = "1.45 C24H24(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C24H23(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(84) = "1.45 P-C16H16-P(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H15-P(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(85) = "4.2 P-C16H17(L) + 2.75 P-C16H15(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H16(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(86) = "4.2 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H14(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(87) = "1.45 C16H18(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C16H17(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(88) = "1.45 C24H26(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C24H25(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
-    reacexp(89) = "1.45 C24H24(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C24H23(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.15 C9H12 + 0.9 C7H8 + C24H25_T(L)"
+    reacexp(78) = "6.95 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H15-P(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(79) = "1.45 P-C16H17(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H16(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(80) = "1.45 P-C16H15(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H14(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(81) = "1.45 C16H18(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C16H17(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(82) = "1.45 C24H26(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C24H25(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(83) = "1.45 C24H24(L) + 5.5 P-C16H16-P(L) + 5.0 P-C16H16(L) -> 1.45 C24H23(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(84) = "1.45 P-C16H16-P(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H15-P(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(85) = "4.2 P-C16H17(L) + 2.75 P-C16H15(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H16(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(86) = "4.2 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 P-C16H14(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(87) = "1.45 C16H18(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C16H17(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(88) = "1.45 C24H26(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C24H25(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
+    reacexp(89) = "1.45 C24H24(L) + 2.75 P-C16H15(L) + 2.75 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.45 C24H23(L) + 2.0 P-C16H16_T(L) + C16H16(L) + C24H24(L) + 3.0 P-C16H15(L) + 0.1 C8H10 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1 + 0.1 C16H17_T(L) + 0.45 C15H15_T(L) + 0.345 C9H12 + 2.25 C7H8 + C24H25_T(L)"
     reacexp(90) = "5.0 P-C16H16-P(L) + 4.0 P-C16H14(L) -> 2.0 P-C16H16_T(L) + C16H14(L) + C24H22(L) + 2.0 P-C16H15(L) + C16H15_T(L) + C24H23_T(L)"
     reacexp(91) = "2.5 P-C16H15(L) + 2.5 P-C16H17(L) + 4.0 P-C16H14(L) -> 2.0 P-C16H16_T(L) + C16H14(L) + C24H22(L) + 2.0 P-C16H15(L) + C16H15_T(L) + C24H23_T(L)"
     reacexp(92) = "1.5 P-C16H16-P(L) + P-C16H14(L) -> P-C16H15-P(L) + P-C16H15(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
@@ -986,12 +988,12 @@ contains
     reacexp(127) = "C16H18(L) + C24H23_A(L) -> C16H17(L) + C16H14(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1"
     reacexp(128) = "C24H26(L) + C24H23_A(L) -> C24H25(L) + C16H14(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1"
     reacexp(129) = "C24H24(L) + C24H23_A(L) -> C24H23(L) + C16H14(L) + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1"
-    reacexp(130) = "P-C16H16-P(L) + C24H21_A(L) -> P-C16H15-P(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
-    reacexp(131) = "P-C16H17(L) + C24H21_A(L) -> P-C16H16(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
-    reacexp(132) = "P-C16H15(L) + C24H21_A(L) -> P-C16H14(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
-    reacexp(133) = "C16H18(L) + C24H21_A(L) -> C16H17(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
-    reacexp(134) = "C24H26(L) + C24H21_A(L) -> C24H25(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
-    reacexp(135) = "C24H24(L) + C24H21_A(L) -> C24H23(L) + C16H14(L) + 0.4705882 C9H10 + 0.2352941 C16H14(L)"
+    reacexp(130) = "P-C16H16-P(L) + C24H21_A(L) -> P-C16H15-P(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
+    reacexp(131) = "P-C16H17(L) + C24H21_A(L) -> P-C16H16(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
+    reacexp(132) = "P-C16H15(L) + C24H21_A(L) -> P-C16H14(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
+    reacexp(133) = "C16H18(L) + C24H21_A(L) -> C16H17(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
+    reacexp(134) = "C24H26(L) + C24H21_A(L) -> C24H25(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
+    reacexp(135) = "C24H24(L) + C24H21_A(L) -> C24H23(L) + 0.4705882 C9H10 + 1.4705882 C16H14(L)"
     reacexp(136) = "0.5 P-C16H16-P(L) + P-C16H16_T(L) -> P-C16H16_T(L) + C8H8"
     reacexp(137) = "0.25 P-C16H15(L) + 0.25 P-C16H17(L) + P-C16H16_T(L) -> P-C16H16_T(L) + C8H8"
     reacexp(138) = "P-C16H16-P(L) + C16H17_T(L) -> P-C16H15-P(L) + C8H8 + 0.1 C8H10 + 0.45 C7H8 + 0.045 C9H12 + 0.405 C6H6 + 0.2025 C2H4 + 0.135 C3H6 + 0.10125 C4H8-1"
@@ -1229,7 +1231,7 @@ contains
     reacexp(370) = "C15H15_T(L) + C24H24(L) -> C15H16(L) + C24H23_T(L)"
     reacexp(371) = "C15H15_T(L) + C24H24(L) -> C15H16(L) + C24H23_A(L)"
     reacexp(372) = "C15H15_T(L) + C24H22(L) -> C15H16(L) + C24H21_A(L)"
-    reacexp(373) = "P-C16H15-P(L) + P-C16H15-P(L) -> 1.625 P-C16H16-P(L) + C6H4"
+    reacexp(373) = "2 P-C16H15-P(L) -> 1.625 P-C16H16-P(L) + C6H4"
     reacexp(374) = "P-C16H15-P(L) + P-C16H16(L) -> P-C16H16-P(L) + P-C16H15(L)"
     reacexp(375) = "P-C16H15-P(L) + P-C16H16_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
     reacexp(376) = "P-C16H15-P(L) + P-C16H14(L) -> 1.4375 P-C16H16-P(L) + 1.5 C6H4"
@@ -1243,130 +1245,132 @@ contains
     reacexp(384) = "P-C16H15-P(L) + C24H23_T(L) -> 2.125 P-C16H16-P(L) + C6H4"
     reacexp(385) = "P-C16H15-P(L) + C24H23_A(L) -> 2.125 P-C16H16-P(L) + C6H4"
     reacexp(386) = "P-C16H15-P(L) + C24H21_A(L) -> 1.75 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(387) = "P-C16H16(L) + P-C16H16_T(L) -> 2.0 P-C16H16-P(L)"
-    reacexp(388) = "P-C16H16(L) + P-C16H14(L) -> 1.625 P-C16H16-P(L) + C6H4"
-    reacexp(389) = "P-C16H16(L) + P-C16H14_A(L) -> 1.625 P-C16H16-P(L) + C6H4"
-    reacexp(390) = "P-C16H16(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(391) = "P-C16H16(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(392) = "P-C16H16(L) + C16H15_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(393) = "P-C16H16(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(394) = "P-C16H16(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(395) = "P-C16H16(L) + C24H23(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(396) = "P-C16H16(L) + C24H23_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(397) = "P-C16H16(L) + C24H23_A(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(398) = "P-C16H16(L) + C24H21_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(399) = "P-C16H16_T(L) + P-C16H14(L) -> 1.625 P-C16H16-P(L) + C6H4"
-    reacexp(400) = "P-C16H16_T(L) + P-C16H14_A(L) -> 1.625 P-C16H16-P(L) + C6H4"
-    reacexp(401) = "P-C16H16_T(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(402) = "P-C16H16_T(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(403) = "P-C16H16_T(L) + C16H15_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(404) = "P-C16H16_T(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(405) = "P-C16H16_T(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
-    reacexp(406) = "P-C16H16_T(L) + C24H23(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(407) = "P-C16H16_T(L) + C24H23_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(408) = "P-C16H16_T(L) + C24H23_A(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(409) = "P-C16H16_T(L) + C24H21_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(410) = "P-C16H14(L) + P-C16H14(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(411) = "P-C16H14(L) + P-C16H14_A(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(412) = "P-C16H14(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(413) = "P-C16H14(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(414) = "P-C16H14(L) + C16H15_T(L) -> 1.4375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(415) = "P-C16H14(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(416) = "P-C16H14(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(417) = "P-C16H14(L) + C24H23(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(418) = "P-C16H14(L) + C24H23_T(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(419) = "P-C16H14(L) + C24H23_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(420) = "P-C16H14(L) + C24H21_A(L) -> 1.5625 P-C16H16-P(L) + 2.5 C6H4"
-    reacexp(421) = "P-C16H14_A(L) + P-C16H14_A(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(422) = "P-C16H14_A(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(423) = "P-C16H14_A(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(424) = "P-C16H14_A(L) + C16H15_T(L) -> 1.4375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(425) = "P-C16H14_A(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(426) = "P-C16H14_A(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
-    reacexp(427) = "P-C16H14_A(L) + C24H23(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(428) = "P-C16H14_A(L) + C24H23_T(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(429) = "P-C16H14_A(L) + C24H23_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
-    reacexp(430) = "P-C16H14_A(L) + C24H21_A(L) -> 1.5625 P-C16H16-P(L) + 2.5 C6H4"
-    reacexp(431) = "C16H17(L) + C16H17(L) -> 2.0 P-C16H17(L)"
-    reacexp(432) = "C16H17(L) + C16H17_T(L) -> 2.0 P-C16H17(L)"
-    reacexp(433) = "C16H17(L) + C16H15_T(L) -> P-C16H17(L) + P-C16H15(L)"
-    reacexp(434) = "C16H17(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(435) = "C16H17(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(436) = "C16H17(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(437) = "C16H17(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(438) = "C16H17(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(439) = "C16H17(L) + C24H21_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(440) = "C16H17_T(L) + C16H17_T(L) -> 2.0 P-C16H17(L)"
-    reacexp(441) = "C16H17_T(L) + C16H15_T(L) -> P-C16H17(L) + P-C16H15(L)"
-    reacexp(442) = "C16H17_T(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(443) = "C16H17_T(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(444) = "C16H17_T(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(445) = "C16H17_T(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(446) = "C16H17_T(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(447) = "C16H17_T(L) + C24H21_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(448) = "C16H15_T(L) + C16H15_T(L) -> 2.0 P-C16H15(L)"
-    reacexp(449) = "C16H15_T(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(450) = "C16H15_T(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(451) = "C16H15_T(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(452) = "C16H15_T(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(453) = "C16H15_T(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(454) = "C16H15_T(L) + C24H21_A(L) -> 1.75 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(455) = "C24H25(L) + C24H25(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(456) = "C24H25(L) + C24H25_T(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(457) = "C24H25(L) + C24H23(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(458) = "C24H25(L) + C24H23_T(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(459) = "C24H25(L) + C24H23_A(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(460) = "C24H25(L) + C24H21_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(461) = "C24H25_T(L) + C24H25_T(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
-    reacexp(462) = "C24H25_T(L) + C24H23(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(463) = "C24H25_T(L) + C24H23_T(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(464) = "C24H25_T(L) + C24H23_A(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
-    reacexp(465) = "C24H25_T(L) + C24H21_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(466) = "C24H23(L) + C24H23(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(467) = "C24H23(L) + C24H23_T(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(468) = "C24H23(L) + C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(469) = "C24H23(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(470) = "C24H23_T(L) + C24H23_T(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(471) = "C24H23_T(L) + C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(472) = "C24H23_T(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(473) = "C24H23_A(L) + C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
-    reacexp(474) = "C24H23_A(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
-    reacexp(475) = "C24H21_A(L) + C24H21_A(L) -> 1.875 P-C16H16-P(L) + 3.0 C6H4"
-    reacexp(476) = "1.125 P-C16H16-P(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H15-P(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(477) = "6.125 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H16(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(478) = "1.125 P-C16H15(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H14(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(479) = "1.125 C16H18(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C16H17(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(480) = "1.125 C24H26(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C24H25(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(481) = "1.125 C24H24(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C24H23(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
-    reacexp(482) = "1.125 P-C16H16-P(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H15-P(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(483) = "1.125 P-C16H17(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H16(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(484) = "5.125 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H14(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(485) = "1.125 C16H18(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C16H17(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(486) = "1.125 C24H26(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C24H25(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(487) = "1.125 C24H24(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C24H23(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(488) = "1.125 P-C16H16-P(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H15-P(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(489) = "5.125 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H16(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(490) = "1.125 P-C16H15(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H14(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(491) = "1.125 C16H18(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C16H17(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(492) = "1.125 C24H26(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C24H25(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(493) = "1.125 C24H24(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C24H23(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
-    reacexp(494) = "1.125 P-C16H16-P(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H15-P(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(495) = "1.125 P-C16H17(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H16(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(496) = "4.125 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H14(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(497) = "1.125 C16H18(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C16H17(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(498) = "1.125 C24H26(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C24H25(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(499) = "1.125 C24H24(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C24H23(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
-    reacexp(500) = "P-C16H16-P(L) + C15H15_T(L) -> P-C16H15-P(L) + C8H8 + C7H8"
-    reacexp(501) = "P-C16H17(L) + C15H15_T(L) -> P-C16H16(L) + C8H8 + C7H8"
-    reacexp(502) = "P-C16H15(L) + C15H15_T(L) -> P-C16H14(L) + C8H8 + C7H8"
-    reacexp(503) = "C16H18(L) + C15H15_T(L) -> C16H17(L) + C8H8 + C7H8"
-    reacexp(504) = "C24H26(L) + C15H15_T(L) -> C24H25(L) + C8H8 + C7H8"
-    reacexp(505) = "C24H24(L) + C15H15_T(L) -> C24H23(L) + C8H8 + C7H8"
-    reacexp(506) = "P-C16H15-P(L) + C15H15_T(L) -> 1.75 P-C16H16-P(L) + 0.5 C6H4"
-    reacexp(507) = "P-C16H16(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H17(L)"
-    reacexp(508) = "P-C16H16_T(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H17(L)"
-    reacexp(509) = "P-C16H14(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H15(L)"
-    reacexp(510) = "P-C16H14_A(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H15(L)"
+    reacexp(387) = "2 P-C16H16(L) -> 2.0 P-C16H16-P(L)"
+    reacexp(388) = "2 P-C16H16_T(L) -> 2.0 P-C16H16-P(L)"
+    reacexp(389) = "P-C16H16(L) + P-C16H16_T(L) -> 2.0 P-C16H16-P(L)"
+    reacexp(390) = "P-C16H16(L) + P-C16H14(L) -> 1.625 P-C16H16-P(L) + C6H4"
+    reacexp(391) = "P-C16H16(L) + P-C16H14_A(L) -> 1.625 P-C16H16-P(L) + C6H4"
+    reacexp(392) = "P-C16H16(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(393) = "P-C16H16(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(394) = "P-C16H16(L) + C16H15_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(395) = "P-C16H16(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(396) = "P-C16H16(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(397) = "P-C16H16(L) + C24H23(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(398) = "P-C16H16(L) + C24H23_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(399) = "P-C16H16(L) + C24H23_A(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(400) = "P-C16H16(L) + C24H21_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(401) = "P-C16H16_T(L) + P-C16H14(L) -> 1.625 P-C16H16-P(L) + C6H4"
+    reacexp(402) = "P-C16H16_T(L) + P-C16H14_A(L) -> 1.625 P-C16H16-P(L) + C6H4"
+    reacexp(403) = "P-C16H16_T(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(404) = "P-C16H16_T(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(405) = "P-C16H16_T(L) + C16H15_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(406) = "P-C16H16_T(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(407) = "P-C16H16_T(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H17(L)"
+    reacexp(408) = "P-C16H16_T(L) + C24H23(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(409) = "P-C16H16_T(L) + C24H23_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(410) = "P-C16H16_T(L) + C24H23_A(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(411) = "P-C16H16_T(L) + C24H21_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(412) = "2 P-C16H14(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(413) = "P-C16H14(L) + P-C16H14_A(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(414) = "P-C16H14(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(415) = "P-C16H14(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(416) = "P-C16H14(L) + C16H15_T(L) -> 1.4375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(417) = "P-C16H14(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(418) = "P-C16H14(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(419) = "P-C16H14(L) + C24H23(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(420) = "P-C16H14(L) + C24H23_T(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(421) = "P-C16H14(L) + C24H23_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(422) = "P-C16H14(L) + C24H21_A(L) -> 1.5625 P-C16H16-P(L) + 2.5 C6H4"
+    reacexp(423) = "2 P-C16H14_A(L) -> 1.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(424) = "P-C16H14_A(L) + C16H17(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(425) = "P-C16H14_A(L) + C16H17_T(L) -> P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(426) = "P-C16H14_A(L) + C16H15_T(L) -> 1.4375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(427) = "P-C16H14_A(L) + C24H25(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(428) = "P-C16H14_A(L) + C24H25_T(L) -> 1.5 P-C16H16-P(L) + P-C16H15(L)"
+    reacexp(429) = "P-C16H14_A(L) + C24H23(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(430) = "P-C16H14_A(L) + C24H23_T(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(431) = "P-C16H14_A(L) + C24H23_A(L) -> 1.9375 P-C16H16-P(L) + 1.5 C6H4"
+    reacexp(432) = "P-C16H14_A(L) + C24H21_A(L) -> 1.5625 P-C16H16-P(L) + 2.5 C6H4"
+    reacexp(433) = "2 C16H17(L) -> 2.0 P-C16H17(L)"
+    reacexp(434) = "C16H17(L) + C16H17_T(L) -> 2.0 P-C16H17(L)"
+    reacexp(435) = "C16H17(L) + C16H15_T(L) -> P-C16H17(L) + P-C16H15(L)"
+    reacexp(436) = "C16H17(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(437) = "C16H17(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(438) = "C16H17(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(439) = "C16H17(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(440) = "C16H17(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(441) = "C16H17(L) + C24H21_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(442) = "2 C16H17_T(L) -> 2.0 P-C16H17(L)"
+    reacexp(443) = "C16H17_T(L) + C16H15_T(L) -> P-C16H17(L) + P-C16H15(L)"
+    reacexp(444) = "C16H17_T(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(445) = "C16H17_T(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(446) = "C16H17_T(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(447) = "C16H17_T(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(448) = "C16H17_T(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(449) = "C16H17_T(L) + C24H21_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(450) = "2 C16H15_T(L) -> 2.0 P-C16H15(L)"
+    reacexp(451) = "C16H15_T(L) + C24H25(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(452) = "C16H15_T(L) + C24H25_T(L) -> 0.5 P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(453) = "C16H15_T(L) + C24H23(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(454) = "C16H15_T(L) + C24H23_T(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(455) = "C16H15_T(L) + C24H23_A(L) -> 0.5 P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(456) = "C16H15_T(L) + C24H21_A(L) -> 1.75 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(457) = "2 C24H25(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(458) = "C24H25(L) + C24H25_T(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(459) = "C24H25(L) + C24H23(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(460) = "C24H25(L) + C24H23_T(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(461) = "C24H25(L) + C24H23_A(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(462) = "C24H25(L) + C24H21_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(463) = "2 C24H25_T(L) -> P-C16H16-P(L) + 2.0 P-C16H17(L)"
+    reacexp(464) = "C24H25_T(L) + C24H23(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(465) = "C24H25_T(L) + C24H23_T(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(466) = "C24H25_T(L) + C24H23_A(L) -> P-C16H16-P(L) + P-C16H17(L) + P-C16H15(L)"
+    reacexp(467) = "C24H25_T(L) + C24H21_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(468) = "2 C24H23(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(469) = "C24H23(L) + C24H23_T(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(470) = "C24H23(L) + C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(471) = "C24H23(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(472) = "2 C24H23_T(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(473) = "C24H23_T(L) + C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(474) = "C24H23_T(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(475) = "2 C24H23_A(L) -> P-C16H16-P(L) + 2.0 P-C16H15(L)"
+    reacexp(476) = "C24H23_A(L) + C24H21_A(L) -> 2.25 P-C16H16-P(L) + 2.0 C6H4"
+    reacexp(477) = "2 C24H21_A(L) -> 1.875 P-C16H16-P(L) + 3.0 C6H4"
+    reacexp(478) = "1.125 P-C16H16-P(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H15-P(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(479) = "6.125 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H16(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(480) = "1.125 P-C16H15(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 P-C16H14(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(481) = "1.125 C16H18(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C16H17(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(482) = "1.125 C24H26(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C24H25(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(483) = "1.125 C24H24(L) + 5.0 P-C16H17(L) + 5.0 P-C16H16(L) -> 1.125 C24H23(L) + 1.125 C8H10 + C16H17_T(L) + 0.875 C24H25_T(L) + 1.875 C8H8 + C16H16(L) + 0.125 C24H24(L) + C16H15_T(L) + C24H23_T(L) + C16H18(L) + C24H26(L)"
+    reacexp(484) = "1.125 P-C16H16-P(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H15-P(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(485) = "1.125 P-C16H17(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H16(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(486) = "5.125 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 P-C16H14(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(487) = "1.125 C16H18(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C16H17(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(488) = "1.125 C24H26(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C24H25(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(489) = "1.125 C24H24(L) + 4.0 P-C16H15(L) + 4.0 P-C16H16(L) -> 1.125 C24H23(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(490) = "1.125 P-C16H16-P(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H15-P(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(491) = "5.125 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H16(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(492) = "1.125 P-C16H15(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 P-C16H14(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(493) = "1.125 C16H18(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C16H17(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(494) = "1.125 C24H26(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C24H25(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(495) = "1.125 C24H24(L) + 4.0 P-C16H17(L) + 4.0 P-C16H14(L) -> 1.125 C24H23(L) + 0.125 C8H10 + 0.875 C16H17_T(L) + 0.875 C16H14(L) + 0.125 C24H22(L) + 2.0 C8H8 + C16H15_T(L) + C24H23_T(L) + C16H16(L) + C24H24(L)"
+    reacexp(496) = "1.125 P-C16H16-P(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H15-P(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(497) = "1.125 P-C16H17(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H16(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(498) = "4.125 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 P-C16H14(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(499) = "1.125 C16H18(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C16H17(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(500) = "1.125 C24H26(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C24H25(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(501) = "1.125 C24H24(L) + 3.0 P-C16H15(L) + 3.0 P-C16H14(L) -> 1.125 C24H23(L) + 1.125 C8H8 + 1.875 C16H15_T(L) + 1.875 C16H14(L) + 1.125 C24H22(L)"
+    reacexp(502) = "P-C16H16-P(L) + C15H15_T(L) -> P-C16H15-P(L) + C8H8 + C7H8"
+    reacexp(503) = "P-C16H17(L) + C15H15_T(L) -> P-C16H16(L) + C8H8 + C7H8"
+    reacexp(504) = "P-C16H15(L) + C15H15_T(L) -> P-C16H14(L) + C8H8 + C7H8"
+    reacexp(505) = "C16H18(L) + C15H15_T(L) -> C16H17(L) + C8H8 + C7H8"
+    reacexp(506) = "C24H26(L) + C15H15_T(L) -> C24H25(L) + C8H8 + C7H8"
+    reacexp(507) = "C24H24(L) + C15H15_T(L) -> C24H23(L) + C8H8 + C7H8"
+    reacexp(508) = "P-C16H15-P(L) + C15H15_T(L) -> 1.75 P-C16H16-P(L) + 0.5 C6H4"
+    reacexp(509) = "P-C16H16(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H17(L)"
+    reacexp(510) = "P-C16H16_T(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H17(L)"
+    reacexp(511) = "P-C16H14(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H15(L)"
+    reacexp(512) = "P-C16H14_A(L) + C15H15_T(L) -> 0.75 P-C16H16-P(L) + 0.5 C6H4 + P-C16H15(L)"
 
   end subroutine reaction_expressions
 
@@ -1776,73 +1780,73 @@ contains
     k(r387) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r388) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r389) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r390) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r391) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r390) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r391) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r392) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r393) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r394) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r393) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r394) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r395) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r396) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r397) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r398) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r399) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r400) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r401) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r402) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r399) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r400) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r401) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r402) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r403) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r404) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r405) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r404) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r405) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r406) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r407) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r408) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r409) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r410) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r411) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r412) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r413) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r410) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r411) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r412) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r413) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r414) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r415) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r416) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r415) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r416) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r417) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r418) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r419) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r420) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r421) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r422) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r423) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r421) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r422) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r423) = (1.000000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r424) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r425) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r426) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r425) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r426) = (6.630000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r427) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r428) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r429) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r430) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r431) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r432) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r431) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r432) = (3.220000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r433) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r434) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r435) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r434) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r435) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r436) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r437) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r438) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r439) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r440) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r441) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r442) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r443) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r440) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r441) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r442) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r443) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r444) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r445) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r446) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r447) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r448) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r448) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r449) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r450) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r450) = (1.230000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r451) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r452) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r453) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r454) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r455) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r456) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r455) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r456) = (8.850000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r457) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r458) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r459) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
@@ -1862,41 +1866,43 @@ contains
     k(r473) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r474) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r475) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r476) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r477) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r476) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r477) = (5.440000e+10_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r478) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r479) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r480) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r481) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r482) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r483) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r480) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r481) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r482) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r483) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r484) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r485) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r486) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r487) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r488) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r489) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r486) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r487) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r488) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r489) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r490) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r491) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r492) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r493) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r494) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r495) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r492) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r493) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r494) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r495) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r496) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r497) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r498) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r499) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
-    k(r500) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
-    k(r501) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
+    k(r498) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r499) = (8.590000e+16_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r500) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
+    k(r501) = (1.290000e+17_WP)*exp((-2.600000e+04_WP)*R_T_inv )
     k(r502) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
     k(r503) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
-    k(r504) = (6.930000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
-    k(r505) = (6.930000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
-    k(r506) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
-    k(r507) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r504) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
+    k(r505) = (4.620000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
+    k(r506) = (6.930000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
+    k(r507) = (6.930000e+14_WP)*exp((-2.400000e+04_WP)*R_T_inv )
     k(r508) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r509) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
     k(r510) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r511) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
+    k(r512) = (2.500000e+11_WP)*exp((-1.400000e+04_WP)*R_T_inv + (1.000000e+00_WP)*T_log )
   
     return
   end subroutine get_rate_coefficients
@@ -2284,7 +2290,7 @@ contains
     w(r370) = k(r370)*1.0E6_WP * (c(sC15H15_TGLG)*1.0E-6_WP) * (c(sC24H24GLG)*1.0E-6_WP) 
     w(r371) = k(r371)*1.0E6_WP * (c(sC15H15_TGLG)*1.0E-6_WP) * (c(sC24H24GLG)*1.0E-6_WP) 
     w(r372) = k(r372)*1.0E6_WP * (c(sC15H15_TGLG)*1.0E-6_WP) * (c(sC24H22GLG)*1.0E-6_WP) 
-    w(r373) = k(r373)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) 
+    w(r373) = k(r373)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP)**2.0_WP 
     w(r374) = k(r374)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sPXC16H16GLG)*1.0E-6_WP) 
     w(r375) = k(r375)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sPXC16H16_TGLG)*1.0E-6_WP) 
     w(r376) = k(r376)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sPXC16H14GLG)*1.0E-6_WP) 
@@ -2298,130 +2304,132 @@ contains
     w(r384) = k(r384)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
     w(r385) = k(r385)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
     w(r386) = k(r386)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r387) = k(r387)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H16_TGLG)*1.0E-6_WP) 
-    w(r388) = k(r388)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H14GLG)*1.0E-6_WP) 
-    w(r389) = k(r389)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
-    w(r390) = k(r390)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
-    w(r391) = k(r391)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r392) = k(r392)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r393) = k(r393)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r394) = k(r394)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r395) = k(r395)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r396) = k(r396)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r397) = k(r397)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r398) = k(r398)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r399) = k(r399)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sPXC16H14GLG)*1.0E-6_WP) 
-    w(r400) = k(r400)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
-    w(r401) = k(r401)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
-    w(r402) = k(r402)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r403) = k(r403)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r404) = k(r404)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r405) = k(r405)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r406) = k(r406)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r407) = k(r407)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r408) = k(r408)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r409) = k(r409)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r410) = k(r410)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) 
-    w(r411) = k(r411)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
-    w(r412) = k(r412)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
-    w(r413) = k(r413)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r414) = k(r414)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r415) = k(r415)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r416) = k(r416)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r417) = k(r417)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r418) = k(r418)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r419) = k(r419)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r420) = k(r420)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r421) = k(r421)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
-    w(r422) = k(r422)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
-    w(r423) = k(r423)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r424) = k(r424)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r425) = k(r425)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r426) = k(r426)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r427) = k(r427)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r428) = k(r428)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r429) = k(r429)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r430) = k(r430)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r431) = k(r431)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) 
-    w(r432) = k(r432)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r433) = k(r433)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r434) = k(r434)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r435) = k(r435)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r436) = k(r436)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r437) = k(r437)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r438) = k(r438)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r439) = k(r439)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r440) = k(r440)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) 
-    w(r441) = k(r441)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r442) = k(r442)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r443) = k(r443)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r444) = k(r444)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r445) = k(r445)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r446) = k(r446)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r447) = k(r447)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r448) = k(r448)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) 
-    w(r449) = k(r449)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r450) = k(r450)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r451) = k(r451)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r452) = k(r452)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r453) = k(r453)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r454) = k(r454)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r455) = k(r455)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) 
-    w(r456) = k(r456)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r457) = k(r457)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r458) = k(r458)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r459) = k(r459)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r460) = k(r460)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r461) = k(r461)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) 
-    w(r462) = k(r462)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r463) = k(r463)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r464) = k(r464)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r465) = k(r465)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r466) = k(r466)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) 
-    w(r467) = k(r467)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r468) = k(r468)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r469) = k(r469)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r470) = k(r470)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP) 
-    w(r471) = k(r471)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r472) = k(r472)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r473) = k(r473)*1.0E6_WP * (c(sC24H23_AGLG)*1.0E-6_WP) 
-    w(r474) = k(r474)*1.0E6_WP * (c(sC24H23_AGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r475) = k(r475)*1.0E6_WP * (c(sC24H21_AGLG)*1.0E-6_WP) 
-    w(r476) = k(r476)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r477) = k(r477)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r478) = k(r478)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r479) = k(r479)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r480) = k(r480)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r481) = k(r481)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r482) = k(r482)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r483) = k(r483)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r484) = k(r484)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r485) = k(r485)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r486) = k(r486)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r487) = k(r487)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
-    w(r488) = k(r488)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r489) = k(r489)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r490) = k(r490)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r491) = k(r491)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r492) = k(r492)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r493) = k(r493)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r494) = k(r494)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r495) = k(r495)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r496) = k(r496)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r497) = k(r497)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r498) = k(r498)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r499) = k(r499)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
-    w(r500) = k(r500)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r501) = k(r501)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r502) = k(r502)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r503) = k(r503)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r504) = k(r504)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r505) = k(r505)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r506) = k(r506)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r507) = k(r507)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r508) = k(r508)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r509) = k(r509)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
-    w(r510) = k(r510)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r387) = k(r387)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**2.0_WP 
+    w(r388) = k(r388)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP)**2.0_WP 
+    w(r389) = k(r389)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H16_TGLG)*1.0E-6_WP) 
+    w(r390) = k(r390)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H14GLG)*1.0E-6_WP) 
+    w(r391) = k(r391)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
+    w(r392) = k(r392)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
+    w(r393) = k(r393)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
+    w(r394) = k(r394)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r395) = k(r395)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r396) = k(r396)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r397) = k(r397)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r398) = k(r398)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r399) = k(r399)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r400) = k(r400)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r401) = k(r401)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sPXC16H14GLG)*1.0E-6_WP) 
+    w(r402) = k(r402)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
+    w(r403) = k(r403)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
+    w(r404) = k(r404)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
+    w(r405) = k(r405)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r406) = k(r406)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r407) = k(r407)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r408) = k(r408)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r409) = k(r409)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r410) = k(r410)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r411) = k(r411)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r412) = k(r412)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**2.0_WP 
+    w(r413) = k(r413)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sPXC16H14_AGLG)*1.0E-6_WP) 
+    w(r414) = k(r414)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
+    w(r415) = k(r415)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
+    w(r416) = k(r416)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r417) = k(r417)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r418) = k(r418)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r419) = k(r419)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r420) = k(r420)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r421) = k(r421)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r422) = k(r422)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r423) = k(r423)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP)**2.0_WP 
+    w(r424) = k(r424)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H17GLG)*1.0E-6_WP) 
+    w(r425) = k(r425)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
+    w(r426) = k(r426)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r427) = k(r427)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r428) = k(r428)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r429) = k(r429)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r430) = k(r430)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r431) = k(r431)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r432) = k(r432)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r433) = k(r433)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP)**2.0_WP 
+    w(r434) = k(r434)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC16H17_TGLG)*1.0E-6_WP) 
+    w(r435) = k(r435)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r436) = k(r436)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r437) = k(r437)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r438) = k(r438)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r439) = k(r439)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r440) = k(r440)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r441) = k(r441)*1.0E6_WP * (c(sC16H17GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r442) = k(r442)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP)**2.0_WP 
+    w(r443) = k(r443)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC16H15_TGLG)*1.0E-6_WP) 
+    w(r444) = k(r444)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r445) = k(r445)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r446) = k(r446)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r447) = k(r447)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r448) = k(r448)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r449) = k(r449)*1.0E6_WP * (c(sC16H17_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r450) = k(r450)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP)**2.0_WP 
+    w(r451) = k(r451)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H25GLG)*1.0E-6_WP) 
+    w(r452) = k(r452)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r453) = k(r453)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r454) = k(r454)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r455) = k(r455)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r456) = k(r456)*1.0E6_WP * (c(sC16H15_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r457) = k(r457)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP)**2.0_WP 
+    w(r458) = k(r458)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H25_TGLG)*1.0E-6_WP) 
+    w(r459) = k(r459)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r460) = k(r460)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r461) = k(r461)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r462) = k(r462)*1.0E6_WP * (c(sC24H25GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r463) = k(r463)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP)**2.0_WP 
+    w(r464) = k(r464)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23GLG)*1.0E-6_WP) 
+    w(r465) = k(r465)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r466) = k(r466)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r467) = k(r467)*1.0E6_WP * (c(sC24H25_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r468) = k(r468)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP)**2.0_WP 
+    w(r469) = k(r469)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H23_TGLG)*1.0E-6_WP) 
+    w(r470) = k(r470)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r471) = k(r471)*1.0E6_WP * (c(sC24H23GLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r472) = k(r472)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP)**2.0_WP 
+    w(r473) = k(r473)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP) * (c(sC24H23_AGLG)*1.0E-6_WP) 
+    w(r474) = k(r474)*1.0E6_WP * (c(sC24H23_TGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r475) = k(r475)*1.0E6_WP * (c(sC24H23_AGLG)*1.0E-6_WP)**2.0_WP 
+    w(r476) = k(r476)*1.0E6_WP * (c(sC24H23_AGLG)*1.0E-6_WP) * (c(sC24H21_AGLG)*1.0E-6_WP) 
+    w(r477) = k(r477)*1.0E6_WP * (c(sC24H21_AGLG)*1.0E-6_WP)**2.0_WP 
+    w(r478) = k(r478)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r479) = k(r479)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r480) = k(r480)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r481) = k(r481)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r482) = k(r482)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r483) = k(r483)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r484) = k(r484)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r485) = k(r485)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r486) = k(r486)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r487) = k(r487)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r488) = k(r488)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r489) = k(r489)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP 
+    w(r490) = k(r490)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r491) = k(r491)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r492) = k(r492)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r493) = k(r493)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r494) = k(r494)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r495) = k(r495)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r496) = k(r496)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r497) = k(r497)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r498) = k(r498)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r499) = k(r499)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r500) = k(r500)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r501) = k(r501)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP 
+    w(r502) = k(r502)*1.0E6_WP * (c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r503) = k(r503)*1.0E6_WP * (c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r504) = k(r504)*1.0E6_WP * (c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r505) = k(r505)*1.0E6_WP * (c(sC16H18GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r506) = k(r506)*1.0E6_WP * (c(sC24H26GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r507) = k(r507)*1.0E6_WP * (c(sC24H24GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r508) = k(r508)*1.0E6_WP * (c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r509) = k(r509)*1.0E6_WP * (c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r510) = k(r510)*1.0E6_WP * (c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r511) = k(r511)*1.0E6_WP * (c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
+    w(r512) = k(r512)*1.0E6_WP * (c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP * (c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP 
   
     return
   end subroutine get_reaction_rates
@@ -2456,27 +2464,27 @@ contains
             &+0.1_WP*w(r114)+0.1_WP*w(r115)+0.1_WP*w(r116)+0.1_WP*w(r117)+0.1_WP*w(r124)&
             &+0.1_WP*w(r125)+0.1_WP*w(r126)+0.1_WP*w(r127)+0.1_WP*w(r128)+0.1_WP*w(r129)&
             &+0.1_WP*w(r138)+0.1_WP*w(r139)+0.1_WP*w(r140)+0.1_WP*w(r141)+0.1_WP*w(r142)&
-            &+0.1_WP*w(r143)+1.125_WP*w(r476)+1.125_WP*w(r477)+1.125_WP*w(r478)+1.125_WP*w(r479)&
-            &+1.125_WP*w(r480)+1.125_WP*w(r481)+0.125_WP*w(r482)+0.125_WP*w(r483)&
-            &+0.125_WP*w(r484)+0.125_WP*w(r485)+0.125_WP*w(r486)+0.125_WP*w(r487)&
-            &+0.125_WP*w(r488)+0.125_WP*w(r489)+0.125_WP*w(r490)+0.125_WP*w(r491)&
-            &+0.125_WP*w(r492)+0.125_WP*w(r493)
+            &+0.1_WP*w(r143)+1.125_WP*w(r478)+1.125_WP*w(r479)+1.125_WP*w(r480)+1.125_WP*w(r481)&
+            &+1.125_WP*w(r482)+1.125_WP*w(r483)+0.125_WP*w(r484)+0.125_WP*w(r485)&
+            &+0.125_WP*w(r486)+0.125_WP*w(r487)+0.125_WP*w(r488)+0.125_WP*w(r489)&
+            &+0.125_WP*w(r490)+0.125_WP*w(r491)+0.125_WP*w(r492)+0.125_WP*w(r493)&
+            &+0.125_WP*w(r494)+0.125_WP*w(r495)
     rhs(sC8H8) = 0.0_WP+w(r22)+w(r23)+w(r24)+w(r25)+w(r26)+w(r27)+w(r28)+w(r29)+w(r30)+w(r31)+w(r32)&
             &+w(r33)+w(r136)+w(r137)+w(r138)+w(r139)+w(r140)+w(r141)+w(r142)+w(r143)&
-            &+w(r144)+w(r145)+w(r146)+w(r147)+w(r148)+w(r149)+w(r150)+1.875_WP*w(r476)&
-            &+1.875_WP*w(r477)+1.875_WP*w(r478)+1.875_WP*w(r479)+1.875_WP*w(r480)&
-            &+1.875_WP*w(r481)+2.0_WP*w(r482)+2.0_WP*w(r483)+2.0_WP*w(r484)+2.0_WP*w(r485)&
-            &+2.0_WP*w(r486)+2.0_WP*w(r487)+2.0_WP*w(r488)+2.0_WP*w(r489)+2.0_WP*w(r490)&
-            &+2.0_WP*w(r491)+2.0_WP*w(r492)+2.0_WP*w(r493)+1.125_WP*w(r494)+1.125_WP*w(r495)&
-            &+1.125_WP*w(r496)+1.125_WP*w(r497)+1.125_WP*w(r498)+1.125_WP*w(r499)&
-            &+w(r500)+w(r501)+w(r502)+w(r503)+w(r504)+w(r505)
+            &+w(r144)+w(r145)+w(r146)+w(r147)+w(r148)+w(r149)+w(r150)+1.875_WP*w(r478)&
+            &+1.875_WP*w(r479)+1.875_WP*w(r480)+1.875_WP*w(r481)+1.875_WP*w(r482)&
+            &+1.875_WP*w(r483)+2.0_WP*w(r484)+2.0_WP*w(r485)+2.0_WP*w(r486)+2.0_WP*w(r487)&
+            &+2.0_WP*w(r488)+2.0_WP*w(r489)+2.0_WP*w(r490)+2.0_WP*w(r491)+2.0_WP*w(r492)&
+            &+2.0_WP*w(r493)+2.0_WP*w(r494)+2.0_WP*w(r495)+1.125_WP*w(r496)+1.125_WP*w(r497)&
+            &+1.125_WP*w(r498)+1.125_WP*w(r499)+1.125_WP*w(r500)+1.125_WP*w(r501)&
+            &+w(r502)+w(r503)+w(r504)+w(r505)+w(r506)+w(r507)
     rhs(sC6H4) = 0.0_WP+w(r373)+1.5_WP*w(r376)+1.5_WP*w(r377)+w(r380)+w(r383)+w(r384)+w(r385)+2.0_WP*w(r386)&
-            &+w(r388)+w(r389)+1.5_WP*w(r398)+w(r399)+w(r400)+1.5_WP*w(r409)+2.0_WP*w(r410)&
-            &+2.0_WP*w(r411)+1.5_WP*w(r414)+1.5_WP*w(r417)+1.5_WP*w(r418)+1.5_WP*w(r419)&
-            &+2.5_WP*w(r420)+2.0_WP*w(r421)+1.5_WP*w(r424)+1.5_WP*w(r427)+1.5_WP*w(r428)&
-            &+1.5_WP*w(r429)+2.5_WP*w(r430)+2.0_WP*w(r454)+2.0_WP*w(r469)+2.0_WP*w(r472)&
-            &+2.0_WP*w(r474)+3.0_WP*w(r475)+0.5_WP*w(r506)+0.5_WP*w(r507)+0.5_WP*w(r508)&
-            &+0.5_WP*w(r509)+0.5_WP*w(r510)
+            &+w(r390)+w(r391)+1.5_WP*w(r400)+w(r401)+w(r402)+1.5_WP*w(r411)+2.0_WP*w(r412)&
+            &+2.0_WP*w(r413)+1.5_WP*w(r416)+1.5_WP*w(r419)+1.5_WP*w(r420)+1.5_WP*w(r421)&
+            &+2.5_WP*w(r422)+2.0_WP*w(r423)+1.5_WP*w(r426)+1.5_WP*w(r429)+1.5_WP*w(r430)&
+            &+1.5_WP*w(r431)+2.5_WP*w(r432)+2.0_WP*w(r456)+2.0_WP*w(r471)+2.0_WP*w(r474)&
+            &+2.0_WP*w(r476)+3.0_WP*w(r477)+0.5_WP*w(r508)+0.5_WP*w(r509)+0.5_WP*w(r510)&
+            &+0.5_WP*w(r511)+0.5_WP*w(r512)
     rhs(sC16H18) = 0.0_WP+w(r1)
     rhs(sC24H26) = 0.0_WP+w(r4)
     rhs(sC16H16) = 0.0_WP+w(r2)
@@ -2492,18 +2500,18 @@ contains
     rhs(sC24H23_T) = 0.0_WP
     rhs(sC24H23_A) = 0.0_WP
     rhs(sC24H21_A) = 0.0_WP
-    rhs(sC7H8) = 0.0_WP+0.9_WP*w(r78)+0.9_WP*w(r79)+0.9_WP*w(r80)+0.9_WP*w(r81)+0.9_WP*w(r82)+0.9_WP*w(r83)&
-            &+0.9_WP*w(r84)+0.9_WP*w(r85)+0.9_WP*w(r86)+0.9_WP*w(r87)+0.9_WP*w(r88)&
-            &+0.9_WP*w(r89)+0.9_WP*w(r106)+0.9_WP*w(r107)+0.9_WP*w(r108)+0.9_WP*w(r109)&
-            &+0.9_WP*w(r110)+0.9_WP*w(r111)+0.45_WP*w(r112)+0.45_WP*w(r113)+0.45_WP*w(r114)&
-            &+0.45_WP*w(r115)+0.45_WP*w(r116)+0.45_WP*w(r117)+0.45_WP*w(r124)+0.45_WP*w(r125)&
-            &+0.45_WP*w(r126)+0.45_WP*w(r127)+0.45_WP*w(r128)+0.45_WP*w(r129)+0.45_WP*w(r138)&
-            &+0.45_WP*w(r139)+0.45_WP*w(r140)+0.45_WP*w(r141)+0.45_WP*w(r142)+0.45_WP*w(r143)&
-            &+0.9_WP*w(r144)+0.9_WP*w(r145)+0.9_WP*w(r146)+0.9_WP*w(r147)+0.9_WP*w(r148)&
-            &+0.9_WP*w(r149)+0.9_WP*w(r151)+0.9_WP*w(r152)+0.9_WP*w(r153)+0.9_WP*w(r154)&
-            &+0.9_WP*w(r155)+0.9_WP*w(r156)+0.9_WP*w(r157)+0.9_WP*w(r158)+0.9_WP*w(r159)&
-            &+0.9_WP*w(r160)+0.9_WP*w(r161)+0.9_WP*w(r162)+w(r500)+w(r501)+w(r502)&
-            &+w(r503)+w(r504)+w(r505)
+    rhs(sC7H8) = 0.0_WP+2.25_WP*w(r78)+2.25_WP*w(r79)+2.25_WP*w(r80)+2.25_WP*w(r81)+2.25_WP*w(r82)&
+            &+2.25_WP*w(r83)+2.25_WP*w(r84)+2.25_WP*w(r85)+2.25_WP*w(r86)+2.25_WP*w(r87)&
+            &+2.25_WP*w(r88)+2.25_WP*w(r89)+0.9_WP*w(r106)+0.9_WP*w(r107)+0.9_WP*w(r108)&
+            &+0.9_WP*w(r109)+0.9_WP*w(r110)+0.9_WP*w(r111)+0.45_WP*w(r112)+0.45_WP*w(r113)&
+            &+0.45_WP*w(r114)+0.45_WP*w(r115)+0.45_WP*w(r116)+0.45_WP*w(r117)+0.45_WP*w(r124)&
+            &+0.45_WP*w(r125)+0.45_WP*w(r126)+0.45_WP*w(r127)+0.45_WP*w(r128)+0.45_WP*w(r129)&
+            &+0.45_WP*w(r138)+0.45_WP*w(r139)+0.45_WP*w(r140)+0.45_WP*w(r141)+0.45_WP*w(r142)&
+            &+0.45_WP*w(r143)+0.9_WP*w(r144)+0.9_WP*w(r145)+0.9_WP*w(r146)+0.9_WP*w(r147)&
+            &+0.9_WP*w(r148)+0.9_WP*w(r149)+0.9_WP*w(r151)+0.9_WP*w(r152)+0.9_WP*w(r153)&
+            &+0.9_WP*w(r154)+0.9_WP*w(r155)+0.9_WP*w(r156)+0.9_WP*w(r157)+0.9_WP*w(r158)&
+            &+0.9_WP*w(r159)+0.9_WP*w(r160)+0.9_WP*w(r161)+0.9_WP*w(r162)+w(r502)&
+            &+w(r503)+w(r504)+w(r505)+w(r506)+w(r507)
     rhs(sC9H10) = 0.0_WP+0.4705882_WP*w(r34)+0.4705882_WP*w(r35)+0.4705882_WP*w(r36)+0.4705882_WP*w(r37)&
             &+0.4705882_WP*w(r38)+0.4705882_WP*w(r39)+0.4705882_WP*w(r40)+0.4705882_WP*w(r41)&
             &+0.4705882_WP*w(r42)+0.4705882_WP*w(r43)+0.4705882_WP*w(r44)+0.4705882_WP*w(r45)&
@@ -2520,9 +2528,9 @@ contains
             &+0.4705882_WP*w(r134)+0.4705882_WP*w(r135)
     rhs(sC15H16) = 0.0_WP+w(r7)
     rhs(sC15H15_T) = 0.0_WP
-    rhs(sC9H12) = 0.0_WP+0.15_WP*w(r78)+0.15_WP*w(r79)+0.15_WP*w(r80)+0.15_WP*w(r81)+0.15_WP*w(r82)&
-            &+0.15_WP*w(r83)+0.15_WP*w(r84)+0.15_WP*w(r85)+0.15_WP*w(r86)+0.15_WP*w(r87)&
-            &+0.15_WP*w(r88)+0.15_WP*w(r89)+0.09_WP*w(r106)+0.09_WP*w(r107)+0.09_WP*w(r108)&
+    rhs(sC9H12) = 0.0_WP+0.345_WP*w(r78)+0.345_WP*w(r79)+0.345_WP*w(r80)+0.345_WP*w(r81)+0.345_WP*w(r82)&
+            &+0.345_WP*w(r83)+0.345_WP*w(r84)+0.345_WP*w(r85)+0.345_WP*w(r86)+0.345_WP*w(r87)&
+            &+0.345_WP*w(r88)+0.345_WP*w(r89)+0.09_WP*w(r106)+0.09_WP*w(r107)+0.09_WP*w(r108)&
             &+0.09_WP*w(r109)+0.09_WP*w(r110)+0.09_WP*w(r111)+0.045_WP*w(r112)+0.045_WP*w(r113)&
             &+0.045_WP*w(r114)+0.045_WP*w(r115)+0.045_WP*w(r116)+0.045_WP*w(r117)&
             &+0.045_WP*w(r124)+0.045_WP*w(r125)+0.045_WP*w(r126)+0.045_WP*w(r127)&
@@ -2582,34 +2590,34 @@ contains
             &-w(r331)-w(r345)-w(r359)+1.625_WP*w(r373)+w(r374)+w(r375)+1.4375_WP*w(r376)&
             &+1.4375_WP*w(r377)+2.0_WP*w(r378)+2.0_WP*w(r379)+1.625_WP*w(r380)+2.5_WP*w(r381)&
             &+2.5_WP*w(r382)+2.125_WP*w(r383)+2.125_WP*w(r384)+2.125_WP*w(r385)+1.75_WP*w(r386)&
-            &+2.0_WP*w(r387)+1.625_WP*w(r388)+1.625_WP*w(r389)+w(r390)+w(r391)+w(r392)&
-            &+1.5_WP*w(r393)+1.5_WP*w(r394)+1.5_WP*w(r395)+1.5_WP*w(r396)+1.5_WP*w(r397)&
-            &+1.9375_WP*w(r398)+1.625_WP*w(r399)+1.625_WP*w(r400)+w(r401)+w(r402)&
-            &+w(r403)+1.5_WP*w(r404)+1.5_WP*w(r405)+1.5_WP*w(r406)+1.5_WP*w(r407)&
-            &+1.5_WP*w(r408)+1.9375_WP*w(r409)+1.25_WP*w(r410)+1.25_WP*w(r411)+w(r412)&
-            &+w(r413)+1.4375_WP*w(r414)+1.5_WP*w(r415)+1.5_WP*w(r416)+1.9375_WP*w(r417)&
-            &+1.9375_WP*w(r418)+1.9375_WP*w(r419)+1.5625_WP*w(r420)+1.25_WP*w(r421)&
-            &+w(r422)+w(r423)+1.4375_WP*w(r424)+1.5_WP*w(r425)+1.5_WP*w(r426)+1.9375_WP*w(r427)&
-            &+1.9375_WP*w(r428)+1.9375_WP*w(r429)+1.5625_WP*w(r430)+0.5_WP*w(r434)&
-            &+0.5_WP*w(r435)+0.5_WP*w(r436)+0.5_WP*w(r437)+0.5_WP*w(r438)+0.5_WP*w(r439)&
-            &+0.5_WP*w(r442)+0.5_WP*w(r443)+0.5_WP*w(r444)+0.5_WP*w(r445)+0.5_WP*w(r446)&
-            &+0.5_WP*w(r447)+0.5_WP*w(r449)+0.5_WP*w(r450)+0.5_WP*w(r451)+0.5_WP*w(r452)&
-            &+0.5_WP*w(r453)+1.75_WP*w(r454)+w(r455)+w(r456)+w(r457)+w(r458)+w(r459)&
-            &+w(r460)+w(r461)+w(r462)+w(r463)+w(r464)+w(r465)+w(r466)+w(r467)+w(r468)&
-            &+2.25_WP*w(r469)+w(r470)+w(r471)+2.25_WP*w(r472)+w(r473)+2.25_WP*w(r474)&
-            &+1.875_WP*w(r475)-1.125_WP*w(r476)-1.125_WP*w(r482)-1.125_WP*w(r488)&
-            &-1.125_WP*w(r494)-w(r500)+1.75_WP*w(r506)+0.75_WP*w(r507)+0.75_WP*w(r508)&
-            &+0.75_WP*w(r509)+0.75_WP*w(r510)
+            &+2.0_WP*w(r387)+2.0_WP*w(r388)+2.0_WP*w(r389)+1.625_WP*w(r390)+1.625_WP*w(r391)&
+            &+w(r392)+w(r393)+w(r394)+1.5_WP*w(r395)+1.5_WP*w(r396)+1.5_WP*w(r397)&
+            &+1.5_WP*w(r398)+1.5_WP*w(r399)+1.9375_WP*w(r400)+1.625_WP*w(r401)+1.625_WP*w(r402)&
+            &+w(r403)+w(r404)+w(r405)+1.5_WP*w(r406)+1.5_WP*w(r407)+1.5_WP*w(r408)&
+            &+1.5_WP*w(r409)+1.5_WP*w(r410)+1.9375_WP*w(r411)+1.25_WP*w(r412)+1.25_WP*w(r413)&
+            &+w(r414)+w(r415)+1.4375_WP*w(r416)+1.5_WP*w(r417)+1.5_WP*w(r418)+1.9375_WP*w(r419)&
+            &+1.9375_WP*w(r420)+1.9375_WP*w(r421)+1.5625_WP*w(r422)+1.25_WP*w(r423)&
+            &+w(r424)+w(r425)+1.4375_WP*w(r426)+1.5_WP*w(r427)+1.5_WP*w(r428)+1.9375_WP*w(r429)&
+            &+1.9375_WP*w(r430)+1.9375_WP*w(r431)+1.5625_WP*w(r432)+0.5_WP*w(r436)&
+            &+0.5_WP*w(r437)+0.5_WP*w(r438)+0.5_WP*w(r439)+0.5_WP*w(r440)+0.5_WP*w(r441)&
+            &+0.5_WP*w(r444)+0.5_WP*w(r445)+0.5_WP*w(r446)+0.5_WP*w(r447)+0.5_WP*w(r448)&
+            &+0.5_WP*w(r449)+0.5_WP*w(r451)+0.5_WP*w(r452)+0.5_WP*w(r453)+0.5_WP*w(r454)&
+            &+0.5_WP*w(r455)+1.75_WP*w(r456)+w(r457)+w(r458)+w(r459)+w(r460)+w(r461)&
+            &+w(r462)+w(r463)+w(r464)+w(r465)+w(r466)+w(r467)+w(r468)+w(r469)+w(r470)&
+            &+2.25_WP*w(r471)+w(r472)+w(r473)+2.25_WP*w(r474)+w(r475)+2.25_WP*w(r476)&
+            &+1.875_WP*w(r477)-1.125_WP*w(r478)-1.125_WP*w(r484)-1.125_WP*w(r490)&
+            &-1.125_WP*w(r496)-w(r502)+1.75_WP*w(r508)+0.75_WP*w(r509)+0.75_WP*w(r510)&
+            &+0.75_WP*w(r511)+0.75_WP*w(r512)
     rhs(sPXC16H15XPGLG) = 0.0_WP+w(r10)+w(r16)+w(r22)+w(r28)+w(r34)+w(r40)+2.0_WP*w(r46)+2.0_WP*w(r52)+2.0_WP*w(r58)&
             &+w(r64)+w(r70)-w(r76)-w(r77)+1.45_WP*w(r78)+1.45_WP*w(r84)+w(r92)+w(r98)&
             &+2.0_WP*w(r106)+w(r112)+w(r118)+w(r124)+w(r130)+w(r138)+0.45_WP*w(r144)&
             &+0.45_WP*w(r151)+0.45_WP*w(r157)-w(r163)-w(r164)-w(r165)-w(r166)-w(r167)&
             &-w(r168)-w(r169)-w(r170)-w(r171)-w(r172)-w(r173)-w(r174)-w(r175)-w(r176)&
             &+w(r177)+w(r191)+w(r205)+w(r219)+w(r233)+w(r247)+w(r261)+w(r275)+w(r289)&
-            &+w(r303)+w(r317)+w(r331)+w(r345)+w(r359)-w(r373)-w(r374)-w(r375)-w(r376)&
-            &-w(r377)-w(r378)-w(r379)-w(r380)-w(r381)-w(r382)-w(r383)-w(r384)-w(r385)&
-            &-w(r386)+1.125_WP*w(r476)+1.125_WP*w(r482)+1.125_WP*w(r488)+1.125_WP*w(r494)&
-            &+w(r500)-w(r506)
+            &+w(r303)+w(r317)+w(r331)+w(r345)+w(r359)-2.0_WP*w(r373)-w(r374)-w(r375)&
+            &-w(r376)-w(r377)-w(r378)-w(r379)-w(r380)-w(r381)-w(r382)-w(r383)-w(r384)&
+            &-w(r385)-w(r386)+1.125_WP*w(r478)+1.125_WP*w(r484)+1.125_WP*w(r490)+1.125_WP*w(r496)&
+            &+w(r502)-w(r508)
     rhs(sPXC16H17GLG) = 0.0_WP-0.5_WP*w(r9)-3.0_WP*w(r10)-4.0_WP*w(r11)-3.0_WP*w(r12)-3.0_WP*w(r13)-3.0_WP*w(r14)&
             &-3.0_WP*w(r15)-4.5_WP*w(r16)-5.5_WP*w(r17)-4.5_WP*w(r18)-4.5_WP*w(r19)&
             &-4.5_WP*w(r20)-4.5_WP*w(r21)-w(r23)-1.5_WP*w(r28)-2.5_WP*w(r29)-1.5_WP*w(r30)&
@@ -2627,15 +2635,15 @@ contains
             &+w(r196)+w(r197)+w(r198)+w(r199)+w(r200)+w(r201)+w(r202)+w(r203)+w(r204)&
             &-w(r206)-w(r207)-w(r220)-w(r221)-w(r234)-w(r235)-w(r248)-w(r249)-w(r262)&
             &-w(r263)-w(r276)-w(r277)-w(r290)-w(r291)-w(r304)-w(r305)-w(r318)-w(r319)&
-            &-w(r332)-w(r333)-w(r346)-w(r347)-w(r360)-w(r361)+w(r390)+w(r391)+w(r393)&
-            &+w(r394)+w(r401)+w(r402)+w(r404)+w(r405)+2.0_WP*w(r431)+2.0_WP*w(r432)&
-            &+w(r433)+2.0_WP*w(r434)+2.0_WP*w(r435)+w(r436)+w(r437)+w(r438)+2.0_WP*w(r440)&
-            &+w(r441)+2.0_WP*w(r442)+2.0_WP*w(r443)+w(r444)+w(r445)+w(r446)+w(r449)&
-            &+w(r450)+2.0_WP*w(r455)+2.0_WP*w(r456)+w(r457)+w(r458)+w(r459)+2.0_WP*w(r461)&
-            &+w(r462)+w(r463)+w(r464)-5.0_WP*w(r476)-6.125_WP*w(r477)-5.0_WP*w(r478)&
-            &-5.0_WP*w(r479)-5.0_WP*w(r480)-5.0_WP*w(r481)-1.125_WP*w(r483)-4.0_WP*w(r488)&
-            &-5.125_WP*w(r489)-4.0_WP*w(r490)-4.0_WP*w(r491)-4.0_WP*w(r492)-4.0_WP*w(r493)&
-            &-1.125_WP*w(r495)-w(r501)+w(r507)+w(r508)
+            &-w(r332)-w(r333)-w(r346)-w(r347)-w(r360)-w(r361)+w(r392)+w(r393)+w(r395)&
+            &+w(r396)+w(r403)+w(r404)+w(r406)+w(r407)+2.0_WP*w(r433)+2.0_WP*w(r434)&
+            &+w(r435)+2.0_WP*w(r436)+2.0_WP*w(r437)+w(r438)+w(r439)+w(r440)+2.0_WP*w(r442)&
+            &+w(r443)+2.0_WP*w(r444)+2.0_WP*w(r445)+w(r446)+w(r447)+w(r448)+w(r451)&
+            &+w(r452)+2.0_WP*w(r457)+2.0_WP*w(r458)+w(r459)+w(r460)+w(r461)+2.0_WP*w(r463)&
+            &+w(r464)+w(r465)+w(r466)-5.0_WP*w(r478)-6.125_WP*w(r479)-5.0_WP*w(r480)&
+            &-5.0_WP*w(r481)-5.0_WP*w(r482)-5.0_WP*w(r483)-1.125_WP*w(r485)-4.0_WP*w(r490)&
+            &-5.125_WP*w(r491)-4.0_WP*w(r492)-4.0_WP*w(r493)-4.0_WP*w(r494)-4.0_WP*w(r495)&
+            &-1.125_WP*w(r497)-w(r503)+w(r509)+w(r510)
     rhs(sPXC16H15GLG) = 0.0_WP-0.5_WP*w(r9)-w(r12)-1.5_WP*w(r16)-1.5_WP*w(r17)-2.5_WP*w(r18)-1.5_WP*w(r19)&
             &-1.5_WP*w(r20)-1.5_WP*w(r21)-3.0_WP*w(r22)-3.0_WP*w(r23)-4.0_WP*w(r24)&
             &-3.0_WP*w(r25)-3.0_WP*w(r26)-3.0_WP*w(r27)-4.5_WP*w(r28)-4.5_WP*w(r29)&
@@ -2660,17 +2668,17 @@ contains
             &+w(r223)+w(r224)+w(r225)+w(r226)+w(r227)+w(r228)+w(r229)+w(r230)+w(r231)&
             &+w(r232)-w(r236)-w(r237)-w(r250)-w(r251)-w(r264)-w(r265)-w(r278)-w(r279)&
             &-w(r292)-w(r293)-w(r306)-w(r307)-w(r320)-w(r321)-w(r334)-w(r335)-w(r348)&
-            &-w(r349)-w(r362)-w(r363)+w(r374)+w(r375)+w(r392)+w(r395)+w(r396)+w(r397)&
-            &+w(r403)+w(r406)+w(r407)+w(r408)+w(r412)+w(r413)+w(r415)+w(r416)+w(r422)&
-            &+w(r423)+w(r425)+w(r426)+w(r433)+w(r436)+w(r437)+w(r438)+2.0_WP*w(r439)&
-            &+w(r441)+w(r444)+w(r445)+w(r446)+2.0_WP*w(r447)+2.0_WP*w(r448)+w(r449)&
-            &+w(r450)+2.0_WP*w(r451)+2.0_WP*w(r452)+2.0_WP*w(r453)+w(r457)+w(r458)&
-            &+w(r459)+2.0_WP*w(r460)+w(r462)+w(r463)+w(r464)+2.0_WP*w(r465)+2.0_WP*w(r466)&
-            &+2.0_WP*w(r467)+2.0_WP*w(r468)+2.0_WP*w(r470)+2.0_WP*w(r471)+2.0_WP*w(r473)&
-            &-1.125_WP*w(r478)-4.0_WP*w(r482)-4.0_WP*w(r483)-5.125_WP*w(r484)-4.0_WP*w(r485)&
-            &-4.0_WP*w(r486)-4.0_WP*w(r487)-1.125_WP*w(r490)-3.0_WP*w(r494)-3.0_WP*w(r495)&
-            &-4.125_WP*w(r496)-3.0_WP*w(r497)-3.0_WP*w(r498)-3.0_WP*w(r499)-w(r502)&
-            &+w(r509)+w(r510)
+            &-w(r349)-w(r362)-w(r363)+w(r374)+w(r375)+w(r394)+w(r397)+w(r398)+w(r399)&
+            &+w(r405)+w(r408)+w(r409)+w(r410)+w(r414)+w(r415)+w(r417)+w(r418)+w(r424)&
+            &+w(r425)+w(r427)+w(r428)+w(r435)+w(r438)+w(r439)+w(r440)+2.0_WP*w(r441)&
+            &+w(r443)+w(r446)+w(r447)+w(r448)+2.0_WP*w(r449)+2.0_WP*w(r450)+w(r451)&
+            &+w(r452)+2.0_WP*w(r453)+2.0_WP*w(r454)+2.0_WP*w(r455)+w(r459)+w(r460)&
+            &+w(r461)+2.0_WP*w(r462)+w(r464)+w(r465)+w(r466)+2.0_WP*w(r467)+2.0_WP*w(r468)&
+            &+2.0_WP*w(r469)+2.0_WP*w(r470)+2.0_WP*w(r472)+2.0_WP*w(r473)+2.0_WP*w(r475)&
+            &-1.125_WP*w(r480)-4.0_WP*w(r484)-4.0_WP*w(r485)-5.125_WP*w(r486)-4.0_WP*w(r487)&
+            &-4.0_WP*w(r488)-4.0_WP*w(r489)-1.125_WP*w(r492)-3.0_WP*w(r496)-3.0_WP*w(r497)&
+            &-4.125_WP*w(r498)-3.0_WP*w(r499)-3.0_WP*w(r500)-3.0_WP*w(r501)-w(r504)&
+            &+w(r511)+w(r512)
     rhs(sPXC16H16GLG) = 0.0_WP+w(r11)+w(r17)+w(r23)+w(r29)+w(r35)+w(r41)+2.0_WP*w(r47)+2.0_WP*w(r53)+2.0_WP*w(r59)&
             &+w(r65)+w(r71)-5.0_WP*w(r78)-5.0_WP*w(r79)+1.45_WP*w(r79)-5.0_WP*w(r80)&
             &-5.0_WP*w(r81)-5.0_WP*w(r82)-5.0_WP*w(r83)-5.0_WP*w(r84)-5.0_WP*w(r85)&
@@ -2679,12 +2687,12 @@ contains
             &+0.45_WP*w(r145)+0.45_WP*w(r152)+0.45_WP*w(r158)+w(r163)-w(r177)-w(r178)&
             &-w(r179)-w(r180)-w(r181)-w(r182)-w(r183)-w(r184)-w(r185)-w(r186)-w(r187)&
             &-w(r188)-w(r189)-w(r190)+w(r192)+w(r206)+w(r220)+w(r234)+w(r248)+w(r262)&
-            &+w(r276)+w(r290)+w(r304)+w(r318)+w(r332)+w(r346)+w(r360)-w(r374)-w(r387)&
-            &-w(r388)-w(r389)-w(r390)-w(r391)-w(r392)-w(r393)-w(r394)-w(r395)-w(r396)&
-            &-w(r397)-w(r398)-5.0_WP*w(r476)-5.0_WP*w(r477)+1.125_WP*w(r477)-5.0_WP*w(r478)&
-            &-5.0_WP*w(r479)-5.0_WP*w(r480)-5.0_WP*w(r481)-4.0_WP*w(r482)-4.0_WP*w(r483)&
-            &+1.125_WP*w(r483)-4.0_WP*w(r484)-4.0_WP*w(r485)-4.0_WP*w(r486)-4.0_WP*w(r487)&
-            &+1.125_WP*w(r489)+1.125_WP*w(r495)+w(r501)-w(r507)
+            &+w(r276)+w(r290)+w(r304)+w(r318)+w(r332)+w(r346)+w(r360)-w(r374)-2.0_WP*w(r387)&
+            &-w(r389)-w(r390)-w(r391)-w(r392)-w(r393)-w(r394)-w(r395)-w(r396)-w(r397)&
+            &-w(r398)-w(r399)-w(r400)-5.0_WP*w(r478)-5.0_WP*w(r479)+1.125_WP*w(r479)&
+            &-5.0_WP*w(r480)-5.0_WP*w(r481)-5.0_WP*w(r482)-5.0_WP*w(r483)-4.0_WP*w(r484)&
+            &-4.0_WP*w(r485)+1.125_WP*w(r485)-4.0_WP*w(r486)-4.0_WP*w(r487)-4.0_WP*w(r488)&
+            &-4.0_WP*w(r489)+1.125_WP*w(r491)+1.125_WP*w(r497)+w(r503)-w(r509)
     rhs(sPXC16H16_TGLG) = 0.0_WP+2.0_WP*w(r8)+2.0_WP*w(r9)+3.0_WP*w(r10)+3.0_WP*w(r11)+3.0_WP*w(r12)+3.0_WP*w(r13)&
             &+3.0_WP*w(r14)+3.0_WP*w(r15)+3.0_WP*w(r16)+3.0_WP*w(r17)+3.0_WP*w(r18)&
             &+3.0_WP*w(r19)+3.0_WP*w(r20)+3.0_WP*w(r21)+3.0_WP*w(r22)+3.0_WP*w(r23)&
@@ -2702,8 +2710,8 @@ contains
             &-w(r191)-w(r192)-w(r193)-w(r194)-w(r195)-w(r196)-w(r197)-w(r198)-w(r199)&
             &-w(r200)-w(r201)-w(r202)-w(r203)-w(r204)+w(r207)+w(r221)+w(r235)+w(r249)&
             &+w(r263)+w(r277)+w(r291)+w(r305)+w(r319)+w(r333)+w(r347)+w(r361)-w(r375)&
-            &-w(r387)-w(r399)-w(r400)-w(r401)-w(r402)-w(r403)-w(r404)-w(r405)-w(r406)&
-            &-w(r407)-w(r408)-w(r409)-w(r508)
+            &-2.0_WP*w(r388)-w(r389)-w(r401)-w(r402)-w(r403)-w(r404)-w(r405)-w(r406)&
+            &-w(r407)-w(r408)-w(r409)-w(r410)-w(r411)-w(r510)
     rhs(sPXC16H14GLG) = 0.0_WP+w(r12)+w(r18)+w(r24)+w(r30)+w(r36)+w(r42)+2.0_WP*w(r48)+2.0_WP*w(r54)+2.0_WP*w(r60)&
             &+w(r66)+w(r72)+1.45_WP*w(r80)+1.45_WP*w(r86)-4.0_WP*w(r90)-4.0_WP*w(r91)&
             &-w(r92)-w(r93)-w(r94)+w(r94)-w(r95)-w(r96)-w(r97)-w(r98)-w(r99)-w(r100)&
@@ -2712,17 +2720,17 @@ contains
             &+w(r179)+w(r193)-w(r205)-w(r206)-w(r207)-w(r208)-w(r209)-w(r210)-w(r211)&
             &-w(r212)-w(r213)-w(r214)-w(r215)-w(r216)-w(r217)-w(r218)+w(r222)+w(r236)&
             &+w(r250)+w(r264)+w(r278)+w(r292)+w(r306)+w(r320)+w(r334)+w(r348)+w(r362)&
-            &-w(r376)-w(r388)-w(r399)-w(r410)-w(r411)-w(r412)-w(r413)-w(r414)-w(r415)&
-            &-w(r416)-w(r417)-w(r418)-w(r419)-w(r420)+1.125_WP*w(r478)+1.125_WP*w(r484)&
-            &-4.0_WP*w(r488)-4.0_WP*w(r489)-4.0_WP*w(r490)+1.125_WP*w(r490)-4.0_WP*w(r491)&
-            &-4.0_WP*w(r492)-4.0_WP*w(r493)-3.0_WP*w(r494)-3.0_WP*w(r495)-3.0_WP*w(r496)&
-            &+1.125_WP*w(r496)-3.0_WP*w(r497)-3.0_WP*w(r498)-3.0_WP*w(r499)+w(r502)&
-            &-w(r509)
+            &-w(r376)-w(r390)-w(r401)-2.0_WP*w(r412)-w(r413)-w(r414)-w(r415)-w(r416)&
+            &-w(r417)-w(r418)-w(r419)-w(r420)-w(r421)-w(r422)+1.125_WP*w(r480)+1.125_WP*w(r486)&
+            &-4.0_WP*w(r490)-4.0_WP*w(r491)-4.0_WP*w(r492)+1.125_WP*w(r492)-4.0_WP*w(r493)&
+            &-4.0_WP*w(r494)-4.0_WP*w(r495)-3.0_WP*w(r496)-3.0_WP*w(r497)-3.0_WP*w(r498)&
+            &+1.125_WP*w(r498)-3.0_WP*w(r499)-3.0_WP*w(r500)-3.0_WP*w(r501)+w(r504)&
+            &-w(r511)
     rhs(sPXC16H14_AGLG) = 0.0_WP-w(r104)-w(r105)+w(r166)+w(r180)+w(r194)+w(r208)-w(r219)-w(r220)-w(r221)-w(r222)&
             &-w(r223)-w(r224)-w(r225)-w(r226)-w(r227)-w(r228)-w(r229)-w(r230)-w(r231)&
             &-w(r232)+w(r237)+w(r251)+w(r265)+w(r279)+w(r293)+w(r307)+w(r321)+w(r335)&
-            &+w(r349)+w(r363)-w(r377)-w(r389)-w(r400)-w(r411)-w(r421)-w(r422)-w(r423)&
-            &-w(r424)-w(r425)-w(r426)-w(r427)-w(r428)-w(r429)-w(r430)-w(r510)
+            &+w(r349)+w(r363)-w(r377)-w(r391)-w(r402)-w(r413)-2.0_WP*w(r423)-w(r424)&
+            &-w(r425)-w(r426)-w(r427)-w(r428)-w(r429)-w(r430)-w(r431)-w(r432)-w(r512)
     rhs(sC16H18GLG) = 0.0_WP-w(r1)-w(r13)-w(r19)-w(r25)-w(r31)-w(r37)-w(r43)-w(r46)-w(r47)-w(r48)-3.0_WP*w(r49)&
             &-w(r50)-w(r51)-2.0_WP*w(r55)-2.0_WP*w(r61)-w(r67)-w(r73)-1.45_WP*w(r81)&
             &-1.45_WP*w(r87)-w(r95)-w(r101)-2.0_WP*w(r109)-w(r115)-w(r121)-w(r127)&
@@ -2733,8 +2741,8 @@ contains
             &+w(r250)+w(r251)-w(r252)+w(r252)+w(r253)+w(r254)+w(r255)+w(r256)+w(r257)&
             &+w(r258)+w(r259)+w(r260)-w(r266)-w(r267)-w(r280)-w(r281)-w(r294)-w(r295)&
             &-w(r308)-w(r309)-w(r322)-w(r323)-w(r336)-w(r337)-w(r350)-w(r351)-w(r364)&
-            &-w(r365)+w(r476)+w(r477)+w(r478)-1.125_WP*w(r479)+w(r479)+w(r480)+w(r481)&
-            &-1.125_WP*w(r485)-1.125_WP*w(r491)-1.125_WP*w(r497)-w(r503)
+            &-w(r365)+w(r478)+w(r479)+w(r480)-1.125_WP*w(r481)+w(r481)+w(r482)+w(r483)&
+            &-1.125_WP*w(r487)-1.125_WP*w(r493)-1.125_WP*w(r499)-w(r505)
     rhs(sC24H26GLG) = 0.0_WP-w(r4)-w(r14)-w(r20)-w(r26)-w(r32)-w(r38)-w(r44)-2.0_WP*w(r50)-2.0_WP*w(r52)&
             &-2.0_WP*w(r53)-2.0_WP*w(r54)-2.0_WP*w(r55)-4.0_WP*w(r56)-2.0_WP*w(r57)&
             &-2.0_WP*w(r62)-w(r68)-w(r74)-1.45_WP*w(r82)-1.45_WP*w(r88)-w(r96)-w(r102)&
@@ -2745,18 +2753,18 @@ contains
             &+w(r282)-w(r283)+w(r283)+w(r284)+w(r285)+w(r286)+w(r287)+w(r288)+w(r289)&
             &+w(r290)+w(r291)+w(r292)+w(r293)+w(r294)+w(r295)+w(r296)-w(r297)+w(r297)&
             &+w(r298)+w(r299)+w(r300)+w(r301)+w(r302)-w(r311)-w(r312)-w(r325)-w(r326)&
-            &-w(r339)-w(r340)-w(r353)-w(r354)-w(r367)-w(r368)+w(r476)+w(r477)+w(r478)&
-            &+w(r479)-1.125_WP*w(r480)+w(r480)+w(r481)-1.125_WP*w(r486)-1.125_WP*w(r492)&
-            &-1.125_WP*w(r498)-w(r504)
+            &-w(r339)-w(r340)-w(r353)-w(r354)-w(r367)-w(r368)+w(r478)+w(r479)+w(r480)&
+            &+w(r481)-1.125_WP*w(r482)+w(r482)+w(r483)-1.125_WP*w(r488)-1.125_WP*w(r494)&
+            &-1.125_WP*w(r500)-w(r506)
     rhs(sC16H16GLG) = 0.0_WP-w(r2)-w(r58)-w(r59)-w(r60)-w(r61)-w(r62)-w(r63)+w(r78)+w(r79)+w(r80)+w(r81)&
             &+w(r82)+w(r83)+w(r84)+w(r85)+w(r86)+w(r87)+w(r88)+w(r89)+2.0_WP*w(r106)&
             &+2.0_WP*w(r107)+2.0_WP*w(r108)+2.0_WP*w(r109)+2.0_WP*w(r110)+2.0_WP*w(r111)&
             &+w(r118)+w(r119)+w(r120)+w(r121)+w(r122)+w(r123)-w(r169)-w(r183)-w(r197)&
             &-w(r211)-w(r225)-w(r239)-w(r253)+w(r261)+w(r262)+w(r263)+w(r264)+w(r265)&
             &+w(r266)+w(r267)+w(r268)+w(r269)+w(r270)+w(r271)+w(r272)+w(r273)+w(r274)&
-            &-w(r282)-w(r296)-w(r310)-w(r324)-w(r338)-w(r352)-w(r366)+w(r476)+w(r477)&
-            &+w(r478)+w(r479)+w(r480)+w(r481)+w(r482)+w(r483)+w(r484)+w(r485)+w(r486)&
-            &+w(r487)+w(r488)+w(r489)+w(r490)+w(r491)+w(r492)+w(r493)
+            &-w(r282)-w(r296)-w(r310)-w(r324)-w(r338)-w(r352)-w(r366)+w(r478)+w(r479)&
+            &+w(r480)+w(r481)+w(r482)+w(r483)+w(r484)+w(r485)+w(r486)+w(r487)+w(r488)&
+            &+w(r489)+w(r490)+w(r491)+w(r492)+w(r493)+w(r494)+w(r495)
     rhs(sC24H24GLG) = 0.0_WP-w(r5)-w(r15)-w(r21)-w(r27)-w(r33)-w(r39)-w(r45)-2.0_WP*w(r51)-2.0_WP*w(r57)&
             &-2.0_WP*w(r63)-w(r64)-w(r65)-w(r66)-w(r67)-w(r68)-2.0_WP*w(r69)-w(r75)&
             &+w(r78)+w(r79)+w(r80)+w(r81)+w(r82)-1.45_WP*w(r83)+w(r83)+w(r84)+w(r85)&
@@ -2772,11 +2780,11 @@ contains
             &+w(r320)+w(r321)+w(r322)+w(r323)+w(r324)+w(r325)+w(r326)-w(r327)+w(r327)&
             &-w(r328)+w(r328)+w(r329)+w(r330)+w(r331)+w(r332)+w(r333)+w(r334)+w(r335)&
             &+w(r336)+w(r337)+w(r338)+w(r339)+w(r340)-w(r341)+w(r341)-w(r342)+w(r342)&
-            &+w(r343)+w(r344)-w(r355)-w(r356)-w(r357)-w(r369)-w(r370)-w(r371)+0.125_WP*w(r476)&
-            &+0.125_WP*w(r477)+0.125_WP*w(r478)+0.125_WP*w(r479)+0.125_WP*w(r480)&
-            &-1.125_WP*w(r481)+0.125_WP*w(r481)+w(r482)+w(r483)+w(r484)+w(r485)+w(r486)&
-            &-1.125_WP*w(r487)+w(r487)+w(r488)+w(r489)+w(r490)+w(r491)+w(r492)-1.125_WP*w(r493)&
-            &+w(r493)-1.125_WP*w(r499)-w(r505)
+            &+w(r343)+w(r344)-w(r355)-w(r356)-w(r357)-w(r369)-w(r370)-w(r371)+0.125_WP*w(r478)&
+            &+0.125_WP*w(r479)+0.125_WP*w(r480)+0.125_WP*w(r481)+0.125_WP*w(r482)&
+            &-1.125_WP*w(r483)+0.125_WP*w(r483)+w(r484)+w(r485)+w(r486)+w(r487)+w(r488)&
+            &-1.125_WP*w(r489)+w(r489)+w(r490)+w(r491)+w(r492)+w(r493)+w(r494)-1.125_WP*w(r495)&
+            &+w(r495)-1.125_WP*w(r501)-w(r507)
     rhs(sC16H14GLG) = 0.0_WP-w(r3)+0.2352941_WP*w(r34)+0.2352941_WP*w(r35)+0.2352941_WP*w(r36)+0.2352941_WP*w(r37)&
             &+0.2352941_WP*w(r38)+0.2352941_WP*w(r39)+0.2352941_WP*w(r40)+0.2352941_WP*w(r41)&
             &+0.2352941_WP*w(r42)+0.2352941_WP*w(r43)+0.2352941_WP*w(r44)+0.2352941_WP*w(r45)&
@@ -2791,30 +2799,30 @@ contains
             &+w(r105)+w(r112)+w(r113)+w(r114)+w(r115)+w(r116)+w(r117)+0.2352941_WP*w(r118)&
             &+0.2352941_WP*w(r119)+0.2352941_WP*w(r120)+0.2352941_WP*w(r121)+0.2352941_WP*w(r122)&
             &+0.2352941_WP*w(r123)+w(r124)+w(r125)+w(r126)+w(r127)+w(r128)+w(r129)&
-            &+0.2352941_WP*w(r130)+0.2352941_WP*w(r131)+0.2352941_WP*w(r132)+0.2352941_WP*w(r133)&
-            &+0.2352941_WP*w(r134)+0.2352941_WP*w(r135)+0.875_WP*w(r482)+0.875_WP*w(r483)&
-            &+0.875_WP*w(r484)+0.875_WP*w(r485)+0.875_WP*w(r486)+0.875_WP*w(r487)&
-            &+0.875_WP*w(r488)+0.875_WP*w(r489)+0.875_WP*w(r490)+0.875_WP*w(r491)&
-            &+0.875_WP*w(r492)+0.875_WP*w(r493)+1.875_WP*w(r494)+1.875_WP*w(r495)&
-            &+1.875_WP*w(r496)+1.875_WP*w(r497)+1.875_WP*w(r498)+1.875_WP*w(r499)
+            &+1.4705882_WP*w(r130)+1.4705882_WP*w(r131)+1.4705882_WP*w(r132)+1.4705882_WP*w(r133)&
+            &+1.4705882_WP*w(r134)+1.4705882_WP*w(r135)+0.875_WP*w(r484)+0.875_WP*w(r485)&
+            &+0.875_WP*w(r486)+0.875_WP*w(r487)+0.875_WP*w(r488)+0.875_WP*w(r489)&
+            &+0.875_WP*w(r490)+0.875_WP*w(r491)+0.875_WP*w(r492)+0.875_WP*w(r493)&
+            &+0.875_WP*w(r494)+0.875_WP*w(r495)+1.875_WP*w(r496)+1.875_WP*w(r497)&
+            &+1.875_WP*w(r498)+1.875_WP*w(r499)+1.875_WP*w(r500)+1.875_WP*w(r501)
     rhs(sC24H22GLG) = 0.0_WP-w(r6)-w(r70)-w(r71)-w(r72)-w(r73)-w(r74)-w(r75)+w(r90)+w(r91)-w(r175)-w(r189)&
             &-w(r203)-w(r217)-w(r231)-w(r245)-w(r259)-w(r273)-w(r287)-w(r301)-w(r315)&
             &-w(r329)-w(r343)+w(r345)+w(r346)+w(r347)+w(r348)+w(r349)+w(r350)+w(r351)&
-            &+w(r352)+w(r353)+w(r354)+w(r355)+w(r356)+w(r357)+w(r358)-w(r372)+0.125_WP*w(r482)&
-            &+0.125_WP*w(r483)+0.125_WP*w(r484)+0.125_WP*w(r485)+0.125_WP*w(r486)&
-            &+0.125_WP*w(r487)+0.125_WP*w(r488)+0.125_WP*w(r489)+0.125_WP*w(r490)&
-            &+0.125_WP*w(r491)+0.125_WP*w(r492)+0.125_WP*w(r493)+1.125_WP*w(r494)&
-            &+1.125_WP*w(r495)+1.125_WP*w(r496)+1.125_WP*w(r497)+1.125_WP*w(r498)&
-            &+1.125_WP*w(r499)
+            &+w(r352)+w(r353)+w(r354)+w(r355)+w(r356)+w(r357)+w(r358)-w(r372)+0.125_WP*w(r484)&
+            &+0.125_WP*w(r485)+0.125_WP*w(r486)+0.125_WP*w(r487)+0.125_WP*w(r488)&
+            &+0.125_WP*w(r489)+0.125_WP*w(r490)+0.125_WP*w(r491)+0.125_WP*w(r492)&
+            &+0.125_WP*w(r493)+0.125_WP*w(r494)+0.125_WP*w(r495)+1.125_WP*w(r496)&
+            &+1.125_WP*w(r497)+1.125_WP*w(r498)+1.125_WP*w(r499)+1.125_WP*w(r500)&
+            &+1.125_WP*w(r501)
     rhs(sC16H17GLG) = 0.0_WP+w(r13)+w(r19)+w(r25)+w(r31)+w(r37)+w(r43)+2.0_WP*w(r49)+2.0_WP*w(r55)+2.0_WP*w(r61)&
             &+w(r67)+w(r73)+1.45_WP*w(r81)+1.45_WP*w(r87)+w(r95)+w(r101)+2.0_WP*w(r109)&
             &+w(r115)+w(r121)+w(r127)+w(r133)+w(r141)+0.45_WP*w(r147)+0.45_WP*w(r154)&
             &+0.45_WP*w(r160)+w(r167)+w(r181)+w(r195)+w(r209)+w(r223)-w(r233)-w(r234)&
             &-w(r235)-w(r236)-w(r237)-w(r238)-w(r239)-w(r240)-w(r241)-w(r242)-w(r243)&
             &-w(r244)-w(r245)-w(r246)+w(r252)+w(r266)+w(r280)+w(r294)+w(r308)+w(r322)&
-            &+w(r336)+w(r350)+w(r364)-w(r378)-w(r390)-w(r401)-w(r412)-w(r422)-w(r431)&
-            &-w(r432)-w(r433)-w(r434)-w(r435)-w(r436)-w(r437)-w(r438)-w(r439)+1.125_WP*w(r479)&
-            &+1.125_WP*w(r485)+1.125_WP*w(r491)+1.125_WP*w(r497)+w(r503)
+            &+w(r336)+w(r350)+w(r364)-w(r378)-w(r392)-w(r403)-w(r414)-w(r424)-2.0_WP*w(r433)&
+            &-w(r434)-w(r435)-w(r436)-w(r437)-w(r438)-w(r439)-w(r440)-w(r441)+1.125_WP*w(r481)&
+            &+1.125_WP*w(r487)+1.125_WP*w(r493)+1.125_WP*w(r499)+w(r505)
     rhs(sC24H25GLG) = 0.0_WP+w(r14)+w(r20)+w(r26)+w(r32)+w(r38)+w(r44)+2.0_WP*w(r50)+2.0_WP*w(r56)+2.0_WP*w(r62)&
             &+w(r68)+w(r74)+1.45_WP*w(r82)+1.45_WP*w(r88)+w(r96)+w(r102)-2.0_WP*w(r106)&
             &-2.0_WP*w(r107)-2.0_WP*w(r108)-2.0_WP*w(r109)-2.0_WP*w(r110)+2.0_WP*w(r110)&
@@ -2822,10 +2830,10 @@ contains
             &+0.45_WP*w(r155)+0.45_WP*w(r161)+w(r170)+w(r184)+w(r198)+w(r212)+w(r226)&
             &+w(r240)+w(r254)+w(r268)-w(r275)-w(r276)-w(r277)-w(r278)-w(r279)-w(r280)&
             &-w(r281)-w(r282)-w(r283)-w(r284)-w(r285)-w(r286)-w(r287)-w(r288)+w(r297)&
-            &+w(r311)+w(r325)+w(r339)+w(r353)+w(r367)-w(r381)-w(r393)-w(r404)-w(r415)&
-            &-w(r425)-w(r434)-w(r442)-w(r449)-w(r455)-w(r456)-w(r457)-w(r458)-w(r459)&
-            &-w(r460)+1.125_WP*w(r480)+1.125_WP*w(r486)+1.125_WP*w(r492)+1.125_WP*w(r498)&
-            &+w(r504)
+            &+w(r311)+w(r325)+w(r339)+w(r353)+w(r367)-w(r381)-w(r395)-w(r406)-w(r417)&
+            &-w(r427)-w(r436)-w(r444)-w(r451)-2.0_WP*w(r457)-w(r458)-w(r459)-w(r460)&
+            &-w(r461)-w(r462)+1.125_WP*w(r482)+1.125_WP*w(r488)+1.125_WP*w(r494)+1.125_WP*w(r500)&
+            &+w(r506)
     rhs(sC16H17_TGLG) = 0.0_WP+w(r10)+w(r11)+w(r12)+w(r13)+w(r14)+w(r15)+w(r16)+w(r17)+w(r18)+w(r19)+w(r20)&
             &+w(r21)+2.0_WP*w(r52)+2.0_WP*w(r53)+2.0_WP*w(r54)+2.0_WP*w(r55)+2.0_WP*w(r56)&
             &+2.0_WP*w(r57)+w(r64)+w(r65)+w(r66)+w(r67)+w(r68)+w(r69)+0.1_WP*w(r78)&
@@ -2838,21 +2846,22 @@ contains
             &+0.1_WP*w(r161)+0.1_WP*w(r162)+w(r168)+w(r182)+w(r196)+w(r210)+w(r224)&
             &+w(r238)-w(r247)-w(r248)-w(r249)-w(r250)-w(r251)-w(r252)-w(r253)-w(r254)&
             &-w(r255)-w(r256)-w(r257)-w(r258)-w(r259)-w(r260)+w(r267)+w(r281)+w(r295)&
-            &+w(r309)+w(r323)+w(r337)+w(r351)+w(r365)-w(r379)-w(r391)-w(r402)-w(r413)&
-            &-w(r423)-w(r432)-w(r440)-w(r441)-w(r442)-w(r443)-w(r444)-w(r445)-w(r446)&
-            &-w(r447)+w(r476)+w(r477)+w(r478)+w(r479)+w(r480)+w(r481)+0.875_WP*w(r482)&
-            &+0.875_WP*w(r483)+0.875_WP*w(r484)+0.875_WP*w(r485)+0.875_WP*w(r486)&
-            &+0.875_WP*w(r487)+0.875_WP*w(r488)+0.875_WP*w(r489)+0.875_WP*w(r490)&
-            &+0.875_WP*w(r491)+0.875_WP*w(r492)+0.875_WP*w(r493)
+            &+w(r309)+w(r323)+w(r337)+w(r351)+w(r365)-w(r379)-w(r393)-w(r404)-w(r415)&
+            &-w(r425)-w(r434)-2.0_WP*w(r442)-w(r443)-w(r444)-w(r445)-w(r446)-w(r447)&
+            &-w(r448)-w(r449)+w(r478)+w(r479)+w(r480)+w(r481)+w(r482)+w(r483)+0.875_WP*w(r484)&
+            &+0.875_WP*w(r485)+0.875_WP*w(r486)+0.875_WP*w(r487)+0.875_WP*w(r488)&
+            &+0.875_WP*w(r489)+0.875_WP*w(r490)+0.875_WP*w(r491)+0.875_WP*w(r492)&
+            &+0.875_WP*w(r493)+0.875_WP*w(r494)+0.875_WP*w(r495)
     rhs(sC24H25_TGLG) = 0.0_WP+w(r10)+w(r11)+w(r12)+w(r13)+w(r14)+w(r15)+w(r16)+w(r17)+w(r18)+w(r19)+w(r20)&
             &+w(r21)+w(r78)+w(r79)+w(r80)+w(r81)+w(r82)+w(r83)+w(r84)+w(r85)+w(r86)&
             &+w(r87)+w(r88)+w(r89)-w(r144)-w(r145)-w(r146)-w(r147)-w(r148)-w(r149)&
             &+w(r171)+w(r185)+w(r199)+w(r213)+w(r227)+w(r241)+w(r255)+w(r269)+w(r283)&
             &-w(r289)-w(r290)-w(r291)-w(r292)-w(r293)-w(r294)-w(r295)-w(r296)-w(r297)&
             &-w(r298)-w(r299)-w(r300)-w(r301)-w(r302)+w(r312)+w(r326)+w(r340)+w(r354)&
-            &+w(r368)-w(r382)-w(r394)-w(r405)-w(r416)-w(r426)-w(r435)-w(r443)-w(r450)&
-            &-w(r456)-w(r461)-w(r462)-w(r463)-w(r464)-w(r465)+0.875_WP*w(r476)+0.875_WP*w(r477)&
-            &+0.875_WP*w(r478)+0.875_WP*w(r479)+0.875_WP*w(r480)+0.875_WP*w(r481)
+            &+w(r368)-w(r382)-w(r396)-w(r407)-w(r418)-w(r428)-w(r437)-w(r445)-w(r452)&
+            &-w(r458)-2.0_WP*w(r463)-w(r464)-w(r465)-w(r466)-w(r467)+0.875_WP*w(r478)&
+            &+0.875_WP*w(r479)+0.875_WP*w(r480)+0.875_WP*w(r481)+0.875_WP*w(r482)&
+            &+0.875_WP*w(r483)
     rhs(sC24H23GLG) = 0.0_WP+w(r15)+w(r21)+w(r27)+w(r33)+w(r39)+w(r45)+2.0_WP*w(r51)+2.0_WP*w(r57)+2.0_WP*w(r63)&
             &+w(r69)+w(r75)+1.45_WP*w(r83)+1.45_WP*w(r89)+w(r97)+w(r103)+2.0_WP*w(r111)&
             &-w(r112)-w(r113)-w(r114)-w(r115)-w(r116)-w(r117)+w(r117)-w(r118)-w(r119)&
@@ -2860,41 +2869,41 @@ contains
             &+0.45_WP*w(r156)+0.45_WP*w(r162)+w(r172)+w(r186)+w(r200)+w(r214)+w(r228)&
             &+w(r242)+w(r256)+w(r270)+w(r284)+w(r298)-w(r303)-w(r304)-w(r305)-w(r306)&
             &-w(r307)-w(r308)-w(r309)-w(r310)-w(r311)-w(r312)-w(r313)-w(r314)-w(r315)&
-            &-w(r316)+w(r327)+w(r341)+w(r355)+w(r369)-w(r383)-w(r395)-w(r406)-w(r417)&
-            &-w(r427)-w(r436)-w(r444)-w(r451)-w(r457)-w(r462)-w(r466)-w(r467)-w(r468)&
-            &-w(r469)+1.125_WP*w(r481)+1.125_WP*w(r487)+1.125_WP*w(r493)+1.125_WP*w(r499)&
-            &+w(r505)
+            &-w(r316)+w(r327)+w(r341)+w(r355)+w(r369)-w(r383)-w(r397)-w(r408)-w(r419)&
+            &-w(r429)-w(r438)-w(r446)-w(r453)-w(r459)-w(r464)-2.0_WP*w(r468)-w(r469)&
+            &-w(r470)-w(r471)+1.125_WP*w(r483)+1.125_WP*w(r489)+1.125_WP*w(r495)+1.125_WP*w(r501)&
+            &+w(r507)
     rhs(sC16H15_TGLG) = 0.0_WP+w(r22)+w(r23)+w(r24)+w(r25)+w(r26)+w(r27)+w(r28)+w(r29)+w(r30)+w(r31)+w(r32)&
             &+w(r33)+w(r70)+w(r71)+w(r72)+w(r73)+w(r74)+w(r75)+w(r90)+w(r91)+w(r150)&
             &+w(r169)+w(r183)+w(r197)+w(r211)+w(r225)+w(r239)+w(r253)-w(r261)-w(r262)&
             &-w(r263)-w(r264)-w(r265)-w(r266)-w(r267)-w(r268)-w(r269)-w(r270)-w(r271)&
             &-w(r272)-w(r273)-w(r274)+w(r282)+w(r296)+w(r310)+w(r324)+w(r338)+w(r352)&
-            &+w(r366)-w(r380)-w(r392)-w(r403)-w(r414)-w(r424)-w(r433)-w(r441)-w(r448)&
-            &-w(r449)-w(r450)-w(r451)-w(r452)-w(r453)-w(r454)+w(r476)+w(r477)+w(r478)&
-            &+w(r479)+w(r480)+w(r481)+w(r482)+w(r483)+w(r484)+w(r485)+w(r486)+w(r487)&
-            &+w(r488)+w(r489)+w(r490)+w(r491)+w(r492)+w(r493)+1.875_WP*w(r494)+1.875_WP*w(r495)&
-            &+1.875_WP*w(r496)+1.875_WP*w(r497)+1.875_WP*w(r498)+1.875_WP*w(r499)
+            &+w(r366)-w(r380)-w(r394)-w(r405)-w(r416)-w(r426)-w(r435)-w(r443)-2.0_WP*w(r450)&
+            &-w(r451)-w(r452)-w(r453)-w(r454)-w(r455)-w(r456)+w(r478)+w(r479)+w(r480)&
+            &+w(r481)+w(r482)+w(r483)+w(r484)+w(r485)+w(r486)+w(r487)+w(r488)+w(r489)&
+            &+w(r490)+w(r491)+w(r492)+w(r493)+w(r494)+w(r495)+1.875_WP*w(r496)+1.875_WP*w(r497)&
+            &+1.875_WP*w(r498)+1.875_WP*w(r499)+1.875_WP*w(r500)+1.875_WP*w(r501)
     rhs(sC24H23_TGLG) = 0.0_WP+w(r22)+w(r23)+w(r24)+w(r25)+w(r26)+w(r27)+w(r28)+w(r29)+w(r30)+w(r31)+w(r32)&
             &+w(r33)+w(r90)+w(r91)-w(r150)+w(r173)+w(r187)+w(r201)+w(r215)+w(r229)&
             &+w(r243)+w(r257)+w(r271)+w(r285)+w(r299)+w(r313)-w(r317)-w(r318)-w(r319)&
             &-w(r320)-w(r321)-w(r322)-w(r323)-w(r324)-w(r325)-w(r326)-w(r327)-w(r328)&
-            &-w(r329)-w(r330)+w(r342)+w(r356)+w(r370)-w(r384)-w(r396)-w(r407)-w(r418)&
-            &-w(r428)-w(r437)-w(r445)-w(r452)-w(r458)-w(r463)-w(r467)-w(r470)-w(r471)&
-            &-w(r472)+w(r476)+w(r477)+w(r478)+w(r479)+w(r480)+w(r481)+w(r482)+w(r483)&
-            &+w(r484)+w(r485)+w(r486)+w(r487)+w(r488)+w(r489)+w(r490)+w(r491)+w(r492)&
-            &+w(r493)
+            &-w(r329)-w(r330)+w(r342)+w(r356)+w(r370)-w(r384)-w(r398)-w(r409)-w(r420)&
+            &-w(r430)-w(r439)-w(r447)-w(r454)-w(r460)-w(r465)-w(r469)-2.0_WP*w(r472)&
+            &-w(r473)-w(r474)+w(r478)+w(r479)+w(r480)+w(r481)+w(r482)+w(r483)+w(r484)&
+            &+w(r485)+w(r486)+w(r487)+w(r488)+w(r489)+w(r490)+w(r491)+w(r492)+w(r493)&
+            &+w(r494)+w(r495)
     rhs(sC24H23_AGLG) = 0.0_WP-w(r124)-w(r125)-w(r126)-w(r127)-w(r128)-w(r129)+w(r174)+w(r188)+w(r202)+w(r216)&
             &+w(r230)+w(r244)+w(r258)+w(r272)+w(r286)+w(r300)+w(r314)+w(r328)-w(r331)&
             &-w(r332)-w(r333)-w(r334)-w(r335)-w(r336)-w(r337)-w(r338)-w(r339)-w(r340)&
-            &-w(r341)-w(r342)-w(r343)-w(r344)+w(r357)+w(r371)-w(r385)-w(r397)-w(r408)&
-            &-w(r419)-w(r429)-w(r438)-w(r446)-w(r453)-w(r459)-w(r464)-w(r468)-w(r471)&
-            &-w(r473)-w(r474)
+            &-w(r341)-w(r342)-w(r343)-w(r344)+w(r357)+w(r371)-w(r385)-w(r399)-w(r410)&
+            &-w(r421)-w(r431)-w(r440)-w(r448)-w(r455)-w(r461)-w(r466)-w(r470)-w(r473)&
+            &-2.0_WP*w(r475)-w(r476)
     rhs(sC24H21_AGLG) = 0.0_WP-w(r130)-w(r131)-w(r132)-w(r133)-w(r134)-w(r135)+w(r175)+w(r189)+w(r203)+w(r217)&
             &+w(r231)+w(r245)+w(r259)+w(r273)+w(r287)+w(r301)+w(r315)+w(r329)+w(r343)&
             &-w(r345)-w(r346)-w(r347)-w(r348)-w(r349)-w(r350)-w(r351)-w(r352)-w(r353)&
-            &-w(r354)-w(r355)-w(r356)-w(r357)-w(r358)+w(r372)-w(r386)-w(r398)-w(r409)&
-            &-w(r420)-w(r430)-w(r439)-w(r447)-w(r454)-w(r460)-w(r465)-w(r469)-w(r472)&
-            &-w(r474)-w(r475)
+            &-w(r354)-w(r355)-w(r356)-w(r357)-w(r358)+w(r372)-w(r386)-w(r400)-w(r411)&
+            &-w(r422)-w(r432)-w(r441)-w(r449)-w(r456)-w(r462)-w(r467)-w(r471)-w(r474)&
+            &-w(r476)-2.0_WP*w(r477)
     rhs(sC15H16GLG) = 0.0_WP-w(r7)-w(r176)-w(r190)-w(r204)-w(r218)-w(r232)-w(r246)-w(r260)-w(r274)-w(r288)&
             &-w(r302)-w(r316)-w(r330)-w(r344)-w(r358)+w(r359)+w(r360)+w(r361)+w(r362)&
             &+w(r363)+w(r364)+w(r365)+w(r366)+w(r367)+w(r368)+w(r369)+w(r370)+w(r371)&
@@ -2908,8 +2917,8 @@ contains
             &+w(r176)+w(r190)+w(r204)+w(r218)+w(r232)+w(r246)+w(r260)+w(r274)+w(r288)&
             &+w(r302)+w(r316)+w(r330)+w(r344)+w(r358)-w(r359)-w(r360)-w(r361)-w(r362)&
             &-w(r363)-w(r364)-w(r365)-w(r366)-w(r367)-w(r368)-w(r369)-w(r370)-w(r371)&
-            &-w(r372)-w(r500)-w(r501)-w(r502)-w(r503)-w(r504)-w(r505)-w(r506)-w(r507)&
-            &-w(r508)-w(r509)-w(r510)
+            &-w(r372)-w(r502)-w(r503)-w(r504)-w(r505)-w(r506)-w(r507)-w(r508)-w(r509)&
+            &-w(r510)-w(r511)-w(r512)
     
     return
   end subroutine fill_rhs_matrix
@@ -3602,9 +3611,9 @@ contains
             & +0.1_WP*k(r112)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r124)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r138)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sPXC16H15XPGLG) = 0.0_WP
         jac(sC8H10,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r10)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r11)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -3632,19 +3641,19 @@ contains
             & +0.1_WP*k(r113)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r125)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r139)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r17)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**3.0_WP*1.0E-6_WP&
@@ -3666,14 +3675,14 @@ contains
             & +0.1_WP*k(r114)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r126)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r140)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sPXC16H16GLG) = 0.0_WP +0.1_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -3686,25 +3695,25 @@ contains
             & +0.1_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC8H10,sPXC16H16_TGLG) = 0.0_WP
-        jac(sC8H10,sPXC16H14GLG) = 0.0_WP +0.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC8H10,sPXC16H14GLG) = 0.0_WP +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC8H10,sPXC16H14_AGLG) = 0.0_WP
         jac(sC8H10,sC16H18GLG) = 0.0_WP +1.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -3722,9 +3731,9 @@ contains
             & +0.1_WP*k(r115)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r127)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r141)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sC24H26GLG) = 0.0_WP +1.0_WP*k(r14)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +2.0_WP*k(r50)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
@@ -3741,9 +3750,9 @@ contains
             & +0.1_WP*k(r116)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r128)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r142)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sC16H16GLG) = 0.0_WP +1.0_WP*k(r58)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r59)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r60)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -3761,9 +3770,9 @@ contains
             & +0.1_WP*k(r117)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r129)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r143)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H10,sC16H14GLG) = 0.0_WP
         jac(sC8H10,sC24H22GLG) = 0.0_WP
         jac(sC8H10,sC16H17GLG) = 0.0_WP
@@ -3844,11 +3853,11 @@ contains
             & +1.0_WP*k(r136)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r138)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r144)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.875_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H8,sPXC16H15XPGLG) = 0.0_WP
         jac(sC8H8,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r23)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r28)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -3860,21 +3869,21 @@ contains
             & +1.0_WP*k(r137)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r139)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r145)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H8,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r22)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r23)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r24)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -3890,76 +3899,76 @@ contains
             & +1.0_WP*k(r137)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r140)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r146)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC8H8,sPXC16H16GLG) = 0.0_WP +1.875_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.875_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC8H8,sPXC16H16GLG) = 0.0_WP +1.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC8H8,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r136)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r137)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC8H8,sPXC16H14GLG) = 0.0_WP +2.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC8H8,sPXC16H14GLG) = 0.0_WP +2.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC8H8,sPXC16H14_AGLG) = 0.0_WP
         jac(sC8H8,sC16H18GLG) = 0.0_WP +1.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r31)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r141)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r147)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC8H8,sC24H26GLG) = 0.0_WP +1.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r142)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r148)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC8H8,sC16H16GLG) = 0.0_WP
-        jac(sC8H8,sC24H24GLG) = 0.0_WP +1.0_WP*k(r27)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r33)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r143)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r149)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.875_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +2.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +2.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC8H8,sC24H26GLG) = 0.0_WP +1.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r142)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r148)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC8H8,sC16H16GLG) = 0.0_WP
+        jac(sC8H8,sC24H24GLG) = 0.0_WP +1.0_WP*k(r27)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r33)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r143)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r149)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC8H8,sC16H14GLG) = 0.0_WP
         jac(sC8H8,sC24H22GLG) = 0.0_WP
         jac(sC8H8,sC16H17GLG) = 0.0_WP
@@ -3982,12 +3991,12 @@ contains
         jac(sC8H8,sC24H23_AGLG) = 0.0_WP
         jac(sC8H8,sC24H21_AGLG) = 0.0_WP
         jac(sC8H8,sC15H16GLG) = 0.0_WP
-        jac(sC8H8,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r500)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r501)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r503)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r504)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r505)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC8H8,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r503)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r504)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r505)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r506)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r507)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC6H4,sN2) = 0.0_WP
         jac(sC6H4,sHE) = 0.0_WP
         jac(sC6H4,sPXC16H16XP) = 0.0_WP
@@ -4026,42 +4035,45 @@ contains
         jac(sC6H4,sC3H6) = 0.0_WP
         jac(sC6H4,sC4H8X1) = 0.0_WP
         jac(sC6H4,sPXC16H16XPGLG) = 0.0_WP
-        jac(sC6H4,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r373)*1.0E6_WP*1.0E-6_WP +1.5_WP*k(r376)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC6H4,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r373)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r376)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.5_WP*k(r377)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r380)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r383)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r384)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r385)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +2.0_WP*k(r386)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +0.5_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC6H4,sPXC16H17GLG) = 0.0_WP
         jac(sC6H4,sPXC16H15GLG) = 0.0_WP
-        jac(sC6H4,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r388)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sPXC16H14GLG) = 0.0_WP +1.5_WP*k(r376)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r388)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r410)*1.0E6_WP*1.0E-6_WP +2.0_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.5_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC6H4,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.5_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sPXC16H14_AGLG) = 0.0_WP +1.5_WP*k(r377)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r400)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r411)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r421)*1.0E6_WP*1.0E-6_WP +1.5_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.5_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC6H4,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
             & +0.5_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC6H4,sPXC16H14GLG) = 0.0_WP +1.5_WP*k(r376)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r412)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r421)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.5_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r511)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC6H4,sPXC16H14_AGLG) = 0.0_WP +1.5_WP*k(r377)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r423)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r431)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.5_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r512)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC6H4,sC16H18GLG) = 0.0_WP
         jac(sC6H4,sC24H26GLG) = 0.0_WP
         jac(sC6H4,sC16H16GLG) = 0.0_WP
@@ -4073,37 +4085,37 @@ contains
         jac(sC6H4,sC16H17_TGLG) = 0.0_WP
         jac(sC6H4,sC24H25_TGLG) = 0.0_WP
         jac(sC6H4,sC24H23GLG) = 0.0_WP +1.0_WP*k(r383)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r380)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r384)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r472)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC6H4,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r385)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r419)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r429)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC6H4,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r380)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC6H4,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r384)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +2.0_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC6H4,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r385)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r421)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r431)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC6H4,sC24H21_AGLG) = 0.0_WP +2.0_WP*k(r386)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.5_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.5_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r472)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +3.0_WP*k(r475)*1.0E6_WP*1.0E-6_WP
+            & +1.5_WP*k(r400)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r411)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.5_WP*k(r422)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.5_WP*k(r432)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r456)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r471)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r476)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +3.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC6H4,sC15H16GLG) = 0.0_WP
-        jac(sC6H4,sC15H15_TGLG) = 0.0_WP +0.5_WP*k(r506)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r507)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r508)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r509)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r510)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC6H4,sC15H15_TGLG) = 0.0_WP +0.5_WP*k(r508)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r509)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r510)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r511)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r512)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18,sN2) = 0.0_WP
         jac(sC16H18,sHE) = 0.0_WP
         jac(sC16H18,sPXC16H16XP) = 0.0_WP
@@ -5071,13 +5083,13 @@ contains
         jac(sC7H8,sC2H4) = 0.0_WP
         jac(sC7H8,sC3H6) = 0.0_WP
         jac(sC7H8,sC4H8X1) = 0.0_WP
-        jac(sC7H8,sPXC16H16XPGLG) = 0.0_WP +0.9_WP*k(r78)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r84)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC7H8,sPXC16H16XPGLG) = 0.0_WP +2.25_WP*k(r78)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r84)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r106)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r112)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r124)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5090,15 +5102,15 @@ contains
             & +0.9_WP*k(r155)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r156)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC7H8,sPXC16H15XPGLG) = 0.0_WP
-        jac(sC7H8,sPXC16H17GLG) = 0.0_WP +0.9_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r85)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC7H8,sPXC16H17GLG) = 0.0_WP +2.25_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r85)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r107)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r113)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r125)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5111,14 +5123,14 @@ contains
             & +0.9_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC7H8,sPXC16H15GLG) = 0.0_WP +0.9_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r86)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC7H8,sPXC16H15GLG) = 0.0_WP +2.25_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r86)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r108)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r114)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r126)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5131,19 +5143,19 @@ contains
             & +0.9_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC7H8,sPXC16H16GLG) = 0.0_WP +0.9_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.9_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC7H8,sPXC16H16GLG) = 0.0_WP +2.25_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC7H8,sPXC16H16_TGLG) = 0.0_WP +0.9_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.9_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.9_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -5158,8 +5170,8 @@ contains
             & +0.9_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC7H8,sPXC16H14GLG) = 0.0_WP
         jac(sC7H8,sPXC16H14_AGLG) = 0.0_WP
-        jac(sC7H8,sC16H18GLG) = 0.0_WP +0.9_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC7H8,sC16H18GLG) = 0.0_WP +2.25_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r109)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r115)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r127)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5167,9 +5179,9 @@ contains
             & +0.9_WP*k(r147)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r154)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r160)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC7H8,sC24H26GLG) = 0.0_WP +0.9_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC7H8,sC24H26GLG) = 0.0_WP +2.25_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r110)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r116)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r128)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5177,10 +5189,10 @@ contains
             & +0.9_WP*k(r148)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r155)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r161)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC7H8,sC16H16GLG) = 0.0_WP
-        jac(sC7H8,sC24H24GLG) = 0.0_WP +0.9_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.9_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC7H8,sC24H24GLG) = 0.0_WP +2.25_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r111)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r117)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r129)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5188,7 +5200,7 @@ contains
             & +0.9_WP*k(r149)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r156)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.9_WP*k(r162)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC7H8,sC16H14GLG) = 0.0_WP
         jac(sC7H8,sC24H22GLG) = 0.0_WP
         jac(sC7H8,sC16H17GLG) = 0.0_WP
@@ -5226,12 +5238,12 @@ contains
             & +0.45_WP*k(r129)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC7H8,sC24H21_AGLG) = 0.0_WP
         jac(sC7H8,sC15H16GLG) = 0.0_WP
-        jac(sC7H8,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r500)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r501)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r503)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r504)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r505)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC7H8,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r503)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r504)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r505)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r506)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r507)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC9H10,sN2) = 0.0_WP
         jac(sC9H10,sHE) = 0.0_WP
         jac(sC9H10,sPXC16H16XP) = 0.0_WP
@@ -5574,13 +5586,13 @@ contains
         jac(sC9H12,sC2H4) = 0.0_WP
         jac(sC9H12,sC3H6) = 0.0_WP
         jac(sC9H12,sC4H8X1) = 0.0_WP
-        jac(sC9H12,sPXC16H16XPGLG) = 0.0_WP +0.15_WP*k(r78)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r84)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sPXC16H16XPGLG) = 0.0_WP +0.345_WP*k(r78)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r84)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r106)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r112)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r124)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5594,13 +5606,13 @@ contains
             & +0.15_WP*k(r156)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC9H12,sPXC16H15XPGLG) = 0.0_WP
-        jac(sC9H12,sPXC16H17GLG) = 0.0_WP +0.15_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r85)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sPXC16H17GLG) = 0.0_WP +0.345_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r85)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r107)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r113)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r125)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5613,13 +5625,13 @@ contains
             & +0.15_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC9H12,sPXC16H15GLG) = 0.0_WP +0.15_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r86)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sPXC16H15GLG) = 0.0_WP +0.345_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r86)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r108)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r114)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r126)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5632,18 +5644,18 @@ contains
             & +0.15_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC9H12,sPXC16H16GLG) = 0.0_WP +0.15_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.15_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC9H12,sPXC16H16GLG) = 0.0_WP +0.345_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.345_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC9H12,sPXC16H16_TGLG) = 0.0_WP +0.15_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.15_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.15_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -5658,8 +5670,8 @@ contains
             & +0.15_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC9H12,sPXC16H14GLG) = 0.0_WP
         jac(sC9H12,sPXC16H14_AGLG) = 0.0_WP
-        jac(sC9H12,sC16H18GLG) = 0.0_WP +0.15_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sC16H18GLG) = 0.0_WP +0.345_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r109)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r115)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r127)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5667,8 +5679,8 @@ contains
             & +0.15_WP*k(r147)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r154)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r160)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC9H12,sC24H26GLG) = 0.0_WP +0.15_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sC24H26GLG) = 0.0_WP +0.345_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r110)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r116)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r128)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -5677,8 +5689,8 @@ contains
             & +0.15_WP*k(r155)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.15_WP*k(r161)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC9H12,sC16H16GLG) = 0.0_WP
-        jac(sC9H12,sC24H24GLG) = 0.0_WP +0.15_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.15_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+        jac(sC9H12,sC24H24GLG) = 0.0_WP +0.345_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.345_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.09_WP*k(r111)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r117)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.045_WP*k(r129)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -6387,11 +6399,11 @@ contains
             & -1.0_WP*k(r331)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r345)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r359)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r76)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r163)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r164)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -6407,7 +6419,8 @@ contains
             & +1.0_WP*k(r174)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r175)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r176)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.625_WP*k(r373)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r374)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.625_WP*k(r373)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r374)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r375)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.4375_WP*k(r376)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.4375_WP*k(r377)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -6420,7 +6433,7 @@ contains
             & +2.125_WP*k(r384)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
             & +2.125_WP*k(r385)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & +1.75_WP*k(r386)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.75_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.75_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r9)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -4.0_WP*k(r10)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & -3.0_WP*k(r11)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -6441,8 +6454,8 @@ contains
             & -0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r163)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r164)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r9)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -3.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -6468,8 +6481,8 @@ contains
             & -0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r165)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r166)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H16GLG) = 0.0_WP -6.95_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & -5.5_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -5.5_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -6479,21 +6492,22 @@ contains
             & -1.45_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r177)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r374)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r387)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.625_WP*k(r388)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.625_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +2.0_WP*k(r387)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.625_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.625_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H16_TGLG) = 0.0_WP -0.5_WP*k(r136)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.95_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & -2.5_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -6504,19 +6518,20 @@ contains
             & -0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r191)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r375)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r387)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.625_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.625_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.75_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +2.0_WP*k(r388)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.625_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.625_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r410)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.75_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H14GLG) = 0.0_WP -5.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.5_WP*k(r92)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & -0.5_WP*k(r93)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -6527,37 +6542,39 @@ contains
             & -1.0_WP*k(r98)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r205)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.4375_WP*k(r376)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.625_WP*k(r388)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.625_WP*k(r399)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.25_WP*k(r410)*1.0E6_WP*1.0E-6_WP +1.25_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r412)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.4375_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5625_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.625_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.625_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.25_WP*k(r412)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.25_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.4375_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r421)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5625_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r511)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r104)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r219)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.4375_WP*k(r377)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.625_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.625_WP*k(r400)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.25_WP*k(r411)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.25_WP*k(r421)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r423)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.4375_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.9375_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.5625_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.75_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.625_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.625_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.25_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.25_WP*k(r423)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.4375_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.9375_WP*k(r431)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.5625_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.75_WP*k(r512)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sC16H18GLG) = 0.0_WP -3.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -3.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -0.5_WP*k(r37)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -6593,104 +6610,65 @@ contains
             & +1.0_WP*k(r175)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16XPGLG,sC16H17GLG) = 0.0_WP -1.0_WP*k(r233)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +2.0_WP*k(r378)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r412)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r440)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sC24H25GLG) = 0.0_WP -2.0_WP*k(r106)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r275)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +2.5_WP*k(r381)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r442)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r449)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r138)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r247)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r379)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r423)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r442)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC24H25_TGLG) = 0.0_WP -0.45_WP*k(r144)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r289)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.5_WP*k(r382)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r450)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r456)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC24H23GLG) = 0.0_WP -1.0_WP*k(r112)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r118)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r303)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.125_WP*k(r383)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r468)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.25_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r261)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.625_WP*k(r380)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.4375_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.4375_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r450)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.5_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.75_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r317)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.125_WP*k(r384)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r457)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r138)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r247)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r379)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r448)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC24H25_TGLG) = 0.0_WP -0.45_WP*k(r144)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r289)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.5_WP*k(r382)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.5_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r467)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.25_WP*k(r472)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H16XPGLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r124)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r331)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.125_WP*k(r385)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r463)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC24H23GLG) = 0.0_WP -1.0_WP*k(r112)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r118)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r303)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.125_WP*k(r383)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r397)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.5_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.9375_WP*k(r419)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -6700,33 +6678,77 @@ contains
             & +0.5_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r468)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r471)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP +2.25_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r468)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r261)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.625_WP*k(r380)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4375_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4375_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.5_WP*k(r455)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.75_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r317)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.125_WP*k(r384)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.9375_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.9375_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r472)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H16XPGLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r124)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r331)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.125_WP*k(r385)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r399)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5_WP*k(r410)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.9375_WP*k(r421)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.9375_WP*k(r431)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r440)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r448)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r455)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r470)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r473)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r475)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.25_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sC24H21_AGLG) = 0.0_WP -1.0_WP*k(r130)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r345)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.75_WP*k(r386)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.9375_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5625_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.5625_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.5_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.75_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.25_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.25_WP*k(r472)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.25_WP*k(r474)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r475)*1.0E6_WP*1.0E-6_WP
+            & +1.9375_WP*k(r400)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.9375_WP*k(r411)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5625_WP*k(r422)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.5625_WP*k(r432)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r441)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.5_WP*k(r449)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.75_WP*k(r456)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r467)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r471)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r474)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.25_WP*k(r476)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16XPGLG,sC15H16GLG) = 0.0_WP +1.0_WP*k(r176)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16XPGLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r359)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r500)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.75_WP*k(r506)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r507)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r508)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r509)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.75_WP*k(r510)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.75_WP*k(r508)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r509)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r510)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r511)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.75_WP*k(r512)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sN2) = 0.0_WP
         jac(sPXC16H15XPGLG,sHE) = 0.0_WP
         jac(sPXC16H15XPGLG,sPXC16H16XP) = 0.0_WP
@@ -6803,11 +6825,11 @@ contains
             & +1.0_WP*k(r331)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r345)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r359)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15XPGLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r76)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r77)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r163)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -6824,7 +6846,8 @@ contains
             & -1.0_WP*k(r174)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r175)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r176)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r373)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r374)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -2.0_WP*k(r373)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r374)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r375)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r376)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r377)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
@@ -6837,7 +6860,7 @@ contains
             & -1.0_WP*k(r384)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r385)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r386)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15XPGLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r10)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r28)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -6848,8 +6871,8 @@ contains
             & +0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r163)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r164)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15XPGLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r22)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r28)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -6861,14 +6884,14 @@ contains
             & +0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r165)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r166)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15XPGLG,sPXC16H16GLG) = 0.0_WP +1.45_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.45_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r177)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r374)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r191)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -6877,8 +6900,8 @@ contains
             & +1.0_WP*k(r98)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r205)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r376)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r219)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r377)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sC16H18GLG) = 0.0_WP +2.0_WP*k(r46)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -6923,8 +6946,8 @@ contains
             & -1.0_WP*k(r386)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r176)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15XPGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r359)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r500)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r506)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r508)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sN2) = 0.0_WP
         jac(sPXC16H17GLG,sHE) = 0.0_WP
         jac(sPXC16H17GLG,sPXC16H16XP) = 0.0_WP
@@ -6982,8 +7005,8 @@ contains
             & -1.25_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r177)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r191)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sPXC16H15XPGLG) = 0.0_WP -0.5_WP*k(r77)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r163)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r164)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP
@@ -7079,21 +7102,21 @@ contains
             & -1.0_WP*k(r347)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r360)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r361)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -6.125_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.125_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -6.125_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.125_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sPXC16H15GLG) = 0.0_WP -0.5_WP*k(r9)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -3.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -4.5_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -7142,10 +7165,10 @@ contains
             & +1.0_WP*k(r180)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r193)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r194)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sPXC16H16GLG) = 0.0_WP -1.45_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.75_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -4.2_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7167,18 +7190,18 @@ contains
             & +1.0_WP*k(r188)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r190)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -6.125_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -6.125_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sPXC16H16_TGLG) = 0.0_WP -0.25_WP*k(r137)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -0.45_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.25_WP*k(r157)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7201,11 +7224,11 @@ contains
             & +1.0_WP*k(r202)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r203)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r204)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sPXC16H14GLG) = 0.0_WP -2.5_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r93)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -0.25_WP*k(r98)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7216,13 +7239,13 @@ contains
             & -0.25_WP*k(r103)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r206)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r207)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.125_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.125_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sPXC16H14_AGLG) = 0.0_WP -0.5_WP*k(r105)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r220)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r221)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP
@@ -7238,8 +7261,8 @@ contains
             & +1.0_WP*k(r182)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r195)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r196)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC24H26GLG) = 0.0_WP -3.0_WP*k(r14)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -4.5_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -1.5_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -7252,8 +7275,8 @@ contains
             & +1.0_WP*k(r185)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r198)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r199)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC16H16GLG) = 0.0_WP -2.0_WP*k(r59)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r183)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r197)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sC24H24GLG) = 0.0_WP -3.0_WP*k(r15)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -7270,85 +7293,89 @@ contains
             & +1.0_WP*k(r200)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r201)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r202)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H17GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r71)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r189)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r203)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sC16H17GLG) = 0.0_WP -1.0_WP*k(r234)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r235)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r431)*1.0E6_WP*1.0E-6_WP +2.0_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r433)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r433)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC24H25GLG) = 0.0_WP -2.0_WP*k(r107)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r276)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r277)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r457)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H17GLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r139)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r248)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r249)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +2.0_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r442)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r449)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP +2.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H17GLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r139)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r248)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r249)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r432)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r442)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+            & +2.0_WP*k(r442)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC24H25_TGLG) = 0.0_WP -0.45_WP*k(r145)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r290)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r291)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r450)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r456)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r463)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC24H23GLG) = 0.0_WP -1.0_WP*k(r113)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r119)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r304)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r305)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H17GLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r262)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r263)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r433)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r450)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H17GLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r318)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r319)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H17GLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r125)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r332)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r333)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r438)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r446)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H17GLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r262)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r263)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H17GLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r318)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r319)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H17GLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r125)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r332)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r333)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r440)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r448)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sC24H21_AGLG) = 0.0_WP -1.0_WP*k(r131)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r346)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r347)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H17GLG,sC15H16GLG) = 0.0_WP +1.0_WP*k(r190)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r204)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H17GLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r360)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r361)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r501)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r507)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r508)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r503)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sN2) = 0.0_WP
         jac(sPXC16H15GLG,sHE) = 0.0_WP
         jac(sPXC16H15GLG,sPXC16H16XP) = 0.0_WP
@@ -7428,8 +7455,8 @@ contains
             & -1.25_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r205)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r219)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r76)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -0.5_WP*k(r77)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r165)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -7487,10 +7514,10 @@ contains
             & +1.0_WP*k(r207)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r220)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r221)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sPXC16H15GLG) = 0.0_WP -0.5_WP*k(r9)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.5_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -7588,21 +7615,21 @@ contains
             & -1.0_WP*k(r349)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r362)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r363)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.125_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.125_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.125_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.125_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sPXC16H16GLG) = 0.0_WP +3.0_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +3.0_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.45_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7618,17 +7645,17 @@ contains
             & -1.0_WP*k(r179)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r180)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r374)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.125_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sPXC16H16_TGLG) = 0.0_WP -0.25_WP*k(r137)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7645,10 +7672,10 @@ contains
             & -1.0_WP*k(r193)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r194)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r375)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r410)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sPXC16H14GLG) = 0.0_WP +2.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.5_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r92)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -7677,18 +7704,18 @@ contains
             & +1.0_WP*k(r216)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r217)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r218)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r412)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.125_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r511)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sPXC16H14_AGLG) = 0.0_WP -0.5_WP*k(r105)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r219)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r220)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -7704,11 +7731,11 @@ contains
             & +1.0_WP*k(r230)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r231)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r232)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r423)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r512)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC16H18GLG) = 0.0_WP -1.5_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -3.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -4.5_WP*k(r31)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -7725,8 +7752,8 @@ contains
             & +1.0_WP*k(r210)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r223)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r224)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC24H26GLG) = 0.0_WP -1.5_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -3.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -4.5_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -7743,8 +7770,8 @@ contains
             & +1.0_WP*k(r213)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r226)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r227)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC16H16GLG) = 0.0_WP -2.0_WP*k(r60)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r211)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r225)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sC24H24GLG) = 0.0_WP -1.5_WP*k(r21)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -7765,81 +7792,50 @@ contains
             & +1.0_WP*k(r228)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r229)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r230)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H15GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r72)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r217)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r231)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sC16H17GLG) = 0.0_WP -1.0_WP*k(r236)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r237)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r412)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r433)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC24H25GLG) = 0.0_WP -2.0_WP*k(r108)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r278)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r279)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r449)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r140)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r250)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r251)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r423)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC24H25_TGLG) = 0.0_WP -0.45_WP*k(r146)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r292)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r293)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r450)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC24H23GLG) = 0.0_WP -1.0_WP*k(r114)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r120)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r306)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r307)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r457)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP +2.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r468)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H15GLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r264)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r265)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r433)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r450)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H15GLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r320)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r321)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r463)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r467)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP +2.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H15GLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r126)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r334)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r335)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r397)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r438)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7847,20 +7843,54 @@ contains
             & +2.0_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r468)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r471)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP
+            & +2.0_WP*k(r468)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H15GLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r264)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r265)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r450)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H15GLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r320)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r321)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r472)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +2.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H15GLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r126)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r334)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r335)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r410)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r440)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r448)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r455)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r461)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r466)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r470)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r473)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r475)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H15GLG,sC24H21_AGLG) = 0.0_WP -1.0_WP*k(r132)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r348)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r349)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & +2.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +2.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +2.0_WP*k(r441)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r449)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r462)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +2.0_WP*k(r467)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sC15H16GLG) = 0.0_WP +1.0_WP*k(r218)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r232)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H15GLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r362)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r363)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r504)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r511)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r512)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sN2) = 0.0_WP
         jac(sPXC16H16GLG,sHE) = 0.0_WP
         jac(sPXC16H16GLG,sPXC16H16XP) = 0.0_WP
@@ -7910,8 +7940,8 @@ contains
             & +1.0_WP*k(r93)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r177)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r163)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r374)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r11)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r17)*1.0E6_WP*3.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -7957,16 +7987,16 @@ contains
             & +1.0_WP*k(r332)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r346)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r360)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r17)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**3.0_WP*1.0E-6_WP +1.0_WP*k(r23)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r29)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r35)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -7982,14 +8012,14 @@ contains
             & +0.45_WP*k(r158)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r179)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r180)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sPXC16H16GLG) = 0.0_WP -5.0_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & -5.0_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -5.0_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -8017,84 +8047,85 @@ contains
             & -1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r190)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r374)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r387)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r388)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -5.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -2.0_WP*k(r387)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -5.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -5.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r158)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r192)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r387)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r93)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r99)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r206)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r388)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r220)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r220)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC16H18GLG) = 0.0_WP +2.0_WP*k(r47)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -5.0_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -5.0_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r181)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r182)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sC24H26GLG) = 0.0_WP +2.0_WP*k(r53)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -5.0_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -5.0_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r184)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r185)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sC16H16GLG) = 0.0_WP +2.0_WP*k(r59)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r183)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r65)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -5.0_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -5.0_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r186)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r187)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r188)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -5.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & -5.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16GLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H16GLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r71)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r189)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r234)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r234)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC24H25GLG) = 0.0_WP +2.0_WP*k(r107)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r276)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r139)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r248)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC24H25_TGLG) = 0.0_WP +0.45_WP*k(r145)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r290)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r113)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r119)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r304)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r262)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r318)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r125)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r332)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r397)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r262)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r318)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r125)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r332)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r131)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r346)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r400)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16GLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r190)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r360)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r501)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r507)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r360)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r503)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16_TGLG,sN2) = 0.0_WP
         jac(sPXC16H16_TGLG,sHE) = 0.0_WP
         jac(sPXC16H16_TGLG,sPXC16H16XP) = 0.0_WP
@@ -8303,7 +8334,7 @@ contains
             & +2.0_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +2.0_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r178)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r387)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16_TGLG,sPXC16H16_TGLG) = 0.0_WP -1.0_WP*k(r136)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r137)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.0_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -8333,27 +8364,28 @@ contains
             & -1.0_WP*k(r203)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r204)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r375)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r387)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -2.0_WP*k(r388)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r410)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H16_TGLG,sPXC16H14GLG) = 0.0_WP +2.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +2.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r207)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r104)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r105)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r221)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r400)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16_TGLG,sC16H18GLG) = 0.0_WP +3.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +3.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +3.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -8394,17 +8426,17 @@ contains
             & -1.0_WP*k(r202)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16_TGLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H16_TGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r203)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r235)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r277)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r249)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r291)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r305)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r263)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r319)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r333)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r347)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r235)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r277)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r249)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r291)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r305)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r263)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r319)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r333)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r410)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r347)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r411)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H16_TGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r204)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H16_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r361)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r508)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H16_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r361)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sN2) = 0.0_WP
         jac(sPXC16H14GLG,sHE) = 0.0_WP
         jac(sPXC16H14GLG,sPXC16H16XP) = 0.0_WP
@@ -8456,8 +8488,8 @@ contains
             & -1.0_WP*k(r98)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r205)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r165)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r376)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r12)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r18)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -8475,14 +8507,14 @@ contains
             & +0.45_WP*k(r159)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r206)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r207)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r18)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r24)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -8528,26 +8560,26 @@ contains
             & +1.0_WP*k(r334)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r348)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r362)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sPXC16H16GLG) = 0.0_WP +1.45_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.45_WP*k(r86)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r179)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r388)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r159)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r193)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sPXC16H14GLG) = 0.0_WP -4.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -4.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r92)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -8577,74 +8609,75 @@ contains
             & -1.0_WP*k(r217)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r218)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r376)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r388)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r410)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r412)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -4.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H14GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r222)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r411)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r412)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r421)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -4.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -4.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r511)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H14GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r222)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC16H18GLG) = 0.0_WP +2.0_WP*k(r48)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r95)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r101)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r209)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r210)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sC24H26GLG) = 0.0_WP +2.0_WP*k(r54)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r96)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r102)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r212)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r213)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sC16H16GLG) = 0.0_WP +2.0_WP*k(r60)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r211)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r66)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r97)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r103)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r214)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r215)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r216)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -4.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -3.0_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & -4.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -3.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14GLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H14GLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r72)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r217)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r236)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r412)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r236)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC24H25GLG) = 0.0_WP +2.0_WP*k(r108)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r278)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r140)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r250)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC24H25_TGLG) = 0.0_WP +0.45_WP*k(r146)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r292)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r114)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r120)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r306)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r264)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r320)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r126)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r334)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r419)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r264)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r320)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r126)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r334)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r421)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r132)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r348)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14GLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r218)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r362)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r362)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r504)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r511)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14_AGLG,sN2) = 0.0_WP
         jac(sPXC16H14_AGLG,sHE) = 0.0_WP
         jac(sPXC16H14_AGLG,sPXC16H16XP) = 0.0_WP
@@ -8704,9 +8737,9 @@ contains
             & +1.0_WP*k(r335)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r349)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r363)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r180)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r389)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H14_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r194)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sPXC16H14_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r208)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H14_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r180)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H14_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r194)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sPXC16H14_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r208)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14_AGLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r104)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r105)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r219)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -8724,19 +8757,20 @@ contains
             & -1.0_WP*k(r231)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r232)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r377)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r389)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r400)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r411)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r421)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r423)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r423)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r431)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r512)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sPXC16H14_AGLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r223)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r224)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14_AGLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r226)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -8747,17 +8781,17 @@ contains
             & -1.0_WP*k(r230)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14_AGLG,sC16H14GLG) = 0.0_WP
         jac(sPXC16H14_AGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r231)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r237)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r279)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r251)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r423)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r293)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r307)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r265)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r321)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r335)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r429)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r349)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r237)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r279)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r251)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r293)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r307)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r429)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r265)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r321)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r335)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r431)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r349)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r432)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sPXC16H14_AGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r232)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sPXC16H14_AGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r363)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sPXC16H14_AGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r363)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r512)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18GLG,sN2) = 0.0_WP
         jac(sC16H18GLG,sHE) = 0.0_WP
         jac(sC16H18GLG,sPXC16H16XP) = 0.0_WP
@@ -8804,7 +8838,7 @@ contains
             & -0.45_WP*k(r154)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r233)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r247)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r167)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r168)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r13)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r19)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -8818,13 +8852,13 @@ contains
             & +1.0_WP*k(r235)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r248)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r249)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r19)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -1.0_WP*k(r25)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r31)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -8838,20 +8872,20 @@ contains
             & +1.0_WP*k(r237)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r250)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r251)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sPXC16H16GLG) = 0.0_WP -1.45_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.45_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r181)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r182)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18GLG,sPXC16H16_TGLG) = 0.0_WP -0.45_WP*k(r154)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -0.45_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r195)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
@@ -8860,8 +8894,8 @@ contains
             & -1.0_WP*k(r101)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r209)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r210)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18GLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r223)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r224)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r1)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -8920,17 +8954,17 @@ contains
             & -1.0_WP*k(r351)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r364)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r365)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r50)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -2.0_WP*k(r55)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r240)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r241)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r254)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r255)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sC16H16GLG) = 0.0_WP -2.0_WP*k(r61)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r239)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r253)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18GLG,sC24H24GLG) = 0.0_WP -1.0_WP*k(r51)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r67)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -8940,7 +8974,7 @@ contains
             & +1.0_WP*k(r256)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r257)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r258)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sC16H14GLG) = 0.0_WP
         jac(sC16H18GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r73)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r245)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r259)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
@@ -8987,7 +9021,7 @@ contains
             & -1.0_WP*k(r351)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H18GLG,sC15H16GLG) = 0.0_WP +1.0_WP*k(r246)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r260)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H18GLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r364)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r365)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r503)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r505)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H26GLG,sN2) = 0.0_WP
         jac(sC24H26GLG,sHE) = 0.0_WP
         jac(sC24H26GLG,sPXC16H16XP) = 0.0_WP
@@ -9034,7 +9068,7 @@ contains
             & -0.45_WP*k(r155)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r275)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r289)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r170)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r171)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r14)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r20)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -9048,13 +9082,13 @@ contains
             & +1.0_WP*k(r277)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r290)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r291)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r20)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -1.0_WP*k(r26)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r32)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -9068,20 +9102,20 @@ contains
             & +1.0_WP*k(r279)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r292)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r293)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sPXC16H16GLG) = 0.0_WP -1.45_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.45_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r184)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r185)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H26GLG,sPXC16H16_TGLG) = 0.0_WP -0.45_WP*k(r155)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -0.45_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r198)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
@@ -9090,15 +9124,15 @@ contains
             & -1.0_WP*k(r102)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r212)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r213)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H26GLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r226)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r227)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sC16H18GLG) = 0.0_WP -2.0_WP*k(r50)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -2.0_WP*k(r55)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r280)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r281)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r294)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r295)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r4)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r14)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -1.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -9156,11 +9190,11 @@ contains
             & -1.0_WP*k(r354)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r367)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r368)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sC16H16GLG) = 0.0_WP -2.0_WP*k(r62)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r282)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r296)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H26GLG,sC24H24GLG) = 0.0_WP -2.0_WP*k(r57)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r68)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9170,7 +9204,7 @@ contains
             & +1.0_WP*k(r298)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r299)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r300)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sC16H14GLG) = 0.0_WP
         jac(sC24H26GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r74)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r287)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r301)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
@@ -9216,7 +9250,7 @@ contains
             & -1.0_WP*k(r354)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H26GLG,sC15H16GLG) = 0.0_WP +1.0_WP*k(r288)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r302)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H26GLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r367)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r368)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r504)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r506)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H16GLG,sN2) = 0.0_WP
         jac(sC16H16GLG,sHE) = 0.0_WP
         jac(sC16H16GLG,sPXC16H16XP) = 0.0_WP
@@ -9264,9 +9298,9 @@ contains
             & +2.0_WP*k(r106)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r118)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r261)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r169)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r59)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -9279,19 +9313,19 @@ contains
             & +1.0_WP*k(r119)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r262)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r263)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r60)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -9303,14 +9337,14 @@ contains
             & +1.0_WP*k(r120)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r264)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r265)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9324,25 +9358,25 @@ contains
             & +1.0_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r183)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H16GLG,sPXC16H16_TGLG) = 0.0_WP -1.0_WP*k(r197)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H16GLG,sPXC16H14GLG) = 0.0_WP -1.0_WP*k(r211)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H16GLG,sPXC16H14GLG) = 0.0_WP -1.0_WP*k(r211)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H16GLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r225)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r61)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -9350,18 +9384,18 @@ contains
             & +1.0_WP*k(r121)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r266)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r267)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r62)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +2.0_WP*k(r110)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r122)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r268)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r269)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sC16H16GLG) = 0.0_WP -1.0_WP*k(r2)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r58)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r59)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r60)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9389,9 +9423,9 @@ contains
             & +1.0_WP*k(r270)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r271)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r272)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H16GLG,sC16H14GLG) = 0.0_WP
         jac(sC16H16GLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r273)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H16GLG,sC16H17GLG) = 0.0_WP -1.0_WP*k(r239)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP
@@ -9489,9 +9523,9 @@ contains
             & +1.0_WP*k(r303)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r317)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r331)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r172)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r173)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r174)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r15)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9520,19 +9554,19 @@ contains
             & +1.0_WP*k(r319)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r332)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r333)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r21)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & -1.0_WP*k(r27)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r33)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -9560,15 +9594,15 @@ contains
             & +1.0_WP*k(r321)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r334)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r335)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9584,18 +9618,18 @@ contains
             & -1.0_WP*k(r186)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r187)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r188)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +0.125_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H24GLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9616,13 +9650,13 @@ contains
             & -1.0_WP*k(r214)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r215)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r216)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H24GLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r228)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r229)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r230)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sC16H18GLG) = 0.0_WP -2.0_WP*k(r51)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r67)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
@@ -9636,9 +9670,9 @@ contains
             & +1.0_WP*k(r323)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r336)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r337)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sC24H26GLG) = 0.0_WP -2.0_WP*k(r57)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r68)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -9650,9 +9684,9 @@ contains
             & +1.0_WP*k(r326)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r339)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r340)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sC16H16GLG) = 0.0_WP -2.0_WP*k(r63)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r310)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r324)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r338)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
@@ -9727,11 +9761,11 @@ contains
             & -1.0_WP*k(r369)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r370)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r371)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.125_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H24GLG,sC16H14GLG) = 0.0_WP
         jac(sC24H24GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r75)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r315)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r329)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9799,7 +9833,7 @@ contains
             & +1.0_WP*k(r344)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H24GLG,sC15H15_TGLG) = 0.0_WP -1.0_WP*k(r369)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r370)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r371)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r505)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r507)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H14GLG,sN2) = 0.0_WP
         jac(sC16H14GLG,sHE) = 0.0_WP
         jac(sC16H14GLG,sPXC16H16XP) = 0.0_WP
@@ -9859,10 +9893,10 @@ contains
             & +1.0_WP*k(r112)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r118)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r124)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r130)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.4705882_WP*k(r130)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H14GLG,sPXC16H15XPGLG) = 0.0_WP
         jac(sC16H14GLG,sPXC16H17GLG) = 0.0_WP +0.2352941_WP*k(r35)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r40)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -9886,15 +9920,15 @@ contains
             & +1.0_WP*k(r113)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r119)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r125)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r131)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.4705882_WP*k(r131)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H14GLG,sPXC16H15GLG) = 0.0_WP +0.2352941_WP*k(r34)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r35)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r36)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -9922,26 +9956,26 @@ contains
             & +1.0_WP*k(r114)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r120)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r126)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r132)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H14GLG,sPXC16H16GLG) = 0.0_WP +0.875_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +1.4705882_WP*k(r132)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H14GLG,sPXC16H16GLG) = 0.0_WP +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H14GLG,sPXC16H16_TGLG) = 0.0_WP
         jac(sC16H14GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -9957,18 +9991,18 @@ contains
             & +0.2352941_WP*k(r101)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r102)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r103)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H14GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r104)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r105)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H14GLG,sC16H18GLG) = 0.0_WP +0.2352941_WP*k(r37)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -9981,10 +10015,10 @@ contains
             & +1.0_WP*k(r115)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r121)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r127)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r133)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.4705882_WP*k(r133)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H14GLG,sC24H26GLG) = 0.0_WP +0.2352941_WP*k(r38)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r44)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r62)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -9995,10 +10029,10 @@ contains
             & +1.0_WP*k(r116)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r122)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r128)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r134)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.4705882_WP*k(r134)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H14GLG,sC16H16GLG) = 0.0_WP +0.2352941_WP*k(r58)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r59)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r60)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10020,10 +10054,10 @@ contains
             & +1.0_WP*k(r117)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +0.2352941_WP*k(r123)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r129)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.2352941_WP*k(r135)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.4705882_WP*k(r135)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H14GLG,sC16H14GLG) = 0.0_WP -1.0_WP*k(r3)*1.0E6_WP*1.0E-6_WP
         jac(sC16H14GLG,sC24H22GLG) = 0.0_WP +0.2352941_WP*k(r70)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.2352941_WP*k(r71)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10055,12 +10089,12 @@ contains
             & +1.0_WP*k(r127)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r128)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r129)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H14GLG,sC24H21_AGLG) = 0.0_WP +0.2352941_WP*k(r130)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.2352941_WP*k(r131)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.2352941_WP*k(r132)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.2352941_WP*k(r133)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.2352941_WP*k(r134)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.2352941_WP*k(r135)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H14GLG,sC24H21_AGLG) = 0.0_WP +1.4705882_WP*k(r130)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4705882_WP*k(r131)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4705882_WP*k(r132)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4705882_WP*k(r133)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4705882_WP*k(r134)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.4705882_WP*k(r135)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H14GLG,sC15H16GLG) = 0.0_WP
         jac(sC16H14GLG,sC15H15_TGLG) = 0.0_WP
         jac(sC24H22GLG,sN2) = 0.0_WP
@@ -10102,77 +10136,77 @@ contains
         jac(sC24H22GLG,sC4H8X1) = 0.0_WP
         jac(sC24H22GLG,sPXC16H16XPGLG) = 0.0_WP -1.0_WP*k(r70)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r90)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r345)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sPXC16H15XPGLG) = 0.0_WP -1.0_WP*k(r175)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sPXC16H17GLG) = 0.0_WP -1.0_WP*k(r71)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r346)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r347)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r72)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r91)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r348)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r349)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H22GLG,sPXC16H16GLG) = 0.0_WP -1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +0.125_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H22GLG,sPXC16H16GLG) = 0.0_WP -1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +0.125_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H22GLG,sPXC16H16_TGLG) = 0.0_WP -1.0_WP*k(r203)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r217)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & +0.125_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H22GLG,sPXC16H14_AGLG) = 0.0_WP -1.0_WP*k(r231)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r73)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r350)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r351)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r74)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r353)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r354)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sC16H16GLG) = 0.0_WP +1.0_WP*k(r352)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H22GLG,sC24H24GLG) = 0.0_WP -1.0_WP*k(r75)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r355)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r356)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r357)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +0.125_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H22GLG,sC16H14GLG) = 0.0_WP
         jac(sC24H22GLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r6)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r70)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r71)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10272,8 +10306,8 @@ contains
             & +0.45_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r234)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r235)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r19)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r25)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r31)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -10284,25 +10318,25 @@ contains
             & +0.45_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r236)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r237)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sPXC16H16GLG) = 0.0_WP +1.45_WP*k(r81)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.45_WP*k(r87)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r181)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r390)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r154)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r160)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r195)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r401)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r95)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r101)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r209)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r412)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r223)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r223)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sC16H18GLG) = 0.0_WP +1.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
@@ -10342,11 +10376,11 @@ contains
             & +1.0_WP*k(r336)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r350)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r364)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sC24H26GLG) = 0.0_WP +2.0_WP*k(r55)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r240)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r241)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC16H16GLG) = 0.0_WP +2.0_WP*k(r61)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r239)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
@@ -10370,35 +10404,36 @@ contains
             & -1.0_WP*k(r245)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r246)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r378)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r390)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r401)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r412)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r431)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r433)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r433)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17GLG,sC24H25GLG) = 0.0_WP +2.0_WP*k(r109)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r280)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r141)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r252)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r432)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC24H25_TGLG) = 0.0_WP +0.45_WP*k(r147)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r294)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r115)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r121)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r308)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r266)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r433)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r322)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r127)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r336)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r438)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r266)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r322)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r127)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r336)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r440)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r133)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r350)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17GLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r246)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r364)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r503)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r364)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r505)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sN2) = 0.0_WP
         jac(sC24H25GLG,sHE) = 0.0_WP
         jac(sC24H25GLG,sPXC16H16XP) = 0.0_WP
@@ -10455,8 +10490,8 @@ contains
             & +0.45_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r276)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r277)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r20)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r26)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r32)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -10468,25 +10503,25 @@ contains
             & +0.45_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r278)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r279)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sPXC16H16GLG) = 0.0_WP +1.45_WP*k(r82)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.45_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r184)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r155)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r198)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r96)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r102)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r212)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r226)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r226)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sC16H18GLG) = 0.0_WP +2.0_WP*k(r50)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -2.0_WP*k(r109)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r280)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r281)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
@@ -10529,11 +10564,11 @@ contains
             & +1.0_WP*k(r339)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r353)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r367)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sC16H16GLG) = 0.0_WP +2.0_WP*k(r62)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r282)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r68)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -2.0_WP*k(r111)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r284)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10541,7 +10576,7 @@ contains
             & -1.0_WP*k(r286)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sC16H14GLG) = 0.0_WP
         jac(sC24H25GLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r74)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r287)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r240)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r240)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sC24H25GLG) = 0.0_WP -2.0_WP*k(r106)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.0_WP*k(r107)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -2.0_WP*k(r108)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10563,33 +10598,34 @@ contains
             & -1.0_WP*k(r287)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r288)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r381)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r442)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r449)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r457)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r457)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r142)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r254)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r442)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25GLG,sC24H25_TGLG) = 0.0_WP +0.45_WP*k(r148)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r297)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r456)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r116)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r122)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r311)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r457)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r268)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r325)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r128)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r339)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r268)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r325)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r128)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r339)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r461)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r134)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r353)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25GLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r288)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r367)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r504)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r367)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r506)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sN2) = 0.0_WP
         jac(sC16H17_TGLG,sHE) = 0.0_WP
         jac(sC16H17_TGLG,sPXC16H16XP) = 0.0_WP
@@ -10653,9 +10689,9 @@ contains
             & +0.1_WP*k(r156)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.1_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r247)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r168)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r379)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r10)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r11)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -10689,19 +10725,19 @@ contains
             & +0.1_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r248)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r249)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r17)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**3.0_WP*1.0E-6_WP&
@@ -10729,14 +10765,14 @@ contains
             & +0.1_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r250)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r251)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sPXC16H16GLG) = 0.0_WP +0.1_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10750,19 +10786,19 @@ contains
             & +0.1_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r182)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r391)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r393)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sPXC16H16_TGLG) = 0.0_WP +0.1_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10776,15 +10812,15 @@ contains
             & +0.1_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r196)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r402)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H17_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r210)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r413)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r224)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r423)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r404)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H17_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r210)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r415)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r224)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r425)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sC16H18GLG) = 0.0_WP +1.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +2.0_WP*k(r55)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
@@ -10810,9 +10846,9 @@ contains
             & +1.0_WP*k(r337)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r351)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r365)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sC24H26GLG) = 0.0_WP +1.0_WP*k(r14)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +2.0_WP*k(r52)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10830,9 +10866,9 @@ contains
             & +0.1_WP*k(r161)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r254)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r255)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sC16H16GLG) = 0.0_WP -1.0_WP*k(r253)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r15)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r21)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -10852,13 +10888,13 @@ contains
             & -1.0_WP*k(r256)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r257)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r258)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sC16H14GLG) = 0.0_WP
         jac(sC16H17_TGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r259)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r238)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H17_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r281)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r442)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r238)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r434)*1.0E6_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H17_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r281)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sC16H17_TGLG) = 0.0_WP -1.0_WP*k(r138)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r139)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r140)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10880,18 +10916,19 @@ contains
             & -1.0_WP*k(r259)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r260)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r379)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r391)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r402)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r413)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r423)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r432)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r442)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r393)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r404)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r415)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r425)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r434)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r442)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H17_TGLG,sC24H25_TGLG) = 0.0_WP +0.1_WP*k(r144)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r145)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r146)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -10899,12 +10936,12 @@ contains
             & +0.1_WP*k(r148)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.1_WP*k(r149)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r295)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r309)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r267)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r323)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r337)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r446)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H17_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r351)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r309)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r446)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r267)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r323)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r337)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r448)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H17_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r351)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r449)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r260)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H17_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r365)*1.0E6_WP*1.0E-6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sN2) = 0.0_WP
@@ -10960,7 +10997,7 @@ contains
             & +1.0_WP*k(r84)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r144)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r289)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r171)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r382)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r10)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r11)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -10984,12 +11021,12 @@ contains
             & -1.0_WP*k(r145)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r290)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r291)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r12)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r16)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r17)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**3.0_WP*1.0E-6_WP&
@@ -11007,7 +11044,7 @@ contains
             & -1.0_WP*k(r146)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r292)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r293)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11021,16 +11058,16 @@ contains
             & +1.0_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r185)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +0.875_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r199)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r213)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r227)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +0.875_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +0.875_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r199)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r213)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r227)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sC16H18GLG) = 0.0_WP +1.0_WP*k(r13)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r19)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -11038,7 +11075,7 @@ contains
             & -1.0_WP*k(r147)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r294)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r295)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sC24H26GLG) = 0.0_WP +1.0_WP*k(r14)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r20)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -11059,7 +11096,7 @@ contains
             & +1.0_WP*k(r340)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r354)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r368)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sC16H16GLG) = 0.0_WP -1.0_WP*k(r296)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25_TGLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r15)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r21)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
@@ -11069,12 +11106,12 @@ contains
             & -1.0_WP*k(r298)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r299)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r300)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +0.875_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
+            & +0.875_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sC16H14GLG) = 0.0_WP
         jac(sC24H25_TGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r301)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r241)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r283)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r255)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r241)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r283)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r255)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H25_TGLG,sC24H25_TGLG) = 0.0_WP -1.0_WP*k(r144)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r145)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r146)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11096,23 +11133,24 @@ contains
             & -1.0_WP*k(r301)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r302)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r382)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r450)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r456)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r463)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r312)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r269)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r450)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H25_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r326)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r463)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r340)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H25_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r354)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r463)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r312)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r269)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H25_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r326)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r340)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r466)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H25_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r354)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r467)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25_TGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r302)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H25_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r368)*1.0E6_WP*1.0E-6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sN2) = 0.0_WP
@@ -11173,8 +11211,8 @@ contains
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r304)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r305)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r21)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP&
             & +1.0_WP*k(r27)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r33)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -11187,25 +11225,25 @@ contains
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r306)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r307)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sPXC16H16GLG) = 0.0_WP +1.45_WP*k(r83)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.45_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r186)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r395)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23GLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r156)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r200)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r406)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r97)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r103)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r214)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r417)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r228)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r427)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H23GLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r228)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC16H18GLG) = 0.0_WP +2.0_WP*k(r51)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r115)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r121)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r308)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11255,20 +11293,20 @@ contains
             & +1.0_WP*k(r341)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r355)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r369)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.125_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.125_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.125_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.125_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC16H14GLG) = 0.0_WP
         jac(sC24H23GLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r75)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP -1.0_WP*k(r315)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r242)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r436)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23GLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r242)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC24H25GLG) = 0.0_WP +2.0_WP*k(r111)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r284)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r457)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r143)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r256)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r444)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC24H25_TGLG) = 0.0_WP +0.45_WP*k(r149)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r298)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23GLG,sC24H23GLG) = 0.0_WP -1.0_WP*k(r112)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r113)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r114)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11296,26 +11334,27 @@ contains
             & -1.0_WP*k(r315)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r316)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r383)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r395)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r406)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r417)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r427)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r436)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r444)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r457)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r468)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r270)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r327)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r467)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r397)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r419)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r429)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r438)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r446)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r468)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23GLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r270)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23GLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r327)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23GLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r129)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r341)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r468)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r470)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23GLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r135)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP +1.0_WP*k(r355)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r471)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23GLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r316)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r369)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r505)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H23GLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r369)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP +1.0_WP*k(r507)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H15_TGLG,sN2) = 0.0_WP
         jac(sC16H15_TGLG,sHE) = 0.0_WP
         jac(sC16H15_TGLG,sPXC16H16XP) = 0.0_WP
@@ -11363,10 +11402,10 @@ contains
             & +1.0_WP*k(r70)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r90)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r261)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r169)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r380)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r23)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r28)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -11379,20 +11418,20 @@ contains
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r262)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r263)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r22)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r23)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r24)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -11409,69 +11448,69 @@ contains
             & +1.0_WP*k(r91)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r264)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r265)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r496)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H15_TGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r183)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r392)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r197)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r403)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r498)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H15_TGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r183)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r394)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r197)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r405)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r211)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r414)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r494)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r495)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r225)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r424)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r416)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r496)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r497)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r498)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r225)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r426)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sC16H18GLG) = 0.0_WP +1.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r31)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r73)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r266)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r267)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r497)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sC24H26GLG) = 0.0_WP +1.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r74)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r268)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r269)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r498)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sC16H16GLG) = 0.0_WP +1.0_WP*k(r169)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r183)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r197)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11492,10 +11531,10 @@ contains
             & -1.0_WP*k(r270)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r271)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r272)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.875_WP*k(r499)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.875_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sC16H14GLG) = 0.0_WP
         jac(sC16H15_TGLG,sC24H22GLG) = 0.0_WP +1.0_WP*k(r70)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r71)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11504,11 +11543,11 @@ contains
             & +1.0_WP*k(r74)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r75)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r273)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r239)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r433)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H15_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r282)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r449)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r253)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC16H15_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r296)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r450)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r310)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r239)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r435)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H15_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r282)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r451)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r253)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r443)*1.0E6_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC16H15_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r296)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r310)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H15_TGLG,sC16H15_TGLG) = 0.0_WP -1.0_WP*k(r261)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r262)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r263)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -11524,22 +11563,23 @@ contains
             & -1.0_WP*k(r273)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r274)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r380)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r392)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r403)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r414)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r424)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r433)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r450)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r394)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r405)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r416)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r426)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r435)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r443)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r450)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r451)*1.0E6_WP*1.0E-6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC16H15_TGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r150)*1.0E6_WP*1.0E-6_WP +1.0_WP*k(r324)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r338)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC16H15_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r352)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r338)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r455)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC16H15_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r352)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r456)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H15_TGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r274)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC16H15_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r366)*1.0E6_WP*1.0E-6_WP*(c(sC16H16GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sN2) = 0.0_WP
@@ -11588,9 +11628,9 @@ contains
             & +1.0_WP*k(r28)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r90)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r317)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r173)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r384)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sPXC16H17GLG) = 0.0_WP +1.0_WP*k(r23)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r28)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
@@ -11602,19 +11642,19 @@ contains
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r318)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r319)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sPXC16H15GLG) = 0.0_WP +1.0_WP*k(r22)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r23)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r24)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
@@ -11630,53 +11670,53 @@ contains
             & +1.0_WP*k(r91)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r320)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r321)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r187)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r396)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r476)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r477)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r482)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r483)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r201)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r407)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r187)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r478)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r479)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r480)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r481)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r482)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r483)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r484)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r485)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r486)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H23_TGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r201)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r90)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r91)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r215)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r418)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r488)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r489)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r229)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r428)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r490)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r491)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r492)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H23_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r229)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sC16H18GLG) = 0.0_WP +1.0_WP*k(r25)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r31)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r322)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r323)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r479)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r485)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r491)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sC24H26GLG) = 0.0_WP +1.0_WP*k(r26)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r32)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r325)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r326)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r480)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r486)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r492)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r482)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r488)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r494)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sC16H16GLG) = 0.0_WP -1.0_WP*k(r324)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_TGLG,sC24H24GLG) = 0.0_WP +1.0_WP*k(r27)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP&
             & +1.0_WP*k(r33)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**2.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -11696,17 +11736,17 @@ contains
             & +1.0_WP*k(r342)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r356)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r370)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & +1.0_WP*k(r481)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r487)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
-            & +1.0_WP*k(r493)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
+            & +1.0_WP*k(r483)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r489)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
+            & +1.0_WP*k(r495)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sC16H14GLG) = 0.0_WP
         jac(sC24H23_TGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r329)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r243)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r437)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r285)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r458)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r257)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r445)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r299)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r463)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r313)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r271)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r452)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r243)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r285)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r257)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r299)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r313)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r271)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_TGLG,sC24H23_TGLG) = 0.0_WP -1.0_WP*k(r150)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r317)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r318)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r319)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP&
@@ -11722,20 +11762,21 @@ contains
             & -1.0_WP*k(r329)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r330)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r384)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r396)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r407)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r418)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r428)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r437)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r445)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r452)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r458)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r463)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r467)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r472)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r342)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r471)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r356)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r472)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r472)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_TGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r342)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r473)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+        jac(sC24H23_TGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r356)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_TGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r330)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_TGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r370)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_AGLG,sN2) = 0.0_WP
@@ -11781,10 +11822,10 @@ contains
             & -1.0_WP*k(r333)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_AGLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r126)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r334)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r335)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r188)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r397)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r202)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r408)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r216)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r419)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r230)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r429)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r188)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r399)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r202)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r410)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r216)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r421)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r230)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r431)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_AGLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r127)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r336)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r337)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_AGLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r128)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r339)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11808,13 +11849,13 @@ contains
             & +1.0_WP*k(r371)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_AGLG,sC16H14GLG) = 0.0_WP
         jac(sC24H23_AGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r343)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H23_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r244)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r438)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r286)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r459)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r258)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r446)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r300)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r464)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r314)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r468)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r272)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r453)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r328)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r244)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r440)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r286)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r461)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r258)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r448)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r300)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r466)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r314)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r470)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r272)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r455)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r328)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H23_AGLG,sC24H23_AGLG) = 0.0_WP -1.0_WP*k(r124)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r125)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r126)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11836,19 +11877,20 @@ contains
             & -1.0_WP*k(r343)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r344)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r385)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r397)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r408)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r419)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r429)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r438)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r446)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r453)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r459)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r464)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r468)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r471)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r473)*1.0E6_WP*1.0E-6_WP -1.0_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H23_AGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r357)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r399)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r410)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r421)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r431)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r440)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r448)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r455)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r461)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r466)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r470)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r473)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r475)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP&
+            & -1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H23_AGLG,sC24H21_AGLG) = 0.0_WP +1.0_WP*k(r357)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r476)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_AGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r344)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H23_AGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r371)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H21_AGLG,sN2) = 0.0_WP
@@ -11894,10 +11936,10 @@ contains
             & -1.0_WP*k(r347)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H21_AGLG,sPXC16H15GLG) = 0.0_WP -1.0_WP*k(r132)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r348)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r349)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H21_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r398)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r203)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r409)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r217)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r420)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r231)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r430)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sPXC16H16GLG) = 0.0_WP +1.0_WP*k(r189)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r400)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sPXC16H16_TGLG) = 0.0_WP +1.0_WP*k(r203)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r411)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r217)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r422)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r231)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r432)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H21_AGLG,sC16H18GLG) = 0.0_WP -1.0_WP*k(r133)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r350)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r351)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H21_AGLG,sC24H26GLG) = 0.0_WP -1.0_WP*k(r134)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r353)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11921,14 +11963,14 @@ contains
             & +1.0_WP*k(r329)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r343)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r372)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
-        jac(sC24H21_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r245)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r439)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r287)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r460)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r259)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r447)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r301)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r465)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r315)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r469)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r273)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r454)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r329)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r472)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC24H21_AGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r343)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r245)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r441)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC24H25GLG) = 0.0_WP +1.0_WP*k(r287)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r462)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC16H17_TGLG) = 0.0_WP +1.0_WP*k(r259)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r449)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC24H25_TGLG) = 0.0_WP +1.0_WP*k(r301)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r467)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC24H23GLG) = 0.0_WP +1.0_WP*k(r315)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r471)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC16H15_TGLG) = 0.0_WP +1.0_WP*k(r273)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r456)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC24H23_TGLG) = 0.0_WP +1.0_WP*k(r329)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r474)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC24H21_AGLG,sC24H23_AGLG) = 0.0_WP +1.0_WP*k(r343)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r476)*1.0E6_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H21_AGLG,sC24H21_AGLG) = 0.0_WP -1.0_WP*k(r130)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r131)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r132)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -11950,19 +11992,19 @@ contains
             & -1.0_WP*k(r357)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r358)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r386)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r398)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r409)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r420)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r430)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r439)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r447)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r454)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r460)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r465)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r469)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r472)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r475)*1.0E6_WP*1.0E-6_WP
+            & -1.0_WP*k(r400)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r411)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r422)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r432)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r441)*1.0E6_WP*(c(sC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r449)*1.0E6_WP*(c(sC16H17_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r456)*1.0E6_WP*(c(sC16H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r462)*1.0E6_WP*(c(sC24H25GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r467)*1.0E6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r471)*1.0E6_WP*(c(sC24H23GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r474)*1.0E6_WP*(c(sC24H23_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r476)*1.0E6_WP*(c(sC24H23_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -2.0_WP*k(r477)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP
         jac(sC24H21_AGLG,sC15H16GLG) = 0.0_WP -1.0_WP*k(r358)*1.0E6_WP*(c(sC24H21_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC24H21_AGLG,sC15H15_TGLG) = 0.0_WP +1.0_WP*k(r372)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H16GLG,sN2) = 0.0_WP
@@ -12107,8 +12149,8 @@ contains
             & +0.45_WP*k(r156)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r157)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r359)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r500)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC15H15_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r176)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC15H15_TGLG,sPXC16H15XPGLG) = 0.0_WP +1.0_WP*k(r176)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sPXC16H17GLG) = 0.0_WP +0.45_WP*k(r79)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r85)*1.0E6_WP*2.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -12126,7 +12168,7 @@ contains
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r360)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r361)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r501)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sPXC16H15GLG) = 0.0_WP +0.45_WP*k(r80)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r84)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r85)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -12144,7 +12186,7 @@ contains
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r362)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r363)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r502)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sPXC16H16GLG) = 0.0_WP +0.45_WP*k(r78)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r79)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r80)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -12158,7 +12200,7 @@ contains
             & +0.45_WP*k(r88)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r89)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r190)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sPXC16H16_TGLG) = 0.0_WP +0.45_WP*k(r151)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**2.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r152)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r153)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
@@ -12172,9 +12214,9 @@ contains
             & +0.45_WP*k(r161)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +0.45_WP*k(r162)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & +1.0_WP*k(r204)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r508)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC15H15_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r218)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r509)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
-        jac(sC15H15_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r232)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r510)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC15H15_TGLG,sPXC16H14GLG) = 0.0_WP +1.0_WP*k(r218)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r511)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+        jac(sC15H15_TGLG,sPXC16H14_AGLG) = 0.0_WP +1.0_WP*k(r232)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP -1.0_WP*k(r512)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sC16H18GLG) = 0.0_WP +0.45_WP*k(r81)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r87)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r147)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
@@ -12182,7 +12224,7 @@ contains
             & +0.45_WP*k(r160)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r364)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r365)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r503)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sC24H26GLG) = 0.0_WP +0.45_WP*k(r82)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r88)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r148)*1.0E6_WP*1.0E-6_WP*(c(sC24H25_TGLG)*1.0E-6_WP)**1.0_WP&
@@ -12190,7 +12232,7 @@ contains
             & +0.45_WP*k(r161)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r367)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r368)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r504)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r506)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sC16H16GLG) = 0.0_WP -1.0_WP*k(r366)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC15H15_TGLG,sC24H24GLG) = 0.0_WP +0.45_WP*k(r83)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
             & +0.45_WP*k(r89)*1.0E6_WP*1.0E-6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP&
@@ -12200,7 +12242,7 @@ contains
             & -1.0_WP*k(r369)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r370)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
             & -1.0_WP*k(r371)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r505)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
+            & -1.0_WP*k(r507)*1.0E6_WP*1.0E-6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP
         jac(sC15H15_TGLG,sC16H14GLG) = 0.0_WP
         jac(sC15H15_TGLG,sC24H22GLG) = 0.0_WP -1.0_WP*k(r372)*1.0E6_WP*(c(sC15H15_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
         jac(sC15H15_TGLG,sC16H17GLG) = 0.0_WP +1.0_WP*k(r246)*1.0E6_WP*1.0E-6_WP*(c(sC15H16GLG)*1.0E-6_WP)**1.0_WP
@@ -12246,17 +12288,17 @@ contains
             & -1.0_WP*k(r370)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r371)*1.0E6_WP*1.0E-6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP&
             & -1.0_WP*k(r372)*1.0E6_WP*1.0E-6_WP*(c(sC24H22GLG)*1.0E-6_WP)**1.0_WP&
-            & -1.0_WP*k(r500)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r501)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r503)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r504)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r505)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r506)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r507)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r508)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
-            & -1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
+            & -1.0_WP*k(r502)*1.0E6_WP*(c(sPXC16H16XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r503)*1.0E6_WP*(c(sPXC16H17GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r504)*1.0E6_WP*(c(sPXC16H15GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r505)*1.0E6_WP*(c(sC16H18GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r506)*1.0E6_WP*(c(sC24H26GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r507)*1.0E6_WP*(c(sC24H24GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r508)*1.0E6_WP*(c(sPXC16H15XPGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r509)*1.0E6_WP*(c(sPXC16H16GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r510)*1.0E6_WP*(c(sPXC16H16_TGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r511)*1.0E6_WP*(c(sPXC16H14GLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP&
+            & -1.0_WP*k(r512)*1.0E6_WP*(c(sPXC16H14_AGLG)*1.0E-6_WP)**1.0_WP*1.0E-6_WP
 
     return
   end subroutine fill_jac_matrix

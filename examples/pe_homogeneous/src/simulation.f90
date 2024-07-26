@@ -52,7 +52,7 @@ module simulation
    type(N_Vector),        pointer :: sunvec_y     ! sundials vector
    type(SUNMatrix),       pointer :: sunmat_A     ! sundials matrix
    type(SUNLinearSolver), pointer :: sunlinsol_LS ! sundials linear solver
-   real(c_double)                 :: rtol=1.0d-15, atol=1.0d-20   ! relative and absolute tolerance
+   real(c_double)                 :: rtol=1.0d-7, atol=1.0d-14   ! relative and absolute tolerance
    integer(c_int)                 :: ierr         ! error flag from C functions
    integer(c_long)                :: mxstep = 1000000000      ! maximum number of steps
 
@@ -63,10 +63,10 @@ module simulation
 
    ! Post-processing variables
    type(monitor) :: fracfile
-   real(WP), dimension(4) :: frac
    real(WP), dimension(nspec) :: mass_fractions
-   real(WP) :: total_mass_ratio
+   real(WP) :: total_mass_ratio, real_species_mass_ratio, LO_ratio
    real(WP) :: rhsp_mass_sum
+   logical, dimension(nspec) :: is_real
 
 
    public :: simulation_init,simulation_run,simulation_final
@@ -117,6 +117,7 @@ contains
          write(*,*) 'ERROR: fvec = NULL'
       end if
 
+      call get_rate_coefficients(k,M,Tloc,Ploc)
       call get_reaction_rates(w,k,m,yvec,cqss)
       call fill_rhs_matrix(rhsp, w)
 
@@ -178,6 +179,7 @@ contains
          write(*,*) 'ERROR: Jmat = NULL'
       end if
 
+      call get_rate_coefficients(k,M,Tloc,Ploc)
       call fill_jac_matrix(Jacp, yvec, k)
 
       ! Fill the Jacobian matrix
@@ -205,25 +207,37 @@ contains
 
    end function schultz_dis
 
-
    subroutine get_product_mass_fraction()
       implicit none
       integer :: i
+      real(WP) :: sum0
 
-      ! Calculate mass fraction
-      frac(1) = c(sC8H8)*vol_0*W_sp(sC8H8)/m_0
-      frac(2) = c(sC8H10)*vol_0*W_sp(sC8H10)/m_0
-      frac(3) = c(sC9H10)*vol_0*W_sp(sC9H10)/m_0
-      frac(4) = c(sC7H8)*vol_0*W_sp(sC7H8)/m_0
+      real_species_mass_ratio = 0.0_WP
 
+      ! Calculate mass fractions
       total_mass_ratio = 0.0_WP
-
       do i=1,nspec
          total_mass_ratio = total_mass_ratio + c(i)*W_sp(i)*vol_0
-         mass_fractions(i) = c(i)*W_sp(i)*vol_0/m_0
+         mass_fractions(i) = c(i)*W_sp(i)*vol_0
+      end do
+      total_mass_ratio = total_mass_ratio/m_0
+
+      ! Normalize mass fractions
+      sum0 = sum(mass_fractions)
+      do i=1,nspec
+         mass_fractions(i) = mass_fractions(i)/sum0
       end do
 
-      total_mass_ratio = total_mass_ratio/m_0
+      ! Calculate mass sum if real species
+      do i=1,nspec
+         if (is_real(i)) then
+            real_species_mass_ratio = real_species_mass_ratio + mass_fractions(i)
+         end if
+      end do
+
+      ! Calculate LO ratio (Light Olefins)
+      LO_ratio = 0.0_WP
+      LO_ratio = mass_fractions(sC6H4)+mass_fractions(sC2H4)+mass_fractions(sC3H6)+mass_fractions(sC4H8X1)
 
    end subroutine get_product_mass_fraction
 
@@ -240,7 +254,6 @@ contains
          sum = sum + rhsp(i)*W_sp(i)*vol_0
       end do
 
-      print *, 'Mass balance: ', sum
       rhsp_mass_sum = sum
 
    end subroutine check_rhs_mass_balance
@@ -250,6 +263,7 @@ contains
       implicit none
       integer :: i
 
+      call isRealSpecies(is_real)
 
       init_concentration: block
          real(WP) :: chain_number, Nec, Nmc
@@ -399,11 +413,17 @@ contains
       fracfile=monitor(.true.,'mass_fraction')
       call fracfile%add_column(tcur, 'Time')
       call fracfile%add_column(total_mass_ratio, 'total mass ratio')
-      call fracfile%add_column(rhsp_mass_sum, 'rhs mass sum [kg]')
-      call fracfile%add_column(frac(1), 'C8H8')
-      call fracfile%add_column(frac(2), 'C8H10')
-      call fracfile%add_column(frac(3), 'C9H10')
-      call fracfile%add_column(frac(4), 'C7H8')
+      call fracfile%add_column(rhsp_mass_sum, 'sum of residure')
+      
+      call fracfile%add_column(real_species_mass_ratio, 'real species mass ratio')
+      
+      call fracfile%add_column(LO_ratio, 'LO ratio')
+      call fracfile%add_column(mass_fractions(sC6H6), 'Benzene')
+      call fracfile%add_column(mass_fractions(sC7H8), 'C7H8')
+      call fracfile%add_column(mass_fractions(sC8H10), 'C8H10')
+      call fracfile%add_column(mass_fractions(sC8H8), 'C8H8')
+      call fracfile%add_column(mass_fractions(sC9H10), 'C9H10')
+
       call fracfile%write()
 
    end subroutine simulation_init
@@ -429,9 +449,6 @@ contains
          ! Update kinetics coefficients
          call get_rate_coefficients(k,M,Tloc,Ploc)
 
-         ! Check residual mass balance
-
-
          ! ! Update CVODE
          ierr = FCVode(cvode_mem, (tcur+dt), sunvec_y, tret, CV_NORMAL)
          if (ierr /= 0) then
@@ -444,26 +461,6 @@ contains
          call check_rhs_mass_balance()
          call get_product_mass_fraction()
 
-         ! ! The following part is to garantee the mass balance
-         ! ! Normalize the mass_fraction array
-         ! do i=1,nspec
-         !    mass_fractions(i) = mass_fractions(i)/sum(mass_fractions)
-         ! end do
-         ! ! re-init the concentration based on mass fraction
-         ! c = 0.0_WP
-         ! do i=1,nspec
-         !    c(i) = mass_fractions(i)*m_0/W_sp(i)/vol_0
-         ! end do
-         ! ! re-init CVode
-         ! ierr = FSUNLinSolFree(sunlinsol_LS)
-         ! call FN_VDestroy(sunvec_y)
-         ! sunvec_y => FN_VMake_Serial(nspec, c, ctx)
-         ! sunlinsol_LS => FSUNLinSol_Dense(sunvec_y, sunmat_A, ctx)
-         ! ! attach linear solver
-         ! ierr = FCVodeSetLinearSolver(cvode_mem, sunlinsol_LS, sunmat_A)
-         ! ! re-init cvode
-         ! ierr = FCVodeReInit(cvode_mem, tcur + dt , sunvec_y)
-
          ! Update time
          tcur = tcur + dt
 
@@ -473,8 +470,6 @@ contains
             call fracfile%write()
          end if
          count = count + 1
-
-
 
       end do
 
