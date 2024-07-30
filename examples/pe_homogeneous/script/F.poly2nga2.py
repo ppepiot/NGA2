@@ -394,6 +394,8 @@ Usage:
     print_species_names(print_variables,use, mech_variables)
 
     print_isrealspecies(print_variables,mech_variables)
+
+    print_is_liquid_species(print_variables,mech_variables)
     
     print_reaction_expressions(print_variables, constants,reactions_variables)
 
