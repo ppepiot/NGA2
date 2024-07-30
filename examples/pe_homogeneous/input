@@ -2,13 +2,21 @@
 Monomer Molecular weight : 104.15
 
 # g/mol
-Number Average Molecular weight : 900.0E3
+Number Average Molecular weight : 100.0E3
 
 # Degree of polymerization
-Degree of polymerization : 8640
+Degree of polymerization : 960
 
 # kg/m^3
 Density : 1.05e3
 
 # m
 Particle diameter : 1e-3
+
+
+# Control parameters
+start time : 0.0
+end time : 30000.0
+time step : 1e-1
+use fixed temperature : .true.
+temperature : 643.15

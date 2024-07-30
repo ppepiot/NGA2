@@ -27,24 +27,29 @@ module simulation
    real(WP) :: m_0           ! initial mass of the polymer
    real(WP) :: vol_0         ! initial volume of the polymer
 
+   real(WP) :: mass ! dynamic mass of the polymer
+   real(WP) :: vol ! dynamic volume of the polymer
+
    ! Time infomation
-   real(WP) :: t_start = 5000.0_WP         ! start time
-   real(WP) :: t_end = 20732.0_WP                    ! end time
-   ! real(WP) :: t_start = 0.0_WP         ! start time
-   ! real(WP) :: t_end = 10.0_WP                    ! end time
-   real(WP) :: dt = 1e-2_WP                      ! time step
+   real(WP) :: t_start         ! start time
+   real(WP) :: t_end                    ! end time
+   real(WP) :: dt                      ! time step
    real(WP) :: tcur               ! current time
    real(WP) :: tret(1)           ! return time
 
    ! working variables
    real(WP) :: Tloc                                    ! local temperature
-   real(WP), dimension(nspec) :: c                     ! Concentration array
+   real(WP), dimension(nspec) :: c, c_old                     ! Concentration array
    real(WP), dimension(nreac + nreac_reverse) :: k     ! reaction kinetics frequency array
    real(WP), dimension(nreac + nreac_reverse) :: w     ! reaction rate array
    real(WP), dimension(nspec) :: rhsp                   ! right hand side of the ODE
    real(WP), dimension(nspec,nspec) :: Jacp               ! Jacobian matrix
    character(len=str_medium),dimension(nspec) :: names                   ! species name
+   logical, dimension(nspec) :: is_real, is_liquid
+   real(WP), dimension(nspec) :: species_mass            ! species mass
 
+
+   logical :: use_fixed_temperature
 
    ! CVode variables
    type(c_ptr)                    :: ctx          ! SUNDIALS context
@@ -62,16 +67,14 @@ module simulation
    real(WP), dimension(nqss) :: cqss
 
    ! Post-processing variables
-   type(monitor) :: fracfile
    real(WP), dimension(nspec) :: mass_fractions
-   real(WP) :: total_mass_ratio, real_species_mass_ratio, LO_ratio
+   real(WP) :: total_mass_ratio, LO_ratio, liquid_species_mass_fraction
    real(WP) :: rhsp_mass_sum
-   logical, dimension(nspec) :: is_real
 
 
    public :: simulation_init,simulation_run,simulation_final
 
-   type(monitor) :: mfile
+   type(monitor) :: mfile,fracfile
 
 contains
 
@@ -117,7 +120,6 @@ contains
          write(*,*) 'ERROR: fvec = NULL'
       end if
 
-      call get_rate_coefficients(k,M,Tloc,Ploc)
       call get_reaction_rates(w,k,m,yvec,cqss)
       call fill_rhs_matrix(rhsp, w)
 
@@ -179,7 +181,6 @@ contains
          write(*,*) 'ERROR: Jmat = NULL'
       end if
 
-      call get_rate_coefficients(k,M,Tloc,Ploc)
       call fill_jac_matrix(Jacp, yvec, k)
 
       ! Fill the Jacobian matrix
@@ -207,40 +208,6 @@ contains
 
    end function schultz_dis
 
-   subroutine get_product_mass_fraction()
-      implicit none
-      integer :: i
-      real(WP) :: sum0
-
-      real_species_mass_ratio = 0.0_WP
-
-      ! Calculate mass fractions
-      total_mass_ratio = 0.0_WP
-      do i=1,nspec
-         total_mass_ratio = total_mass_ratio + c(i)*W_sp(i)*vol_0
-         mass_fractions(i) = c(i)*W_sp(i)*vol_0
-      end do
-      total_mass_ratio = total_mass_ratio/m_0
-
-      ! Normalize mass fractions
-      sum0 = sum(mass_fractions)
-      do i=1,nspec
-         mass_fractions(i) = mass_fractions(i)/sum0
-      end do
-
-      ! Calculate mass sum if real species
-      do i=1,nspec
-         if (is_real(i)) then
-            real_species_mass_ratio = real_species_mass_ratio + mass_fractions(i)
-         end if
-      end do
-
-      ! Calculate LO ratio (Light Olefins)
-      LO_ratio = 0.0_WP
-      LO_ratio = mass_fractions(sC6H4)+mass_fractions(sC2H4)+mass_fractions(sC3H6)+mass_fractions(sC4H8X1)
-
-   end subroutine get_product_mass_fraction
-
    subroutine check_rhs_mass_balance()
       implicit none
       integer :: i
@@ -258,12 +225,71 @@ contains
 
    end subroutine check_rhs_mass_balance
 
+   subroutine update_liquid_concentration()
+      implicit none
+      integer :: i
+      real(WP) :: g
+
+      ! update mass of all species
+      do i=1,nspec
+         species_mass(i) = species_mass(i) + (c(i)-c_old(i))*W_sp(i)*vol
+      end do
+      total_mass_ratio = sum(species_mass)/m_0
+
+      ! species_mass = species_mass/total_mass_ratio
+
+      ! calculate the mass and volume of liquid species
+      mass = 0.0_WP
+      do i=1,nspec
+         if (is_liquid(i)) then
+            mass = mass + species_mass(i)
+         end if
+      end do
+      vol = mass/rho_0
+
+      ! remove gas species from the concentration and update the concentration of liquid species
+      do i=1,nspec
+         if (.not. is_liquid(i)) then
+            c(i) = 0.0_WP
+         else
+            c(i) = (species_mass(i)/W_sp(i))/vol
+         end if
+      end do
+
+      ! calculate the mass fractions respect to initial mass
+      do i=1,nspec
+         mass_fractions(i) = species_mass(i)/m_0
+      end do
+
+      ! Calculate LO ratio (Light Olefins)
+      LO_ratio = 0.0_WP
+      LO_ratio = mass_fractions(sC2H4)+mass_fractions(sC3H6)+mass_fractions(sC4H8X1)
+
+      ! Calculate mass fraction of liquid species
+      liquid_species_mass_fraction = 0.0_WP
+      do i=1,nspec
+         if (is_liquid(i)) then
+            liquid_species_mass_fraction = liquid_species_mass_fraction + mass_fractions(i)
+         end if
+      end do
+
+   end subroutine update_liquid_concentration
 
    subroutine simulation_init
       implicit none
       integer :: i
 
       call isRealSpecies(is_real)
+      call isLiquidSpecies(is_liquid)
+
+      call param_read("start time", t_start)
+      call param_read("end time", t_end)
+      call param_read("time step", dt)
+
+      call param_read("use fixed temperature", use_fixed_temperature)
+      if (use_fixed_temperature) then
+         call param_read("temperature", Tloc)
+      end if
 
       init_concentration: block
          real(WP) :: chain_number, Nec, Nmc
@@ -320,15 +346,17 @@ contains
          c(sPXC16H17GLG) = Nec/vol_0
          c(sPXC16H15GLG) = Nec/vol_0
 
-         call get_product_mass_fraction()
+         species_mass = 0.0_WP
+         mass = m_0
+         vol = vol_0
+
+         call update_liquid_concentration()
 
       end block init_concentration
-
 
       init_kinetics: block
          k = 0.0_WP
          w = 0.0_WP
-         Tloc = 0.0_WP
       end block init_kinetics
 
 
@@ -412,18 +440,16 @@ contains
 
       fracfile=monitor(.true.,'mass_fraction')
       call fracfile%add_column(tcur, 'Time')
-      call fracfile%add_column(total_mass_ratio, 'total mass ratio')
+      call fracfile%add_column(total_mass_ratio, 'sum of mass fraction')
       call fracfile%add_column(rhsp_mass_sum, 'sum of residure')
-      
-      call fracfile%add_column(real_species_mass_ratio, 'real species mass ratio')
-      
+      call fracfile%add_column(Tloc, 'temperature')
+      call fracfile%add_column(liquid_species_mass_fraction, 'liquid mass fraction')
       call fracfile%add_column(LO_ratio, 'LO ratio')
       call fracfile%add_column(mass_fractions(sC6H6), 'Benzene')
       call fracfile%add_column(mass_fractions(sC7H8), 'C7H8')
       call fracfile%add_column(mass_fractions(sC8H10), 'C8H10')
       call fracfile%add_column(mass_fractions(sC8H8), 'C8H8')
       call fracfile%add_column(mass_fractions(sC9H10), 'C9H10')
-
       call fracfile%write()
 
    end subroutine simulation_init
@@ -435,34 +461,51 @@ contains
 
       integer :: i,count
 
-      count = 0
+      count = -1
       tcur = t_start
 
       ! Time loop
       do while (tcur < t_end)
          print *, '[Solving] Time: ', tcur, 's'
+
          ! Update Temperature
-         call get_temperature(T = Tloc, time = tcur)
-         ! Tloc = (750.0_WP+273.15_WP)
+         if (.not. use_fixed_temperature) then
+            call get_temperature(T = Tloc, time = tcur)
+         end if
          print *, 'Temperature: ', Tloc
 
          ! Update kinetics coefficients
          call get_rate_coefficients(k,M,Tloc,Ploc)
 
-         ! ! Update CVODE
+         ! store the old concentration
+         c_old = c
+         ! Update CVODE
          ierr = FCVode(cvode_mem, (tcur+dt), sunvec_y, tret, CV_NORMAL)
          if (ierr /= 0) then
             print *, 'ERROR: FCVode failed'
             stop 1
          end if
-
          print *, 'Returned Time: ', tret(1), 's'
 
-         call check_rhs_mass_balance()
-         call get_product_mass_fraction()
+         ! Update concentration
+         call update_liquid_concentration()
 
          ! Update time
          tcur = tcur + dt
+
+         ! reinit CVODE
+         ! free old sunvecy and linear solver
+         ierr = FSUNLinSolFree(sunlinsol_LS)
+         call FN_VDestroy(sunvec_y)
+         sunvec_y => FN_VMake_Serial(nspec, c, ctx)
+         ! re-create linear solver
+         sunlinsol_LS => FSUNLinSol_Dense(sunvec_y, sunmat_A, ctx)
+         ! re-set linear solver
+         ierr = FCVodeSetLinearSolver(cvode_mem, sunlinsol_LS, sunmat_A)
+         ! re-init cvode
+         ierr = FCVodeReInit(cvode_mem, tcur, sunvec_y)
+
+         call check_rhs_mass_balance()
 
          if (mod(count,100) == 0) then
             ! Write to monitor file

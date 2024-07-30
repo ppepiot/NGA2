@@ -853,6 +853,50 @@ contains
 
         return
     end subroutine isRealSpecies
+
+    ! ----------------------------------------------- !
+    ! Tell if the species is a real species           !
+    ! ----------------------------------------------- !
+    subroutine isLiquidSpecies(ils)
+
+        implicit none
+
+        logical, dimension(nspec) :: ils
+
+        ! Initialize
+        ils = .false.
+
+        ils(sPXC16H16XPGLG) = .true.
+        ils(sPXC16H15XPGLG) = .true.
+        ils(sPXC16H17GLG) = .true.
+        ils(sPXC16H15GLG) = .true.
+        ils(sPXC16H16GLG) = .true.
+        ils(sPXC16H16_TGLG) = .true.
+        ils(sPXC16H14GLG) = .true.
+        ils(sPXC16H14_AGLG) = .true.
+        ils(sC16H18GLG) = .true.
+        ils(sC24H26GLG) = .true.
+        ils(sC16H16GLG) = .true.
+        ils(sC24H24GLG) = .true.
+        ils(sC16H14GLG) = .true.
+        ils(sC24H22GLG) = .true.
+        ils(sC16H17GLG) = .true.
+        ils(sC24H25GLG) = .true.
+        ils(sC16H17_TGLG) = .true.
+        ils(sC24H25_TGLG) = .true.
+        ils(sC24H23GLG) = .true.
+        ils(sC16H15_TGLG) = .true.
+        ils(sC24H23_TGLG) = .true.
+        ils(sC24H23_AGLG) = .true.
+        ils(sC24H21_AGLG) = .true.
+        ils(sC15H16GLG) = .true.
+        ils(sC15H15_TGLG) = .true.
+
+
+        return
+    end subroutine isLiquidSpecies
+
+
   ! ----------------------------------------------- !
   !     Subroutine for explicit reaction names      !
   ! ----------------------------------------------- !
