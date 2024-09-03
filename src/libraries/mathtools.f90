@@ -161,7 +161,7 @@ contains
       else
          arctan = atan(dy/dx)
       end if
-      if (dx.lt.0.0_WP) then
+      if (dx.le.0.0_WP) then
          arctan = Pi+arctan
       else if (dy.le.0.0_WP .and. dx.gt.0.0_WP) then
          arctan = twoPi+arctan

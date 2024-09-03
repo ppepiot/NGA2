@@ -90,7 +90,7 @@ contains
 
 
         do i = 1, self%Nr-1
-            if (self%radius(i) <= r_corrected .and. r_corrected <= self%radius(i+1)) then
+            if ((self%radius(i) <= r_corrected) .and. (r_corrected <= self%radius(i+1))) then
                 c = self%chord(i) + (self%chord(i+1) - self%chord(i)) * (r_corrected - self%radius(i)) / (self%radius(i+1) - self%radius(i))
                 t = self%twist(i) + (self%twist(i+1) - self%twist(i)) * (r_corrected - self%radius(i)) / (self%radius(i+1) - self%radius(i))
                 return
@@ -114,8 +114,10 @@ contains
         if (a < minval(self%aoa)) a_corrected = minval(self%aoa)
         if (a > maxval(self%aoa)) a_corrected = maxval(self%aoa)
 
+
+
         do i=1, self%Na-1
-            if (self%aoa(i) <= a_corrected .and. a_corrected <= self%aoa(i+1)) then
+            if ((self%aoa(i) <= a_corrected) .and. (a_corrected) <= (self%aoa(i+1))) then
                 cl = self%cl(i) + (self%cl(i+1) - self%cl(i)) * (a_corrected - self%aoa(i)) / (self%aoa(i+1) - self%aoa(i))
                 cd = self%cd(i) + (self%cd(i+1) - self%cd(i)) * (a_corrected - self%aoa(i)) / (self%aoa(i+1) - self%aoa(i))
                 return

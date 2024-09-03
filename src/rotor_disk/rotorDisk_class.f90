@@ -5,15 +5,15 @@ module rotorDisk_class
    implicit none
    private
 
-   public :: rotorDisk, cart2cyl_vec, cyl2cart_vec
+   public :: rotorDisk
 
-   ! In ori cartesian coordinates, x-/y-/z- are the same as config mesh
+   ! In global cartesian coordinates, x-/y-/z- are the same as config mesh
    ! In rotor disk cartesian coordinates, the z- dir is the axis
    ! the y- dir is the reference direction, the x- dir is the cross product of the axis and reference direction
    ! arctan(y/x) = theta  (rad)
    ! sqrt(x^2 + y^2) = r
-   real(WP), dimension(3,3) :: rotMat        ! Rotation matrix from ori cartesian to rotor disk cartesian coordinates
-   real(WP), dimension(3,3) :: invRotMat     ! Rotation matrix from rotor disk cartesian to ori cartesian coordinates
+   real(WP), dimension(3,3) :: rotMat        ! Rotation matrix from global cartesian to rotor disk cartesian coordinates
+   real(WP), dimension(3,3) :: invRotMat     ! Rotation matrix from rotor disk cartesian to global cartesian coordinates
 
    type :: rotorDisk
       ! User-defined rotor disk properties
@@ -23,19 +23,33 @@ module rotorDisk_class
       real(WP) :: omega                           ! Rotor angular velocity
       integer :: nblades                          ! Number of blades
 
+      real(WP) :: tipEffectParam                  ! Tip effect parameter, over it*radius, no lift force
+
       real(WP), dimension(3) :: center            ! Rotor center position
       real(WP), dimension(3) :: axis              ! Rotor axis vector, must be normalized and in x-/y-/z- direction
       real(WP), dimension(3) :: ref_dir           ! Reference direction for theta calculation
+
+      real(WP) :: rho_ref                         ! Reference density, for output
 
       ! Internal rotor disk properties
 
       type(blade) :: bl
       type(config) :: cfg
 
+      real(WP), dimension(:,:,:,:), allocatable :: cylPos  ! Cylindrical position in the rotor disk
+      real(WP), dimension(:,:,:), allocatable :: area    ! Blade face area in every cell
+      real(WP), dimension(:,:,:), allocatable :: forceX  ! Volumetric force in x-direction
+      real(WP), dimension(:,:,:), allocatable :: forceY  ! Volumetric force in y-direction
+      real(WP), dimension(:,:,:), allocatable :: forceZ  ! Volumetric force in z-direction
+
+      ! output
+      logical :: output
+      real(WP) :: dragEff, liftEff, powerEff
+
    contains
 
       procedure :: prepareRotorDisk         ! Prepare the rotor disk properties
-      procedure :: setFaceArea              ! Set the blade face area in every cell
+      procedure :: setTipEffect             ! Set the tip effect correction
       procedure :: calculateForce           ! Calculate the volumetric force in every cell from the rotor disk, the force can be added to the momentum equation
 
    end type rotorDisk
@@ -62,17 +76,41 @@ contains
       self%nblades = 0
       self%center = 0.0_WP
       self%axis = 0.0_WP
+
+      self%tipEffectParam = 1.0_WP
+
+      self%output = .true.
+      self%rho_ref = 1000.0_WP
+
+      allocate(self%cylPos(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,3))
+      allocate(self%area(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+
+      allocate(self%forceX(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+      allocate(self%forceY(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+      allocate(self%forceZ(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+
    end function rotorDisk_constructor
 
    subroutine prepareRotorDisk(self)
       use mathtools, only: cross_product
       use mathtools, only: normalize
       use mathtools, only: inverse_matrix
+      use mathtools, only: arctan
+      use mathtools, only: twoPi, pi
       implicit none
       class(rotorDisk) :: self
 
+      integer :: i, j, k
+
       real(WP), dimension(3,3) :: Ra, Rb, temp
       real(WP), dimension(3) :: x_
+
+      integer :: mask(1), origin_index
+      logical :: is_inside
+      real(WP) :: m1, m2, n1, n2
+      integer, dimension(4) :: insideCircle
+
+      real(WP), dimension(3) :: globalPos, rotatedPos, movedPos ! positions in global, rotated, moved, and cylindrical coordinates
 
       ! Prepare the rotor disk properties
       ! check center, axis, and ref_dir
@@ -116,60 +154,8 @@ contains
       temp = transpose(Rb)
       invRotMat = matmul(Ra, temp)
 
-
-   end subroutine prepareRotorDisk
-
-   ! Note: this function is to transform a vector from ori cartesian (Mesh coordinates) to rotor disk cylindric coordinates
-   function cart2cyl_vec(carVec) result(CylVec)
-      use mathtools, only: cross_product
-      use mathtools, only: arctan
-      implicit none
-      real(WP), dimension(3), intent(in) :: carVec
-      real(WP), dimension(3) :: CylVec     ! r, theta, z
-
-      real(WP), dimension(3) :: temp
-
-      ! Rotate the vector from ori cartesian to rotor disk cartesian coordinates
-      temp = matmul(rotMat, carVec)
-
-      CylVec(1) = sqrt(temp(1)**2 + temp(2)**2)
-      CylVec(2) = arctan(temp(1), temp(2))
-      CylVec(3) = temp(3)
-   end function cart2cyl_vec
-
-   ! Note: this function is to transform a vector from rotor disk cylindric to ori cartesian coordinates (Mesh coordinates)
-   function cyl2cart_vec(CylVec) result(carVec)
-      use mathtools, only: cross_product
-      use mathtools, only: arctan
-      implicit none
-      real(WP), dimension(3), intent(in) :: CylVec    ! r, theta, z
-      real(WP), dimension(3) :: carVec                ! x, y, z
-
-      real(WP), dimension(3) :: temp                  ! x, y, z
-
-      ! transform the vector from cylindrical to cartesian coordinates
-      temp(1) = CylVec(1) * cos(CylVec(2))
-      temp(2) = CylVec(2) * sin(CylVec(2))
-      temp(3) = CylVec(3)
-
-      ! Rotate the vector from rotor disk cartesian to ori cartesian coordinates
-      carVec = matmul(invRotMat, temp)
-   end function cyl2cart_vec
-
-   subroutine setFaceArea(self, area_)
-      implicit none
-      class(rotorDisk) :: self
-      real(WP), dimension(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_), intent(inout) :: area_
-
-
-      integer :: i, j, k
-      integer :: mask(1), origin_index
-      logical :: is_inside
-      real(WP) :: m1, m2, n1, n2
-      integer, dimension(4) :: insideCircle
-
       ! calculate the BET area in every cell
-      area_ = 0.0_WP
+      self%area = 0.0_WP
 
       ! Get the axis direction. If mask(1) is 1, the axis is x-direction,
       ! if mask(1) is 2, the axis is y-direction, if mask(1) is 3, the axis is z-direction
@@ -219,13 +205,13 @@ contains
 
                         ! determine number of points inside the circle
                         insideCircle = 0
-                        if (((m1**2 + n1**2) .lt. self%maxR**2) .and. ((m1**2 + n1**2) .gt. self%minR**2)) insideCircle(1) = 1
-                        if (((m2**2 + n1**2) .lt. self%maxR**2) .and. ((m2**2 + n1**2) .gt. self%minR**2)) insideCircle(2) = 1
-                        if (((m1**2 + n2**2) .lt. self%maxR**2) .and. ((m1**2 + n2**2) .gt. self%minR**2)) insideCircle(3) = 1
-                        if (((m2**2 + n2**2) .lt. self%maxR**2) .and. ((m2**2 + n2**2) .gt. self%minR**2)) insideCircle(4) = 1
+                        if (((m1**2 + n1**2) .le. self%maxR**2) .and. ((m1**2 + n1**2) .ge. self%minR**2)) insideCircle(1) = 1
+                        if (((m2**2 + n1**2) .le. self%maxR**2) .and. ((m2**2 + n1**2) .ge. self%minR**2)) insideCircle(2) = 1
+                        if (((m1**2 + n2**2) .le. self%maxR**2) .and. ((m1**2 + n2**2) .ge. self%minR**2)) insideCircle(3) = 1
+                        if (((m2**2 + n2**2) .le. self%maxR**2) .and. ((m2**2 + n2**2) .ge. self%minR**2)) insideCircle(4) = 1
 
                         ! estimate the area of the circle
-                        area_(i,j,k) = sum(insideCircle) * self%cfg%dy(j) * self%cfg%dz(k) / 4.0_WP
+                        self%area(i,j,k) = sum(insideCircle) * self%cfg%dy(j) * self%cfg%dz(k) / 4.0_WP
                      end if
                   else if (mask(1)==2) then
                      if (j == origin_index) then
@@ -237,13 +223,13 @@ contains
 
                         ! determine number of points inside the circle
                         insideCircle = 0
-                        if (((m1**2 + n1**2) .lt. self%maxR**2) .and. ((m1**2 + n1**2) .gt. self%minR**2)) insideCircle(1) = 1
-                        if (((m2**2 + n1**2) .lt. self%maxR**2) .and. ((m2**2 + n1**2) .gt. self%minR**2)) insideCircle(2) = 1
-                        if (((m1**2 + n2**2) .lt. self%maxR**2) .and. ((m1**2 + n2**2) .gt. self%minR**2)) insideCircle(3) = 1
-                        if (((m2**2 + n2**2) .lt. self%maxR**2) .and. ((m2**2 + n2**2) .gt. self%minR**2)) insideCircle(4) = 1
+                        if (((m1**2 + n1**2) .le. self%maxR**2) .and. ((m1**2 + n1**2) .ge. self%minR**2)) insideCircle(1) = 1
+                        if (((m2**2 + n1**2) .le. self%maxR**2) .and. ((m2**2 + n1**2) .ge. self%minR**2)) insideCircle(2) = 1
+                        if (((m1**2 + n2**2) .le. self%maxR**2) .and. ((m1**2 + n2**2) .ge. self%minR**2)) insideCircle(3) = 1
+                        if (((m2**2 + n2**2) .le. self%maxR**2) .and. ((m2**2 + n2**2) .ge. self%minR**2)) insideCircle(4) = 1
 
                         ! estimate the area of the circle
-                        area_(i,j,k) = sum(insideCircle) * self%cfg%dx(i) * self%cfg%dz(k) / 4.0_WP
+                        self%area(i,j,k) = sum(insideCircle) * self%cfg%dx(i) * self%cfg%dz(k) / 4.0_WP
                      end if
                   else
                      if (k == origin_index) then
@@ -255,13 +241,13 @@ contains
 
                         ! determine number of points inside the circle
                         insideCircle = 0
-                        if (((m1**2 + n1**2) .lt. self%maxR**2) .and. ((m1**2 + n1**2) .gt. self%minR**2)) insideCircle(1) = 1
-                        if (((m2**2 + n1**2) .lt. self%maxR**2) .and. ((m2**2 + n1**2) .gt. self%minR**2)) insideCircle(2) = 1
-                        if (((m1**2 + n2**2) .lt. self%maxR**2) .and. ((m1**2 + n2**2) .gt. self%minR**2)) insideCircle(3) = 1
-                        if (((m2**2 + n2**2) .lt. self%maxR**2) .and. ((m2**2 + n2**2) .gt. self%minR**2)) insideCircle(4) = 1
+                        if (((m1**2 + n1**2) .le. self%maxR**2) .and. ((m1**2 + n1**2) .ge. self%minR**2)) insideCircle(1) = 1
+                        if (((m2**2 + n1**2) .le. self%maxR**2) .and. ((m2**2 + n1**2) .ge. self%minR**2)) insideCircle(2) = 1
+                        if (((m1**2 + n2**2) .le. self%maxR**2) .and. ((m1**2 + n2**2) .ge. self%minR**2)) insideCircle(3) = 1
+                        if (((m2**2 + n2**2) .le. self%maxR**2) .and. ((m2**2 + n2**2) .ge. self%minR**2)) insideCircle(4) = 1
 
                         ! estimate the area of the circle
-                        area_(i,j,k) = sum(insideCircle) * self%cfg%dx(i) * self%cfg%dy(j) / 4.0_WP
+                        self%area(i,j,k) = sum(insideCircle) * self%cfg%dx(i) * self%cfg%dy(j) / 4.0_WP
                      end if
                   end if
                end do
@@ -269,79 +255,172 @@ contains
          end do
       end if
 
-   end subroutine setFaceArea
+      call self%cfg%sync(self%area)
 
-   subroutine calculateForce(self, area, rho, U, V, W, forceX, forceY, forceZ)
-      use mathtools, only: arctan
-      use mathtools, only: twoPi
-      implicit none
-      class(rotorDisk) :: self
-      real(WP), dimension(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_), intent(in) :: area, rho, U, V, W
-      real(WP), dimension(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_), intent(out) :: forceX, forceY, forceZ
-
-      real(WP) :: relaPos(3), carVelocity(3), cylVelocity(3)
-      integer :: i, j, k
-      integer :: mask(1)
-      real(WP) :: radius, chord, twist, cl, cd
-      real(WP) :: alphaGeom, alphaEff              ! Geometric and effective angle of attack
-      real(WP) :: pDyn, f
-      real(WP), dimension(3) :: localforce
+      ! Prepare the relative position in the rotor disk
 
       do k=self%cfg%kmin_,self%cfg%kmax_
          do j=self%cfg%jmin_,self%cfg%jmax_
             do i=self%cfg%imin_,self%cfg%imax_
-               if (area(i,j,k) .gt. 0.0_WP) then
-                  ! Get the radius, from cell center to the rotor disk center
-                  mask = maxloc(abs(self%axis))
-                  relaPos = [self%cfg%xm(i) - self%center(1),self%cfg%ym(j) - self%center(2),self%cfg%zm(k) - self%center(3)]
-                  relaPos(mask(1)) = 0.0_WP
-                  radius = sqrt(sum(relaPos**2))
+               globalPos = [self%cfg%xm(i), self%cfg%ym(j), self%cfg%zm(k)]
+               rotatedPos = matmul(rotMat, globalPos)       ! rotate the position to disk cartesian direction
+               movedPos = rotatedPos + matmul(rotMat, self%center)         ! move the origin position
+               self%cylPos(i,j,k,1) = sqrt(movedPos(1)**2 + movedPos(2)**2)     ! r
+               self%cylPos(i,j,k,2) = arctan(movedPos(1), movedPos(2))          ! theta
+               self%cylPos(i,j,k,3) = movedPos(3)                               ! z
+            end do
+         end do
+      end do
+      
+      ! Prepare the angular velocity in rad/s
+      self%omega = self%omega * 2.0_WP * pi / 60.0_WP 
 
+   end subroutine prepareRotorDisk
+
+   subroutine setTipEffect(self, tf)
+      implicit none
+      class(rotorDisk) :: self
+      real(WP), intent(in) :: tf
+
+      self%tipEffectParam = tf
+
+   end subroutine setTipEffect
+
+
+   subroutine calculateForce(self, rho, U, V, W)
+      use mathtools, only: arctan
+      use mathtools, only: cross_product
+      use mathtools, only: twoPi, pi
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_SUM
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(rotorDisk) :: self
+      real(WP), dimension(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_), intent(in) :: rho, U, V, W
+  
+
+      real(WP), dimension(3) :: cylPos
+      real(WP), dimension(3) :: globalVel       ! U, V, W
+      real(WP), dimension(3) :: CylVel          ! radial, tangential, axial
+      real(WP), dimension(3,3) :: rotMat_vec
+      integer :: i, j, k
+      real(WP) :: radius, chord, twist, cl, cd
+      real(WP) :: alphaGeom, alphaEff, alphaFlow              ! Geometric and effective angle of attack
+      real(WP) :: tipFactor                        ! Tip effect factor
+      real(WP) :: fz, ftheta, f, flift, fdrag
+      real(WP), dimension(3) :: localforce
+      real(WP) :: signOmega
+
+      real(WP) :: mydragEff, myliftEff, mypowerEff
+      integer :: ierr
+
+      self%forceX = 0.0_WP
+      self%forceY = 0.0_WP
+      self%forceZ = 0.0_WP
+
+      mydragEff = 0.0_WP
+      myliftEff = 0.0_WP
+      mypowerEff = 0.0_WP
+
+      signOmega = sign(1.0_WP, self%omega)
+
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               if (self%area(i,j,k) .gt. 1.0E-32_WP) then
+                  ! Get cylindrical position
+                  cylPos = self%cylPos(i,j,k,:)
+
+                  radius = cylPos(1)
+
+                  ! prepare vector rotation matrix, disk-cartesian to radial-tangential-axial
+                  rotMat_vec = reshape([cos(cylPos(2)), -sin(cylPos(2)), 0.0_WP, &
+                     sin(cylPos(2)), cos(cylPos(2)), 0.0_WP, &
+                     0.0_WP, 0.0_WP, 1.0_WP], [3,3])
                   ! Transform the velocity from ori cartesian to rotor disk cylindrical coordinates
-                  carVelocity = [U(i,j,k), V(i,j,k), W(i,j,k)]
-               
-                  cylVelocity = cart2cyl_vec(carVelocity)
+                  globalVel = [U(i,j,k), V(i,j,k), W(i,j,k)]
+                  globalVel = matmul(rotMat, globalVel)        ! rotate the velocity to disk cartesian direction
+                  CylVel = matmul(rotMat_vec, globalVel)       ! rotate again to radial-tangential-axial
 
 
                   ! Set Radical component to be zero
-                  cylVelocity(1) = 0.0_WP
+                  CylVel(1) = 0.0_WP
 
                   ! Set blade normal component (theta) of velocity
-                  cylVelocity(2) = self%omega * radius - cylVelocity(2)
+                  CylVel(2) = self%omega * radius - CylVel(2)
 
                   ! Determine blade data for this radius
                   call self%bl%interpolate_r(radius, chord, twist)
 
                   ! Effective angle of attack
-                  alphaGeom = twist                               ! Twist angle in degrees
-                  alphaEff = alphaGeom - arctan(sign(1.0_WP, self%omega)*cylVelocity(2), cylVelocity(3))*360.0_WP/twoPi    ! Effective angle of attack in degrees
+                  alphaGeom = twist                               ! Twist angle in degrees, no trim angle
+                  alphaFlow = arctan(CylVel(2), CylVel(3))/pi*180.0_WP
+
+                  if (alphaFlow .gt. 180.0_WP) alphaFlow = alphaFlow - 360.0_WP
+
+                  alphaEff = alphaGeom - alphaFlow
+
 
                   ! Calculate the lift and drag coefficients
                   call self%bl%interpolate_a(alphaEff, cl, cd)
 
-                  ! Tip effect correction, ignore for now
+                  ! Tip effect correction
+                  tipFactor = 1.0_WP
+                  if (radius .gt. (self%tipEffectParam*self%maxR)) tipFactor = 0.0_WP
 
-                  ! Calculate forces perpendicular to blade
-                  pDyn = 0.5_WP * rho(i,j,k) * sum(cylVelocity**2)
-                  f = pDyn * chord * self%nblades * area(i,j,k) / radius / twoPi
+                  ! Calculate forces
+                  alphaFlow = alphaFlow / 180.0_WP * pi
 
-                  localforce = [0.0_WP, sign(1.0_WP, self%omega)*-1.0_WP*f*cd, f*cl]      ! r, theta, z
+                  f = 0.5*rho(i,j,k)*sum(CylVel**2)*chord*self%area(i,j,k)*self%nblades/radius/twoPi
+                  fdrag = -1.0_WP*f*signOmega*cd
+                  flift = tipFactor*f*cl
 
-                  ! Transform the force from rotor disk cylindrical to ori cartesian coordinates
-                  ! Note : the force transformation does not consider the trimming rotation of the rotor disk (LRF - RSP, common in helicopter and so on)
-                  localforce = cyl2cart_vec(localforce)
+                  ftheta = flift*sin(alphaFlow) + fdrag*cos(alphaFlow)
+                  fz = flift*cos(alphaFlow) - fdrag*sin(alphaFlow)
                   
+
+                  if (radius .lt. 0.018_WP) then
+                     print*, 'alphaEff:', alphaEff, "Cl:", cl, "Cd:", cd   
+                     print*, 'fz:', fz
+                     print*, CylVel
+                  end if
+
+
+                  ! Calculate the force in the rotor disk cylindrical coordinates
+                  ! radial, tangential, axial
+                  localforce = [0.0_WP, ftheta , fz]
+
+                  
+
+                  mydragEff = mydragEff + localforce(2)*self%rho_ref 
+                  myliftEff = myliftEff + localforce(3)*self%rho_ref
+                  mypowerEff = mypowerEff + localforce(2)*radius*signOmega*self%omega*self%rho_ref
+
+                  ! Transform the force from rotor disk cylindrical to global cartesian coordinates
+                  ! Note : the force transformation does not consider the trimming rotation of the rotor disk (LRF - RSP, common in helicopter and so on)
+                  rotMat_vec = transpose(rotMat_vec)
+                  localforce = matmul(rotMat_vec, localforce)
+                  localforce = matmul(invRotMat, localforce)
+
                   ! Transform the force into volumetric force
                   localforce = localforce / self%cfg%vol(i,j,k)
 
-                  forceX(i,j,k) = localforce(1)
-                  forceY(i,j,k) = localforce(2)
-                  forceZ(i,j,k) = localforce(3)
-                  
+                  self%forceX(i,j,k) = localforce(1)
+                  ! self%forceY(i,j,k) = localforce(2)
+                  ! self%forceZ(i,j,k) = localforce(3)
+
                end if
             end do
          end do
       end do
+
+      call self%cfg%sync(self%forceX)
+      call self%cfg%sync(self%forceY)
+      call self%cfg%sync(self%forceZ)
+
+      ! Synchronize the output
+      call MPI_ALLREDUCE(mydragEff, self%dragEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
+      call MPI_ALLREDUCE(myliftEff, self%liftEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
+      call MPI_ALLREDUCE(mypowerEff, self%powerEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
 
    end subroutine calculateForce
 
