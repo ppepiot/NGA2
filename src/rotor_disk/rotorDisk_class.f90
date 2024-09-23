@@ -2,6 +2,7 @@ module rotorDisk_class
    use blade_class, only: blade
    use precision, only: WP
    use config_class, only: config
+   use diag_class,     only: diag
    implicit none
    private
 
@@ -17,7 +18,6 @@ module rotorDisk_class
 
    type :: rotorDisk
       ! User-defined rotor disk properties
-
       real(WP) :: minR                            ! Minimum radius of the rotor disk
       real(WP) :: maxR                            ! Maximum radius of the rotor disk
       real(WP) :: omega                           ! Rotor angular velocity
@@ -29,12 +29,9 @@ module rotorDisk_class
       real(WP), dimension(3) :: axis              ! Rotor axis vector, must be normalized and in x-/y-/z- direction
       real(WP), dimension(3) :: ref_dir           ! Reference direction for theta calculation
 
-      real(WP) :: rho_ref                         ! Reference density, for output
-
       ! Internal rotor disk properties
-
-      type(blade) :: bl
-      type(config) :: cfg
+      type(blade),pointer :: bl
+      type(config),pointer :: cfg
 
       real(WP), dimension(:,:,:,:), allocatable :: cylPos  ! Cylindrical position in the rotor disk
       real(WP), dimension(:,:,:), allocatable :: area    ! Blade face area in every cell
@@ -42,15 +39,22 @@ module rotorDisk_class
       real(WP), dimension(:,:,:), allocatable :: forceY  ! Volumetric force in y-direction
       real(WP), dimension(:,:,:), allocatable :: forceZ  ! Volumetric force in z-direction
 
-      ! output
-      logical :: output
-      real(WP) :: dragEff, liftEff, powerEff
+      ! output parameters
+      real(WP) :: Torque, Thrust, Power
+
+      ! filter related parameters
+      type(diag) :: tridiag                               !< Tridiagonal solver for implicit filter
+      logical :: implicit_filter                          !< Solve implicitly
+      real(WP) :: filter_width                            !< Characteristic filter width
+      real(WP), dimension(:,:,:,:), allocatable :: div_x,div_y,div_z    !< Divergence operator
+      real(WP), dimension(:,:,:,:), allocatable :: grd_x,grd_y,grd_z    !< Gradient operator
 
    contains
-
+      procedure :: setRotorArea             ! Set the rotor disk area in cells
       procedure :: prepareRotorDisk         ! Prepare the rotor disk properties
       procedure :: setTipEffect             ! Set the tip effect correction
-      procedure :: calculateForce           ! Calculate the volumetric force in every cell from the rotor disk, the force can be added to the momentum equation
+      procedure :: calculateForce           ! Calculate the volumetric force in every cell from the rotor disk
+      procedure :: filter                   !< Apply volume filtering to field
 
    end type rotorDisk
 
@@ -63,11 +67,16 @@ contains
    function rotorDisk_constructor(bl, cfg) result(self)
       implicit none
       type(rotorDisk) :: self
-      type(blade), intent(in) :: bl
-      type(config), intent(in) :: cfg
+      type(blade), intent(in), target :: bl
+      type(config), intent(in), target :: cfg
 
-      self%cfg = cfg
-      self%bl = bl
+      integer :: i, j, k
+
+      ! Bind the config
+      self%cfg => cfg
+
+      ! Bind the blade
+      self%bl => bl
 
       ! initialize rotor disk properties
       self%minR = 0.0_WP
@@ -79,9 +88,8 @@ contains
 
       self%tipEffectParam = 1.0_WP
 
-      self%output = .true.
-      self%rho_ref = 1000.0_WP
 
+      ! Allocate the arrays
       allocate(self%cylPos(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,3))
       allocate(self%area(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
 
@@ -89,72 +97,99 @@ contains
       allocate(self%forceY(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       allocate(self%forceZ(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
 
+      ! Initialize the filter
+      ! Create tridiagonal solver object
+      self%tridiag=diag(cfg=self%cfg,name='Tridiagonal',n=3)
+
+      ! Set filter width to zero by default
+      self%filter_width=cfg%min_meshsize*3.5_WP
+
+      ! Solve implicitly by default
+      self%implicit_filter=.true.
+
+      ! Allocate finite volume divergence operators
+      allocate(self%div_x(0:+1,self%cfg%imin_:self%cfg%imax_,self%cfg%jmin_:self%cfg%jmax_,self%cfg%kmin_:self%cfg%kmax_)) !< Cell-centered
+      allocate(self%div_y(0:+1,self%cfg%imin_:self%cfg%imax_,self%cfg%jmin_:self%cfg%jmax_,self%cfg%kmin_:self%cfg%kmax_)) !< Cell-centered
+      allocate(self%div_z(0:+1,self%cfg%imin_:self%cfg%imax_,self%cfg%jmin_:self%cfg%jmax_,self%cfg%kmin_:self%cfg%kmax_)) !< Cell-centered
+      ! Create divergence operator to cell center [xm,ym,zm]
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               self%div_x(:,i,j,k)=self%cfg%dxi(i)*[-1.0_WP,+1.0_WP] !< Divergence from [x ,ym,zm]
+               self%div_y(:,i,j,k)=self%cfg%dyi(j)*[-1.0_WP,+1.0_WP] !< Divergence from [xm,y ,zm]
+               self%div_z(:,i,j,k)=self%cfg%dzi(k)*[-1.0_WP,+1.0_WP] !< Divergence from [xm,ym,z ]
+            end do
+         end do
+      end do
+
+      ! Allocate finite difference velocity gradient operators
+      allocate(self%grd_x(-1:0,self%cfg%imin_:self%cfg%imax_+1,self%cfg%jmin_:self%cfg%jmax_+1,self%cfg%kmin_:self%cfg%kmax_+1)) !< X-face-centered
+      allocate(self%grd_y(-1:0,self%cfg%imin_:self%cfg%imax_+1,self%cfg%jmin_:self%cfg%jmax_+1,self%cfg%kmin_:self%cfg%kmax_+1)) !< Y-face-centered
+      allocate(self%grd_z(-1:0,self%cfg%imin_:self%cfg%imax_+1,self%cfg%jmin_:self%cfg%jmax_+1,self%cfg%kmin_:self%cfg%kmax_+1)) !< Z-face-centered
+      ! Create gradient coefficients to cell faces
+      do k=self%cfg%kmin_,self%cfg%kmax_+1
+         do j=self%cfg%jmin_,self%cfg%jmax_+1
+            do i=self%cfg%imin_,self%cfg%imax_+1
+               self%grd_x(:,i,j,k)=self%cfg%dxmi(i)*[-1.0_WP,+1.0_WP] !< Gradient in x from [xm,ym,zm] to [x,ym,zm]
+               self%grd_y(:,i,j,k)=self%cfg%dymi(j)*[-1.0_WP,+1.0_WP] !< Gradient in y from [xm,ym,zm] to [xm,y,zm]
+               self%grd_z(:,i,j,k)=self%cfg%dzmi(k)*[-1.0_WP,+1.0_WP] !< Gradient in z from [xm,ym,zm] to [xm,ym,z]
+            end do
+         end do
+      end do
+
+      ! Loop over the domain and zero divergence in walls
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               if (self%cfg%VF(i,j,k).eq.0.0_WP) then
+                  self%div_x(:,i,j,k)=0.0_WP
+                  self%div_y(:,i,j,k)=0.0_WP
+                  self%div_z(:,i,j,k)=0.0_WP
+               end if
+            end do
+         end do
+      end do
+
+      ! Zero out gradient to wall faces
+      do k=self%cfg%kmin_,self%cfg%kmax_+1
+         do j=self%cfg%jmin_,self%cfg%jmax_+1
+            do i=self%cfg%imin_,self%cfg%imax_+1
+               if (self%cfg%VF(i,j,k).eq.0.0_WP.or.self%cfg%VF(i-1,j,k).eq.0.0_WP) self%grd_x(:,i,j,k)=0.0_WP
+               if (self%cfg%VF(i,j,k).eq.0.0_WP.or.self%cfg%VF(i,j-1,k).eq.0.0_WP) self%grd_y(:,i,j,k)=0.0_WP
+               if (self%cfg%VF(i,j,k).eq.0.0_WP.or.self%cfg%VF(i,j,k-1).eq.0.0_WP) self%grd_z(:,i,j,k)=0.0_WP
+            end do
+         end do
+      end do
+
+      ! Adjust metrics to account for lower dimensionality
+      if (self%cfg%nx.eq.1) then
+         self%div_x=0.0_WP
+         self%grd_x=0.0_WP
+      end if
+      if (self%cfg%ny.eq.1) then
+         self%div_y=0.0_WP
+         self%grd_y=0.0_WP
+      end if
+      if (self%cfg%nz.eq.1) then
+         self%div_z=0.0_WP
+         self%grd_z=0.0_WP
+      end if
+
    end function rotorDisk_constructor
 
-   subroutine prepareRotorDisk(self)
-      use mathtools, only: cross_product
-      use mathtools, only: normalize
-      use mathtools, only: inverse_matrix
+   subroutine setRotorArea(self)
       use mathtools, only: arctan
       use mathtools, only: twoPi, pi
       implicit none
       class(rotorDisk) :: self
 
+
       integer :: i, j, k
-
-      real(WP), dimension(3,3) :: Ra, Rb, temp
-      real(WP), dimension(3) :: x_
-
       integer :: mask(1), origin_index
       logical :: is_inside
       real(WP) :: m1, m2, n1, n2
       integer, dimension(4) :: insideCircle
 
-      real(WP), dimension(3) :: globalPos, rotatedPos, movedPos ! positions in global, rotated, moved, and cylindrical coordinates
-
-      ! Prepare the rotor disk properties
-      ! check center, axis, and ref_dir
-      if (sum(self%axis) .lt. 1.0E-9_WP) then
-         write(*,*) '[Rotor Disk] Error: axis vector is not defined'
-         stop
-      end if
-
-      if (sum(self%ref_dir) .lt. 1.0E-9_WP) then
-         write(*,*) '[Rotor Disk] Error: reference direction vector is not defined'
-         stop
-      end if
-
-      ! Normalize
-      self%axis = normalize(self%axis)
-      self%ref_dir = normalize(self%ref_dir)
-
-
-      ! Calculate the rotation matrix from cartesian to cylindrical coordinates
-      ! A stands for cartesian coordinates, Columns in Ra are the unit vectors of the cartesian coordinates
-      ! B stands for cylindrical coordinates, Columns in Rb are the unit vectors of the cylindrical coordinates
-
-      Ra = reshape([1.0_WP, 0.0_WP, 0.0_WP, &
-         0.0_WP, 1.0_WP, 0.0_WP, &
-         0.0_WP, 0.0_WP, 1.0_WP], [3,3])
-
-      ! In rotor disk cartesian coordinates, the z- dir is the axis
-      ! the y- dir is the reference direction, the x- dir is the cross product of the axis and reference direction
-      ! arctan(y/x) = theta
-      x_ = cross_product(self%axis, self%ref_dir)
-
-      Rb = reshape([x_(1), self%ref_dir(1), self%axis(1), &
-         x_(2), self%ref_dir(2), self%axis(2), &
-         x_(3), self%ref_dir(3), self%axis(3)], [3,3])
-
-      ! The rotation matrix from cartesian to cylindrical coordinates (A => B) is Rb * Ra^(-1)
-      ! The rotation matrix from cylindrical to cartesian coordinates (B => A) is Ra * Rb^(-1)
-      temp = transpose(Ra)
-      rotMat = matmul(Rb, temp)
-
-      temp = transpose(Rb)
-      invRotMat = matmul(Ra, temp)
-
-      ! calculate the BET area in every cell
       self%area = 0.0_WP
 
       ! Get the axis direction. If mask(1) is 1, the axis is x-direction,
@@ -257,8 +292,66 @@ contains
 
       call self%cfg%sync(self%area)
 
-      ! Prepare the relative position in the rotor disk
+   end subroutine setRotorArea
 
+   subroutine prepareRotorDisk(self)
+      use mathtools, only: cross_product
+      use mathtools, only: normalize
+      use mathtools, only: inverse_matrix
+      use mathtools, only: arctan
+      use mathtools, only: twoPi, pi
+      implicit none
+      class(rotorDisk) :: self
+
+      integer :: i, j, k
+      real(WP), dimension(3,3) :: Ra, Rb, temp
+      real(WP), dimension(3) :: x_
+      real(WP), dimension(3) :: globalPos, rotatedPos, movedPos ! positions in global, rotated, moved, and cylindrical coordinates
+
+      ! Prepare the rotor disk properties
+      ! check center, axis, and ref_dir
+      if (sum(self%axis) .lt. 1.0E-9_WP) then
+         write(*,*) '[Rotor Disk] Error: axis vector is not defined'
+         stop
+      end if
+
+      if (sum(self%ref_dir) .lt. 1.0E-9_WP) then
+         write(*,*) '[Rotor Disk] Error: reference direction vector is not defined'
+         stop
+      end if
+
+      ! Normalize
+      self%axis = normalize(self%axis)
+      self%ref_dir = normalize(self%ref_dir)
+
+
+      ! Calculate the rotation matrix from cartesian to cylindrical coordinates
+      ! A stands for cartesian coordinates, Columns in Ra are the unit vectors of the cartesian coordinates
+      ! B stands for cylindrical coordinates, Columns in Rb are the unit vectors of the cylindrical coordinates
+      Ra = reshape([1.0_WP, 0.0_WP, 0.0_WP, &
+         0.0_WP, 1.0_WP, 0.0_WP, &
+         0.0_WP, 0.0_WP, 1.0_WP], [3,3])
+
+      ! In rotor disk cartesian coordinates, the z- dir is the axis
+      ! the y- dir is the reference direction, the x- dir is the cross product of the axis and reference direction
+      ! arctan(y/x) = theta
+      x_ = cross_product(self%axis, self%ref_dir)
+      Rb = reshape([x_(1), self%ref_dir(1), self%axis(1), &
+         x_(2), self%ref_dir(2), self%axis(2), &
+         x_(3), self%ref_dir(3), self%axis(3)], [3,3])
+
+      ! The rotation matrix from cartesian to cylindrical coordinates (A => B) is Rb * Ra^(-1)
+      ! The rotation matrix from cylindrical to cartesian coordinates (B => A) is Ra * Rb^(-1)
+      temp = transpose(Ra)
+      rotMat = matmul(Rb, temp)
+
+      temp = transpose(Rb)
+      invRotMat = matmul(Ra, temp)
+
+      ! Set the rotor disk area in cells
+      call self%setRotorArea()
+
+      ! Prepare the relative position in the rotor disk
       do k=self%cfg%kmin_,self%cfg%kmax_
          do j=self%cfg%jmin_,self%cfg%jmax_
             do i=self%cfg%imin_,self%cfg%imax_
@@ -271,9 +364,9 @@ contains
             end do
          end do
       end do
-      
+
       ! Prepare the angular velocity in rad/s
-      self%omega = self%omega * 2.0_WP * pi / 60.0_WP 
+      self%omega = self%omega * 2.0_WP * pi / 60.0_WP
 
    end subroutine prepareRotorDisk
 
@@ -286,7 +379,6 @@ contains
 
    end subroutine setTipEffect
 
-
    subroutine calculateForce(self, rho, U, V, W)
       use mathtools, only: arctan
       use mathtools, only: cross_product
@@ -296,7 +388,6 @@ contains
       implicit none
       class(rotorDisk) :: self
       real(WP), dimension(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_), intent(in) :: rho, U, V, W
-  
 
       real(WP), dimension(3) :: cylPos
       real(WP), dimension(3) :: globalVel       ! U, V, W
@@ -306,20 +397,20 @@ contains
       real(WP) :: radius, chord, twist, cl, cd
       real(WP) :: alphaGeom, alphaEff, alphaFlow              ! Geometric and effective angle of attack
       real(WP) :: tipFactor                        ! Tip effect factor
-      real(WP) :: fz, ftheta, f, flift, fdrag
+      real(WP) :: fAxial, fTang, f, flift, fdrag
       real(WP), dimension(3) :: localforce
       real(WP) :: signOmega
 
-      real(WP) :: mydragEff, myliftEff, mypowerEff
+      real(WP) :: myTorque, myThrust, myPower
       integer :: ierr
 
       self%forceX = 0.0_WP
       self%forceY = 0.0_WP
       self%forceZ = 0.0_WP
 
-      mydragEff = 0.0_WP
-      myliftEff = 0.0_WP
-      mypowerEff = 0.0_WP
+      myTorque = 0.0_WP
+      myThrust = 0.0_WP
+      myPower = 0.0_WP
 
       signOmega = sign(1.0_WP, self%omega)
 
@@ -354,11 +445,8 @@ contains
                   ! Effective angle of attack
                   alphaGeom = twist                               ! Twist angle in degrees, no trim angle
                   alphaFlow = arctan(CylVel(2), CylVel(3))/pi*180.0_WP
-
                   if (alphaFlow .gt. 180.0_WP) alphaFlow = alphaFlow - 360.0_WP
-
                   alphaEff = alphaGeom - alphaFlow
-
 
                   ! Calculate the lift and drag coefficients
                   call self%bl%interpolate_a(alphaEff, cl, cd)
@@ -374,26 +462,15 @@ contains
                   fdrag = -1.0_WP*f*signOmega*cd
                   flift = tipFactor*f*cl
 
-                  ftheta = flift*sin(alphaFlow) + fdrag*cos(alphaFlow)
-                  fz = flift*cos(alphaFlow) - fdrag*sin(alphaFlow)
-                  
+                  fTang = flift*sin(alphaFlow) + fdrag*cos(alphaFlow)
+                  fAxial = flift*cos(alphaFlow) - fdrag*sin(alphaFlow)
 
-                  if (radius .lt. 0.018_WP) then
-                     print*, 'alphaEff:', alphaEff, "Cl:", cl, "Cd:", cd   
-                     print*, 'fz:', fz
-                     print*, CylVel
-                  end if
-
-
-                  ! Calculate the force in the rotor disk cylindrical coordinates
                   ! radial, tangential, axial
-                  localforce = [0.0_WP, ftheta , fz]
+                  localforce = [0.0_WP, fTang , fAxial]
 
-                  
-
-                  mydragEff = mydragEff + localforce(2)*self%rho_ref 
-                  myliftEff = myliftEff + localforce(3)*self%rho_ref
-                  mypowerEff = mypowerEff + localforce(2)*radius*signOmega*self%omega*self%rho_ref
+                  myTorque = myTorque + localforce(2)
+                  myThrust = myThrust + localforce(3)
+                  myPower = myPower + localforce(2)*radius*signOmega*self%omega
 
                   ! Transform the force from rotor disk cylindrical to global cartesian coordinates
                   ! Note : the force transformation does not consider the trimming rotation of the rotor disk (LRF - RSP, common in helicopter and so on)
@@ -405,8 +482,8 @@ contains
                   localforce = localforce / self%cfg%vol(i,j,k)
 
                   self%forceX(i,j,k) = localforce(1)
-                  ! self%forceY(i,j,k) = localforce(2)
-                  ! self%forceZ(i,j,k) = localforce(3)
+                  self%forceY(i,j,k) = localforce(2)
+                  self%forceZ(i,j,k) = localforce(3)
 
                end if
             end do
@@ -417,12 +494,115 @@ contains
       call self%cfg%sync(self%forceY)
       call self%cfg%sync(self%forceZ)
 
+      call self%filter(self%forceX)
+      call self%filter(self%forceY)
+      call self%filter(self%forceZ)
+
       ! Synchronize the output
-      call MPI_ALLREDUCE(mydragEff, self%dragEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
-      call MPI_ALLREDUCE(myliftEff, self%liftEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
-      call MPI_ALLREDUCE(mypowerEff, self%powerEff, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
+      call MPI_ALLREDUCE(myTorque, self%Torque, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
+      call MPI_ALLREDUCE(myThrust, self%Thrust, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
+      call MPI_ALLREDUCE(myPower, self%Power, 1, MPI_REAL_WP, MPI_SUM, self%cfg%comm, ierr)
 
    end subroutine calculateForce
+
+   !> Laplacian filtering operation
+  subroutine filter(self,A)
+   implicit none
+   class(rotorDisk), intent(inout) :: self
+   real(WP), dimension(self%cfg%imino_:,self%cfg%jmino_:,self%cfg%kmino_:), intent(inout) :: A     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   real(WP) :: filter_coeff
+   integer :: i,j,k,n,nstep
+   real(WP), dimension(:,:,:), allocatable :: FX,FY,FZ
+
+   ! Return without filtering if filter width is zero
+   if (self%filter_width.le.0.0_WP) return
+
+   ! Recompute filter coeff and number of explicit steps needed
+   filter_coeff=0.5_WP*(self%filter_width/(2.0_WP*sqrt(2.0_WP*log(2.0_WP))))**2
+
+   if (self%implicit_filter) then  !< Apply filter implicitly via approximate factorization
+      ! Inverse in X-direction
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               self%tridiag%Ax(j,k,i,-1) = - self%div_x(0,i,j,k) * filter_coeff * self%grd_x(-1,i,j,k)
+               self%tridiag%Ax(j,k,i, 0) = 1.0_WP - (self%div_x(0,i,j,k) * filter_coeff * self%grd_x(0,i,j,k) &
+                    + self%div_x(1,i,j,k) * filter_coeff * self%grd_x(-1,i+1,j,k))
+               self%tridiag%Ax(j,k,i,+1) = - self%div_x(1,i,j,k) * filter_coeff * self%grd_x(0,i+1,j,k)
+               self%tridiag%Rx(j,k,i) = A(i,j,k)
+            end do
+         end do
+      end do
+      call self%tridiag%linsol_x()         
+      ! Inverse in Y-direction
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               self%tridiag%Ay(i,k,j,-1) = - self%div_y(0,i,j,k) * filter_coeff * self%grd_y(-1,i,j,k)
+               self%tridiag%Ay(i,k,j, 0) = 1.0_WP - (self%div_y(0,i,j,k)* filter_coeff * self%grd_y(0,i,j,k) &
+                    + self%div_y(1,i,j,k) * filter_coeff * self%grd_y(-1,i,j+1,k))
+               self%tridiag%Ay(i,k,j,+1) = - self%div_y(1,i,j,k) * filter_coeff * self%grd_y(0,i,j+1,k)
+               self%tridiag%Ry(i,k,j) = self%tridiag%Rx(j,k,i)
+            end do
+         end do
+      end do
+      call self%tridiag%linsol_y()
+      ! Inverse in Z-direction
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               self%tridiag%Az(i,j,k,-1) = - self%div_z(0,i,j,k) * filter_coeff * self%grd_z(-1,i,j,k)
+               self%tridiag%Az(i,j,k, 0) = 1.0_WP - (self%div_z(0,i,j,k) * filter_coeff * self%grd_z(0,i,j,k) &
+                    + self%div_z(1,i,j,k) * filter_coeff * self%grd_z(-1,i,j,k+1))
+               self%tridiag%Az(i,j,k,+1) = - self%div_z(1,i,j,k) * filter_coeff * self%grd_z(0,i,j,k+1)
+               self%tridiag%Rz(i,j,k) = self%tridiag%Ry(i,k,j)
+            end do
+         end do
+      end do
+      call self%tridiag%linsol_z()        
+      ! Update A
+      do k=self%cfg%kmin_,self%cfg%kmax_
+         do j=self%cfg%jmin_,self%cfg%jmax_
+            do i=self%cfg%imin_,self%cfg%imax_
+               A(i,j,k)=self%tridiag%Rz(i,j,k)
+            end do
+         end do
+      end do
+   else  !< Apply filter explicitly
+      ! Allocate flux arrays
+      allocate(FX(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_))
+      allocate(FY(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_))
+      allocate(FZ(self%cfg%imino_:self%cfg%imaxo_,self%cfg%jmino_:self%cfg%jmaxo_,self%cfg%kmino_:self%cfg%kmaxo_))
+      nstep=ceiling(6.0_WP*filter_coeff/self%cfg%min_meshsize**2)
+      filter_coeff=filter_coeff/real(nstep,WP)
+      do n=1,nstep
+         ! Diffusive flux of A
+         do k=self%cfg%kmin_,self%cfg%kmax_+1
+            do j=self%cfg%jmin_,self%cfg%jmax_+1
+               do i=self%cfg%imin_,self%cfg%imax_+1
+                  FX(i,j,k)=filter_coeff*sum(self%grd_x(:,i,j,k)*A(i-1:i,j,k))
+                  FY(i,j,k)=filter_coeff*sum(self%grd_y(:,i,j,k)*A(i,j-1:j,k))
+                  FZ(i,j,k)=filter_coeff*sum(self%grd_z(:,i,j,k)*A(i,j,k-1:k))
+               end do
+            end do
+         end do
+         ! Divergence of fluxes
+         do k=self%cfg%kmin_,self%cfg%kmax_
+            do j=self%cfg%jmin_,self%cfg%jmax_
+               do i=self%cfg%imin_,self%cfg%imax_
+                  A(i,j,k)=A(i,j,k)+sum(self%div_x(:,i,j,k)*FX(i:i+1,j,k))+sum(self%div_y(:,i,j,k)*FY(i,j:j+1,k))+sum(self%div_z(:,i,j,k)*FZ(i,j,k:k+1))
+               end do
+            end do
+         end do
+      end do
+      ! Deallocate flux arrays
+      deallocate(FX,FY,FZ)
+   end if
+
+   ! Sync A
+   call self%cfg%sync(A)
+
+ end subroutine filter
 
 
 end module rotorDisk_class
