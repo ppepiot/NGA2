@@ -21,6 +21,7 @@ module incomp_class
    integer, parameter, public :: convective=4        !< Convective outflow condition
    integer, parameter, public :: clipped_neumann=5   !< Clipped Neumann condition (outflow only)
    integer, parameter, public :: slip=6              !< Free-slip condition
+   integer, parameter, public :: inletOutlet=7       !< Outlet condition, backflow allowed
 
    !> Boundary conditions for the incompressible solver
    type :: bcond
@@ -32,6 +33,7 @@ module incomp_class
       integer :: dir                                      !< Bcond direction (+1,-1,0 for interior)
       real(WP) :: rdir                                    !< Bcond direction (real variable)
       logical :: canCorrect                               !< Can this bcond be corrected for global conservation?
+      real(WP) :: backflow_velocity                       !< Backflow velocity for inletOutlet bcond
    end type bcond
    
    !> Incompressible solver object definition
@@ -818,7 +820,7 @@ contains
    
    
    !> Add a boundary condition
-   subroutine add_bcond(this,name,type,locator,face,dir,canCorrect)
+   subroutine add_bcond(this,name,type,locator,face,dir,canCorrect,backflow_velocity)
       use string,         only: lowercase
       use messager,       only: die
       use iterator_class, only: locator_ftype
@@ -830,6 +832,7 @@ contains
       character(len=1), intent(in) :: face
       integer, intent(in) :: dir
       logical, intent(in) :: canCorrect
+      real(WP), intent(in), optional :: backflow_velocity
       type(bcond), pointer :: new_bc
       integer :: i,j,k,n
       
@@ -852,6 +855,7 @@ contains
       end select
       new_bc%rdir=real(new_bc%dir,WP)
       new_bc%canCorrect=canCorrect
+      new_bc%backflow_velocity=0.0_WP
       
       ! Insert it up front
       new_bc%next=>this%first_bc
@@ -885,6 +889,14 @@ contains
       case (clipped_neumann)
       case (convective)
       case (slip)
+
+      case (inletOutlet)
+         if (.not. present(backflow_velocity)) then
+            call die('[incomp add_bcond] backflow_velocity is required for inletOutlet bcond')
+         else
+            new_bc%backflow_velocity=backflow_velocity
+         end if
+
       case default
          call die('[incomp apply_bcond] Unknown bcond type')
       end select
@@ -947,7 +959,7 @@ contains
                ! This is done by the user directly
                ! Unclear whether we want to do this within the solver...
                
-            case (neumann,clipped_neumann,slip) !< Apply Neumann condition to all 3 components
+            case (neumann,clipped_neumann,slip,inletOutlet) !< Apply Neumann condition to all 3 components
                ! Handle index shift due to staggering
                stag=min(my_bc%dir,0)
                ! Implement based on bcond direction
@@ -1014,6 +1026,26 @@ contains
                      do n=1,my_bc%itr%n_
                         i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                         this%W(i,j,k)=0.0_WP
+                     end do
+                  end select
+               end if
+               ! If needed, apply backflow velocity
+               if (my_bc%type.eq.inletOutlet) then
+                  select case (my_bc%face)
+                  case ('x')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        if (this%U(i,j,k)*my_bc%rdir.lt.0.0_WP) this%U(i,j,k)=-1.0_WP*my_bc%backflow_velocity*my_bc%rdir
+                     end do
+                  case ('y')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        if (this%V(i,j,k)*my_bc%rdir.lt.0.0_WP) this%V(i,j,k)=-1.0_WP*my_bc%backflow_velocity*my_bc%rdir
+                     end do
+                  case ('z')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        if (this%W(i,j,k)*my_bc%rdir.lt.0.0_WP) this%W(i,j,k)=-1.0_WP*my_bc%backflow_velocity*my_bc%rdir
                      end do
                   end select
                end if

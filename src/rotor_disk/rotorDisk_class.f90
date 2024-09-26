@@ -326,11 +326,11 @@ contains
 
 
       ! Calculate the rotation matrix from cartesian to cylindrical coordinates
-      ! A stands for cartesian coordinates, Columns in Ra are the unit vectors of the cartesian coordinates
-      ! B stands for cylindrical coordinates, Columns in Rb are the unit vectors of the cylindrical coordinates
+      ! A stands for global cartesian coordinates, Columns in Ra are the unit vectors
+      ! B stands for disk cartesian coordinates, Columns in Rb are the unit vectors
       Ra = reshape([1.0_WP, 0.0_WP, 0.0_WP, &
          0.0_WP, 1.0_WP, 0.0_WP, &
-         0.0_WP, 0.0_WP, 1.0_WP], [3,3])
+         0.0_WP, 0.0_WP, 1.0_WP], [3,3])  
 
       ! In rotor disk cartesian coordinates, the z- dir is the axis
       ! the y- dir is the reference direction, the x- dir is the cross product of the axis and reference direction

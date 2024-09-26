@@ -1,12 +1,12 @@
 # NGA location if not yet defined
-NGA_HOME = ../../ppNGA2
+NGA_HOME = ../..
 
 # Compilation parameters
 PRECISION = DOUBLE
 USE_MPI   = TRUE
+USE_FFTW  = #TRUE
 USE_HYPRE = TRUE
 USE_LAPACK= TRUE
-USE_IRL   = TRUE
 PROFILE   = FALSE
 DEBUG     = FALSE
 COMP      = gnu
@@ -28,7 +28,7 @@ VPATH_LOCATIONS   += $(Ulocs)
 include $(NGA_HOME)/tools/GNUMake/Make.defs
 
 # Include NGA base code
-Bdirs   := non_newtonian core two_phase constant_density data solver config grid libraries rotor_disk
+Bdirs   := core constant_density data solver config grid libraries rotor_disk
 Bpack   += $(foreach dir, $(Bdirs), $(NGA_HOME)/src/$(dir)/Make.package)
 include $(Bpack)
 
