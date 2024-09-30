@@ -468,9 +468,9 @@ contains
                   ! radial, tangential, axial
                   localforce = [0.0_WP, fTang , fAxial]
 
-                  myTorque = myTorque + localforce(2)
-                  myThrust = myThrust + localforce(3)
-                  myPower = myPower + localforce(2)*radius*signOmega*self%omega
+                  myTorque = myTorque + abs(localforce(2))
+                  myThrust = myThrust + abs(localforce(3))
+                  myPower = myPower + abs(localforce(2)*radius*self%omega)
 
                   ! Transform the force from rotor disk cylindrical to global cartesian coordinates
                   ! Note : the force transformation does not consider the trimming rotation of the rotor disk (LRF - RSP, common in helicopter and so on)
