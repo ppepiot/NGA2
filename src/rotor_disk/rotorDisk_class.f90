@@ -31,7 +31,8 @@ module rotorDisk_class
 
       ! Internal rotor disk properties
       type(blade),pointer :: bl
-      type(config),pointer :: cfg
+      ! This is our config
+      class(config), pointer :: cfg                       !< This is the config the solver is build for
 
       real(WP), dimension(:,:,:,:), allocatable :: cylPos  ! Cylindrical position in the rotor disk
       real(WP), dimension(:,:,:), allocatable :: area    ! Blade face area in every cell
@@ -67,16 +68,16 @@ contains
    function rotorDisk_constructor(bl, cfg) result(self)
       implicit none
       type(rotorDisk) :: self
-      type(blade), intent(in), target :: bl
-      type(config), intent(in), target :: cfg
+      type(blade), target, intent(in) :: bl
+      class(config), target, intent(in) :: cfg
 
       integer :: i, j, k
 
-      ! Bind the config
-      self%cfg => cfg
+      ! Point to pgrid object
+      self%cfg=>cfg
 
       ! Bind the blade
-      self%bl => bl
+      self%bl=>bl
 
       ! initialize rotor disk properties
       self%minR = 0.0_WP
