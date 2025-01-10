@@ -18,6 +18,7 @@ module simulation
    !> Get a couple linear solvers, a two-phase flow solver and volume fraction solver and corresponding time tracker
    type(hypre_str),   public :: ps,psL
    type(ddadi),       public :: ss
+   ! type(hypre_str),   public :: ss
    type(tpns),        public :: fs,fsL
    type(vfs),         public :: vf
    type(tpscalar),    public :: sc
@@ -354,8 +355,8 @@ contains
       ! Create a one-sided scalar solver
       create_scalar: block
          use param, only: param_read
-         use tpscalar_class,  only: neumann
-         use hypre_str_class, only: pcg_pfmg2,pfmg,gmres_pfmg
+         use tpscalar_class,  only: neumann,dirichlet
+         use hypre_str_class, only: pcg_pfmg2
          integer :: i,j,k
          real(WP) :: LTdiff,GTdiff,vapor_diff
          ! Create scalar solver
@@ -379,6 +380,10 @@ contains
          sc%diff(:,:,:,iYv)=vapor_diff
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Scalar',nst=7)
+         ! ss=hypre_str(cfg=cfg,name='Scalar',method=pcg_pfmg2,nst=7)
+         ! ss%maxlevel=16
+         ! ss%maxit=50
+         ! ss%rcvg=1e-7
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
          ! Initialize scalar fields
@@ -447,10 +452,10 @@ contains
          call ens_out%add_scalar('pressure',fs%P)
          call ens_out%add_scalar('curvature',vf%curv)
          call ens_out%add_surface('plic',smesh)
-         ! do nsc=1,sc%nscalar
-         !   call ens_out%add_scalar(trim(sc%SCname(nsc)),sc%SC(:,:,:,nsc))
-         ! end do
-         call ens_out%add_scalar(trim(sc%SCname(iYv)),sc%SC(:,:,:,iYv))
+         do nsc=1,sc%nscalar
+           call ens_out%add_scalar(trim(sc%SCname(nsc)),sc%SC(:,:,:,nsc))
+         end do
+         ! call ens_out%add_scalar(trim(sc%SCname(iYv)),sc%SC(:,:,:,iYv))
          call ens_out%add_scalar('mflux',evp%mflux)
          call ens_out%add_scalar('evp_div',evp%div_src)
          call ens_out%add_scalar('mdotdp',evp%mdotdp)
@@ -460,6 +465,10 @@ contains
          call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
          call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
          call ens_out%add_scalar('Temperature',T)
+         ! Debug
+         call ens_out%add_scalar('SD',vf%SD)
+         call ens_out%add_scalar('PVFL',sc%PVF(:,:,:,Lphase))
+         call ens_out%add_scalar('PVFG',sc%PVF(:,:,:,Gphase))
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -613,27 +622,34 @@ contains
          ! Transport scalars
          advance_scalar: block
             integer :: nsc
-            
+
             ! Update the phas-specific VOF
             sc%PVF(:,:,:,Lphase)=vf%VF
             sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
             
             ! Explicit calculation of dSC/dt from advective term
-            call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
+            ! call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
+            call sc%get_dSCdt(dSCdt=resSC,UL=fsL%U,VL=fsL%V,WL=fsL%W,UG=fs%U,VG=fs%V,WG=fs%W,VFold=vf%VFold,VF=vf%VF)
             
             ! Advance advection
-            do nsc=1,sc%nscalar
-               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*resSC(:,:,:,nsc))/(sc%PVF(:,:,:,sc%phase(nsc)))
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
-            end do
-            
+            ! do nsc=1,sc%nscalar
+            !    where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*resSC(:,:,:,nsc))/(sc%PVF(:,:,:,sc%phase(nsc)))
+            !    where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
+            ! end do
+
             ! Apply the mass/energy transfer term for the species/temperature
             nsc=iYv
             where (sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP.and.sc%PVF(:,:,:,sc%phase(nsc)).lt.1.0_WP) sc%SC(:,:,:,nsc)=sc%SC(:,:,:,nsc)+evp%mflux/sc%Prho(sc%phase(nsc))*time%dt
-            
+
             ! Advance diffusion
-            call sc%solve_implicit_diff(time%dt,sc%SC)
-            
+            ! call sc%solve_implicit_diff(time%dt,sc%SC)
+            do nsc=1,sc%nscalar
+               where (sc%PVF(:,:,:,sc%phase(nsc)).gt.1.0e-12_WP)
+                  resSC(:,:,:,nsc)=sc%PVFold(:,:,:,sc%phase(nsc))/sc%PVF(:,:,:,sc%phase(nsc))*sc%SC(:,:,:,nsc)
+               end where
+            end do
+            call sc%solve_implicit_diff(time%dt,resSC)
+
             ! Apply boundary conditions
             call sc%apply_bcond(time%t,time%dt)
             

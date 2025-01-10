@@ -464,25 +464,190 @@ contains
    
    
    !> Calculate the explicit SC time derivative from advective term based on U/V/W
-   subroutine get_dSCdt(this,dSCdt,U,V,W,VFold,VF,detailed_face_flux,dt)
-      use irl_fortran_interface
+   ! subroutine get_dSCdt(this,dSCdt,U,V,W,VFold,VF,detailed_face_flux,dt)
+   !    use irl_fortran_interface
+   !    implicit none
+   !    class(tpscalar), intent(inout) :: this
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VFold    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VF       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    type(TagAccVM_SepVM_type), dimension(1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:) :: detailed_face_flux !< Needs to be (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), intent(in) :: dt  !< This is the time step size that was used to generate the detailed_face_flux geometric data
+   !    type(SepVM_type) :: my_SepVM
+   !    integer :: i,j,k,nsc,n
+   !    real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
+   !    real(WP), dimension(:,:,:,:), allocatable :: grad
+   !    real(WP) :: my_vol,SCm,SCp
+   !    !real(WP), dimension(3) :: my_bar
+   !    integer, dimension(3) :: ind
+   !    ! Zero out dSC/dt array
+   !    dSCdt=0.0_WP
+   !    ! Allocate flux arrays
+   !    allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+   !    allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+   !    allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+   !    ! Allocate scalar gradient
+   !    allocate(grad(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+   !    ! Work on each scalar
+   !    do nsc=1,this%nscalar
+   !       ! Reset fluxes and gradient to zero
+   !       FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP; grad=0.0_WP
+   !       ! Calculate minmod-limited gradient of SC everywhere
+   !       do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
+   !          do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
+   !             do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+   !                ! No need to calculate gradient inside of wall cell
+   !                if (this%mask(i,j,k).eq.1) cycle
+   !                ! Get gradient
+   !                grad(1,i,j,k)=minmod((this%SC(i+1,j,k,nsc)-this%SC(i,j,k,nsc))*this%cfg%dxmi(i+1),(this%SC(i,j,k,nsc)-this%SC(i-1,j,k,nsc))*this%cfg%dxmi(i))
+   !                grad(2,i,j,k)=minmod((this%SC(i,j+1,k,nsc)-this%SC(i,j,k,nsc))*this%cfg%dymi(j+1),(this%SC(i,j,k,nsc)-this%SC(i,j-1,k,nsc))*this%cfg%dymi(j))
+   !                grad(3,i,j,k)=minmod((this%SC(i,j,k+1,nsc)-this%SC(i,j,k,nsc))*this%cfg%dzmi(k+1),(this%SC(i,j,k,nsc)-this%SC(i,j,k-1,nsc))*this%cfg%dzmi(k))
+   !             end do
+   !          end do
+   !       end do
+   !       call this%cfg%sync(grad)
+   !       ! Convective flux of SC
+   !       do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !          do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !             do i=this%cfg%imin_,this%cfg%imax_+1
+   !                ! Flux on x-face
+   !                if (getSize(detailed_face_flux(1,i,j,k)).gt.0) then
+   !                   ! Detailed geometric flux is available, use geometric fluxing
+   !                   do n=0,getSize(detailed_face_flux(1,i,j,k))-1
+   !                      ! Get cell index for nth object
+   !                      ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(1,i,j,k),n))
+   !                      ! Get SepVM for nth object
+   !                      call getSepVMAtIndex(detailed_face_flux(1,i,j,k),n,my_SepVM)
+   !                      ! Extract volume for relevant phase
+   !                      my_vol=getVolume(my_SepVM,this%phase(nsc))
+   !                      ! Increment flux with first order estimate
+   !                      FX(i,j,k)=FX(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
+   !                      ! Second order correction
+   !                      !my_bar=getCentroid(my_SepVM,this%phase(nsc))
+   !                      !FX(i,j,k)=FX(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
+   !                   end do
+   !                   ! Scale by cell face area and time step size
+   !                   FX(i,j,k)=FX(i,j,k)/(dt*this%cfg%dy(j)*this%cfg%dz(k))
+   !                else
+   !                   ! No detailed geometric flux is available, use MUSCL flux
+   !                   SCm=0.0_WP; if (VFold(i-1,j,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
+   !                   SCp=0.0_WP; if (VFold(i  ,j,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
+   !                   FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
+   !                end if
+   !                ! Flux on y-face
+   !                if (getSize(detailed_face_flux(2,i,j,k)).gt.0) then
+   !                   ! Detailed geometric flux is available, use geometric fluxing
+   !                   do n=0,getSize(detailed_face_flux(2,i,j,k))-1
+   !                      ! Get cell index for nth object
+   !                      ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(2,i,j,k),n))
+   !                      ! Get SepVM for nth object
+   !                      call getSepVMAtIndex(detailed_face_flux(2,i,j,k),n,my_SepVM)
+   !                      ! Extract volume for relevant phase
+   !                      my_vol=getVolume(my_SepVM,this%phase(nsc))
+   !                      ! Increment flux with first order estimate
+   !                      FY(i,j,k)=FY(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
+   !                      ! Second order correction
+   !                      !my_bar=getCentroid(my_SepVM,this%phase(nsc))
+   !                      !FY(i,j,k)=FY(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
+   !                   end do
+   !                   ! Scale by cell face area and time step size
+   !                   FY(i,j,k)=FY(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dz(k))
+   !                else
+   !                   ! No detailed geometric flux is available, use MUSCL flux
+   !                   SCm=0.0_WP; if (VFold(i,j-1,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
+   !                   SCp=0.0_WP; if (VFold(i,j  ,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
+   !                   FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
+   !                end if
+   !                ! Flux on z-face
+   !                if (getSize(detailed_face_flux(3,i,j,k)).gt.0) then
+   !                   ! Detailed geometric flux is available, use geometric fluxing
+   !                   do n=0,getSize(detailed_face_flux(3,i,j,k))-1
+   !                      ! Get cell index for nth object
+   !                      ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(3,i,j,k),n))
+   !                      ! Get SepVM for nth object
+   !                      call getSepVMAtIndex(detailed_face_flux(3,i,j,k),n,my_SepVM)
+   !                      ! Extract volume for relevant phase
+   !                      my_vol=getVolume(my_SepVM,this%phase(nsc))
+   !                      ! Increment flux with first order estimate
+   !                      FZ(i,j,k)=FZ(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
+   !                      ! Second order correction
+   !                      !my_bar=getCentroid(my_SepVM,this%phase(nsc))
+   !                      !FZ(i,j,k)=FZ(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
+   !                   end do
+   !                   ! Scale by cell face area and time step size
+   !                   FZ(i,j,k)=FZ(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dy(j))
+   !                else
+   !                   ! No detailed geometric flux is available, use MUSCL flux
+   !                   SCm=0.0_WP; if (VFold(i,j,k-1).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
+   !                   SCp=0.0_WP; if (VFold(i,j,k  ).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
+   !                   FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
+   !                end if
+   !             end do
+   !          end do
+   !       end do
+   !       ! Time derivative of SC
+   !       do k=this%cfg%kmin_,this%cfg%kmax_
+   !          do j=this%cfg%jmin_,this%cfg%jmax_
+   !             do i=this%cfg%imin_,this%cfg%imax_
+   !                dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
+   !                &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
+   !                &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))
+   !             end do
+   !          end do
+   !       end do
+   !       ! Sync residual
+   !       call this%cfg%sync(dSCdt(:,:,:,nsc))
+   !    end do
+   !    ! Deallocate flux arrays
+   !    deallocate(FX,FY,FZ,grad)
+      
+   ! contains
+      
+   !    !> Minmod gradient
+   !    function minmod(g1,g2) result(g)
+   !       implicit none
+   !       real(WP), intent(in) :: g1,g2
+   !       real(WP) :: g
+   !       if (g1*g2.le.0.0_WP) then
+   !          g=0.0_WP
+   !       else
+   !          if (abs(g1).lt.abs(g2)) then
+   !             g=g1
+   !          else
+   !             g=g2
+   !          end if
+   !       end if
+   !    end function minmod
+      
+   ! end subroutine get_dSCdt
+
+
+   !> Calculate the explicit SC time derivative from advective term based on U/V/W
+   subroutine get_dSCdt(this,dSCdt,UL,VL,WL,UG,VG,WG,VFold,VF)
+      use vfs_class, only: VFhi,VFlo
       implicit none
       class(tpscalar), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VFold    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VF       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      type(TagAccVM_SepVM_type), dimension(1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:) :: detailed_face_flux !< Needs to be (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), intent(in) :: dt  !< This is the time step size that was used to generate the detailed_face_flux geometric data
-      type(SepVM_type) :: my_SepVM
-      integer :: i,j,k,nsc,n
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out)      :: dSCdt    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: UL       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: VL       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: WL       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: UG       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: VG       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), target, intent(in)  :: WG       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),         intent(in)  :: VFold    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),         intent(in)  :: VF       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(:,:,:), pointer :: U
+      real(WP), dimension(:,:,:), pointer :: V
+      real(WP), dimension(:,:,:), pointer :: W
+      integer :: i,j,k,nsc
       real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
       real(WP), dimension(:,:,:,:), allocatable :: grad
-      real(WP) :: my_vol,SCm,SCp
-      !real(WP), dimension(3) :: my_bar
-      integer, dimension(3) :: ind
+      real(WP) :: SCm,SCp
+      real(WP) :: VFm,VFp
+      logical  :: is_interfacial_m,is_interfacial_p
       ! Zero out dSC/dt array
       dSCdt=0.0_WP
       ! Allocate flux arrays
@@ -493,6 +658,13 @@ contains
       allocate(grad(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       ! Work on each scalar
       do nsc=1,this%nscalar
+         ! Point to the appropriate velocity field
+         select case (this%phase(nsc))
+         case (Lphase)
+            U=>UL;V=>VL;W=>WL
+         case (Gphase)
+            U=>UG;V=>VG;W=>WG
+         end select
          ! Reset fluxes and gradient to zero
          FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP; grad=0.0_WP
          ! Calculate minmod-limited gradient of SC everywhere
@@ -514,77 +686,50 @@ contains
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
                   ! Flux on x-face
-                  if (getSize(detailed_face_flux(1,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(1,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(1,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(1,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FX(i,j,k)=FX(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FX(i,j,k)=FX(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FX(i,j,k)=FX(i,j,k)/(dt*this%cfg%dy(j)*this%cfg%dz(k))
+                  VFm=VF(i-1,j,k)
+                  VFp=VF(i  ,j,k)
+                  is_interfacial_m=VFm.gt.VFlo.and.VFm.lt.VFhi
+                  is_interfacial_p=VFp.gt.VFlo.and.VFp.lt.VFhi
+                  if (is_interfacial_m.or.is_interfacial_p) then
+                     ! Prepare adjacent scalar values for upwind flux
+                     SCm=this%SC(i-1,j,k,nsc)
+                     SCp=this%SC(i  ,j,k,nsc)
                   else
-                     ! No detailed geometric flux is available, use MUSCL flux
+                     ! Prepare adjacent scalar values for MUSCL flux
                      SCm=0.0_WP; if (VFold(i-1,j,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
                      SCp=0.0_WP; if (VFold(i  ,j,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
-                     FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
                   end if
+                  FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
                   ! Flux on y-face
-                  if (getSize(detailed_face_flux(2,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(2,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(2,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(2,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FY(i,j,k)=FY(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FY(i,j,k)=FY(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FY(i,j,k)=FY(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dz(k))
+                  VFm=VF(i,j-1,k)
+                  VFp=VF(i,j  ,k)
+                  is_interfacial_m=VFm.gt.VFlo.and.VFm.lt.VFhi
+                  is_interfacial_p=VFp.gt.VFlo.and.VFp.lt.VFhi
+                  if (is_interfacial_m.or.is_interfacial_p) then
+                     ! Prepare adjacent scalar values for upwind flux
+                     SCm=this%SC(i,j-1,k,nsc)
+                     SCp=this%SC(i,j  ,k,nsc)
                   else
-                     ! No detailed geometric flux is available, use MUSCL flux
+                     ! Prepare adjacent scalar values for MUSCL flux
                      SCm=0.0_WP; if (VFold(i,j-1,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
                      SCp=0.0_WP; if (VFold(i,j  ,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
-                     FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
                   end if
+                  FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
                   ! Flux on z-face
-                  if (getSize(detailed_face_flux(3,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(3,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(3,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(3,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FZ(i,j,k)=FZ(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FZ(i,j,k)=FZ(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FZ(i,j,k)=FZ(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dy(j))
+                  VFm=VF(i,j,k-1)
+                  VFp=VF(i,j,k  )
+                  is_interfacial_m=VFm.gt.VFlo.and.VFm.lt.VFhi
+                  is_interfacial_p=VFp.gt.VFlo.and.VFp.lt.VFhi
+                  if (is_interfacial_m.or.is_interfacial_p) then
+                     ! Prepare adjacent scalar values for upwind flux
+                     SCm=this%SC(i,j,k-1,nsc)
+                     SCp=this%SC(i,j,k  ,nsc)
                   else
-                     ! No detailed geometric flux is available, use MUSCL flux
+                     ! Prepare adjacent scalar values for MUSCL flux
                      SCm=0.0_WP; if (VFold(i,j,k-1).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
                      SCp=0.0_WP; if (VFold(i,j,k  ).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
-                     FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
                   end if
+                  FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
                end do
             end do
          end do
@@ -655,7 +800,7 @@ contains
       implicit none
       class(tpscalar), intent(inout) :: this
       real(WP), intent(in) :: dt
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(inout) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
       integer :: i,j,k,nsc
       
       ! Apply implicit treatment for each scalar
@@ -667,18 +812,44 @@ contains
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
                   if (this%PVF(i,j,k,this%phase(nsc)).gt.0.0_WP) then
-                     this%implicit%opr(1,i,j,k)=this%implicit%opr(1,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k) *sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k) *sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k) *sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k) *sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1) *sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  ) *sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP))
-                     this%implicit%opr(2,i,j,k)=this%implicit%opr(2,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k))*sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(3,i,j,k)=this%implicit%opr(3,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k))*sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(4,i,j,k)=this%implicit%opr(4,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k))*sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(5,i,j,k)=this%implicit%opr(5,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k))*sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(6,i,j,k)=this%implicit%opr(6,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1))*sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(7,i,j,k)=this%implicit%opr(7,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  ))*sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(1,i,j,k)=this%implicit%opr(1,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k) *sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                         this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k) *sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                         this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k) *sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                         this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k) *sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                         this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1) *sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                         this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  ) *sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP))
+                     ! this%implicit%opr(2,i,j,k)=this%implicit%opr(2,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k))*sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(3,i,j,k)=this%implicit%opr(3,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k))*sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(4,i,j,k)=this%implicit%opr(4,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k))*sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(5,i,j,k)=this%implicit%opr(5,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k))*sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(6,i,j,k)=this%implicit%opr(6,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1))*sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(7,i,j,k)=this%implicit%opr(7,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  ))*sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP)
+
+                     ! this%implicit%opr(1,i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))* (this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k) *sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                                                   this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k) *sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                                                   this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k) *sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                                                   this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k) *sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                                                   this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1) *sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)+&
+                     ! &                                                                                                                   this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  ) *sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP))
+                     ! this%implicit%opr(2,i,j,k)=this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k))*sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(3,i,j,k)=this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k))*sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(4,i,j,k)=this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k))*sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(5,i,j,k)=this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k))*sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(6,i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1))*sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)
+                     ! this%implicit%opr(7,i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  ))*sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP)
+
+                     this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k) -dt/this%PVF(i,j,k,this%phase(nsc))* (this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k) *sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)+&
+                     &                                                                                                                                             this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k) *sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)+&
+                     &                                                                                                                                             this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k) *sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)+&
+                     &                                                                                                                                             this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k) *sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)+&
+                     &                                                                                                                                             this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1) *sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)+&
+                     &                                                                                                                                             this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  ) *sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP))
+                     this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k))*sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)
+                     this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k))*sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)
+                     this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k))*sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)
+                     this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k))*sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)
+                     this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1))*sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)
+                     this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  ))*sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP)
                   end if
                end do
             end do
@@ -687,13 +858,13 @@ contains
          ! Solve the linear system
          call this%implicit%setup()
          this%implicit%rhs=resSC(:,:,:,nsc)
-         this%implicit%sol=0.0_WP
+         this%implicit%sol=this%SC(:,:,:,nsc)
          call this%implicit%solve()
-         resSC(:,:,:,nsc)=this%implicit%sol
+         this%SC(:,:,:,nsc)=this%implicit%sol
          
-         ! Sync up residual
-         call this%cfg%sync(resSC(:,:,:,nsc))
-         
+         ! Sync it
+         call this%cfg%sync(this%SC(:,:,:,nsc))
+
       end do
       
    end subroutine solve_implicit_diff

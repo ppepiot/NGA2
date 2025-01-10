@@ -48,6 +48,8 @@ module evap_class
       real(WP), dimension(:,:,:,:), allocatable :: vel_pc              !< Phase-change velocity
       real(WP), dimension(:,:,:),   allocatable :: U_itf,V_itf,W_itf   !< Interfacial velocity components
       real(WP), dimension(:,:,:,:), allocatable :: pseudo_vel          !< Pseudo velocity for shifting mflux
+      ! Debug
+      ! real(WP), dimension(:,:,:), allocatable :: psdiv
 
       ! Metrics (point to flow solver metrics)
       type(arr_ptr_4d), dimension(:), allocatable :: itp               !< Cell to face interpolation coefficients
@@ -75,6 +77,9 @@ module evap_class
       procedure :: shift_mflux                                         !< Shift the evaporation mass flux
       procedure :: get_div                                             !< Get the evaporation source term
       procedure :: get_cfl                                             !< Get the CFL
+      procedure :: filter                                             
+      procedure :: extend_normal                                             
+      ! procedure :: get_psdiv                                             
 
    end type evap
 
@@ -122,6 +127,8 @@ contains
       allocate(this%W_itf     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));     this%W_itf     =0.0_WP
       allocate(this%itp(3))
       allocate(this%div(3))
+      ! debug
+      ! allocate(this%psdiv     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));     this%psdiv     =0.0_WP
 
       ! Set metrics
       this%itp(1)%arr=>itp_x
@@ -183,9 +190,322 @@ contains
             end do
          end do
       end do
+      ! Check dimensions
+      do dir=1,3
+         if (this%nCell(dir).eq.1) this%normal(:,:,:,dir)=0.0_WP
+      end do
    end subroutine get_normal
 
+
+   !> Analytical normal for the droplet
+   ! subroutine get_normal(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    integer  :: i,j,k,dir
+   !    real(WP) :: mag
+   !    ! Initizlize
+   !    this%normal=0.0_WP
+   !    ! Loop over cells
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             if (this%vf%VF(i,j,k).lt.1.0_WP.and.this%vf%VF(i,j,k).gt.0.0_WP) then
+   !                mag=sqrt(this%cfg%xm(i)**2+this%cfg%ym(j)**2+this%cfg%zm(k)**2)
+   !                if (mag.gt.0.0_WP) then
+   !                   this%normal(i,j,k,1)=this%cfg%xm(i)/mag
+   !                   this%normal(i,j,k,2)=this%cfg%ym(j)/mag
+   !                   this%normal(i,j,k,3)=this%cfg%zm(k)/mag
+   !                end if
+   !             end if
+   !          end do
+   !       end do
+   !    end do
+   !    ! Sync
+   !    do dir=1,3
+   !       call this%cfg%sync(this%normal(:,:,:,dir))
+   !    end do
+   ! end subroutine get_normal
+
+
+   !> Calculate the interfacial normal vector using Youngs' method (implementation 1: Paper)
+   ! subroutine get_normal(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    real(WP), dimension(:,:,:), allocatable :: VF_x_edge,VF_Y_edge,VF_Z_edge
+   !    real(WP), dimension(:,:,:), allocatable :: VF_grd_x,VF_grd_y,VF_grd_z
+   !    integer  :: i,j,k,dir
+   !    real(WP) :: n_mag
+
+   !    ! Allocate edge-centered VOF and vertex-centered VOF gradient
+   !    allocate(VF_x_edge(this%cfg%imin_-1:this%cfg%imax_+1,this%cfg%jmin_  :this%cfg%jmax_+1,this%cfg%kmin_  :this%cfg%kmax_+1))
+   !    allocate(VF_y_edge(this%cfg%imin_  :this%cfg%imax_+1,this%cfg%jmin_-1:this%cfg%jmax_+1,this%cfg%kmin_  :this%cfg%kmax_+1))
+   !    allocate(VF_z_edge(this%cfg%imin_  :this%cfg%imax_+1,this%cfg%jmin_  :this%cfg%jmax_+1,this%cfg%kmin_-1:this%cfg%kmax_+1))
+   !    allocate(VF_grd_x(this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1))
+   !    allocate(VF_grd_y(this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1))
+   !    allocate(VF_grd_z(this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1))
+
+   !    ! Interpolate VOF at the x-edges
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_-1,this%cfg%imax_+1
+   !             VF_x_edge(i,j,k)=this%itp(3)%arr(-1,i,j,k)*sum(this%itp(2)%arr(:,i,j,k-1)*this%vf%VF(i,j-1:j,k-1)) &
+   !             &               +this%itp(3)%arr( 0,i,j,k)*sum(this%itp(2)%arr(:,i,j,k  )*this%vf%VF(i,j-1:j,k  ))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Interpolate VOF at the y-edges
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_-1,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             VF_y_edge(i,j,k)=this%itp(3)%arr(-1,i,j,k)*sum(this%itp(1)%arr(:,i,j,k-1)*this%vf%VF(i-1:i,j,k-1)) &
+   !             &               +this%itp(3)%arr( 0,i,j,k)*sum(this%itp(1)%arr(:,i,j,k  )*this%vf%VF(i-1:i,j,k  ))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Interpolate VOF at the z-edges
+   !    do k=this%cfg%kmin_-1,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             VF_z_edge(i,j,k)=this%itp(2)%arr(-1,i,j,k)*sum(this%itp(1)%arr(:,i,j-1,k)*this%vf%VF(i-1:i,j-1,k)) &
+   !             &               +this%itp(2)%arr( 0,i,j,k)*sum(this%itp(1)%arr(:,i,j  ,k)*this%vf%VF(i-1:i,j  ,k))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Calculate the vertex-centered x-component of VOF gradient
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             VF_grd_x(i,j,k)=this%cfg%dxmi(i)*(VF_x_edge(i,j,k)-VF_x_edge(i-1,j,k))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Calculate the vertex-centered y-component of VOF gradient
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             VF_grd_y(i,j,k)=this%cfg%dymi(j)*(VF_y_edge(i,j,k)-VF_y_edge(i,j-1,k))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Calculate the vertex-centered z-component of VOF gradient
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             VF_grd_z(i,j,k)=this%cfg%dzmi(k)*(VF_z_edge(i,j,k)-VF_z_edge(i,j,k-1))
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Calculate the cell-centered VOF gradient
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             ! X-component
+   !             this%normal(i,j,k,1)=0.125_WP*(VF_grd_x(i  ,j  ,k  )+VF_grd_x(i+1,j  ,k  ) &
+   !             &                             +VF_grd_x(i+1,j+1,k  )+VF_grd_x(i  ,j+1,k  ) &
+   !             &                             +VF_grd_x(i  ,j  ,k+1)+VF_grd_x(i+1,j  ,k+1) &
+   !             &                             +VF_grd_x(i+1,j+1,k+1)+VF_grd_x(i  ,j+1,k+1))
+   !             ! Y-component
+   !             this%normal(i,j,k,2)=0.125_WP*(VF_grd_y(i  ,j  ,k  )+VF_grd_y(i+1,j  ,k  ) &
+   !             &                             +VF_grd_y(i+1,j+1,k  )+VF_grd_y(i  ,j+1,k  ) &
+   !             &                             +VF_grd_y(i  ,j  ,k+1)+VF_grd_y(i+1,j  ,k+1) &
+   !             &                             +VF_grd_y(i+1,j+1,k+1)+VF_grd_y(i  ,j+1,k+1))
+   !             ! Z-component
+   !             this%normal(i,j,k,3)=0.125_WP*(VF_grd_z(i  ,j  ,k  )+VF_grd_z(i+1,j  ,k  ) &
+   !             &                             +VF_grd_z(i+1,j+1,k  )+VF_grd_z(i  ,j+1,k  ) &
+   !             &                             +VF_grd_z(i  ,j  ,k+1)+VF_grd_z(i+1,j  ,k+1) &
+   !             &                             +VF_grd_z(i+1,j+1,k+1)+VF_grd_z(i  ,j+1,k+1))
+   !             ! Normalize
+   !             n_mag=sqrt(this%normal(i,j,k,1)**2+this%normal(i,j,k,2)**2+this%normal(i,j,k,3)**2)
+   !             if (n_mag.gt.0.0_WP) then
+   !                do dir=1,3
+   !                   this%normal(i,j,k,dir)=-this%normal(i,j,k,dir)/n_mag
+   !                end do
+   !             end if
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Sync the normal vector
+   !    do dir=1,3
+   !       call this%cfg%sync(this%normal(:,:,:,dir))
+   !    end do
+
+   !    ! Deallocate edge-centered and vertex-centered data
+   !    deallocate(VF_x_edge,VF_y_edge,VF_z_edge,VF_grd_x,VF_grd_y,VF_grd_z)
+
+   ! end subroutine get_normal
+
+
+   !> Calculate the interfacial normal vector using Youngs' method (implementation 2: Olivier)
+   ! subroutine get_normal(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    real(WP), dimension(:,:,:), allocatable :: vcVF
+   !    integer  :: i,j,k,dir
+   !    real(WP) :: tmp_yp,tmp_ym
+   !    real(WP) :: tmp_zp,tmp_zm
+   !    real(WP) :: n_mag
+
+   !    ! Allocate the vertex-centered VOF
+   !    allocate(vcVF(this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1))
+
+   !    ! Get the vertex-centered VOF
+   !    do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !       do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !          do i=this%cfg%imin_,this%cfg%imax_+1
+   !             tmp_ym=this%itp(1)%arr(-1,i,j-1,k-1)*this%vf%VF(i-1,j-1,k-1)+this%itp(1)%arr(0,i,j-1,k-1)*this%vf%VF(i,j-1,k-1)
+   !             tmp_yp=this%itp(1)%arr(-1,i,j  ,k-1)*this%vf%VF(i-1,j  ,k-1)+this%itp(1)%arr(0,i,j  ,k-1)*this%vf%VF(i,j  ,k-1)
+   !             tmp_zm=this%itp(2)%arr(-1,i,j,k-1)*tmp_ym+this%itp(2)%arr(0,i,j,k-1)*tmp_yp
+   !             tmp_ym=this%itp(1)%arr(-1,i,j-1,k)*this%vf%VF(i-1,j-1,k)+this%itp(1)%arr(0,i,j-1,k)*this%vf%VF(i,j-1,k)
+   !             tmp_yp=this%itp(1)%arr(-1,i,j  ,k)*this%vf%VF(i-1,j  ,k)+this%itp(1)%arr(0,i,j  ,k)*this%vf%VF(i,j  ,k)
+   !             tmp_zp=this%itp(2)%arr(-1,i,j,k)*tmp_ym+this%itp(2)%arr(0,i,j,k)*tmp_yp
+   !             vcVF(i,j,k)=this%itp(3)%arr(-1,i,j,k)*tmp_zm+this%itp(3)%arr(0,i,j,k)*tmp_zp
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Get the cell-centered normal vector
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             ! X component VOF gradient
+   !             this%normal(i,j,k,1)=0.25_WP*this%cfg%dxi(i)*((vcVF(i+1,j  ,k  )-vcVF(i,j  ,k  )) &
+   !             &                                            +(vcVF(i+1,j+1,k  )-vcVF(i,j+1,k  )) &
+   !             &                                            +(vcVF(i+1,j  ,k+1)-vcVF(i,j  ,k+1)) &
+   !             &                                            +(vcVF(i+1,j+1,k+1)-vcVF(i,j+1,k+1)))
+   !             ! Y component VOF gradient
+   !             this%normal(i,j,k,2)=0.25_WP*this%cfg%dyi(i)*((vcVF(i  ,j+1,k  )-vcVF(i  ,j  ,k  )) &
+   !             &                                            +(vcVF(i+1,j+1,k  )-vcVF(i+1,j  ,k  )) &
+   !             &                                            +(vcVF(i  ,j+1,k+1)-vcVF(i  ,j  ,k+1)) &
+   !             &                                            +(vcVF(i+1,j+1,k+1)-vcVF(i+1,j  ,k+1)))
+   !             ! Z component VOF gradient
+   !             this%normal(i,j,k,3)=0.25_WP*this%cfg%dzi(i)*((vcVF(i  ,j  ,k+1)-vcVF(i  ,j  ,k  )) &
+   !             &                                            +(vcVF(i+1,j  ,k+1)-vcVF(i+1,j  ,k  )) &
+   !             &                                            +(vcVF(i  ,j+1,k+1)-vcVF(i  ,j+1,k  )) &
+   !             &                                            +(vcVF(i+1,j+1,k+1)-vcVF(i+1,j+1,k  )))
+   !             ! Normalize
+   !             n_mag=sqrt(this%normal(i,j,k,1)**2+this%normal(i,j,k,2)**2+this%normal(i,j,k,3)**2)
+   !             if (n_mag.gt.0.0_WP) then
+   !                do dir=1,3
+   !                   this%normal(i,j,k,dir)=-this%normal(i,j,k,dir)/n_mag
+   !                end do
+   !             end if
+   !          end do
+   !       end do
+   !    end do
+
+   !    ! Sync it
+   !    do dir=1,3
+   !       call this%cfg%sync(this%normal(:,:,:,dir))
+   !    end do
+
+   !    ! Deallocate
+   !    deallocate(vcVF)
+
+   ! end subroutine get_normal
+
    
+   ! !> Extend the interface normal for a smoother transition to zero
+   ! subroutine extend_normal(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    integer  :: i,j,k,dir
+   !    integer  :: stx,sty,stz
+   !    real(WP) :: vol
+   !    real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
+   !    ! Allocate memory for the temporary field
+   !    allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+   !    ! Take a copy of the normal
+   !    normal_tmp=this%normal
+   !    ! Loop over cells
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             ! Work on the pure cells
+   !             if (this%vf%VF(i,j,k).eq.1.0_WP.or.this%vf%VF(i,j,k).eq.0.0_WP) then
+   !                vol=0.0_WP
+   !                ! Loop over the stencils
+   !                do stz=-1,1,2
+   !                   do sty=-1,1,2
+   !                      do stx=-1,1,2
+   !                         vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
+   !                         this%normal(i,j,k,:)=this%normal(i,j,k,:)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,:)
+   !                      end do
+   !                   end do
+   !                end do
+   !                ! Scale by volume
+   !                if (vol.gt.0.0_WP) this%normal(i,j,k,:)=this%normal(i,j,k,:)/vol
+   !             end if
+   !          end do
+   !       end do
+   !    end do
+   !    ! Sync
+   !    do dir=1,3
+   !       call this%cfg%sync(this%normal(:,:,:,dir))
+   !    end do
+   ! end subroutine extend_normal
+
+
+   !> Extend the interface normal for a smoother transition to zero
+   subroutine extend_normal(this,lvl)
+      implicit none
+      class(evap), intent(inout) :: this
+      integer, intent(in) :: lvl
+      integer  :: n,dir,i,j,k
+      integer  :: stx,sty,stz
+      real(WP) :: vol
+      real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
+      ! Allocate memory for the temporary field
+      allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+      ! Loop over levels
+      do n=1,lvl
+         ! Take a copy of the normal
+         normal_tmp=this%normal
+         ! Loop over directions
+         do dir=1,3
+            ! Check the dimensions
+            if (this%nCell(dir).gt.1) then
+               ! Loop over cells
+               do k=this%cfg%kmin_,this%cfg%kmax_
+                  do j=this%cfg%jmin_,this%cfg%jmax_
+                     do i=this%cfg%imin_,this%cfg%imax_
+                        ! Work on the pure cells
+                        if (this%vf%VF(i,j,k).eq.1.0_WP.or.this%vf%VF(i,j,k).eq.0.0_WP) then
+                           ! Initialize with zero
+                           vol=0.0_WP
+                           this%normal(i,j,k,dir)=0.0_WP
+                           ! Loop over the stencils
+                           ! do stz=-ind_shift(3,dir),ind_shift(3,dir)
+                           !    do sty=-ind_shift(2,dir),ind_shift(2,dir)
+                           !       do stx=-ind_shift(1,dir),ind_shift(1,dir)
+                           do stz=-1,1
+                              do sty=-1,1
+                                 do stx=-1,1
+                                    vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
+                                    this%normal(i,j,k,dir)=this%normal(i,j,k,dir)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,dir)
+                                 end do
+                              end do
+                           end do
+                           ! Scale by volume
+                           if (vol.gt.0.0_WP) this%normal(i,j,k,dir)=this%normal(i,j,k,dir)/vol
+                        end if
+                     end do
+                  end do
+               end do
+               ! Sync
+               call this%cfg%sync(this%normal(:,:,:,dir))
+            end if
+         end do
+      end do
+   end subroutine extend_normal
+
+
    !> Calculate the face-centered phase-change velocity
    subroutine get_vel_pc(this)
       use vfs_class, only: vfs
@@ -275,6 +595,32 @@ contains
       end do
 
    end subroutine get_pseudo_vel
+
+
+   ! Debug
+   !> 
+   ! subroutine get_psdiv(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    integer :: i,j,k,dir
+   !    integer :: im,jm,km
+   !    integer :: ip,jp,kp
+   !    this%psdiv=0.0_WP
+   !    do dir=1,3
+   !       do k=this%cfg%kmin_,this%cfg%kmax_
+   !          do j=this%cfg%jmin_,this%cfg%jmax_
+   !             do i=this%cfg%imin_,this%cfg%imax_
+   !                im=i; ip=i+ind_shift(1,dir)
+   !                jm=j; jp=j+ind_shift(2,dir)
+   !                km=k; kp=k+ind_shift(3,dir)
+   !                this%psdiv(i,j,k)=this%psdiv(i,j,k)+this%div(dir)%arr(0,i,j,k)*this%pseudo_vel(im,jm,km,dir) &
+   !                &                                  +this%div(dir)%arr(1,i,j,k)*this%pseudo_vel(ip,jp,kp,dir)
+   !             end do
+   !          end do
+   !       end do
+   !    end do
+   !    call this%cfg%sync(this%psdiv)
+   ! end subroutine get_psdiv
    
 
    !> Calculate the volumetric mass flux
@@ -282,6 +628,7 @@ contains
       implicit none
       class(evap), intent(inout) :: this
       this%mflux=this%mdotdp*this%vf%SD
+      ! call this%filter(this%mflux,2,0.0_WP)
    end subroutine get_mflux
 
 
@@ -339,14 +686,13 @@ contains
 
    !> Shift mflux away from the interface
    subroutine shift_mflux(this)
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
       use parallel,  only: MPI_REAL_WP
-      use vfs_class, only: vfs
       implicit none
       class(evap), intent(inout) :: this
       real(WP), dimension(:,:,:), allocatable :: resmfluxL,resmfluxG
-      integer  :: ierr
-      real(WP) :: mflux_max,my_mflux_max,mflux_err,my_mflux_err
+      integer  :: i,j,k,ierr
+      real(WP) :: my_mflux_int,mflux_err
 
       ! Allocate memory for mflux residuals
       allocate(resmfluxL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
@@ -355,8 +701,14 @@ contains
       ! Get the interface normal
       call this%get_normal()
 
+      ! Extend the interface normal
+      call this%extend_normal(lvl=10)
+
       ! Get the normalized gradient of VOF
       call this%get_pseudo_vel()
+
+      ! debug
+      ! call this%get_psdiv()
 
       ! Get the CFL based on the gradient of the VOF
       call this%get_cfl(this%pseudo_time%dt,this%pseudo_vel(:,:,:,1),this%pseudo_vel(:,:,:,2),this%pseudo_vel(:,:,:,3),this%pseudo_time%cfl)
@@ -389,23 +741,37 @@ contains
          this%mfluxL=this%mfluxL_old+this%pseudo_time%dt*resmfluxL
          this%mfluxG=this%mfluxG_old+this%pseudo_time%dt*resmfluxG
 
-         ! Get the maximum of mflux
-         my_mflux_max=maxval(this%mflux)
-         call MPI_ALLREDUCE(my_mflux_max,mflux_max,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
-
-         ! Calculate the error on the liquid side
-         my_mflux_err=maxval(abs((this%mfluxL-this%mfluxL_old)/mflux_max))
-         call MPI_ALLREDUCE(my_mflux_err,this%mfluxL_err,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
+         ! Calculate the integral of the residual error of mfluxL
+         my_mflux_int=0.0_WP
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  if (this%vf%VF(i,j,k).lt.1) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxL(i,j,k))
+               end do
+            end do
+         end do
+         call MPI_ALLREDUCE(my_mflux_int,this%mfluxL_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
          
-         ! Calculate the error on the gas side
-         my_mflux_err=maxval(abs((this%mfluxG-this%mfluxG_old)/mflux_max))
-         call MPI_ALLREDUCE(my_mflux_err,this%mfluxG_err,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
+         ! Calculate the integral of the residual error of mfluxG
+         my_mflux_int=0.0_WP
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  if (this%vf%VF(i,j,k).gt.0) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxG(i,j,k))
+               end do
+            end do
+         end do
+         call MPI_ALLREDUCE(my_mflux_int,this%mfluxG_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
 
          ! Check convergence
          mflux_err=max(this%mfluxL_err,this%mfluxG_err)
          if (mflux_err.lt.this%mflux_tol) exit
 
       end do
+
+      ! Take volume filter
+      ! call this%filter(this%mfluxL,1,0.0_WP)
+      ! call this%filter(this%mfluxG,1,0.0_WP)
 
       ! Integral of mflux
       call this%cfg%integrate(this%mflux,this%mflux_int)
@@ -418,6 +784,62 @@ contains
       deallocate(resmfluxL,resmfluxG)
 
    end subroutine shift_mflux
+
+
+   !> Take spatial filter of a given field
+   subroutine filter(this,F,nFilter,Fmin)
+      implicit none
+      class(evap), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer  :: nFilter
+      real(WP) :: Fmin
+      real(WP), dimension(:,:,:), allocatable :: F_tmp
+      integer  :: i,j,k
+      integer  :: stx,sty,stz
+      integer  :: n
+      real(WP) :: vol
+
+      ! Allocate memory for the temporary field
+      allocate(F_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+
+      ! Apply the filtering
+      do n=1,nFilter
+         F_tmp=F
+         ! Loop over the cells
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  ! Work only on values greater than the threshold
+                  if (F_tmp(i,j,k).gt.Fmin) then
+                     ! Initialize with zero
+                     vol=0.0_WP
+                     F(i,j,k)=0.0_WP
+                     ! Loop over the stencil
+                     do stz=-1,+1
+                        do sty=-1,+1
+                           do stx=-1,+1
+                              ! Only add values greater than the threshold
+                              if (F_tmp(i+stx,j+sty,k+stz).gt.Fmin) then
+                                 vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
+                                 F(i,j,k)=F(i,j,k)+this%cfg%vol(i+stx,j+sty,k+stz)*F_tmp(i+stx,j+sty,k+stz)
+                              end if
+                           end do
+                        end do
+                     end do
+                     ! Normalize it by volume
+                     if (vol.gt.0.0_WP) F(i,j,k)=F(i,j,k)/vol
+                  end if
+               end do
+            end do
+         end do
+         ! Sync it
+         call this%cfg%sync(F)
+      end do
+
+      ! Deallocate the temporary field
+      deallocate(F_tmp)
+
+   end subroutine filter
 
 
    !> Calculate the divergence induced by phase change

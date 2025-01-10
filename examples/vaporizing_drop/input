@@ -26,18 +26,18 @@ Static contact angle        : 140
 Max timestep size : 3e-5
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Max time          : 1.03
+Max time          : 3e-5
 
 # Evaporation
 Evaporation mass flux    : 5
 Max pseudo timestep size : 1.75e-4
 Max pseudo cfl number    : 0.9
 Max pseudo time steps    : 5
-Mass flux tolerence      : 1e-4
+Mass flux tolerence      : 1e-7
 
 # Pressure solver
 Pressure tolerance : 1e-6
 Pressure iteration : 50
 
 # Ensight output
-Ensight output period : 1e-2
+Ensight output period : 3e-5

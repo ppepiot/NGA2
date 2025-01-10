@@ -331,6 +331,9 @@ contains
       ! Check that setup was done
       if (.not.this%setup_done) call die('[hypre_str solve] Solver has not been setup.')
       
+      ! Apply boundary conditions
+      call this%apply_bcond()
+
       ! Set solver it and err to standard values
       this%it=-1; this%aerr=huge(1.0_WP); this%rerr=huge(1.0_WP)
       
