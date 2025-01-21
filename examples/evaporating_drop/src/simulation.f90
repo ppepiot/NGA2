@@ -629,7 +629,7 @@ contains
             
             ! Explicit calculation of dSC/dt from advective term
             ! call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
-            call sc%get_dSCdt(dSCdt=resSC,UL=fsL%U,VL=fsL%V,WL=fsL%W,UG=fs%U,VG=fs%V,WG=fs%W,VFold=vf%VFold,VF=vf%VF)
+            ! call sc%get_dSCdt(dSCdt=resSC,UL=fsL%U,VL=fsL%V,WL=fsL%W,UG=fs%U,VG=fs%V,WG=fs%W,VFold=vf%VFold,VF=vf%VF)
             
             ! Advance advection
             ! do nsc=1,sc%nscalar
@@ -642,7 +642,6 @@ contains
             where (sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP.and.sc%PVF(:,:,:,sc%phase(nsc)).lt.1.0_WP) sc%SC(:,:,:,nsc)=sc%SC(:,:,:,nsc)+evp%mflux/sc%Prho(sc%phase(nsc))*time%dt
 
             ! Advance diffusion
-            ! call sc%solve_implicit_diff(time%dt,sc%SC)
             do nsc=1,sc%nscalar
                where (sc%PVF(:,:,:,sc%phase(nsc)).gt.1.0e-12_WP)
                   resSC(:,:,:,nsc)=sc%PVFold(:,:,:,sc%phase(nsc))/sc%PVF(:,:,:,sc%phase(nsc))*sc%SC(:,:,:,nsc)

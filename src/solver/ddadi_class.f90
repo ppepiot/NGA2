@@ -122,9 +122,19 @@ contains
                   ! this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
                   ! this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
                   ! this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
-                  if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax)) this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
-                  if ((j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax)) this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
-                  if ((k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
+                  ! if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax)) this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
+                  ! if ((j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax)) this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
+                  ! if ((k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
+                  
+                  if (this%stc(st,2).eq.0.and.this%stc(st,3).eq.0) then
+                     if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax)) this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
+                  end if
+                  if (this%stc(st,3).eq.0.and.this%stc(st,1).eq.0) then
+                     if ((j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax)) this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
+                  end if
+                  if (this%stc(st,1).eq.0.and.this%stc(st,2).eq.0) then
+                     if ((k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
+                  end if
                end do
             end do
          end do
@@ -165,16 +175,17 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               opr_sum=0.0_WP
-               do st=1,this%nst
-                  if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
-                  &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
-                  &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
-                     opr_sum=opr_sum+this%opr(st,i,j,k)
-                  end if
-               end do
-               this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*opr_sum
+               ! opr_sum=0.0_WP
+               ! do st=1,this%nst
+               !    if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
+               !    &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
+               !    &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
+               !       opr_sum=opr_sum+this%opr(st,i,j,k)
+               !    end if
+               ! end do
+               ! this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*opr_sum
                ! this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*sum(this%opr(:,i,j,k))
+               this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*this%opr(this%stmap(0,0,0),i,j,k)
             end do
          end do
       end do
@@ -184,16 +195,17 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               opr_sum=0.0_WP
-               do st=1,this%nst
-                  if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
-                  &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
-                  &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
-                     opr_sum=opr_sum+this%opr(st,i,j,k)
-                  end if
-               end do
-               this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*opr_sum
+               ! opr_sum=0.0_WP
+               ! do st=1,this%nst
+               !    if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
+               !    &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
+               !    &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
+               !       opr_sum=opr_sum+this%opr(st,i,j,k)
+               !    end if
+               ! end do
+               ! this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*opr_sum
                ! this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*sum(this%opr(:,i,j,k))
+               this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*this%opr(this%stmap(0,0,0),i,j,k)
             end do
          end do
       end do
