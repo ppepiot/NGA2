@@ -26,17 +26,17 @@ Gas thermal diffusivity     : 1e-05
 Vapor diffusivity           : 1.452e-05
 
 # Time integration
-Max timestep size : 8e-5 ! 3e-5
+Max timestep size : 8e-5
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Max time          : 8e-5
+Max time          : 8e-4
 
 # Evaporation
-Evaporation mass flux    : 1.8e-2 ! 5
+Evaporation mass flux    : 1.8e-2
 Max pseudo timestep size : 1.75e-4
 Max pseudo cfl number    : 0.9
-Max pseudo time steps    : 5
-Mass flux tolerence      : 1e-4
+Max pseudo time steps    : 10
+Mass flux tolerence      : 1e-22
 
 # Pressure solver
 Pressure tolerance : 1e-6

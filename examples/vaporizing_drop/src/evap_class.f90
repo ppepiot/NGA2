@@ -78,9 +78,7 @@ module evap_class
       procedure :: shift_mflux                                         !< Shift the evaporation mass flux
       procedure :: get_div                                             !< Get the evaporation source term
       procedure :: get_cfl                                             !< Get the CFL
-      procedure :: filter                                             
-      procedure :: extend_normal                                             
-      ! procedure :: get_psdiv                                             
+      procedure :: extend_normal                                       !< Extend the interface normal                                             
 
    end type evap
 
@@ -199,60 +197,6 @@ contains
          if (this%nCell(dir).eq.1) this%normal(:,:,:,dir)=0.0_WP
       end do
    end subroutine get_normal
-
-
-   ! !> Extend the interface normal for a smoother transition to zero
-   ! subroutine extend_normal(this,lvl)
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    integer, intent(in) :: lvl
-   !    integer  :: n,dir,i,j,k
-   !    integer  :: stx,sty,stz
-   !    real(WP) :: vol
-   !    real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
-   !    ! Allocate memory for the temporary field
-   !    allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
-   !    ! Loop over levels
-   !    do n=1,lvl
-   !       ! Take a copy of the normal
-   !       normal_tmp=this%normal
-   !       ! Loop over directions
-   !       do dir=1,3
-   !          ! Check the dimensions
-   !          if (this%nCell(dir).gt.1) then
-   !             ! Loop over cells
-   !             do k=this%cfg%kmin_,this%cfg%kmax_
-   !                do j=this%cfg%jmin_,this%cfg%jmax_
-   !                   do i=this%cfg%imin_,this%cfg%imax_
-   !                      ! Work on the pure cells
-   !                      if (this%vf%VF(i,j,k).eq.1.0_WP.or.this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                         ! Initialize with zero
-   !                         vol=0.0_WP
-   !                         this%normal(i,j,k,dir)=0.0_WP
-   !                         ! Loop over the stencils
-   !                         ! do stz=-ind_shift(3,dir),ind_shift(3,dir)
-   !                         !    do sty=-ind_shift(2,dir),ind_shift(2,dir)
-   !                         !       do stx=-ind_shift(1,dir),ind_shift(1,dir)
-   !                         do stz=-1,1
-   !                            do sty=-1,1
-   !                               do stx=-1,1
-   !                                  vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
-   !                                  this%normal(i,j,k,dir)=this%normal(i,j,k,dir)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,dir)
-   !                               end do
-   !                            end do
-   !                         end do
-   !                         ! Scale by volume
-   !                         if (vol.gt.0.0_WP) this%normal(i,j,k,dir)=this%normal(i,j,k,dir)/vol
-   !                      end if
-   !                   end do
-   !                end do
-   !             end do
-   !             ! Sync
-   !             call this%cfg%sync(this%normal(:,:,:,dir))
-   !          end if
-   !       end do
-   !    end do
-   ! end subroutine extend_normal
 
 
    !> Extend the interface normal for a smoother transition to zero
@@ -401,65 +345,11 @@ contains
       implicit none
       class(evap), intent(inout) :: this
       this%mflux=this%mdotdp*this%vf%SD
-      ! call this%filter(this%mflux,2,0.0_WP)
    end subroutine get_mflux
-
-
-   !> Calculate the explicit mflux time derivative
-   ! subroutine get_dmfluxdt(this,vel,mflux_old,dmfluxdt)
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in)  :: vel        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:3)
-   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),    intent(in)  :: mflux_old  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),    intent(out) :: dmfluxdt   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-   !    integer :: i,j,k,dir
-   !    integer :: im,jm,km
-   !    integer :: ip,jp,kp
-   !    real(WP), dimension(:,:,:,:), allocatable :: F
-   !    ! Zero out dmflux/dt array
-   !    dmfluxdt=0.0_WP
-   !    ! Allocate flux arrays
-   !    allocate(F(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
-   !    ! Fluxes of mflux
-   !    do dir=1,3
-   !       ! Loop over cell faces
-   !       do k=this%cfg%kmin_,this%cfg%kmax_+ind_shift(3,dir)
-   !          do j=this%cfg%jmin_,this%cfg%jmax_+ind_shift(2,dir)
-   !             do i=this%cfg%imin_,this%cfg%imax_+ind_shift(1,dir)
-   !                ! Prepare indices for the adjacent cells
-   !                im=i-ind_shift(1,dir); ip=i
-   !                jm=j-ind_shift(2,dir); jp=j
-   !                km=k-ind_shift(3,dir); kp=k
-   !                ! Compute the face flux
-   !                F(i,j,k,dir)=-0.5_WP*(vel(i,j,k,dir)+abs(vel(i,j,k,dir)))*mflux_old(im,jm,km) &
-   !                &            -0.5_WP*(vel(i,j,k,dir)-abs(vel(i,j,k,dir)))*mflux_old(ip,jp,kp)
-   !             end do
-   !          end do
-   !       end do
-   !    end do
-   !    ! Time derivative of mflux
-   !    do dir=1,3
-   !       ! Loop over the cells
-   !       do k=this%cfg%kmin_,this%cfg%kmax_
-   !          do j=this%cfg%jmin_,this%cfg%jmax_
-   !             do i=this%cfg%imin_,this%cfg%imax_
-   !                dmfluxdt(i,j,k)=dmfluxdt(i,j,k)                                                                            &
-   !                &              +this%div(dir)%arr(0,i,j,k)*F(i,j,k,dir)                                                    &
-   !                &              +this%div(dir)%arr(1,i,j,k)*F(i+ind_shift(1,dir),j+ind_shift(2,dir),k+ind_shift(3,dir),dir)
-   !             end do
-   !          end do
-   !       end do
-   !    end do
-   !    ! Deallocate flux arrays
-   !    deallocate(F)
-   !    ! Sync residual
-   !    call this%cfg%sync(dmfluxdt)
-   ! end subroutine get_dmfluxdt
 
    
    !> Calculate the explicit mflux time derivative
    subroutine get_dmfluxdt(this,vel,mflux_old,dmfluxdt)
-      use vfs_class, only: nband
       implicit none
       class(evap), intent(inout) :: this
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in)  :: vel        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:3)
@@ -473,9 +363,9 @@ contains
       ! Zero out dmflux/dt array
       dmfluxdt=0.0_WP
       ! Allocate flux arrays
-      allocate(F(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+      allocate(F(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3)); F=0.0_WP
       ! Fluxes of mflux
-      do index=1,sum(this%vf%band_count(0:nband))
+      do index=1,sum(this%vf%band_count(0:ext_lvl+1))
          ! Get the cell indices
          ic=this%vf%band_map(1,index)
          jc=this%vf%band_map(2,index)
@@ -485,23 +375,25 @@ contains
             ! Loop over the plus and minus faces
             do n=0,1
                ! Get the face indices
-               i=ind_shift(1,dir)*n+ic
-               j=ind_shift(2,dir)*n+jc
-               k=ind_shift(3,dir)*n+kc
+               i=ic+ind_shift(1,dir)*n
+               j=jc+ind_shift(2,dir)*n
+               k=kc+ind_shift(3,dir)*n
                ! Prepare indices for the adjacent cells
                im=i-ind_shift(1,dir); ip=i
                jm=j-ind_shift(2,dir); jp=j
                km=k-ind_shift(3,dir); kp=k
                ! Compute the face flux
-               F(i,j,k,dir)=-0.5_WP*(vel(i,j,k,dir)+abs(vel(i,j,k,dir)))*mflux_old(im,jm,km) &
-               &            -0.5_WP*(vel(i,j,k,dir)-abs(vel(i,j,k,dir)))*mflux_old(ip,jp,kp)
+               if (F(i,j,k,dir).eq.0.0_WP) then
+                  F(i,j,k,dir)=-0.5_WP*(vel(i,j,k,dir)+abs(vel(i,j,k,dir)))*mflux_old(im,jm,km) &
+                  &            -0.5_WP*(vel(i,j,k,dir)-abs(vel(i,j,k,dir)))*mflux_old(ip,jp,kp)
+               end if
             end do
          end do
       end do
       ! Time derivative of mflux
       do dir=1,3
          ! Loop over the cells
-         do index=1,sum(this%vf%band_count(0:nband))
+         do index=1,sum(this%vf%band_count(0:ext_lvl+1))
             ! Get the cell indices
             i=this%vf%band_map(1,index)
             j=this%vf%band_map(2,index)
@@ -537,7 +429,7 @@ contains
       call this%get_normal()
 
       ! Extend the interface normal
-      call this%extend_normal(lvl=4)
+      call this%extend_normal(lvl=5)
 
       ! Get the normalized gradient of VOF
       call this%get_pseudo_vel()
@@ -601,10 +493,6 @@ contains
 
       end do
 
-      ! Take volume filter
-      ! call this%filter(this%mfluxL,1,0.0_WP)
-      ! call this%filter(this%mfluxG,1,0.0_WP)
-
       ! Integral of mflux
       call this%cfg%integrate(this%mflux,this%mflux_int)
       call this%cfg%integrate(this%mfluxL,this%mfluxL_int)
@@ -616,128 +504,6 @@ contains
       deallocate(resmfluxL,resmfluxG)
 
    end subroutine shift_mflux
-
-
-   ! !> Take spatial filter of a given field
-   ! subroutine filter(this,F,nFilter,Fmin)
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-   !    integer  :: nFilter
-   !    real(WP) :: Fmin
-   !    real(WP), dimension(:,:,:), allocatable :: F_tmp
-   !    integer  :: i,j,k
-   !    integer  :: stx,sty,stz
-   !    integer  :: n
-   !    real(WP) :: vol
-
-   !    ! Allocate memory for the temporary field
-   !    allocate(F_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-
-   !    ! Apply the filtering
-   !    do n=1,nFilter
-   !       F_tmp=F
-   !       ! Loop over the cells
-   !       do k=this%cfg%kmin_,this%cfg%kmax_
-   !          do j=this%cfg%jmin_,this%cfg%jmax_
-   !             do i=this%cfg%imin_,this%cfg%imax_
-   !                ! Work only on values greater than the threshold
-   !                if (F_tmp(i,j,k).gt.Fmin) then
-   !                   ! Initialize with zero
-   !                   vol=0.0_WP
-   !                   F(i,j,k)=0.0_WP
-   !                   ! Loop over the stencil
-   !                   do stz=-1,+1
-   !                      do sty=-1,+1
-   !                         do stx=-1,+1
-   !                            ! Only add values greater than the threshold
-   !                            if (F_tmp(i+stx,j+sty,k+stz).gt.Fmin) then
-   !                               vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
-   !                               F(i,j,k)=F(i,j,k)+this%cfg%vol(i+stx,j+sty,k+stz)*F_tmp(i+stx,j+sty,k+stz)
-   !                            end if
-   !                         end do
-   !                      end do
-   !                   end do
-   !                   ! Normalize it by volume
-   !                   if (vol.gt.0.0_WP) F(i,j,k)=F(i,j,k)/vol
-   !                end if
-   !             end do
-   !          end do
-   !       end do
-   !       ! Sync it
-   !       call this%cfg%sync(F)
-   !    end do
-
-   !    ! Deallocate the temporary field
-   !    deallocate(F_tmp)
-
-   ! end subroutine filter
-
-
-   !> Take spatial filter of a given field
-   subroutine filter(this,F,nFilter,Fmin)
-      implicit none
-      class(evap), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      integer  :: nFilter
-      real(WP) :: Fmin
-      real(WP), dimension(:,:,:), allocatable :: F_tmp
-      integer  :: i,j,k
-      integer  :: stx,sty,stz
-      integer  :: n
-      real(WP) :: vol
-
-      ! Allocate memory for the temporary field
-      allocate(F_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-
-      ! Apply the filtering
-      do n=1,nFilter
-         F_tmp=F
-         F=0.0_WP
-         ! Loop over the cells
-         do k=this%cfg%kmin_,this%cfg%kmax_
-            do j=this%cfg%jmin_,this%cfg%jmax_
-               do i=this%cfg%imin_,this%cfg%imax_
-                  ! Work only on values greater than the threshold
-                  if (F_tmp(i,j,k).gt.Fmin) then
-                     ! Initialize with zero
-                     vol=0.0_WP
-                     ! Loop over the stencil
-                     do stz=-1,+1
-                        do sty=-1,+1
-                           do stx=-1,+1
-                              ! Only add values greater than the threshold
-                              if (F_tmp(i+stx,j+sty,k+stz).gt.Fmin) then
-                                 vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
-                              end if
-                           end do
-                        end do
-                     end do
-                     if (vol.gt.0.0_WP) then
-                     ! Loop over the stencil
-                        do stz=-1,+1
-                           do sty=-1,+1
-                              do stx=-1,+1
-                                 ! Only add values greater than the threshold
-                                 if (F_tmp(i+stx,j+sty,k+stz).gt.Fmin) then
-                                    F(i+stx,j+sty,k+stz)=F(i+stx,j+sty,k+stz)+F_tmp(i,j,k)*this%cfg%vol(i,j,k)/vol
-                                 end if
-                              end do
-                           end do
-                        end do
-                     end if
-                  end if
-               end do
-            end do
-         end do
-         ! Sync it
-         call this%cfg%sync(F)
-      end do
-
-      ! Deallocate the temporary field
-      deallocate(F_tmp)
-
-   end subroutine filter
 
 
    !> Calculate the divergence induced by phase change

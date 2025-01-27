@@ -20,7 +20,7 @@ module ddadi_class
       
       !> Diagonal object
       class(diag), allocatable :: dsol
-      
+
    contains
       
       procedure :: print_short=>ddadi_print_short !< One-line printing of solver status
@@ -118,27 +118,24 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               do st=1,this%nst
-                  ! this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
-                  ! this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
-                  ! this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
-                  ! if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax)) this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
-                  ! if ((j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax)) this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
-                  ! if ((k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
-                  
-                  if (this%stc(st,2).eq.0.and.this%stc(st,3).eq.0) then
-                     if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax)) this%dsol%Ax(j,k,i,this%stc(st,1))=this%dsol%Ax(j,k,i,this%stc(st,1))+this%opr(st,i,j,k)
-                  end if
-                  if (this%stc(st,3).eq.0.and.this%stc(st,1).eq.0) then
-                     if ((j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax)) this%dsol%Ay(i,k,j,this%stc(st,2))=this%dsol%Ay(i,k,j,this%stc(st,2))+this%opr(st,i,j,k)
-                  end if
-                  if (this%stc(st,1).eq.0.and.this%stc(st,2).eq.0) then
-                     if ((k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) this%dsol%Az(i,j,k,this%stc(st,3))=this%dsol%Az(i,j,k,this%stc(st,3))+this%opr(st,i,j,k)
-                  end if
+               do st=minval(this%stc(:,1)),maxval(this%stc(:,1))
+                  if ((i+st.ge.this%cfg%imin).and.(i+st.le.this%cfg%imax)) this%dsol%Ax(j,k,i,st)=this%dsol%Ax(j,k,i,st)+this%opr(this%stmap(st,0,0),i,j,k)
+               end do
+               do st=minval(this%stc(:,2)),maxval(this%stc(:,2))
+                  if ((j+st.ge.this%cfg%jmin).and.(j+st.le.this%cfg%jmax)) this%dsol%Ay(i,k,j,st)=this%dsol%Ay(i,k,j,st)+this%opr(this%stmap(0,st,0),i,j,k)
+               end do
+               do st=minval(this%stc(:,3)),maxval(this%stc(:,3))
+                  if ((k+st.ge.this%cfg%kmin).and.(k+st.le.this%cfg%kmax)) this%dsol%Az(i,j,k,st)=this%dsol%Az(i,j,k,st)+this%opr(this%stmap(0,0,st),i,j,k)
                end do
             end do
          end do
       end do
+      ! this%dsol%Ax(:,:,this%cfg%imin_,-1)=0.0_WP
+      ! this%dsol%Ax(:,:,this%cfg%imax_,+1)=0.0_WP
+      ! this%dsol%Ay(i,k,this%cfg%jmin_,-1)=0.0_WP
+      ! this%dsol%Ay(i,k,this%cfg%jmax_,+1)=0.0_WP
+      ! this%dsol%Az(i,j,this%cfg%kmin_,-1)=0.0_WP
+      ! this%dsol%Az(i,j,this%cfg%kmax_,+1)=0.0_WP
       
       ! Set setup-flag to true
       this%setup_done=.true.
@@ -153,7 +150,6 @@ contains
       implicit none
       class(ddadi), intent(inout) :: this
       integer :: i,j,k,st
-      real(WP) :: opr_sum
       
       ! Check that setup was done
       if (.not.this%setup_done) call die('[ddadi solve] Solver has not been setup.')
@@ -175,16 +171,6 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               ! opr_sum=0.0_WP
-               ! do st=1,this%nst
-               !    if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
-               !    &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
-               !    &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
-               !       opr_sum=opr_sum+this%opr(st,i,j,k)
-               !    end if
-               ! end do
-               ! this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*opr_sum
-               ! this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*sum(this%opr(:,i,j,k))
                this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*this%opr(this%stmap(0,0,0),i,j,k)
             end do
          end do
@@ -195,16 +181,6 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               ! opr_sum=0.0_WP
-               ! do st=1,this%nst
-               !    if ((i+this%stc(st,1).ge.this%cfg%imin).and.(i+this%stc(st,1).le.this%cfg%imax).and. &
-               !    &   (j+this%stc(st,2).ge.this%cfg%jmin).and.(j+this%stc(st,2).le.this%cfg%jmax).and. &
-               !    &   (k+this%stc(st,3).ge.this%cfg%kmin).and.(k+this%stc(st,3).le.this%cfg%kmax)) then
-               !       opr_sum=opr_sum+this%opr(st,i,j,k)
-               !    end if
-               ! end do
-               ! this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*opr_sum
-               ! this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*sum(this%opr(:,i,j,k))
                this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*this%opr(this%stmap(0,0,0),i,j,k)
             end do
          end do
@@ -228,6 +204,185 @@ contains
       if (verbose.gt.1) call this%print_short
       
    end subroutine ddadi_solve
+
+
+   ! subroutine ddadi_solve(this)
+   !    use messager, only: die
+   !    use param,    only: verbose
+   !    implicit none
+   !    class(ddadi), intent(inout) :: this
+   !    integer :: i,j,k,st,stm,ist
+      
+   !    ! Check that setup was done
+   !    if (.not.this%setup_done) call die('[ddadi solve] Solver has not been setup.')
+
+   !    ! Inverse in X-direction
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%dsol%Rx(j,k,i)=this%rhs(i,j,k)
+   !          end do
+   !       end do
+   !    end do
+   !    ! Apply boundary conditions in x
+   !    if (this%cfg%nx.gt.1.and.this%cfg%xper.eqv..false.) then
+   !       ! xm boundary
+   !       if (this%cfg%imin_.eq.this%cfg%imin) then
+   !          ! Get the minimum stencil shift
+   !          stm=minval(this%stc(:,1))
+   !          ! Loop over the cells
+   !          do k=this%cfg%kmin_,this%cfg%kmax_
+   !             do j=this%cfg%jmin_,this%cfg%jmax_
+   !                do ist=0,-stm-1,+1
+   !                   i=this%cfg%imin_+ist
+   !                   do st=-1-ist,stm,-1
+   !                      this%dsol%Rx(j,k,i)=this%dsol%Rx(j,k,i)-this%dsol%Ax(j,k,i,st)*this%sol(i+st,j,k)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !       ! xp boundary
+   !       if (this%cfg%imax_.eq.this%cfg%imax) then
+   !          ! Get the maximum stencil shift
+   !          stm=maxval(this%stc(:,1))
+   !          ! Loop over the cells
+   !          do k=this%cfg%kmin_,this%cfg%kmax_
+   !             do j=this%cfg%jmin_,this%cfg%jmax_
+   !                do ist=0,-stm+1,-1
+   !                   i=this%cfg%imax_+ist
+   !                   do st=+1-ist,stm,+1
+   !                      this%dsol%Rx(j,k,i)=this%dsol%Rx(j,k,i)-this%dsol%Ax(j,k,i,st)*this%sol(i+st,j,k)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !    end if
+   !    call this%dsol%linsol_x()
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%sol(i,j,k)=this%dsol%Rx(j,k,i)
+   !          end do
+   !       end do
+   !    end do
+      
+   !    ! Inverse in Y-direction
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%dsol%Ry(i,k,j)=this%dsol%Rx(j,k,i)*this%opr(this%stmap(0,0,0),i,j,k)
+   !          end do
+   !       end do
+   !    end do
+      
+   !    ! Apply boundary conditions in z
+   !    if (this%cfg%ny.gt.1.and.this%cfg%yper.eqv..false.) then
+   !       ! ym boundary
+   !       if (this%cfg%jmin_.eq.this%cfg%jmin) then
+   !          ! Get the minimum stencil shift
+   !          stm=minval(this%stc(:,2))
+   !          ! Loop over the cells
+   !          do k=this%cfg%kmin_,this%cfg%kmax_
+   !             do ist=0,-stm-1,+1
+   !                j=this%cfg%jmin_+ist
+   !                do st=-1-ist,stm,-1
+   !                   do i=this%cfg%imin_,this%cfg%imax_
+   !                      this%dsol%Ry(i,k,j)=this%dsol%Ry(i,k,j)-this%dsol%Ay(i,k,j,st)*this%sol(i,j+st,k)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !       ! yp boundary
+   !       if (this%cfg%jmax_.eq.this%cfg%jmax) then
+   !          ! Get the maximum stencil shift
+   !          stm=maxval(this%stc(:,2))
+   !          ! Loop over the cells
+   !          do k=this%cfg%kmin_,this%cfg%kmax_
+   !             do ist=0,-stm+1,-1
+   !                j=this%cfg%jmax_+ist
+   !                do st=+1-ist,stm,+1
+   !                   do i=this%cfg%imin_,this%cfg%imax_
+   !                      this%dsol%Ry(i,k,j)=this%dsol%Ry(i,k,j)-this%dsol%Ay(i,k,j,st)*this%sol(i,j+st,k)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !    end if
+   !    call this%dsol%linsol_y()
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%sol(i,j,k)=this%dsol%Ry(i,k,j)
+   !          end do
+   !       end do
+   !    end do
+      
+   !    ! Inverse in Z-direction
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%dsol%Rz(i,j,k)=this%dsol%Ry(i,k,j)*this%opr(this%stmap(0,0,0),i,j,k)
+   !          end do
+   !       end do
+   !    end do
+   !    ! Apply boundary conditions in z
+   !    if (this%cfg%nz.gt.1.and.this%cfg%zper.eqv..false.) then
+   !       ! zm boundary
+   !       if (this%cfg%kmin_.eq.this%cfg%kmin) then
+   !          ! Get the minimum stencil shift
+   !          stm=minval(this%stc(:,3))
+   !          ! Loop over the cells
+   !          do ist=0,-stm-1,+1
+   !             k=this%cfg%kmin_+ist
+   !             do st=-1-ist,stm,-1
+   !                do j=this%cfg%jmin_,this%cfg%jmax_
+   !                   do i=this%cfg%imin_,this%cfg%imax_
+   !                      this%dsol%Rz(i,j,k)=this%dsol%Rz(i,j,k)-this%dsol%Az(i,j,k,st)*this%sol(i,j,k+st)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !       ! zp boundary
+   !       if (this%cfg%kmax_.eq.this%cfg%kmax) then
+   !          ! Get the maximum stencil shift
+   !          stm=maxval(this%stc(:,3))
+   !          ! Loop over the cells
+   !          do ist=0,-stm+1,-1
+   !             k=this%cfg%kmax_+ist
+   !             do st=+1-ist,stm,+1
+   !                do j=this%cfg%jmin_,this%cfg%jmax_
+   !                   do i=this%cfg%imin_,this%cfg%imax_
+   !                      this%dsol%Rz(i,j,k)=this%dsol%Rz(i,j,k)-this%dsol%Az(i,j,k,st)*this%sol(i,j,k+st)
+   !                   end do
+   !                end do
+   !             end do
+   !          end do
+   !       end if
+   !    end if
+   !    call this%dsol%linsol_z()
+      
+   !    ! Update solution vector
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             this%sol(i,j,k)=this%dsol%Rz(i,j,k)
+   !          end do
+   !       end do
+   !    end do
+      
+   !    ! Sync the solution vector
+   !    call this%cfg%sync(this%sol)
+      
+   !    ! If verbose run, log and or print info
+   !    if (verbose.gt.0) call this%log
+   !    if (verbose.gt.1) call this%print_short
+      
+   ! end subroutine ddadi_solve
    
    
    !> Log ddadi info

@@ -41,8 +41,7 @@ module simulation
    real(WP) :: radius
    real(WP) :: mdotdp
    real(WP) :: rad_drop
-   ! Debug (single core)
-   ! real(WP) :: bnd_mfr,evp_mfr
+   
    
 contains
 
@@ -400,9 +399,7 @@ contains
          call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
          call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
          call ens_out%add_scalar('SD',vf%SD)
-         ! Debug
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
-         ! call ens_out%add_scalar('psdiv',evp%psdiv)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -596,16 +593,6 @@ contains
             ! Recompute interpolated velocity and divergence
             call fs%interp_vel(Ui,Vi,Wi)
             call fs%get_div(src=evp%div_src)
-
-            ! Debug (single core)
-            ! call evp%cfg%integrate_without_VF(evp%mflux*(evp%rho_l-evp%rho_g)/evp%rho_l,evp_mfr)
-            ! ! call evp%cfg%integrate_without_VF(evp%div_src,evp_mfr)
-            ! call fs%get_mfr()
-            ! bnd_mfr=sum(fs%mfr)*fs%rho_g
-            ! ! bnd_mfr=sum(fs%mfr)
-            ! print*,'Evaporation mfr = ',evp_mfr
-            ! print*,'Boundaries mfr  = ',bnd_mfr
-            ! print*,'mfr difference  = ',abs(evp_mfr)-abs(bnd_mfr)
 
          end block advance_flow
 

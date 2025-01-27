@@ -14,6 +14,9 @@ module evap_class
    ! Index shift
    integer, dimension(1:3,1:3) :: ind_shift=reshape([1,0,0,0,1,0,0,0,1], shape(ind_shift))
 
+   ! Default parameters for the evaporation class
+   integer, parameter :: ext_lvl=5                                     !< The extension level for the interface normal (needs to be smaller than the VOF solver band for the shift_mflux to work properly)
+
    type :: arr_ptr_4d
       real(WP), pointer :: arr(:,:,:,:)
    end type arr_ptr_4d
@@ -75,6 +78,7 @@ module evap_class
       procedure :: shift_mflux                                         !< Shift the evaporation mass flux
       procedure :: get_div                                             !< Get the evaporation source term
       procedure :: get_cfl                                             !< Get the CFL
+      procedure :: extend_normal                                       !< Extend the interface normal                                             
 
    end type evap
 
@@ -84,6 +88,8 @@ contains
    
    !> Object initializer
    subroutine initialize(this,cfg,vf,itp_x,itp_y,itp_z,div_x,div_y,div_z,name)
+      use messager, only: die
+      use vfs_class, only: nband
       implicit none
       class(evap), intent(inout) :: this
       class(config), target, intent(in) :: cfg
@@ -97,6 +103,9 @@ contains
       character(len=*), optional :: name
       integer :: i,j,k
       
+      ! Check the extension level
+      if (ext_lvl.ge.nband) call die('The normal extension level needs to be smaller than the VOF solver band')
+
       ! Set the name for the solver
       if (present(name)) this%name=trim(adjustl(name))
       
@@ -183,9 +192,63 @@ contains
             end do
          end do
       end do
+      ! Check dimensions
+      do dir=1,3
+         if (this%nCell(dir).eq.1) this%normal(:,:,:,dir)=0.0_WP
+      end do
    end subroutine get_normal
 
-   
+
+   !> Extend the interface normal for a smoother transition to zero
+   subroutine extend_normal(this,lvl)
+      implicit none
+      class(evap), intent(inout) :: this
+      integer, intent(in) :: lvl
+      integer  :: n,dir,i,j,k,index,index_pure
+      integer  :: stx,sty,stz
+      real(WP) :: vol
+      real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
+      ! Allocate memory for the temporary field
+      allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+      ! Loop over the extension levels
+      do n=1,lvl
+         ! Take a copy of the normal
+         normal_tmp=this%normal
+         ! Loop over directions
+         do dir=1,3
+            ! Check the dimensions
+            if (this%nCell(dir).gt.1) then
+               ! Loop over the pure cells within the band
+               do index=1,sum(this%vf%band_count(1:lvl))
+                  ! Offset for the interfacial cells' index
+                  index_pure=this%vf%band_count(0)+index
+                  ! Get the cell indices
+                  i=this%vf%band_map(1,index_pure)
+                  j=this%vf%band_map(2,index_pure)
+                  k=this%vf%band_map(3,index_pure)
+                  ! Initialize with zero
+                  vol=0.0_WP
+                  this%normal(i,j,k,dir)=0.0_WP
+                  ! Loop over the stencils
+                  do stz=-1,1
+                     do sty=-1,1
+                        do stx=-1,1
+                           vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
+                           this%normal(i,j,k,dir)=this%normal(i,j,k,dir)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,dir)
+                        end do
+                     end do
+                  end do
+                  ! Scale by volume
+                  if (vol.gt.0.0_WP) this%normal(i,j,k,dir)=this%normal(i,j,k,dir)/vol
+               end do
+               ! Sync
+               call this%cfg%sync(this%normal(:,:,:,dir))
+            end if
+         end do
+      end do
+   end subroutine extend_normal
+
+
    !> Calculate the face-centered phase-change velocity
    subroutine get_vel_pc(this)
       use vfs_class, only: vfs
@@ -284,7 +347,7 @@ contains
       this%mflux=this%mdotdp*this%vf%SD
    end subroutine get_mflux
 
-
+   
    !> Calculate the explicit mflux time derivative
    subroutine get_dmfluxdt(this,vel,mflux_old,dmfluxdt)
       implicit none
@@ -292,42 +355,53 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in)  :: vel        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:3)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),    intent(in)  :: mflux_old  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:),    intent(out) :: dmfluxdt   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      integer :: i,j,k,dir
+      integer :: i,j,k,dir,index,n
+      integer :: ic,jc,kc
       integer :: im,jm,km
       integer :: ip,jp,kp
       real(WP), dimension(:,:,:,:), allocatable :: F
       ! Zero out dmflux/dt array
       dmfluxdt=0.0_WP
       ! Allocate flux arrays
-      allocate(F(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+      allocate(F(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3)); F=0.0_WP
       ! Fluxes of mflux
-      do dir=1,3
-         ! Loop over cell faces
-         do k=this%cfg%kmin_,this%cfg%kmax_+ind_shift(3,dir)
-            do j=this%cfg%jmin_,this%cfg%jmax_+ind_shift(2,dir)
-               do i=this%cfg%imin_,this%cfg%imax_+ind_shift(1,dir)
-                  ! Prepare indices for the adjacent cells
-                  im=i-ind_shift(1,dir); ip=i
-                  jm=j-ind_shift(2,dir); jp=j
-                  km=k-ind_shift(3,dir); kp=k
-                  ! Compute the face flux
+      do index=1,sum(this%vf%band_count(0:ext_lvl+1))
+         ! Get the cell indices
+         ic=this%vf%band_map(1,index)
+         jc=this%vf%band_map(2,index)
+         kc=this%vf%band_map(3,index)
+         ! Loop over directions
+         do dir=1,3
+            ! Loop over the plus and minus faces
+            do n=0,1
+               ! Get the face indices
+               i=ic+ind_shift(1,dir)*n
+               j=jc+ind_shift(2,dir)*n
+               k=kc+ind_shift(3,dir)*n
+               ! Prepare indices for the adjacent cells
+               im=i-ind_shift(1,dir); ip=i
+               jm=j-ind_shift(2,dir); jp=j
+               km=k-ind_shift(3,dir); kp=k
+               ! Compute the face flux
+               if (F(i,j,k,dir).eq.0.0_WP) then
                   F(i,j,k,dir)=-0.5_WP*(vel(i,j,k,dir)+abs(vel(i,j,k,dir)))*mflux_old(im,jm,km) &
                   &            -0.5_WP*(vel(i,j,k,dir)-abs(vel(i,j,k,dir)))*mflux_old(ip,jp,kp)
-               end do
+               end if
             end do
          end do
       end do
       ! Time derivative of mflux
       do dir=1,3
          ! Loop over the cells
-         do k=this%cfg%kmin_,this%cfg%kmax_
-            do j=this%cfg%jmin_,this%cfg%jmax_
-               do i=this%cfg%imin_,this%cfg%imax_
-                  dmfluxdt(i,j,k)=dmfluxdt(i,j,k)                                                                            &
-                  &              +this%div(dir)%arr(0,i,j,k)*F(i,j,k,dir)                                                    &
-                  &              +this%div(dir)%arr(1,i,j,k)*F(i+ind_shift(1,dir),j+ind_shift(2,dir),k+ind_shift(3,dir),dir)
-               end do
-            end do
+         do index=1,sum(this%vf%band_count(0:ext_lvl+1))
+            ! Get the cell indices
+            i=this%vf%band_map(1,index)
+            j=this%vf%band_map(2,index)
+            k=this%vf%band_map(3,index)
+            ! Get the residual
+            dmfluxdt(i,j,k)=dmfluxdt(i,j,k)                                                                            &
+            &              +this%div(dir)%arr(0,i,j,k)*F(i,j,k,dir)                                                    &
+            &              +this%div(dir)%arr(1,i,j,k)*F(i+ind_shift(1,dir),j+ind_shift(2,dir),k+ind_shift(3,dir),dir)
          end do
       end do
       ! Deallocate flux arrays
@@ -339,14 +413,13 @@ contains
 
    !> Shift mflux away from the interface
    subroutine shift_mflux(this)
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
       use parallel,  only: MPI_REAL_WP
-      use vfs_class, only: vfs
       implicit none
       class(evap), intent(inout) :: this
       real(WP), dimension(:,:,:), allocatable :: resmfluxL,resmfluxG
-      integer  :: ierr
-      real(WP) :: mflux_max,my_mflux_max,mflux_err,my_mflux_err
+      integer  :: i,j,k,ierr
+      real(WP) :: my_mflux_int,mflux_err
 
       ! Allocate memory for mflux residuals
       allocate(resmfluxL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
@@ -354,6 +427,9 @@ contains
 
       ! Get the interface normal
       call this%get_normal()
+
+      ! Extend the interface normal
+      call this%extend_normal(lvl=5)
 
       ! Get the normalized gradient of VOF
       call this%get_pseudo_vel()
@@ -389,17 +465,27 @@ contains
          this%mfluxL=this%mfluxL_old+this%pseudo_time%dt*resmfluxL
          this%mfluxG=this%mfluxG_old+this%pseudo_time%dt*resmfluxG
 
-         ! Get the maximum of mflux
-         my_mflux_max=maxval(this%mflux)
-         call MPI_ALLREDUCE(my_mflux_max,mflux_max,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
-
-         ! Calculate the error on the liquid side
-         my_mflux_err=maxval(abs((this%mfluxL-this%mfluxL_old)/mflux_max))
-         call MPI_ALLREDUCE(my_mflux_err,this%mfluxL_err,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
+         ! Calculate the integral of the residual error of mfluxL
+         my_mflux_int=0.0_WP
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  if (this%vf%VF(i,j,k).lt.1) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxL(i,j,k))
+               end do
+            end do
+         end do
+         call MPI_ALLREDUCE(my_mflux_int,this%mfluxL_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
          
-         ! Calculate the error on the gas side
-         my_mflux_err=maxval(abs((this%mfluxG-this%mfluxG_old)/mflux_max))
-         call MPI_ALLREDUCE(my_mflux_err,this%mfluxG_err,1,MPI_REAL_WP,MPI_Max,this%cfg%comm,ierr)
+         ! Calculate the integral of the residual error of mfluxG
+         my_mflux_int=0.0_WP
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  if (this%vf%VF(i,j,k).gt.0) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxG(i,j,k))
+               end do
+            end do
+         end do
+         call MPI_ALLREDUCE(my_mflux_int,this%mfluxG_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
 
          ! Check convergence
          mflux_err=max(this%mfluxL_err,this%mfluxG_err)

@@ -198,7 +198,7 @@ contains
       ! Initialize our VOF solver and field
       create_and_initialize_vof: block
          use mms_geom,  only: cube_refine_vol
-         use vfs_class, only: lvira,VFhi,VFlo,flux_storage,neumann
+         use vfs_class, only: lvira,VFhi,VFlo,flux,neumann
          use mathtools, only: Pi
          integer :: i,j,k,n,si,sj,sk
          real(WP), dimension(3,8) :: cube_vertex
@@ -206,7 +206,7 @@ contains
          real(WP) :: vol,area
          integer, parameter :: amr_ref_lvl=4
          ! Create a VOF solver
-         call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux_storage,name='VOF')
+         call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux,name='VOF')
          vf%cons_correct=.false.
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
@@ -465,10 +465,7 @@ contains
          call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
          call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
          call ens_out%add_scalar('Temperature',T)
-         ! Debug
-         call ens_out%add_scalar('SD',vf%SD)
-         call ens_out%add_scalar('PVFL',sc%PVF(:,:,:,Lphase))
-         call ens_out%add_scalar('PVFG',sc%PVF(:,:,:,Gphase))
+         call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -627,15 +624,13 @@ contains
             sc%PVF(:,:,:,Lphase)=vf%VF
             sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
             
-            ! Explicit calculation of dSC/dt from advective term
-            ! call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
-            ! call sc%get_dSCdt(dSCdt=resSC,UL=fsL%U,VL=fsL%V,WL=fsL%W,UG=fs%U,VG=fs%V,WG=fs%W,VFold=vf%VFold,VF=vf%VF)
-            
             ! Advance advection
-            ! do nsc=1,sc%nscalar
-            !    where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*resSC(:,:,:,nsc))/(sc%PVF(:,:,:,sc%phase(nsc)))
-            !    where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
-            ! end do
+            ! call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
+            call sc%get_dSCdt(dSCdt=resSC,UL=fsL%U,VL=fsL%V,WL=fsL%W,UG=fs%U,VG=fs%V,WG=fs%W,VFold=vf%VFold,VF=vf%VF)
+            do nsc=1,sc%nscalar
+               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*resSC(:,:,:,nsc))/(sc%PVF(:,:,:,sc%phase(nsc)))
+               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
+            end do
 
             ! Apply the mass/energy transfer term for the species/temperature
             nsc=iYv
@@ -648,6 +643,9 @@ contains
                end where
             end do
             call sc%solve_implicit_diff(time%dt,resSC)
+            do nsc=1,sc%nscalar
+               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
+            end do
 
             ! Apply boundary conditions
             call sc%apply_bcond(time%t,time%dt)
