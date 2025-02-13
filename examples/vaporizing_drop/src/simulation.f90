@@ -41,6 +41,8 @@ module simulation
    real(WP) :: radius
    real(WP) :: mdotdp
    real(WP) :: rad_drop
+   real(WP) :: VFint_old,VFint_diff,VFint_over_SDint,vfintdot_err,div_src_int,vfintdot,V_D_ext,V_D_ext_0,vel_div_int,vf_vel_div_int
+   real(WP), dimension(:,:,:), allocatable :: div_old
    
    
 contains
@@ -173,6 +175,8 @@ contains
          allocate(Ui_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Vi_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         ! debug
+         allocate(div_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); div_old=0.0_WP
       end block allocate_work_arrays
       
       
@@ -255,6 +259,11 @@ contains
          ! Droplet size
          call vf%get_max()
          rad_drop=sqrt(vf%VFint/(Lz*Pi))
+         VFint_old=vf%VFint
+         VFint_diff=0.0_WP
+         vfintdot_err=0.0_WP
+         V_D_ext_0=vf%VFint
+         V_D_ext=V_D_ext_0
       end block create_and_initialize_vof
       
       
@@ -396,10 +405,11 @@ contains
          call ens_out%add_scalar('mfluxL',evp%mfluxL)
          call ens_out%add_scalar('mfluxG',evp%mfluxG)
          call ens_out%add_scalar('divergence',fs%div)
-         call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
-         call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
+         ! call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
+         ! call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
          call ens_out%add_scalar('SD',vf%SD)
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
+         call ens_out%add_scalar('div',div_old)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -429,6 +439,14 @@ contains
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
          call mfile%add_column(rad_drop,'Droplet raduis')
+         call mfile%add_column(V_D_ext,'V_D_ext')
+         ! call mfile%add_column(VFint_over_SDint,'VFint_over_SDint')
+         call mfile%add_column(vfintdot_err,'vfintdot_err')
+         call mfile%add_column(vfintdot,'vfintdot')
+         call mfile%add_column(vf%clipped_vol,'clipped_vol')
+         ! call mfile%add_column(div_src_int,'div_src_int')
+         ! call mfile%add_column(vel_div_int,'vel_div_int')
+         call mfile%add_column(vf_vel_div_int,'vf_vel_div_int')
          call mfile%write()
          ! Create simulation monitor for liquid
          mfileL=monitor(fsL%cfg%amRoot,'simulation_liquid')
@@ -499,6 +517,8 @@ contains
          fs%Uold=fs%U; fsL%Uold=fsL%U
          fs%Vold=fs%V; fsL%Vold=fsL%V
          fs%Wold=fs%W; fsL%Wold=fsL%W
+         call fs%get_div()
+         div_old=fs%div
          
          ! Apply time-varying Dirichlet conditions
          ! This is where time-dpt Dirichlet would be enforced
@@ -517,13 +537,16 @@ contains
          call evp%get_mflux()
 
          ! Get the interface velocity
-         call evp%get_vel_pc()
-         evp%U_itf=fsL%U-evp%vel_pc(:,:,:,1)
-         evp%V_itf=fsL%V-evp%vel_pc(:,:,:,2)
-         evp%W_itf=fsL%W-evp%vel_pc(:,:,:,3)
+         ! call evp%get_vel_pc()
+         ! evp%U_itf=fsL%U-evp%vel_pc(:,:,:,1)
+         ! evp%V_itf=fsL%V-evp%vel_pc(:,:,:,2)
+         ! evp%W_itf=fsL%W-evp%vel_pc(:,:,:,3)
 
          ! VOF solver step
-         call vf%advance(dt=time%dt,U=evp%U_itf,V=evp%V_itf,W=evp%W_itf)
+         call vf%get_max()
+         VFint_old=vf%VFint
+         ! call vf%advance(dt=time%dt,U=evp%U_itf,V=evp%V_itf,W=evp%W_itf)
+         call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
 
          ! Shift the evaporation mass flux
@@ -597,72 +620,72 @@ contains
          end block advance_flow
 
          ! Advance flow for the divergence-free velocity field
-         advance_div_free_liquid: block
-            integer  :: it_L,itmax_L
+         ! advance_div_free_liquid: block
+         !    integer  :: it_L,itmax_L
 
-            ! Prepare new staggered viscosity (at n+1)
-            call fsL%get_viscosity(vf=vf,strat=harmonic_visc)
+         !    ! Prepare new staggered viscosity (at n+1)
+         !    call fsL%get_viscosity(vf=vf,strat=harmonic_visc)
             
-            ! Perform sub-iterations
-            itmax_L=2
-            it_L=1            
-            do while (it_L.le.itmax_L)
+         !    ! Perform sub-iterations
+         !    itmax_L=2
+         !    it_L=1            
+         !    do while (it_L.le.itmax_L)
                
-               ! Build mid-time velocity
-               fsL%U=0.5_WP*(fsL%U+fsL%Uold)
-               fsL%V=0.5_WP*(fsL%V+fsL%Vold)
-               fsL%W=0.5_WP*(fsL%W+fsL%Wold)
+         !       ! Build mid-time velocity
+         !       fsL%U=0.5_WP*(fsL%U+fsL%Uold)
+         !       fsL%V=0.5_WP*(fsL%V+fsL%Vold)
+         !       fsL%W=0.5_WP*(fsL%W+fsL%Wold)
                
-               ! Preliminary mass and momentum transport step at the interface
-               call fsL%prepare_advection_upwind(dt=time%dt)
+         !       ! Preliminary mass and momentum transport step at the interface
+         !       call fsL%prepare_advection_upwind(dt=time%dt)
                
-               ! Explicit calculation of drho*u/dt from NS
-               call fsL%get_dmomdt(resU,resV,resW)
+         !       ! Explicit calculation of drho*u/dt from NS
+         !       call fsL%get_dmomdt(resU,resV,resW)
                
-               ! Add momentum mass fluxes
-               call fsL%addsrc_gravity(resU,resV,resW)
+         !       ! Add momentum mass fluxes
+         !       call fsL%addsrc_gravity(resU,resV,resW)
                
-               ! Assemble explicit residual
-               resU=-2.0_WP*fsL%rho_U*fsL%U+(fsL%rho_Uold+fsL%rho_U)*fsL%Uold+time%dt*resU
-               resV=-2.0_WP*fsL%rho_V*fsL%V+(fsL%rho_Vold+fsL%rho_V)*fsL%Vold+time%dt*resV
-               resW=-2.0_WP*fsL%rho_W*fsL%W+(fsL%rho_Wold+fsL%rho_W)*fsL%Wold+time%dt*resW
+         !       ! Assemble explicit residual
+         !       resU=-2.0_WP*fsL%rho_U*fsL%U+(fsL%rho_Uold+fsL%rho_U)*fsL%Uold+time%dt*resU
+         !       resV=-2.0_WP*fsL%rho_V*fsL%V+(fsL%rho_Vold+fsL%rho_V)*fsL%Vold+time%dt*resV
+         !       resW=-2.0_WP*fsL%rho_W*fsL%W+(fsL%rho_Wold+fsL%rho_W)*fsL%Wold+time%dt*resW
                
-               ! Apply these residuals
-               fsL%U=2.0_WP*fsL%U-fsL%Uold+resU/fsL%rho_U
-               fsL%V=2.0_WP*fsL%V-fsL%Vold+resV/fsL%rho_V
-               fsL%W=2.0_WP*fsL%W-fsL%Wold+resW/fsL%rho_W
+         !       ! Apply these residuals
+         !       fsL%U=2.0_WP*fsL%U-fsL%Uold+resU/fsL%rho_U
+         !       fsL%V=2.0_WP*fsL%V-fsL%Vold+resV/fsL%rho_V
+         !       fsL%W=2.0_WP*fsL%W-fsL%Wold+resW/fsL%rho_W
                
-               ! Apply other boundary conditions
-               call fsL%apply_bcond(time%t,time%dt)
+         !       ! Apply other boundary conditions
+         !       call fsL%apply_bcond(time%t,time%dt)
                
-               ! Solve Poisson equation
-               call fsL%update_laplacian()
-               call fsL%correct_mfr()
-               call fsL%get_div()
-               ! call fsL%add_surface_tension_jump(dt=time%dt,div=fsL%div,vf=vf,contact_model=static_contact)
-               call fsL%add_surface_tension_jump(dt=time%dt,div=fsL%div,vf=vf)
-               fsL%psolv%rhs=-fsL%cfg%vol*fsL%div/time%dt
-               fsL%psolv%sol=0.0_WP
-               call fsL%psolv%solve()
-               call fsL%shift_p(fsL%psolv%sol)
+         !       ! Solve Poisson equation
+         !       call fsL%update_laplacian()
+         !       call fsL%correct_mfr()
+         !       call fsL%get_div()
+         !       ! call fsL%add_surface_tension_jump(dt=time%dt,div=fsL%div,vf=vf,contact_model=static_contact)
+         !       call fsL%add_surface_tension_jump(dt=time%dt,div=fsL%div,vf=vf)
+         !       fsL%psolv%rhs=-fsL%cfg%vol*fsL%div/time%dt
+         !       fsL%psolv%sol=0.0_WP
+         !       call fsL%psolv%solve()
+         !       call fsL%shift_p(fsL%psolv%sol)
                
-               ! Correct velocity
-               call fsL%get_pgrad(fsL%psolv%sol,resU,resV,resW)
-               fsL%P=fsL%P+fsL%psolv%sol
-               fsL%U=fsL%U-time%dt*resU/fsL%rho_U
-               fsL%V=fsL%V-time%dt*resV/fsL%rho_V
-               fsL%W=fsL%W-time%dt*resW/fsL%rho_W
+         !       ! Correct velocity
+         !       call fsL%get_pgrad(fsL%psolv%sol,resU,resV,resW)
+         !       fsL%P=fsL%P+fsL%psolv%sol
+         !       fsL%U=fsL%U-time%dt*resU/fsL%rho_U
+         !       fsL%V=fsL%V-time%dt*resV/fsL%rho_V
+         !       fsL%W=fsL%W-time%dt*resW/fsL%rho_W
                
-               ! Increment sub-iteration counter
-               it_L=it_L+1
+         !       ! Increment sub-iteration counter
+         !       it_L=it_L+1
                
-            end do
+         !    end do
             
-            ! Recompute interpolated velocity and divergence
-            call fsL%interp_vel(Ui_L,Vi_L,Wi_L)
-            call fsL%get_div()
+         !    ! Recompute interpolated velocity and divergence
+         !    call fsL%interp_vel(Ui_L,Vi_L,Wi_L)
+         !    call fsL%get_div()
 
-         end block advance_div_free_liquid
+         ! end block advance_div_free_liquid
          
          ! Output to ensight
          if (ens_evt%occurs()) then
@@ -673,8 +696,16 @@ contains
          ! Perform and output monitoring
          call fs%get_max(); call fsL%get_max()
          call vf%get_max()
-         call evp%get_max_vel_pc()
+         ! call evp%get_max_vel_pc()
          rad_drop=sqrt(vf%VFint/(Lz*Pi))
+         VFint_diff=vf%VFint-VFint_old
+         vfintdot=VFint_diff/time%dt
+         VFint_over_SDint=VFint_diff/vf%SDint
+         ! call cfg%integrate(evp%mdotdp/evp%rho_l*vf%SD,div_src_int)
+         ! call cfg%integrate(evp%div_src,div_src_int)
+         call cfg%integrate(vf%VF*div_old,vf_vel_div_int)
+         vfintdot_err=vfintdot-vf_vel_div_int
+         V_D_ext=V_D_ext_0-mdotdp*vf%SDint/evp%rho_l*time%t
          call mfile%write(); call mfileL%write()
          call cflfile%write()
          call evpfile%write()

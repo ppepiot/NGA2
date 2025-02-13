@@ -803,6 +803,12 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
       integer :: i,j,k,nsc
       
+      print*,'Before implicit solver'
+      print*,'SC(imax  ,jmax  ,1) = ',this%SC(this%cfg%imax  ,this%cfg%jmax  ,1,2)
+      print*,'SC(imax+1,jmax  ,1) = ',this%SC(this%cfg%imax+1,this%cfg%jmax  ,1,2)
+      print*,'SC(imax  ,jmax+1,1) = ',this%SC(this%cfg%imax  ,this%cfg%jmax+1,1,2)
+      print*,'SC(imax+1,jmax+1,1) = ',this%SC(this%cfg%imax+1,this%cfg%jmax+1,1,2)
+
       ! Apply implicit treatment for each scalar
       do nsc=1,this%nscalar
          
@@ -828,11 +834,39 @@ contains
                end do
             end do
          end do
+
+         ! this%implicit%opr(this%implicit%stmap(-1,0,0),1,1,1)=2.0_WP
+         ! this%implicit%opr(this%implicit%stmap( 0,0,0),1,1,1)=4.0_WP
+         ! this%implicit%opr(this%implicit%stmap(+1,0,0),1,1,1)=1.0_WP
+
+         ! this%implicit%opr(this%implicit%stmap(-1,0,0),2,1,1)=2.0_WP
+         ! this%implicit%opr(this%implicit%stmap( 0,0,0),2,1,1)=5.0_WP
+         ! this%implicit%opr(this%implicit%stmap(+1,0,0),2,1,1)=2.0_WP
+
+         ! this%implicit%opr(this%implicit%stmap(-1,0,0),3,1,1)=1.0_WP
+         ! this%implicit%opr(this%implicit%stmap( 0,0,0),3,1,1)=6.0_WP
+         ! this%implicit%opr(this%implicit%stmap(+1,0,0),3,1,1)=4.0_WP
+
+         ! this%implicit%opr(this%implicit%stmap(-1,0,0),4,1,1)=3.0_WP
+         ! this%implicit%opr(this%implicit%stmap( 0,0,0),4,1,1)=5.0_WP
+         ! this%implicit%opr(this%implicit%stmap(+1,0,0),4,1,1)=1.0_WP
+
+         ! this%implicit%opr(this%implicit%stmap(-1,0,0),5,1,1)=5.0_WP
+         ! this%implicit%opr(this%implicit%stmap( 0,0,0),5,1,1)=7.0_WP
+         ! this%implicit%opr(this%implicit%stmap(+1,0,0),5,1,1)=1.0_WP
+         
          
          ! Solve the linear system
          call this%implicit%setup()
-         this%implicit%rhs=resSC(:,:,:,nsc)
+         ! this%implicit%rhs=resSC(:,:,:,nsc)
+         this%implicit%rhs=400.0_WP
          this%implicit%sol=this%SC(:,:,:,nsc)
+         ! this%implicit%rhs(1,1,1)=900.0_WP
+         ! this%implicit%rhs(2,1,1)=400.0_WP
+         ! this%implicit%rhs(3,1,1)=100.0_WP
+         ! this%implicit%rhs(4,1,1)=300.0_WP
+         ! this%implicit%rhs(5,1,1)=600.0_WP
+         ! this%implicit%sol=100.0_WP
          call this%implicit%solve()
          this%SC(:,:,:,nsc)=this%implicit%sol
          
@@ -840,6 +874,15 @@ contains
          call this%cfg%sync(this%SC(:,:,:,nsc))
 
       end do
+
+      print*,'After implicit solver'
+      print*,'SC(imax  ,jmax  ,1) = ',this%SC(this%cfg%imax  ,this%cfg%jmax  ,1,2)
+      print*,'SC(imax+1,jmax  ,1) = ',this%SC(this%cfg%imax+1,this%cfg%jmax  ,1,2)
+      print*,'SC(imax  ,jmax+1,1) = ',this%SC(this%cfg%imax  ,this%cfg%jmax+1,1,2)
+      print*,'SC(imax+1,jmax+1,1) = ',this%SC(this%cfg%imax+1,this%cfg%jmax+1,1,2)
+      ! do i=this%cfg%imin_,this%cfg%imax_
+      !    print*,this%SC(i,1,1,2)
+      ! end do
       
    end subroutine solve_implicit_diff
 

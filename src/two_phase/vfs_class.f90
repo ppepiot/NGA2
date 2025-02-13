@@ -45,7 +45,7 @@ module vfs_class
    
    ! Default parameters for volume fraction solver
    integer,  parameter, public :: nband=6                         !< Number of cells around the interfacial cells on which localized work is performed
-   integer,  parameter :: advect_band=1                           !< How far we do the transport
+   integer,  parameter :: advect_band=2                           !< How far we do the transport
    integer,  parameter :: distance_band=2                         !< How far we build the distance
    integer,  parameter :: max_interface_planes=2                  !< Maximum number of interfaces allowed (2 for R2P)
    real(WP), parameter :: VFlo=1.0e-12_WP                         !< Minimum VF value considered
@@ -169,6 +169,9 @@ module vfs_class
       type(LocSepLink_type), dimension(:,:,:), allocatable :: localized_separator_linkold
       type(ObjServer_PlanarSep_type)  :: planar_separatorold_allocation
       type(ObjServer_LocSepLink_type) :: localized_separator_linkold_allocation
+
+      ! debug
+      real(WP) :: clipped_vol
       
    contains
       procedure :: initialize                             !< Initialize the vfs object
@@ -1153,6 +1156,9 @@ contains
    
    !> Perform flux-based transport of VF based on U/V/W and dt
    subroutine transport_flux(this,dt,U,V,W)
+      ! debug
+      use mpi_f08,  only: MPI_SUM,MPI_ALLREDUCE
+      use parallel, only: MPI_REAL_WP
       implicit none
       class(vfs), intent(inout) :: this
       real(WP), intent(inout) :: dt  !< Timestep size over which to advance
@@ -1169,6 +1175,9 @@ contains
       real(WP), dimension(3) :: ctr_now
       real(WP), dimension(3,2) :: bounding_pts
       integer, dimension(3,2) :: bb_indices
+      ! debug
+      real(WP) :: my_clipped_vol
+      integer :: ierr
       
       ! Allocate
       call new(flux_polyhedron)
@@ -1287,6 +1296,9 @@ contains
       end do
       
       ! Compute transported moments
+      ! debug
+      this%clipped_vol=0.0_WP
+      my_clipped_vol=0.0_WP
       do index=1,sum(this%band_count(0:advect_band))
          i=this%band_map(1,index)
          j=this%band_map(2,index)
@@ -1316,8 +1328,10 @@ contains
          
          ! Only work on higher order moments if VF is in [VFlo,VFhi]
          if (this%VF(i,j,k).lt.VFlo) then
+            my_clipped_vol=my_clipped_vol+(this%VF(i,j,k)-0.0_WP)*this%cfg%vol(i,j,k)
             this%VF(i,j,k)=0.0_WP
          else if (this%VF(i,j,k).gt.VFhi) then
+            my_clipped_vol=my_clipped_vol+(this%VF(i,j,k)-1.0_WP)*this%cfg%vol(i,j,k)
             this%VF(i,j,k)=1.0_WP
          else
             ! Compute old phase barycenters
@@ -1332,6 +1346,8 @@ contains
             this%Gbary(:,i,j,k)=this%project(this%Gbary(:,i,j,k),i,j,k,dt,U,V,W)
          end if
       end do
+      ! debug
+      call MPI_ALLREDUCE(my_clipped_vol,this%clipped_vol,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
       
       ! Synchronize VF and barycenter fields
       call this%cfg%sync(this%VF)

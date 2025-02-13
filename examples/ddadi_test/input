@@ -1,16 +1,16 @@
 # Parallelization
-Partition : 2 4 1
+Partition : 1 1 1
 
 # Mesh definition
-Lx : 0.05
-Ly : 0.05
-Lz : 0.0001953125
-nx : 128 ! 256
-ny : 128 ! 256
+Lx : 1
+Ly : 0.2
+Lz : 0.2
+nx : 5
+ny : 1
 nz : 1
 
 # Case parameters
-Droplet diameter : 0 ! 0.01
+Droplet diameter : 0
 Droplet center   : 0 0 0
 
 # Fluid properties
