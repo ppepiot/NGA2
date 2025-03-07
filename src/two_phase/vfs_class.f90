@@ -44,7 +44,6 @@ module vfs_class
    integer, parameter, public :: nonrecurs_simplex=2 !< Non-recursive simplex cutting
    
    ! Default parameters for volume fraction solver
-   integer,  parameter, public :: nband=6                         !< Number of cells around the interfacial cells on which localized work is performed
    integer,  parameter :: advect_band=2                           !< How far we do the transport
    integer,  parameter :: distance_band=2                         !< How far we build the distance
    integer,  parameter :: max_interface_planes=2                  !< Maximum number of interfaces allowed (2 for R2P)
@@ -103,9 +102,10 @@ module vfs_class
       real(WP), dimension(:,:,:,:), allocatable :: curv2p !< Curvature for each interface
       
       ! Band strategy
-      integer, dimension(:,:,:), allocatable :: band      !< Band to localize workload around the interface
-      integer, dimension(:,:),   allocatable :: band_map  !< Unstructured band mapping
-      integer, dimension(0:nband) :: band_count           !< Number of cells per band value
+      integer :: nband                                     !< Number of cells around the interfacial cells on which localized work is performed
+      integer, dimension(:,:,:), allocatable :: band       !< Band to localize workload around the interface
+      integer, dimension(:,:),   allocatable :: band_map   !< Unstructured band mapping
+      integer, dimension(:),     allocatable :: band_count !< Number of cells per band value
       
       ! Interface handling methods
       integer :: reconstruction_method                    !< Interface reconstruction method
@@ -238,13 +238,14 @@ contains
    
    
    !> Initialization for volume fraction solver
-   subroutine initialize(this,cfg,reconstruction_method,transport_method,name)
+   subroutine initialize(this,cfg,reconstruction_method,transport_method,nband,name)
       use messager, only: die
       implicit none
       class(vfs), intent(inout) :: this
       class(config), target, intent(in) :: cfg
       integer, intent(in) :: reconstruction_method
       integer, intent(in), optional :: transport_method
+      integer, intent(in), optional :: nband
       character(len=*), optional :: name
       integer :: i,j,k
 
@@ -267,6 +268,13 @@ contains
       ! Nullify bcond list
       this%nbc=0
       this%first_bc=>NULL()
+
+      ! Default band width
+      if (present(nband)) then
+         this%nband=nband
+      else
+         this%nband=3
+      end if
       
       ! Allocate variables
       allocate(this%VF   (  this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%VF   =0.0_WP
@@ -276,6 +284,7 @@ contains
       allocate(this%SD   (  this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%SD   =0.0_WP
       allocate(this%G    (  this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%G    =0.0_WP
       allocate(this%curv (  this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%curv =0.0_WP
+      allocate(this%band_count(0:this%nband))
       
       ! Set clipping distance
       this%Gclip=real(distance_band+1,WP)*this%cfg%min_meshsize
@@ -2088,7 +2097,7 @@ contains
       integer :: i,j,k,ii,jj,kk,dir,n,index
       integer, dimension(3) :: ind
       integer :: ibmin_,ibmax_,jbmin_,jbmax_,kbmin_,kbmax_
-      integer, dimension(0:nband) :: band_size
+      integer, dimension(0:this%nband) :: band_size
       
       ! Loop extents
       ibmin_=this%cfg%imin_; if (this%cfg%iproc.eq.1           .and..not.this%cfg%xper) ibmin_=this%cfg%imin-1
@@ -2099,7 +2108,7 @@ contains
       kbmax_=this%cfg%kmax_; if (this%cfg%kproc.eq.this%cfg%npz.and..not.this%cfg%zper) kbmax_=this%cfg%kmax+1
       
       ! Reset band
-      this%band=(nband+1)*int(sign(1.0_WP,this%VF-0.5_WP))
+      this%band=(this%nband+1)*int(sign(1.0_WP,this%VF-0.5_WP))
       
       ! First sweep to identify cells with interface
       do k=kbmin_,kbmax_
@@ -2125,7 +2134,7 @@ contains
       call this%cfg%sync(this%band)
       
       ! Sweep to identify the bands up to nband
-      do n=1,nband
+      do n=1,this%nband
          ! For each band
          do k=kbmin_,kbmax_
             do j=jbmin_,jbmax_
@@ -2157,7 +2166,7 @@ contains
       do k=kbmin_,kbmax_
          do j=jbmin_,jbmax_
             do i=ibmin_,ibmax_
-               if (abs(this%band(i,j,k)).le.nband) band_size(abs(this%band(i,j,k)))=band_size(abs(this%band(i,j,k)))+1
+               if (abs(this%band(i,j,k)).le.this%nband) band_size(abs(this%band(i,j,k)))=band_size(abs(this%band(i,j,k)))+1
             end do
          end do
       end do
@@ -2168,7 +2177,7 @@ contains
       do k=kbmin_,kbmax_
          do j=jbmin_,jbmax_
             do i=ibmin_,ibmax_
-               if (abs(this%band(i,j,k)).le.nband) then
+               if (abs(this%band(i,j,k)).le.this%nband) then
                   this%band_count(abs(this%band(i,j,k)))=this%band_count(abs(this%band(i,j,k)))+1
                   index=sum(band_size(0:abs(this%band(i,j,k))-1))+this%band_count(abs(this%band(i,j,k)))
                   this%band_map(:,index)=[i,j,k]

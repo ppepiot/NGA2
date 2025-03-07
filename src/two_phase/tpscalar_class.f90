@@ -88,7 +88,7 @@ module tpscalar_class
       procedure :: add_bcond                              !< Add a boundary condition
       procedure :: get_bcond                              !< Get a boundary condition
       procedure :: apply_bcond                            !< Apply all boundary conditions
-      procedure :: get_dSCdt                              !< Calculate drhoSC/dt from advective fluxes
+      procedure :: get_dSCdt                              !< Calculate dSC/dt
       procedure :: get_max                                !< Calculate maximum and integral field values
       procedure :: solve_implicit_diff                    !< Solve for the diffusive scalar residuals implicitly
    end type tpscalar
@@ -461,9 +461,9 @@ contains
       end do
       
    end subroutine apply_bcond
-   
-   
-   !> Calculate the explicit SC time derivative from advective term based on U/V/W
+
+
+   !> Calculate the explicit SC time derivative term based on U/V/W
    subroutine get_dSCdt(this,dSCdt,U,V,W,VFold,VF,detailed_face_flux,dt)
       use irl_fortran_interface
       implicit none
@@ -509,7 +509,7 @@ contains
             end do
          end do
          call this%cfg%sync(grad)
-         ! Convective flux of SC
+         ! Fluxes
          do k=this%cfg%kmin_,this%cfg%kmax_+1
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
@@ -537,6 +537,9 @@ contains
                      SCp=0.0_WP; if (VFold(i  ,j,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
                      FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
                   end if
+                  if (this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FX(i,j,k)=FX(i,j,k)+sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SC(i-1:i,j,k,nsc))*sum(this%itp_x(:,i,j,k)*this%PVF(i-1:i,j,k,this%phase(nsc)))
+                  end if
                   ! Flux on y-face
                   if (getSize(detailed_face_flux(2,i,j,k)).gt.0) then
                      ! Detailed geometric flux is available, use geometric fluxing
@@ -561,6 +564,9 @@ contains
                      SCp=0.0_WP; if (VFold(i,j  ,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
                      FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
                   end if
+                  if (this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FY(i,j,k)=FY(i,j,k)+sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SC(i,j-1:j,k,nsc))*sum(this%itp_y(:,i,j,k)*this%PVF(i,j-1:j,k,this%phase(nsc)))
+                  end if
                   ! Flux on z-face
                   if (getSize(detailed_face_flux(3,i,j,k)).gt.0) then
                      ! Detailed geometric flux is available, use geometric fluxing
@@ -584,6 +590,9 @@ contains
                      SCm=0.0_WP; if (VFold(i,j,k-1).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
                      SCp=0.0_WP; if (VFold(i,j,k  ).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
                      FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
+                  end if
+                  if (this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FZ(i,j,k)=FZ(i,j,k)+sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SC(i,j,k-1:k,nsc))*sum(this%itp_z(:,i,j,k)*this%PVF(i,j,k-1:k,this%phase(nsc)))
                   end if
                end do
             end do
@@ -651,12 +660,11 @@ contains
 
 
    !> Solve for implicit scalar residual (only diffusion)
-   subroutine solve_implicit_diff(this,dt,resSC,evp_src)
+   subroutine solve_implicit_diff(this,dt,resSC)
       implicit none
       class(tpscalar), intent(inout) :: this
       real(WP), intent(in) :: dt
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in), optional :: evp_src !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(inout) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
       integer :: i,j,k,nsc
 
       ! Apply implicit treatment for each scalar
@@ -664,16 +672,6 @@ contains
          
          ! Prepare diffusive operator
          this%implicit%opr(1,:,:,:)=1.0_WP; this%implicit%opr(2:,:,:,:)=0.0_WP
-         if (present(evp_src)) then
-            do k=this%cfg%kmin_,this%cfg%kmax_
-               do j=this%cfg%jmin_,this%cfg%jmax_
-                  do i=this%cfg%imin_,this%cfg%imax_
-                     ! if (this%mask(i,j,k).eq.0.and.this%PVF(i,j,k,this%phase(nsc)).gt.0.0_WP) this%implicit%opr(1,i,j,k)=this%implicit%opr(1,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*evp_src(i,j,k)
-                     if (this%mask(i,j,k).eq.0.and.this%PVF(i,j,k,this%phase(nsc)).gt.0.0_WP) this%implicit%opr(1,i,j,k)=this%implicit%opr(1,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*sign(1.0_WP,real(this%phase(nsc),WP)-0.5_WP)*evp_src(i,j,k)
-                  end do
-               end do
-            end do
-         end if
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
@@ -698,12 +696,12 @@ contains
          ! Solve the linear system
          call this%implicit%setup()
          this%implicit%rhs=resSC(:,:,:,nsc)
-         this%implicit%sol=this%SC(:,:,:,nsc)
+         this%implicit%sol=0.0_WP
          call this%implicit%solve()
-         this%SC(:,:,:,nsc)=this%implicit%sol
+         resSC(:,:,:,nsc)=this%implicit%sol
          
          ! Sync it
-         call this%cfg%sync(this%SC(:,:,:,nsc))
+         call this%cfg%sync(resSC(:,:,:,nsc))
 
       end do
       

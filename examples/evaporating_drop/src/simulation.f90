@@ -19,8 +19,8 @@ module simulation
    
    !> Get a couple linear solvers, a two-phase flow solver and volume fraction solver and corresponding time tracker
    type(hypre_str),   public :: ps
-   type(hypre_str),   public :: ss
-   ! type(ddadi),       public :: ss
+   ! type(hypre_str),   public :: ss
+   type(ddadi),       public :: ss
    type(tpns),        public :: fs
    type(vfs),         public :: vf
    type(tpscalar),    public :: sc
@@ -204,7 +204,8 @@ contains
          real(WP) :: vol,area
          integer, parameter :: amr_ref_lvl=4
          ! Create a VOF solver
-         call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux_storage,name='VOF')
+         call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux_storage,nband=6,name='VOF')
+         vf%nband=6
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
@@ -337,11 +338,11 @@ contains
          ! call param_read('Vapor diffusivity',vapor_diff)
          ! sc%diff(:,:,:,iYv)=vapor_diff
          ! Configure implicit scalar solver
-         ss=hypre_str(cfg=cfg,name='Scalar',method=gmres,nst=7)
-         ss%maxlevel=16
-         call param_read('Scalar iteration',ss%maxit)
-         call param_read('Scalar tolerance',ss%rcvg)
-         ! ss=ddadi(cfg=cfg,name='Scalar',nst=7)
+         ! ss=hypre_str(cfg=cfg,name='Scalar',method=gmres,nst=7)
+         ! ss%maxlevel=16
+         ! call param_read('Scalar iteration',ss%maxit)
+         ! call param_read('Scalar tolerance',ss%rcvg)
+         ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
          ! Initialize scalar fields
@@ -528,11 +529,11 @@ contains
          
          ! Prepare old staggered density (at n)
          call fs%get_olddensity(vf=vf)
-         
+
          ! VOF solver step
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
-         
+
          ! Interface jump conditions
          where ((vf%VF.gt.0.0_WP).and.(vf%VF.lt.1.0_WP))
             evp%mdotdp=mdotdp
@@ -556,20 +557,21 @@ contains
             ! Update the phas-specific VOF
             sc%PVF(:,:,:,Lphase)=vf%VF
             sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
-            
-            ! Advance advection
+
+            ! Explicit calculation of dVOFSC/dt from scalar equation
             call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
+
+            ! Assemble explicit residual
             do nsc=1,sc%nscalar
-               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=(sc%PVFold(:,:,:,sc%phase(nsc))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
+               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) resSC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc))-sc%PVF(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
+               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
             end do
             
-            ! Advance diffusion
-            resSC=sc%SC
+            ! Form implicit residual
             call sc%solve_implicit_diff(time%dt,resSC)
-            do nsc=1,sc%nscalar
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
-            end do
+
+            ! Advance scalar field
+            sc%SC=sc%SCold+resSC
 
             ! Apply boundary conditions
             call sc%apply_bcond(time%t,time%dt)

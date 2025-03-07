@@ -85,7 +85,6 @@ contains
    !> Object initializer
    subroutine initialize(this,cfg,vf,itp_x,itp_y,itp_z,div_x,div_y,div_z,name)
       use messager,  only: die
-      use vfs_class, only: nband
       implicit none
       class(evap), intent(inout) :: this
       class(config), target, intent(in) :: cfg
@@ -100,7 +99,7 @@ contains
       integer :: i,j,k
       
       ! Check the extension level
-      if (ext_lvl.ge.nband) call die('The normal extension level needs to be smaller than the VOF solver band')
+      if (ext_lvl.ge.vf%nband) call die('The normal extension level needs to be smaller than the VOF solver band')
 
       ! Set the name for the solver
       if (present(name)) this%name=trim(adjustl(name))

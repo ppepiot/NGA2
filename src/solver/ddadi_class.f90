@@ -20,7 +20,7 @@ module ddadi_class
       
       !> Diagonal object
       class(diag), allocatable :: dsol
-
+      
    contains
       
       procedure :: print_short=>ddadi_print_short !< One-line printing of solver status
@@ -110,13 +110,7 @@ contains
       implicit none
       class(ddadi), intent(inout) :: this
       integer :: i,j,k
-      integer :: st,stx1,stx2,sty1,sty2,stz1,stz2
       
-      ! Get the stencil bounds
-      stx1=minval(this%stc(:,1)); stx2=maxval(this%stc(:,1))
-      sty1=minval(this%stc(:,2)); sty2=maxval(this%stc(:,2))
-      stz1=minval(this%stc(:,3)); stz2=maxval(this%stc(:,3))
-
       ! Update DDADI operators
       this%dsol%Ax=0.0_WP
       this%dsol%Ay=0.0_WP
@@ -124,15 +118,9 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               do st=stx1,stx2
-                  if ((i+st.ge.this%cfg%imin).and.(i+st.le.this%cfg%imax)) this%dsol%Ax(j,k,i,st)=this%dsol%Ax(j,k,i,st)+this%opr(this%stmap(st,0,0),i,j,k)
-               end do
-               do st=sty1,sty2
-                  if ((j+st.ge.this%cfg%jmin).and.(j+st.le.this%cfg%jmax)) this%dsol%Ay(i,k,j,st)=this%dsol%Ay(i,k,j,st)+this%opr(this%stmap(0,st,0),i,j,k)
-               end do
-               do st=stz1,stz2
-                  if ((k+st.ge.this%cfg%kmin).and.(k+st.le.this%cfg%kmax)) this%dsol%Az(i,j,k,st)=this%dsol%Az(i,j,k,st)+this%opr(this%stmap(0,0,st),i,j,k)
-               end do
+               this%dsol%Ax(j,k,i,:)=this%opr(this%stmap(:,0,0),i,j,k)
+               this%dsol%Ay(i,k,j,:)=this%opr(this%stmap(0,:,0),i,j,k)
+               this%dsol%Az(i,j,k,:)=this%opr(this%stmap(0,0,:),i,j,k)
             end do
          end do
       end do
@@ -149,13 +137,10 @@ contains
       use param,    only: verbose
       implicit none
       class(ddadi), intent(inout) :: this
-      integer :: i,j,k,st
+      integer :: i,j,k
       
       ! Check that setup was done
       if (.not.this%setup_done) call die('[ddadi solve] Solver has not been setup.')
-
-      ! Apply boundary conditions
-      call this%apply_bcond()
       
       ! Inverse in X-direction
       do k=this%cfg%kmin_,this%cfg%kmax_
@@ -204,8 +189,8 @@ contains
       if (verbose.gt.1) call this%print_short
       
    end subroutine ddadi_solve
-
-
+   
+   
    !> Log ddadi info
    subroutine ddadi_log(this)
       use string,   only: str_long

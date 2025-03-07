@@ -29,7 +29,7 @@ Vapor diffusivity           : 1.452e-05
 Max timestep size : 3e-5
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Max time          : 1.2
+Max time          : 0.1
 
 # Evaporation
 Evaporation mass flux    : 5
@@ -47,4 +47,4 @@ Scalar tolerance : 1e-7
 Scalar iteration : 50
 
 # Ensight output
-Ensight output period : 0.1
+Ensight output period : 0.01
