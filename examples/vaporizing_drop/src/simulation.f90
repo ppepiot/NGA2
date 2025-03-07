@@ -1,4 +1,4 @@
-
+!> Various definitions and tools for running an NGA2 simulation
 module simulation
    use precision,         only: WP
    use geometry,          only: cfg,Lz
@@ -41,8 +41,6 @@ module simulation
    real(WP) :: radius
    real(WP) :: mdotdp
    real(WP) :: rad_drop
-   real(WP) :: VFint_old,VFint_diff,VFint_over_SDint,vfintdot_err,div_src_int,vfintdot,V_D_ext,V_D_ext_0,vel_div_int,vf_vel_div_int
-   real(WP), dimension(:,:,:), allocatable :: div_old
    
    
 contains
@@ -175,8 +173,6 @@ contains
          allocate(Ui_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Vi_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi_L(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         ! debug
-         allocate(div_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); div_old=0.0_WP
       end block allocate_work_arrays
       
       
@@ -203,7 +199,6 @@ contains
          integer, parameter :: amr_ref_lvl=4
          ! Create a VOF solver
          call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux,name='VOF')
-         vf%cons_correct=.false.
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
@@ -259,11 +254,6 @@ contains
          ! Droplet size
          call vf%get_max()
          rad_drop=sqrt(vf%VFint/(Lz*Pi))
-         VFint_old=vf%VFint
-         VFint_diff=0.0_WP
-         vfintdot_err=0.0_WP
-         V_D_ext_0=vf%VFint
-         V_D_ext=V_D_ext_0
       end block create_and_initialize_vof
       
       
@@ -397,7 +387,6 @@ contains
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('VOF',vf%VF)
          call ens_out%add_scalar('pressure',fs%P)
-         call ens_out%add_scalar('curvature',vf%curv)
          call ens_out%add_surface('plic',smesh)
          call ens_out%add_scalar('mflux',evp%mflux)
          call ens_out%add_scalar('evp_div',evp%div_src)
@@ -407,9 +396,7 @@ contains
          call ens_out%add_scalar('divergence',fs%div)
          ! call ens_out%add_vector('vel_itf',evp%U_itf,evp%V_itf,evp%W_itf)
          ! call ens_out%add_vector('vel_L',Ui_L,Vi_L,Wi_L)
-         call ens_out%add_scalar('SD',vf%SD)
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
-         call ens_out%add_scalar('div',div_old)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -439,14 +426,6 @@ contains
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
          call mfile%add_column(rad_drop,'Droplet raduis')
-         call mfile%add_column(V_D_ext,'V_D_ext')
-         ! call mfile%add_column(VFint_over_SDint,'VFint_over_SDint')
-         call mfile%add_column(vfintdot_err,'vfintdot_err')
-         call mfile%add_column(vfintdot,'vfintdot')
-         call mfile%add_column(vf%clipped_vol,'clipped_vol')
-         ! call mfile%add_column(div_src_int,'div_src_int')
-         ! call mfile%add_column(vel_div_int,'vel_div_int')
-         call mfile%add_column(vf_vel_div_int,'vf_vel_div_int')
          call mfile%write()
          ! Create simulation monitor for liquid
          mfileL=monitor(fsL%cfg%amRoot,'simulation_liquid')
@@ -517,8 +496,6 @@ contains
          fs%Uold=fs%U; fsL%Uold=fsL%U
          fs%Vold=fs%V; fsL%Vold=fsL%V
          fs%Wold=fs%W; fsL%Wold=fsL%W
-         call fs%get_div()
-         div_old=fs%div
          
          ! Apply time-varying Dirichlet conditions
          ! This is where time-dpt Dirichlet would be enforced
@@ -543,8 +520,6 @@ contains
          ! evp%W_itf=fsL%W-evp%vel_pc(:,:,:,3)
 
          ! VOF solver step
-         call vf%get_max()
-         VFint_old=vf%VFint
          ! call vf%advance(dt=time%dt,U=evp%U_itf,V=evp%V_itf,W=evp%W_itf)
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
@@ -698,14 +673,6 @@ contains
          call vf%get_max()
          ! call evp%get_max_vel_pc()
          rad_drop=sqrt(vf%VFint/(Lz*Pi))
-         VFint_diff=vf%VFint-VFint_old
-         vfintdot=VFint_diff/time%dt
-         VFint_over_SDint=VFint_diff/vf%SDint
-         ! call cfg%integrate(evp%mdotdp/evp%rho_l*vf%SD,div_src_int)
-         ! call cfg%integrate(evp%div_src,div_src_int)
-         call cfg%integrate(vf%VF*div_old,vf_vel_div_int)
-         vfintdot_err=vfintdot-vf_vel_div_int
-         V_D_ext=V_D_ext_0-mdotdp*vf%SDint/evp%rho_l*time%t
          call mfile%write(); call mfileL%write()
          call cflfile%write()
          call evpfile%write()

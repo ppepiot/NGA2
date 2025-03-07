@@ -75,118 +75,6 @@ module linsol_class
 contains
 
 
-   ! !> Impose boundary conditions to the RHS
-   ! subroutine apply_bcond(this)
-   !    implicit none
-   !    class(linsol), intent(inout) :: this
-   !    integer :: i,j,k,st,stm,ist
-   !    ! X-direction
-   !    if (this%cfg%nx.gt.1.and.this%cfg%xper.eqv..false.) then
-   !       ! xm boundary
-   !       if (this%cfg%imin_.eq.this%cfg%imin) then
-   !          ! Get the minimum stencil shift
-   !          stm=minval(this%stc(:,1))
-   !          ! Loop over the cells
-   !          do k=this%cfg%kmin_,this%cfg%kmax_
-   !             do j=this%cfg%jmin_,this%cfg%jmax_
-   !                do ist=0,-stm-1,+1
-   !                   i=this%cfg%imin_+ist
-   !                   do st=-1-ist,stm,-1
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(st,0,0),i,j,k)*this%sol(i+st,j,k)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !       ! xp boundary
-   !       if (this%cfg%imax_.eq.this%cfg%imax) then
-   !          ! Get the maximum stencil shift
-   !          stm=maxval(this%stc(:,1))
-   !          ! Loop over the cells
-   !          do k=this%cfg%kmin_,this%cfg%kmax_
-   !             do j=this%cfg%jmin_,this%cfg%jmax_
-   !                do ist=0,-stm+1,-1
-   !                   i=this%cfg%imax_+ist
-   !                   do st=+1-ist,stm,+1
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(st,0,0),i,j,k)*this%sol(i+st,j,k)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !    end if
-   !    ! Y-direction
-   !    if (this%cfg%ny.gt.1.and.this%cfg%yper.eqv..false.) then
-   !       ! ym boundary
-   !       if (this%cfg%jmin_.eq.this%cfg%jmin) then
-   !          ! Get the minimum stencil shift
-   !          stm=minval(this%stc(:,2))
-   !          ! Loop over the cells
-   !          do k=this%cfg%kmin_,this%cfg%kmax_
-   !             do ist=0,-stm-1,+1
-   !                j=this%cfg%jmin_+ist
-   !                do st=-1-ist,stm,-1
-   !                   do i=this%cfg%imin_,this%cfg%imax_
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,st,0),i,j,k)*this%sol(i,j+st,k)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !       ! yp boundary
-   !       if (this%cfg%jmax_.eq.this%cfg%jmax) then
-   !          ! Get the maximum stencil shift
-   !          stm=maxval(this%stc(:,2))
-   !          ! Loop over the cells
-   !          do k=this%cfg%kmin_,this%cfg%kmax_
-   !             do ist=0,-stm+1,-1
-   !                j=this%cfg%jmax_+ist
-   !                do st=+1-ist,stm,+1
-   !                   do i=this%cfg%imin_,this%cfg%imax_
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,st,0),i,j,k)*this%sol(i,j+st,k)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !    end if
-   !    ! Z-direction
-   !    if (this%cfg%nz.gt.1.and.this%cfg%zper.eqv..false.) then
-   !       ! zm boundary
-   !       if (this%cfg%kmin_.eq.this%cfg%kmin) then
-   !          ! Get the minimum stencil shift
-   !          stm=minval(this%stc(:,3))
-   !          ! Loop over the cells
-   !          do ist=0,-stm-1,+1
-   !             k=this%cfg%kmin_+ist
-   !             do st=-1-ist,stm,-1
-   !                do j=this%cfg%jmin_,this%cfg%jmax_
-   !                   do i=this%cfg%imin_,this%cfg%imax_
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,0,st),i,j,k)*this%sol(i,j,k+st)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !       ! zp boundary
-   !       if (this%cfg%kmax_.eq.this%cfg%kmax) then
-   !          ! Get the maximum stencil shift
-   !          stm=maxval(this%stc(:,3))
-   !          ! Loop over the cells
-   !          do ist=0,-stm+1,-1
-   !             k=this%cfg%kmax_+ist
-   !             do st=+1-ist,stm,+1
-   !                do j=this%cfg%jmin_,this%cfg%jmax_
-   !                   do i=this%cfg%imin_,this%cfg%imax_
-   !                      this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,0,st),i,j,k)*this%sol(i,j,k+st)
-   !                   end do
-   !                end do
-   !             end do
-   !          end do
-   !       end if
-   !    end if
-   ! end subroutine apply_bcond
-
    !> Impose boundary conditions to the RHS
    subroutine apply_bcond(this)
       implicit none
@@ -204,7 +92,7 @@ contains
                   do ist=0,-stm-1,+1
                      i=this%cfg%imin_+ist
                      do st=-1-ist,stm,-1
-                        this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i+st,j,k)
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(st,0,0),i,j,k)*this%sol(i+st,j,k)
                      end do
                   end do
                end do
@@ -220,7 +108,7 @@ contains
                   do ist=0,-stm+1,-1
                      i=this%cfg%imax_+ist
                      do st=+1-ist,stm,+1
-                        this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i+st,j,k)
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(st,0,0),i,j,k)*this%sol(i+st,j,k)
                      end do
                   end do
                end do
@@ -228,40 +116,40 @@ contains
          end if
       end if
       ! Y-direction
-      ! if (this%cfg%ny.gt.1.and.this%cfg%yper.eqv..false.) then
-      !    ! ym boundary
-      !    if (this%cfg%jmin_.eq.this%cfg%jmin) then
-      !       ! Get the minimum stencil shift
-      !       stm=minval(this%stc(:,2))
-      !       ! Loop over the cells
-      !       do k=this%cfg%kmin_,this%cfg%kmax_
-      !          do ist=0,-stm-1,+1
-      !             j=this%cfg%jmin_+ist
-      !             do st=-1-ist,stm,-1
-      !                do i=this%cfg%imin_,this%cfg%imax_
-      !                   this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i,j+st,k)
-      !                end do
-      !             end do
-      !          end do
-      !       end do
-      !    end if
-      !    ! yp boundary
-      !    if (this%cfg%jmax_.eq.this%cfg%jmax) then
-      !       ! Get the maximum stencil shift
-      !       stm=maxval(this%stc(:,2))
-      !       ! Loop over the cells
-      !       do k=this%cfg%kmin_,this%cfg%kmax_
-      !          do ist=0,-stm+1,-1
-      !             j=this%cfg%jmax_+ist
-      !             do st=+1-ist,stm,+1
-      !                do i=this%cfg%imin_,this%cfg%imax_
-      !                   this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i,j+st,k)
-      !                end do
-      !             end do
-      !          end do
-      !       end do
-      !    end if
-      ! end if
+      if (this%cfg%ny.gt.1.and.this%cfg%yper.eqv..false.) then
+         ! ym boundary
+         if (this%cfg%jmin_.eq.this%cfg%jmin) then
+            ! Get the minimum stencil shift
+            stm=minval(this%stc(:,2))
+            ! Loop over the cells
+            do k=this%cfg%kmin_,this%cfg%kmax_
+               do ist=0,-stm-1,+1
+                  j=this%cfg%jmin_+ist
+                  do st=-1-ist,stm,-1
+                     do i=this%cfg%imin_,this%cfg%imax_
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,st,0),i,j,k)*this%sol(i,j+st,k)
+                     end do
+                  end do
+               end do
+            end do
+         end if
+         ! yp boundary
+         if (this%cfg%jmax_.eq.this%cfg%jmax) then
+            ! Get the maximum stencil shift
+            stm=maxval(this%stc(:,2))
+            ! Loop over the cells
+            do k=this%cfg%kmin_,this%cfg%kmax_
+               do ist=0,-stm+1,-1
+                  j=this%cfg%jmax_+ist
+                  do st=+1-ist,stm,+1
+                     do i=this%cfg%imin_,this%cfg%imax_
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,st,0),i,j,k)*this%sol(i,j+st,k)
+                     end do
+                  end do
+               end do
+            end do
+         end if
+      end if
       ! Z-direction
       if (this%cfg%nz.gt.1.and.this%cfg%zper.eqv..false.) then
          ! zm boundary
@@ -274,7 +162,7 @@ contains
                do st=-1-ist,stm,-1
                   do j=this%cfg%jmin_,this%cfg%jmax_
                      do i=this%cfg%imin_,this%cfg%imax_
-                        this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i,j,k+st)
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,0,st),i,j,k)*this%sol(i,j,k+st)
                      end do
                   end do
                end do
@@ -290,7 +178,7 @@ contains
                do st=+1-ist,stm,+1
                   do j=this%cfg%jmin_,this%cfg%jmax_
                      do i=this%cfg%imin_,this%cfg%imax_
-                        this%rhs(i,j,k)=this%rhs(i,j,k)+2.0_WP*this%sol(i,j,k+st)
+                        this%rhs(i,j,k)=this%rhs(i,j,k)-this%opr(this%stmap(0,0,st),i,j,k)*this%sol(i,j,k+st)
                      end do
                   end do
                end do

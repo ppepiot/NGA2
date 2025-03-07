@@ -9,18 +9,18 @@ R0    = D0 / 2
 mflux = 5
 rhoL  = 1000
 muL   = 1.05e-3
-# tref  = rhoL * D0**2 / muL
 tR  = R0 * rhoL / mflux
 
 # Load file
 data = np.loadtxt('./monitor/simulation', skiprows=2)
 
-# Extract time and volume
+# Extract time and radius
 t = data[:, 1 ]
 r = data[:, 14]
 
 # Analytical solution
 r_ext = R0 - mflux/rhoL * t
+r_ext[r_ext < 0] = 0
 
 # Use latex font
 plt.rcParams['text.usetex'] = True

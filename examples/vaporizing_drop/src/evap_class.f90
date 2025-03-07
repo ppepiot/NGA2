@@ -15,7 +15,7 @@ module evap_class
    integer, dimension(1:3,1:3) :: ind_shift=reshape([1,0,0,0,1,0,0,0,1], shape(ind_shift))
 
    ! Default parameters for the evaporation class
-   integer, parameter :: ext_lvl=2                                     !< The extension level for the interface normal (needs to be smaller than the VOF solver band for the shift_mflux to work properly)
+   integer, parameter :: ext_lvl=1                                     !< The extension level for the interface normal (needs to be smaller than the VOF solver band for the shift_mflux to work properly)
 
    type :: arr_ptr_4d
       real(WP), pointer :: arr(:,:,:,:)
