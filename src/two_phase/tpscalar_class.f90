@@ -88,7 +88,8 @@ module tpscalar_class
       procedure :: add_bcond                              !< Add a boundary condition
       procedure :: get_bcond                              !< Get a boundary condition
       procedure :: apply_bcond                            !< Apply all boundary conditions
-      procedure :: get_dSCdt                              !< Calculate dSC/dt
+      procedure :: get_dSCdt_adv                          !< Calculate dSC/dt from advective term
+      procedure :: get_dSCdt_dff                          !< Calculate dSC/dt from diffusive term
       procedure :: get_max                                !< Calculate maximum and integral field values
       procedure :: solve_implicit_diff                    !< Solve for the diffusive scalar residuals implicitly
    end type tpscalar
@@ -463,8 +464,8 @@ contains
    end subroutine apply_bcond
 
 
-   !> Calculate the explicit SC time derivative term based on U/V/W
-   subroutine get_dSCdt(this,dSCdt,U,V,W,VFold,VF,detailed_face_flux,dt)
+   !> Calculate the explicit SC time derivative term based on U/V/W from advective term
+   subroutine get_dSCdt_adv(this,dSCdt,U,V,W,detailed_face_flux,dt)
       use irl_fortran_interface
       implicit none
       class(tpscalar), intent(inout) :: this
@@ -472,8 +473,6 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VFold    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VF       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       type(TagAccVM_SepVM_type), dimension(1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:) :: detailed_face_flux !< Needs to be (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), intent(in) :: dt  !< This is the time step size that was used to generate the detailed_face_flux geometric data
       type(SepVM_type) :: my_SepVM
@@ -509,7 +508,7 @@ contains
             end do
          end do
          call this%cfg%sync(grad)
-         ! Fluxes
+         ! Convective flux of SC
          do k=this%cfg%kmin_,this%cfg%kmax_+1
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
@@ -533,12 +532,9 @@ contains
                      FX(i,j,k)=FX(i,j,k)/(dt*this%cfg%dy(j)*this%cfg%dz(k))
                   else
                      ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i-1,j,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
-                     SCp=0.0_WP; if (VFold(i  ,j,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
+                     SCm=0.0_WP; if (this%PVFold(i-1,j,k,this%phase(nsc)).gt.0.0_WP) SCm=this%SC(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
+                     SCp=0.0_WP; if (this%PVFold(i  ,j,k,this%phase(nsc)).gt.0.0_WP) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
                      FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
-                  end if
-                  if (this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
-                     FX(i,j,k)=FX(i,j,k)+sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SC(i-1:i,j,k,nsc))*sum(this%itp_x(:,i,j,k)*this%PVF(i-1:i,j,k,this%phase(nsc)))
                   end if
                   ! Flux on y-face
                   if (getSize(detailed_face_flux(2,i,j,k)).gt.0) then
@@ -560,12 +556,9 @@ contains
                      FY(i,j,k)=FY(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dz(k))
                   else
                      ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i,j-1,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
-                     SCp=0.0_WP; if (VFold(i,j  ,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
+                     SCm=0.0_WP; if (this%PVFold(i,j-1,k,this%phase(nsc)).gt.0.0_WP) SCm=this%SC(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
+                     SCp=0.0_WP; if (this%PVFold(i,j  ,k,this%phase(nsc)).gt.0.0_WP) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
                      FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
-                  end if
-                  if (this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
-                     FY(i,j,k)=FY(i,j,k)+sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SC(i,j-1:j,k,nsc))*sum(this%itp_y(:,i,j,k)*this%PVF(i,j-1:j,k,this%phase(nsc)))
                   end if
                   ! Flux on z-face
                   if (getSize(detailed_face_flux(3,i,j,k)).gt.0) then
@@ -587,12 +580,9 @@ contains
                      FZ(i,j,k)=FZ(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dy(j))
                   else
                      ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i,j,k-1).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
-                     SCp=0.0_WP; if (VFold(i,j,k  ).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
+                     SCm=0.0_WP; if (this%PVFold(i,j,k-1,this%phase(nsc)).gt.0.0_WP) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
+                     SCp=0.0_WP; if (this%PVFold(i,j,k  ,this%phase(nsc)).gt.0.0_WP) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
                      FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
-                  end if
-                  if (this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
-                     FZ(i,j,k)=FZ(i,j,k)+sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SC(i,j,k-1:k,nsc))*sum(this%itp_z(:,i,j,k)*this%PVF(i,j,k-1:k,this%phase(nsc)))
                   end if
                end do
             end do
@@ -631,16 +621,70 @@ contains
          end if
       end function minmod
       
-   end subroutine get_dSCdt
+   end subroutine get_dSCdt_adv
+
+
+   !> Calculate the explicit SC time derivative term based on U/V/W from diffusive term
+   subroutine get_dSCdt_dff(this,dSCdt)
+      implicit none
+      class(tpscalar), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+      integer :: i,j,k,nsc
+      real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
+      ! Zero out dSC/dt array
+      dSCdt=0.0_WP
+      ! Allocate flux arrays
+      allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      ! Work on each scalar
+      do nsc=1,this%nscalar
+         ! Reset fluxes to zero
+         FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP
+         ! Diffusive flux of SC
+         do k=this%cfg%kmin_,this%cfg%kmax_+1
+            do j=this%cfg%jmin_,this%cfg%jmax_+1
+               do i=this%cfg%imin_,this%cfg%imax_+1
+                  ! Flux on x-face
+                  if (this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FX(i,j,k)=sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SC(i-1:i,j,k,nsc))*sum(this%itp_x(:,i,j,k)*this%PVF(i-1:i,j,k,this%phase(nsc)))
+                  end if
+                  ! Flux on y-face
+                  if (this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FY(i,j,k)=sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SC(i,j-1:j,k,nsc))*sum(this%itp_y(:,i,j,k)*this%PVF(i,j-1:j,k,this%phase(nsc)))
+                  end if
+                  ! Flux on z-face
+                  if (this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP.and.this%PVF(i,j,k,this%phase(nsc))>0.0_WP) then
+                     FZ(i,j,k)=sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SC(i,j,k-1:k,nsc))*sum(this%itp_z(:,i,j,k)*this%PVF(i,j,k-1:k,this%phase(nsc)))
+                  end if
+               end do
+            end do
+         end do
+         ! Time derivative of SC
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
+                  &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
+                  &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))
+               end do
+            end do
+         end do
+         ! Sync residual
+         call this%cfg%sync(dSCdt(:,:,:,nsc))
+      end do
+      ! Deallocate flux arrays
+      deallocate(FX,FY,FZ)
+      
+   end subroutine get_dSCdt_dff
 
    
    !> Calculate the min, max, and int of our SC field
-   subroutine get_max(this,VF)
+   subroutine get_max(this)
       use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
       use parallel, only: MPI_REAL_WP
       implicit none
       class(tpscalar), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: VF        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: ierr,nsc
       real(WP) :: my_SCmax,my_SCmin
       real(WP), dimension(:,:,:), allocatable :: tmp
@@ -648,11 +692,7 @@ contains
       do nsc=1,this%nscalar
          my_SCmax=maxval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmax,this%SCmax(nsc),1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
          my_SCmin=minval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmin,this%SCmin(nsc),1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-         if      (this%phase(nsc).eq.Lphase) then ! Liquid scalar
-            tmp=this%SC(:,:,:,nsc)*(       VF(:,:,:))
-         else if (this%phase(nsc).eq.Gphase) then ! Gas scalar
-            tmp=this%SC(:,:,:,nsc)*(1.0_WP-VF(:,:,:))
-         end if
+         tmp=this%SC(:,:,:,nsc)*this%PVF(:,:,:,nsc)
          call this%cfg%integrate(A=tmp,integral=this%SCint(nsc))
       end do
       deallocate(tmp)

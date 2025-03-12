@@ -433,7 +433,7 @@ contains
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
          call vf%get_max()
-         call sc%get_max(VF=vf%VF)
+         call sc%get_max()
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
          call mfile%add_column(time%n,'Timestep number')
@@ -558,25 +558,32 @@ contains
             sc%PVF(:,:,:,Lphase)=vf%VF
             sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
 
-            ! Explicit calculation of dVOFSC/dt from scalar equation
-            call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,VFold=vf%VFold,VF=vf%VF,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
+            ! Explicit calculation of dVOFSC/dt from scalar advection
+            call sc%get_dSCdt_adv(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
 
-            ! Assemble explicit residual
+            ! Advance scalar advection
             do nsc=1,sc%nscalar
-               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) resSC(:,:,:,nsc)=((sc%PVFold(:,:,:,sc%phase(nsc))-sc%PVF(:,:,:,sc%phase(nsc)))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
+               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) sc%SC(:,:,:,nsc)=(sc%PVFold(:,:,:,sc%phase(nsc))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
+               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
             end do
             
-            ! Form implicit residual
+            ! Explicit calculation of dVOFSC/dt from scalar diffusion
+            call sc%get_dSCdt_dff(dSCdt=resSC)
+            do nsc=1,sc%nscalar
+               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.0.0_WP) resSC(:,:,:,nsc)=time%dt*resSC(:,:,:,nsc)/sc%PVF(:,:,:,sc%phase(nsc))
+               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
+            end do
+
+            ! Form implicit diffusive residual
             call sc%solve_implicit_diff(time%dt,resSC)
 
-            ! Advance scalar field
-            sc%SC=sc%SCold+resSC
+            ! Advance scalar diffusion
+            sc%SC=sc%SC+resSC
 
             ! Apply boundary conditions
             call sc%apply_bcond(time%t,time%dt)
             
-            ! Post process
+            ! One-field temperature
             T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
 
          end block advance_scalar
@@ -655,7 +662,7 @@ contains
          ! Perform and output monitoring
          call fs%get_max()
          call vf%get_max()
-         call sc%get_max(VF=vf%VF)
+         call sc%get_max()
          rad_drop=sqrt(vf%VFint/(Lz*Pi))
          call mfile%write()
          call cflfile%write()

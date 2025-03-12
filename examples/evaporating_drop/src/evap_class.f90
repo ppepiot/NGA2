@@ -476,8 +476,7 @@ contains
    !    call this%get_normal()
 
    !    ! Initialize one sided mfluxes
-   !    this%mfluxG=0.0_WP
-   !    this%mfluxL=0.0_WP
+   !    this%mfluxLG=0.0_WP
 
    !    ! Loop over the interfacial cells
    !    do index=1,this%vf%band_count(0)
@@ -519,25 +518,45 @@ contains
    !                i=ihat+stx
    !                ! Update the mflux of the pure cell
    !                if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                   this%mfluxG(i,j,k)=this%mfluxG(i,j,k)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
+   !                   this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                   this%mfluxL(i,j,k)=this%mfluxL(i,j,k)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
+   !                   this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                end if
    !             end do
    !          end do
    !       end do
    !    end do
 
-   !    ! Sync
-   !    ! call this%cfg%sync(this%mfluxL)
-   !    ! call this%cfg%sync(this%mfluxG)
+   !    ! How to sync?
+
+   !    ! Calculate the integral of the residual error of mfluxL
+   !    my_mflux_int=0.0_WP
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             if (this%vf%VF(i,j,k).lt.1) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
+   !          end do
+   !       end do
+   !    end do
+   !    call MPI_ALLREDUCE(my_mflux_int,this%mfluxL_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
+      
+   !    ! Calculate the integral of the residual error of mfluxG
+   !    my_mflux_int=0.0_WP
+   !    do k=this%cfg%kmin_,this%cfg%kmax_
+   !       do j=this%cfg%jmin_,this%cfg%jmax_
+   !          do i=this%cfg%imin_,this%cfg%imax_
+   !             if (this%vf%VF(i,j,k).gt.0) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
+   !          end do
+   !       end do
+   !    end do
+   !    call MPI_ALLREDUCE(my_mflux_int,this%mfluxG_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
 
    !    ! Integral of mflux
    !    call this%cfg%integrate(this%mflux,this%mflux_int)
-   !    call this%cfg%integrate(this%mfluxL,this%mfluxL_int)
-   !    call this%cfg%integrate(this%mfluxG,this%mfluxG_int)
-   !    this%mfluxL_int_err=abs(this%mfluxL_int-this%mflux_int)
-   !    this%mfluxG_int_err=abs(this%mfluxG_int-this%mflux_int)
+   !    call this%cfg%integrate(this%mfluxLG(:,:,:,Lphase),this%mfluxL_int)
+   !    call this%cfg%integrate(this%mfluxLG(:,:,:,Gphase),this%mfluxG_int)
+   !    this%mfluxL_int_err=abs(abs(this%mfluxL_int)-this%mflux_int)
+   !    this%mfluxG_int_err=abs(abs(this%mfluxG_int)-this%mflux_int)
 
    !    ! Deallocate
    !    deallocate(wG,wL)
@@ -545,7 +564,7 @@ contains
    ! end subroutine shift_mflux
 
 
-   ! !> Shift mflux away from the interface (Boyd and Ling) parallel
+   ! !> Shift mflux away from the interface (Boyd and Ling) parallel: Some of the terms are counted twice
    ! subroutine shift_mflux(this)
    !    use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
    !    use parallel,  only: MPI_REAL_WP
@@ -639,11 +658,11 @@ contains
    !                         i=ihat+stx
    !                         ! Update the mflux of the pure cell
    !                         if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                            ! this%mfluxG(i,j,k)=this%mfluxG(i,j,k)+wG(i,j,k)*this%mflux(ihat,jhat,khat)
-   !                            this%mfluxG(i,j,k)=this%mfluxG(i,j,k)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
+   !                            ! this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(i,j,k)*this%mflux(ihat,jhat,khat)
+   !                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                         else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                            ! this%mfluxL(i,j,k)=this%mfluxL(i,j,k)+wL(i,j,k)*this%mflux(ihat,jhat,khat)
-   !                            this%mfluxL(i,j,k)=this%mfluxL(i,j,k)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
+   !                            ! this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(i,j,k)*this%mflux(ihat,jhat,khat)
+   !                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                         end if
    !                      end do
    !                   end do
