@@ -436,7 +436,7 @@ contains
    end subroutine shift_mflux
 
 
-   ! !> Shift mflux away from the interface (Boyd and Ling) serial
+   ! !> Shift mflux away from the interface (Boyd and Ling)
    ! subroutine shift_mflux(this)
    !    use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
    !    use parallel,  only: MPI_REAL_WP
@@ -497,7 +497,7 @@ contains
    !                ! Calculate the weight
    !                d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
    !                w=abs(sum(d*this%normal(ihat,jhat,khat,:)))/norm2(d)
-   !                ! Assign the weight to the pure cell
+   !                ! Assign the weight to the pure cells
    !                if (this%vf%VF(i,j,k).eq.0.0_WP) then
    !                   wG(stx,sty,stz)=w
    !                else if (this%vf%VF(i,j,k).eq.1.0_WP) then
@@ -507,8 +507,8 @@ contains
    !          end do
    !       end do
    !       ! Normalize the weights
-   !       wG=wG/(sum(wG)+tiny(1.0_WP))
-   !       wL=wL/(sum(wL)+tiny(1.0_WP))
+   !       wG=wG/sum(wG)
+   !       wL=wL/sum(wL)
    !       ! Loop over the stencil
    !       do stz=stzm,stzp
    !          k=khat+stz
@@ -516,18 +516,20 @@ contains
    !             j=jhat+sty
    !             do stx=stxm,stxp
    !                i=ihat+stx
-   !                ! Update the mflux of the pure cell
+   !                ! Update the mflux of the pure cells
    !                if (this%vf%VF(i,j,k).eq.0.0_WP) then
    !                   this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                   this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
+   !                   this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)-wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
    !                end if
    !             end do
    !          end do
    !       end do
    !    end do
 
-   !    ! How to sync?
+   !    ! Sync the liquid and gas mfluxes
+   !    call this%cfg%syncsum(this%mfluxLG(:,:,:,Gphase))
+   !    call this%cfg%syncsum(this%mfluxLG(:,:,:,Lphase))
 
    !    ! Calculate the integral of the residual error of mfluxL
    !    my_mflux_int=0.0_WP
@@ -557,131 +559,6 @@ contains
    !    call this%cfg%integrate(this%mfluxLG(:,:,:,Gphase),this%mfluxG_int)
    !    this%mfluxL_int_err=abs(abs(this%mfluxL_int)-this%mflux_int)
    !    this%mfluxG_int_err=abs(abs(this%mfluxG_int)-this%mflux_int)
-
-   !    ! Deallocate
-   !    deallocate(wG,wL)
-
-   ! end subroutine shift_mflux
-
-
-   ! !> Shift mflux away from the interface (Boyd and Ling) parallel: Some of the terms are counted twice
-   ! subroutine shift_mflux(this)
-   !    use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
-   !    use parallel,  only: MPI_REAL_WP
-   !    use vfs_class, only: VFlo,VFhi
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    real(WP), dimension(:,:,:), allocatable :: resmfluxL,resmfluxG
-   !    integer  :: i,j,k,ihat,jhat,khat,index,ierr
-   !    real(WP) :: my_mflux_int,mflux_err,w
-   !    real(WP), dimension(:,:,:), allocatable :: wG,wL
-   !    integer :: stxm,stym,stzm
-   !    integer :: stxp,styp,stzp
-   !    integer :: stx,sty,stz
-   !    real(WP), dimension(3) :: d
-      
-   !    ! Check the dimensions
-   !    if (this%nCell(1).gt.1) then
-   !       stxm=-2; stxp=+2
-   !    else
-   !       stxm= 0; stxp= 0
-   !    end if
-   !    if (this%nCell(2).gt.1) then
-   !       stym=-2; styp=+2
-   !    else
-   !       stym= 0; styp= 0
-   !    end if
-   !    if (this%nCell(3).gt.1) then
-   !       stzm=-2; stzp=+2
-   !    else
-   !       stzm= 0; stzp= 0
-   !    end if
-
-   !    ! Allocate the weight matrix
-   !    ! allocate(wG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-   !    ! allocate(wL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-   !    allocate(wG(stxm:stxp,stym:styp,stzm:stzp))
-   !    allocate(wL(stxm:stxp,stym:styp,stzm:stzp))
-
-   !    ! Get the interface normal
-   !    call this%get_normal()
-
-   !    ! Initialize one sided mfluxes
-   !    this%mfluxG=0.0_WP
-   !    this%mfluxL=0.0_WP
-
-   !    ! Loop over the interfacial cells
-   !    do khat=this%cfg%kmin_+stzm,this%cfg%kmax_+stzp
-   !       do jhat=this%cfg%jmin_+stym,this%cfg%jmax_+styp
-   !          do ihat=this%cfg%imin_+stxm,this%cfg%imax_+stxp
-   !             if (this%vf%VF(ihat,khat,jhat).gt.VFlo.and.this%vf%VF(ihat,khat,jhat).lt.VFhi) then
-   !                ! Initialize weights
-   !                wG=0.0_WP
-   !                wL=0.0_WP
-   !                ! Loop over the stencil
-   !                ! do k=khat+stzm,khat+stzp
-   !                !    do j=jhat+stym,jhat+styp
-   !                !       do i=ihat+stxm,ihat+stxp
-   !                do stz=stzm,stzp
-   !                   k=khat+stz
-   !                   do sty=stym,styp
-   !                      j=jhat+sty
-   !                      do stx=stxm,stxp
-   !                         i=ihat+stx
-   !                         ! Calculate the weight
-   !                         d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
-   !                         w=abs(sum(d*this%normal(ihat,jhat,khat,:)))/norm2(d)
-   !                         ! w=1.0_WP
-   !                         ! Assign the weight to the pure cell
-   !                         if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                            ! wG(i,j,k)=w
-   !                            wG(stx,sty,stz)=w
-   !                         else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                            ! wL(i,j,k)=w
-   !                            wL(stx,sty,stz)=w
-   !                         end if
-   !                      end do
-   !                   end do
-   !                end do
-   !                ! Normalize the weights
-   !                wG=wG/(sum(wG)+tiny(1.0_WP))
-   !                wL=wL/(sum(wL)+tiny(1.0_WP))
-   !                ! Loop over the stencil
-   !                ! do k=khat+stzm,khat+stzp
-   !                !    do j=jhat+stym,jhat+styp
-   !                !       do i=ihat+stxm,ihat+stxp
-   !                do stz=stzm,stzp
-   !                   k=khat+stz
-   !                   do sty=stym,styp
-   !                      j=jhat+sty
-   !                      do stx=stxm,stxp
-   !                         i=ihat+stx
-   !                         ! Update the mflux of the pure cell
-   !                         if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                            ! this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(i,j,k)*this%mflux(ihat,jhat,khat)
-   !                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
-   !                         else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                            ! this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(i,j,k)*this%mflux(ihat,jhat,khat)
-   !                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)+wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
-   !                         end if
-   !                      end do
-   !                   end do
-   !                end do
-   !             end if
-   !          end do
-   !       end do
-   !    end do
-
-   !    ! Sync
-   !    call this%cfg%sync(this%mfluxL)
-   !    call this%cfg%sync(this%mfluxG)
-
-   !    ! Integral of mflux
-   !    call this%cfg%integrate(this%mflux,this%mflux_int)
-   !    call this%cfg%integrate(this%mfluxL,this%mfluxL_int)
-   !    call this%cfg%integrate(this%mfluxG,this%mfluxG_int)
-   !    this%mfluxL_int_err=abs(this%mfluxL_int-this%mflux_int)
-   !    this%mfluxG_int_err=abs(this%mfluxG_int-this%mflux_int)
 
    !    ! Deallocate
    !    deallocate(wG,wL)
