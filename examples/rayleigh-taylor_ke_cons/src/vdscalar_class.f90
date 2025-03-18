@@ -64,7 +64,7 @@ module vdscalar_class
       integer, dimension(:,:,:), allocatable :: mask        !< Integer array used for modifying SC metrics
       
       ! Monitoring quantities
-      real(WP) :: SCmax,SCmin,SCint                         !< Maximum and minimum, integral scalar
+      real(WP) :: SCmax,SCmin,rhoSCint                      !< Maximum and minimum, integral scalar
       
    contains
       procedure :: print=>scalar_print                      !< Output solver to the screen
@@ -457,7 +457,7 @@ contains
       allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       ! Allocate and compute mid scalars
       allocate(SC_(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); SC_=0.5_WP*(this%SC+this%SCold)
-      allocate(SCmid(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); SCmid=(this%theta*RHO*this%SC+(1.0_WP-this%theta)*RHOold*this%SCold)/(this%theta*RHO+(1.0_WP-this%theta)*RHOold)
+      allocate(SCmid(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); SCmid=(this%theta*sqrt(RHO)*this%SC+(1.0_WP-this%theta)*sqrt(RHOold)*this%SCold)/(this%theta*sqrt(RHO)+(1.0_WP-this%theta)*sqrt(RHOold))
       ! Flux of rhoSC
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
@@ -486,14 +486,15 @@ contains
    
 
    !> Calculate the int, min, and max of our SC field
-   subroutine get_max(this)
+   subroutine get_max(this,rho)
       use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
       use parallel, only: MPI_REAL_WP
       implicit none
       class(vdscalar), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: rho
       integer :: ierr,i,j,k
       real(WP) :: my_SCmax,my_SCmin
-      call this%cfg%integrate(this%SC,integral=this%SCint)
+      call this%cfg%integrate(rho*this%SC,integral=this%rhoSCint)
       my_SCmax=-huge(1.0_WP)
       my_SCmin=+huge(1.0_WP)
       do k=this%cfg%kmin_,this%cfg%kmax_

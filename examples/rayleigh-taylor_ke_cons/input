@@ -5,9 +5,9 @@ Partition : 8 1 1
 Lx : 1
 Ly : 1
 Lz : 1
-nx : 50
-ny : 50
-nz : 50
+nx : 128
+ny : 128
+nz : 128
 
 # Fluid properties
 Gravity :             0 -10 0
@@ -18,13 +18,14 @@ Max temperature :     500
 Total mass :          1
 
 # Time integration
-Max timestep size :   5e-2
-Max cfl number :      1
-Max time :            20
+Max timestep size :   1e-2
+Max cfl number :      0.8
+Max time :            10
+Subiterations :       3
 
 # Pressure convergence
 Pressure iteration :  20
-Pressure tolerance :  1e-6
+Pressure tolerance :  1e-5
 
 # Ensight output
 Ensight output period : 1e-1

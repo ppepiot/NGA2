@@ -102,6 +102,8 @@ contains
          real(WP) :: diffusivity
          ! Create scalar solver
          call sc%initialize(cfg=cfg,name='Temperature')
+         ! Add slight backward bias to CN scheme
+         sc%theta=sc%theta+1.0e-2_WP
          ! Assign constant diffusivity
          call param_read('Dynamic diffusivity',diffusivity)
          sc%diff=diffusivity
@@ -118,6 +120,8 @@ contains
          real(WP) :: visc
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Variable density low Mach NS')
+         ! Add slight backward bias to CN scheme
+         fs%theta=fs%theta+1.0e-2_WP
          ! Assign constant viscosity
          call param_read('Dynamic viscosity',visc); fs%visc=visc
          ! Assign acceleration of gravity
@@ -209,7 +213,7 @@ contains
          ! Prepare some info about fields
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
-         call sc%get_max()
+         call sc%get_max(fs%RHO)
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
          call mfile%add_column(time%n,'Timestep number')
@@ -222,7 +226,7 @@ contains
          call mfile%add_column(fs%Pmax,'Pmax')
          call mfile%add_column(sc%SCmax,'SCmax')
          call mfile%add_column(sc%SCmin,'SCmin')
-         call mfile%add_column(sc%SCint,'SCint')
+         call mfile%add_column(sc%rhoSCint,'rhoSCint')
          call mfile%add_column(fs%RHOmax,'RHOmax')
          call mfile%add_column(fs%RHOmin,'RHOmin')
          call mfile%add_column(fs%RHOint,'RHOint')
@@ -297,6 +301,9 @@ contains
             ! ===================================================
             
             ! ============ VELOCITY SOLVER ======================
+            ! Compute Umid
+            call fs%get_Umid()
+
             ! Get rhoU/rhoV/rhoW
             call fs%rho_multiply()
             
@@ -339,16 +346,16 @@ contains
             call fs%shift_p(fs%psolv%sol)
             call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
             fs%P=fs%P+fs%psolv%sol
-            fs%rhoU=fs%rhoU-time%dt*resU
-            fs%rhoV=fs%rhoV-time%dt*resV
-            fs%rhoW=fs%rhoW-time%dt*resW
+            fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
+            fs%rhoV=fs%rhoV-time%dt*resV*((1.0_WP-fs%theta)*fs%sRHOYold**2+fs%theta*fs%sRHOY**2)/((fs%sRHOY+fs%sRHOYold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOY)
+            fs%rhoW=fs%rhoW-time%dt*resW*((1.0_WP-fs%theta)*fs%sRHOZold**2+fs%theta*fs%sRHOZ**2)/((fs%sRHOZ+fs%sRHOZold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOZ)
             ! Recover Umid
             call fs%rho_divide()
             ! Recover U
             call fs%get_U()
             ! ===================================================
             
-            ! Increment sub-iteration counter ===================
+            ! Increment sub-iteration
             time%it=time%it+1
             
          end do
@@ -359,7 +366,7 @@ contains
          !call sc%solve_implicit(time%dt,resSC,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
          !sc%SC=sc%SC+resSC
          !call sc%apply_bcond(time%t,time%dt)
-
+         
          ! Recompute interpolated velocity and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
@@ -369,7 +376,7 @@ contains
          
          ! Perform and output monitoring
          call fs%get_max()
-         call sc%get_max()
+         call sc%get_max(fs%RHO)
          call mfile%write()
          call cflfile%write()
          
