@@ -92,7 +92,6 @@ contains
          call param_read('Max cfl number',time%cflmax)
          time%dt=time%dtmax
          call param_read('Max time',time%tmax)
-         time%dt=time%dtmax
          call param_read('Subiterations',time%itmax,default=2)
       end block initialize_timetracker
       
