@@ -2,8 +2,8 @@
 module simulation
    use precision,         only: WP
    use geometry,          only: cfg
-   use hypre_str_class,   only: hypre_str
    use ddadi_class,       only: ddadi
+   use hypre_str_class,   only: hypre_str
    use lowmach_class,     only: lowmach
    use vdscalar_class,    only: vdscalar
    use timetracker_class, only: timetracker
@@ -12,7 +12,6 @@ module simulation
    use monitor_class,     only: monitor
    implicit none
    private
-   public :: simulation_init,simulation_run,simulation_final
    
    !> Single low Mach flow solver and scalar solver and corresponding time tracker
    type(hypre_str),   public :: ps
@@ -29,39 +28,114 @@ module simulation
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
    
+   public :: simulation_init,simulation_run,simulation_final
+   
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resSC
    real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi
    
    !> Equation of state
-   real(WP) :: Tmin,Tmax,fluid_mass
+   real(WP) :: Zst,rho0,rho1,rhost
+   
+   !> Initial mass
+   real(WP) :: mass=0.0_WP
+   
+   !> Initial perturbations
+   integer :: nwaveX,nwaveZ
+   real(WP) :: wamp
+   real(WP), dimension(:), allocatable :: wnumbX,wshiftX,wnumbZ,wshiftZ
+
+   !> Quadrature rule
+   integer :: nq
+   real(WP), dimension(:), allocatable :: xq,wq
    
 contains
    
    
-   !> Define here our equation of state - rho(T,mass)
-   subroutine get_rho(mass)
+   !> Obtain density from equation of state based on Burke-Schumann
+   subroutine get_rho()
       implicit none
-      real(WP), intent(in) :: mass
-      integer :: i,j,k
-      real(WP) :: one_over_T
-      ! Integrate 1/T
-      do k=sc%cfg%kmino_,sc%cfg%kmaxo_
-         do j=sc%cfg%jmino_,sc%cfg%jmaxo_
-            do i=sc%cfg%imino_,sc%cfg%imaxo_
-               resSC(i,j,k)=1.0_WP/min(max(sc%SC(i,j,k),Tmin),Tmax)
+      integer  :: i,j,k
+      real(WP) :: coeff,mySC
+      !real(WP), dimension(3) :: grad
+      integer :: iq,jq,kq
+      ! Evaluate rho
+      do k=fs%cfg%kmin_,fs%cfg%kmax_
+         do j=fs%cfg%jmin_,fs%cfg%jmax_
+            do i=fs%cfg%imin_,fs%cfg%imax_
+               ! Direct evaluation
+               !fs%RHO(i,j,k)=rho(sc%SC(i,j,k))
+               ! Quadrature rule
+               fs%RHO(i,j,k)=0.0_WP
+               !grad(1)=minmod((sc%SC(i+1,j,k)-sc%SC(i,j,k))*cfg%dxmi(i+1),(sc%SC(i,j,k)-sc%SC(i-1,j,k))*cfg%dxmi(i))
+               !grad(2)=minmod((sc%SC(i,j+1,k)-sc%SC(i,j,k))*cfg%dymi(j+1),(sc%SC(i,j,k)-sc%SC(i,j-1,k))*cfg%dymi(j))
+               !grad(3)=minmod((sc%SC(i,j,k+1)-sc%SC(i,j,k))*cfg%dzmi(k+1),(sc%SC(i,j,k)-sc%SC(i,j,k-1))*cfg%dzmi(k))
+               do kq=1,nq
+                  do jq=1,nq
+                     do iq=1,nq
+                        ! Use MUSCL to get scalar in the cell
+                        !mySC=sc%SC(i,j,k)+grad(1)*xq(iq)*cfg%dx(i)+grad(2)*xq(jq)*cfg%dy(j)+grad(3)*xq(kq)*cfg%dz(k)
+                        ! Use trilinear interpolation to get scalar in the cell
+                        mySC=cfg%get_scalar([cfg%x(i)+xq(iq)*cfg%dx(i),cfg%y(j)+xq(jq)*cfg%dy(j),cfg%z(k)+xq(kq)*cfg%dz(k)],i,j,k,sc%SC,'n')
+                        ! Accumulate integral
+                        fs%RHO(i,j,k)=fs%RHO(i,j,k)+wq(iq)*wq(jq)*wq(kq)*rho(mySC)
+                     end do
+                  end do
+               end do
             end do
          end do
       end do
-      call sc%cfg%integrate(resSC,integral=one_over_T)
-      ! Calculate density
-      do k=fs%cfg%kmino_,fs%cfg%kmaxo_
-         do j=fs%cfg%jmino_,fs%cfg%jmaxo_
-            do i=fs%cfg%imino_,fs%cfg%imaxo_
-               fs%RHO(i,j,k)=mass/(min(max(sc%SC(i,j,k),Tmin),Tmax)*one_over_T)
-            end do
+      ! Synchronize and apply Neumann top and bottom
+      call cfg%sync(fs%RHO)
+      if (cfg%jproc.eq.1) then
+         do j=cfg%jmino,cfg%jmin-1
+            fs%RHO(:,j,:)=fs%RHO(:,cfg%jmin,:)
          end do
-      end do
+      end if
+      if (cfg%jproc.eq.cfg%npy) then
+         do j=cfg%jmax+1,cfg%jmaxo
+            fs%RHO(:,j,:)=fs%RHO(:,cfg%jmax,:)
+         end do
+      end if
+      ! Rescale rho to preserve its integral
+      if (mass.eq.0.0_WP) then
+         ! First time, just calculate mass
+         call cfg%integrate(fs%RHO,integral=mass)
+      else
+         ! Mass is non-zero, rescale to conserve it
+         call cfg%integrate(fs%RHO,integral=coeff); coeff=mass/coeff
+         fs%RHO=fs%RHO*coeff
+      end if
+   contains
+      real(WP) function rho(Z)
+         implicit none
+         real(WP), intent(in) :: Z
+         real(WP) :: Zclip
+         ! Clip mixture fraction between - and 1
+         Zclip=min(max(Z,0.0_WP),1.0_WP)
+         ! Pure mixing flamelet
+         !rho=rho0*rho1/(rho1*(1.0_WP-Zclip)+rho0*Zclip)
+         ! Burke-Schumann flamelet
+         if (Zclip.le.Zst) then
+            rho=Zst*rho0*rhost/(rhost*(Zst-Zclip)+rho0*Zclip)
+         else
+            rho=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-Zclip)+rhost*(Zclip-Zst))
+         end if
+      end function rho
+      function minmod(g1,g2) result(g)
+         implicit none
+         real(WP), intent(in) :: g1,g2
+         real(WP) :: g
+         if (g1*g2.le.0.0_WP) then
+            g=0.0_WP
+         else
+            if (abs(g1).lt.abs(g2)) then
+               g=g1
+            else
+               g=g2
+            end if
+         end if
+      end function minmod
    end subroutine get_rho
    
    
@@ -70,20 +144,89 @@ contains
       use param, only: param_read
       implicit none
       
+      ! Read in EOS parameters
+      initialize_eos: block
+         use mathtools, only: quadrature_rule
+         ! EOS parameters
+         call param_read('rho0',rho0)
+         call param_read('rho1',rho1)
+         call param_read('rhost',rhost)
+         call param_read('Zst',Zst)
+         if (Zst.le.0.0_WP) Zst=0.0_WP+epsilon(Zst)
+         if (Zst.ge.1.0_WP) Zst=1.0_WP-epsilon(Zst)
+         ! Prepare quadrature for integrating density
+         nq=5; allocate(xq(nq),wq(nq))
+         call quadrature_rule(nq,xq,wq)
+      end block initialize_eos
+      
+      ! Initialize disturbances
+      initialize_disturbances: block
+         use mathtools, only: twoPi
+         use random,    only: random_uniform
+         use parallel,  only: MPI_REAL_WP
+         use mpi_f08,   only: MPI_BCAST
+         use string,    only: str_long
+         use messager,  only: log
+         character(str_long) :: message
+         integer :: ierr,n
+         ! Prepare interface disturbance in X
+         call param_read('Wave amplitude',wamp)
+         call param_read('NwaveX',NwaveX,default=-1)
+         if (NwaveX.gt.0) then
+            allocate(wnumbX(nwaveX),wshiftX(nwaveX))
+            call param_read('wnumbX',wnumbX)
+            call param_read('wshiftX',wshiftX)
+         else
+            nwaveX=6
+            allocate(wnumbX(nwaveX),wshiftX(nwaveX))
+            wnumbX=[3.0_WP,4.0_WP,5.0_WP,6.0_WP,7.0_WP,8.0_WP]*twoPi/cfg%xL
+            if (cfg%amRoot) then
+               do n=1,nwaveX
+                  wshiftX(n)=random_uniform(lo=-0.5_WP*cfg%xL,hi=+0.5_WP*cfg%xL)
+               end do
+            end if
+            call MPI_BCAST(wshiftX,nwaveX,MPI_REAL_WP,0,cfg%comm,ierr)
+         end if
+         ! Prepare interface disturbance in Z
+         call param_read('NwaveZ',NwaveZ,default=-1)
+         if (NwaveZ.gt.0) then
+            allocate(wnumbZ(nwaveZ),wshiftZ(nwaveZ))
+            call param_read('wnumbZ',wnumbZ)
+            call param_read('wshiftZ',wshiftZ)
+         else
+            nwaveZ=6
+            allocate(wnumbZ(nwaveZ),wshiftZ(nwaveZ))
+            wnumbZ=[3.0_WP,4.0_WP,5.0_WP,6.0_WP,7.0_WP,8.0_WP]*twoPi/cfg%zL
+            ! Handle 2D case
+            if (cfg%nz.eq.1) wnumbZ=0.0_WP
+            if (cfg%amRoot) then
+               do n=1,nwaveZ
+                  wshiftZ(n)=random_uniform(lo=-0.5_WP*cfg%zL,hi=+0.5_WP*cfg%zL)
+               end do
+            end if
+            call MPI_BCAST(wshiftZ,nwaveZ,MPI_REAL_WP,0,cfg%comm,ierr)
+         end if
+         ! Print out initial disturbance
+         if (cfg%amRoot) then
+            write(message,'("[Initial conditions] =>  NwaveX =",i6)')              nwaveX; call log(message)
+            write(message,'("[Initial conditions] =>  wnumbX =",1000(es12.5,x))')  wnumbX; call log(message)
+            write(message,'("[Initial conditions] => wshiftX =",1000(es12.5,x))') wshiftX; call log(message)
+            write(message,'("[Initial conditions] =>  NwaveZ =",i6)')              nwaveZ; call log(message)
+            write(message,'("[Initial conditions] =>  wnumbZ =",1000(es12.5,x))')  wnumbZ; call log(message)
+            write(message,'("[Initial conditions] => wshiftZ =",1000(es12.5,x))') wshiftZ; call log(message)
+         end if
+      end block initialize_disturbances
       
       ! Allocate work arrays
       allocate_work_arrays: block
-         ! Flow solver
-         allocate(resU(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(resV(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(resW(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Ui  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Vi  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Wi  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         ! Scalar solver
+         allocate(resU (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resV (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resW (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Ui   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Vi   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Wi   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resSC(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
-      
       
       ! Initialize time tracker with 2 subiterations
       initialize_timetracker: block
@@ -91,31 +234,33 @@ contains
          call param_read('Max timestep size',time%dtmax)
          call param_read('Max cfl number',time%cflmax)
          time%dt=time%dtmax
-         call param_read('Max time',time%tmax)
          call param_read('Subiterations',time%itmax,default=2)
       end block initialize_timetracker
       
-      
       ! Create a scalar solver
       create_scalar: block
+         use vdscalar_class, only: dirichlet,neumann
          real(WP) :: diffusivity
          ! Create scalar solver
-         call sc%initialize(cfg=cfg,name='Temperature')
+         call sc%initialize(cfg=cfg,name='MixFrac')
          ! Add slight backward bias to CN scheme
-         sc%theta=sc%theta+1.0e-2_WP
+         sc%theta=sc%theta!+1.0e-2_WP
+         ! Define boundary conditions
+         call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
+         call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
          ! Assign constant diffusivity
          call param_read('Dynamic diffusivity',diffusivity)
          sc%diff=diffusivity
          ! Configure implicit scalar solver
-         ss=ddadi(cfg=cfg,name='Scalar',nst=7)
+         ss=ddadi(cfg=cfg,name='Scalar',nst=13)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
       end block create_scalar
       
-      
-      ! Create a low-mach flow solver
-      create_solver: block
+      ! Create a low-Mach flow solver with bconds
+      create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
+         use lowmach_class,   only: slip
          real(WP) :: visc
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Variable density low Mach NS')
@@ -123,77 +268,79 @@ contains
          fs%theta=fs%theta+1.0e-2_WP
          ! Assign constant viscosity
          call param_read('Dynamic viscosity',visc); fs%visc=visc
-         ! Assign acceleration of gravity
-         call param_read('Gravity',fs%gravity)
+         ! Define boundary conditions
+         call fs%add_bcond(name='yp',type=slip,face='y',dir=+1,canCorrect=.false.,locator=yp_locator)
+         call fs%add_bcond(name='ym',type=slip,face='y',dir=-1,canCorrect=.false.,locator=ym_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
-         ps%maxlevel=24
+         ps%maxlevel=18
          call param_read('Pressure iteration',ps%maxit)
          call param_read('Pressure tolerance',ps%rcvg)
          ! Configure implicit velocity solver
          vs=ddadi(cfg=cfg,name='Velocity',nst=7)
          ! Setup the solver
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
-      end block create_solver
+      end block create_velocity_solver
       
-      
-      ! Initialize our temperature field
+      ! Initialize our mixture fraction field
       initialize_scalar: block
-         use mathtools, only: twoPi
-         integer :: i,j,k
-         ! Read in the temperature and mass
-         call param_read('Min temperature',Tmin)
-         call param_read('Max temperature',Tmax)
-         call param_read('Total mass',fluid_mass)
-         ! Stratified initial field
-         do k=fs%cfg%kmino_,fs%cfg%kmaxo_
-            do j=fs%cfg%jmino_,fs%cfg%jmaxo_
-               do i=fs%cfg%imino_,fs%cfg%imaxo_
-                  sc%SC(i,j,k)=Tmin+0.5_WP*(tanh((-fs%cfg%ym(j)-0.001_WP*cos(twoPi*fs%cfg%xm(i)/cfg%xL)-0.001_WP*cos(twoPi*fs%cfg%zm(k)/cfg%zL))/0.05_WP)+1.0_WP)*(Tmax-Tmin)
+         integer :: i,j,k,nX,nZ
+         real(WP) :: y
+         do k=cfg%kmino_,cfg%kmaxo_
+            do j=cfg%jmino_,cfg%jmaxo_
+               do i=cfg%imino_,cfg%imaxo_
+                  ! Distance to the nominal interface position
+                  y=cfg%ym(j)
+                  ! Perturb interface position
+                  do nX=1,nwaveX
+                     do nZ=1,nwaveZ
+                        y=y+wamp*cos(wnumbX(nX)*(cfg%xm(i)-wshiftX(nX)))*cos(wnumbZ(nZ)*(cfg%zm(k)-wshiftZ(nZ)))
+                     end do
+                  end do
+                  ! Hyperbolic tangent
+                  sc%SC(i,j,k)=0.5_WP*(1.0_WP+tanh(y))
                end do
             end do
          end do
       end block initialize_scalar
       
-      
       ! Initialize our velocity field
       initialize_velocity: block
+         integer :: i,j,k,nX,nZ
+         real(WP) :: y
          ! Initialize density from scalar
-         call get_rho(mass=fluid_mass); call fs%update_sRHO()
+         call get_rho(); call fs%update_sRHO()
          fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
          ! Initialize velocity field
-         fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
+         do k=cfg%kmino_,cfg%kmaxo_
+            do j=cfg%jmino_,cfg%jmaxo_
+               do i=cfg%imino_,cfg%imaxo_
+                  ! Distance to the nominal interface position
+                  y=cfg%ym(j)
+                  ! Perturb interface position
+                  do nX=1,nwaveX
+                     do nZ=1,nwaveZ
+                        y=y+wamp*cos(wnumbX(nX)*(cfg%x(i)-wshiftX(nX)))*cos(wnumbZ(nZ)*(cfg%zm(k)-wshiftZ(nZ)))
+                     end do
+                  end do
+                  ! Hyperbolic tangent
+                  fs%U(i,j,k)=tanh(y)
+               end do
+            end do
+         end do
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid
          call fs%get_Umid()
-         ! Get rhoU/rhoV/rhoW
-         call fs%rho_multiply()
-         ! Correct MFR
-         call fs%correct_mfr(dt=time%dt)
-         ! Project
-         call fs%update_laplacian()
-         call fs%get_div(dt=time%dt)
-         fs%psolv%rhs=-fs%cfg%vol*fs%div
-         fs%psolv%sol=0.0_WP
-         call fs%psolv%solve()
-         call fs%shift_p(fs%psolv%sol)
-         call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
-         fs%rhoU=fs%rhoU-resU
-         fs%rhoV=fs%rhoV-resV
-         fs%rhoW=fs%rhoW-resW
-         call fs%rho_divide()
-         call fs%get_U()
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
       end block initialize_velocity
       
-      
       ! Add Ensight output
       create_ensight: block
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='test')
+         ens_out=ensight(cfg=cfg,name='mixing')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -201,11 +348,10 @@ contains
          call ens_out%add_scalar('pressure',fs%P)
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
-         call ens_out%add_scalar('temperature',sc%SC)
+         call ens_out%add_scalar('mixfrac',sc%SC)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
-      
       
       ! Create a monitor file
       create_monitor: block
@@ -246,6 +392,37 @@ contains
          call cflfile%write()
       end block create_monitor
       
+   contains
+      
+      !> Function that localizes y- boundary
+      function ym_locator(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (j.eq.pg%jmin) isIn=.true.
+      end function ym_locator
+      
+      !> Function that localizes y- boundary
+      function ym_locator_sc(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (j.eq.pg%jmin-1) isIn=.true.
+      end function ym_locator_sc
+      
+      !> Function that localizes y+ boundary
+      function yp_locator(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (j.eq.pg%jmax+1) isIn=.true.
+      end function yp_locator
       
    end subroutine simulation_init
    
@@ -296,7 +473,7 @@ contains
             ! ===================================================
             
             ! ============ UPDATE DENSITY========================
-            call get_rho(mass=fluid_mass); call fs%update_sRHO()
+            call get_rho(); call fs%update_sRHO()
             ! ===================================================
             
             ! ============ VELOCITY SOLVER ======================
@@ -308,9 +485,6 @@ contains
             
             ! Explicit calculation of drho*u/dt from NS
             call fs%get_dmomdt(resU,resV,resW)
-            
-            ! Add momentum source terms
-            call fs%addsrc_gravity(resU,resV,resW)
             
             ! Assemble explicit residual
             resU=time%dt*resU-(fs%sRHOX**2*fs%U-fs%sRHOXold**2*fs%Uold)
