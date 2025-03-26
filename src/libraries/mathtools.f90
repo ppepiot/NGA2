@@ -317,8 +317,8 @@ contains
       if (n.lt.1) call die('[quadrature_rule] n must be at least 1')
       ! Handle n=1 case
       if (n.eq.1) then
-         x(1)=0.0_WP
-         w(1)=2.0_WP
+         x(1)=0.5_WP
+         w(1)=1.0_WP
          return
       end if
       ! Calculate quadrature point in general case

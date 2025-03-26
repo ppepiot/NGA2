@@ -27,6 +27,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
+   real(WP) :: RHOcvg
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -40,11 +41,14 @@ module simulation
    !> Initial mass
    real(WP) :: mass=0.0_WP
    
+   !> VISC and DIFF
+   real(WP) :: visc,diff
+   
    !> Initial perturbations
    integer :: nwaveX,nwaveZ
    real(WP) :: wamp
    real(WP), dimension(:), allocatable :: wnumbX,wshiftX,wnumbZ,wshiftZ
-
+   
    !> Quadrature rule
    integer :: nq
    real(WP), dimension(:), allocatable :: xq,wq
@@ -54,37 +58,19 @@ contains
    
    !> Obtain density from equation of state based on Burke-Schumann
    subroutine get_rho()
+      use integrator, only: int_adapt,int_order
       implicit none
       integer  :: i,j,k
-      real(WP) :: coeff,mySC
-      !real(WP), dimension(3) :: grad
-      integer :: iq,jq,kq
-      ! Evaluate rho
-      do k=fs%cfg%kmin_,fs%cfg%kmax_
-         do j=fs%cfg%jmin_,fs%cfg%jmax_
-            do i=fs%cfg%imin_,fs%cfg%imax_
-               ! Direct evaluation
-               !fs%RHO(i,j,k)=rho(sc%SC(i,j,k))
-               ! Quadrature rule
-               fs%RHO(i,j,k)=0.0_WP
-               !grad(1)=minmod((sc%SC(i+1,j,k)-sc%SC(i,j,k))*cfg%dxmi(i+1),(sc%SC(i,j,k)-sc%SC(i-1,j,k))*cfg%dxmi(i))
-               !grad(2)=minmod((sc%SC(i,j+1,k)-sc%SC(i,j,k))*cfg%dymi(j+1),(sc%SC(i,j,k)-sc%SC(i,j-1,k))*cfg%dymi(j))
-               !grad(3)=minmod((sc%SC(i,j,k+1)-sc%SC(i,j,k))*cfg%dzmi(k+1),(sc%SC(i,j,k)-sc%SC(i,j,k-1))*cfg%dzmi(k))
-               do kq=1,nq
-                  do jq=1,nq
-                     do iq=1,nq
-                        ! Use MUSCL to get scalar in the cell
-                        !mySC=sc%SC(i,j,k)+grad(1)*xq(iq)*cfg%dx(i)+grad(2)*xq(jq)*cfg%dy(j)+grad(3)*xq(kq)*cfg%dz(k)
-                        ! Use trilinear interpolation to get scalar in the cell
-                        mySC=cfg%get_scalar([cfg%x(i)+xq(iq)*cfg%dx(i),cfg%y(j)+xq(jq)*cfg%dy(j),cfg%z(k)+xq(kq)*cfg%dz(k)],i,j,k,sc%SC,'n')
-                        ! Accumulate integral
-                        fs%RHO(i,j,k)=fs%RHO(i,j,k)+wq(iq)*wq(jq)*wq(kq)*rho(mySC)
-                     end do
-                  end do
-               end do
-            end do
-         end do
-      end do
+      real(WP) :: coeff
+      ! Evaluate rho using adaptive integrator
+      do k=fs%cfg%kmin_,fs%cfg%kmax_; do j=fs%cfg%jmin_,fs%cfg%jmax_; do i=fs%cfg%imin_,fs%cfg%imax_
+         ! No sub-grid integration
+         !fs%RHO(i,j,k)=rho(pos=[cfg%xm(i),cfg%ym(j),cfg%zm(k)],ind=[i,j,k])
+         ! Sub-grid integration at a fixed order
+         fs%RHO(i,j,k)=int_order(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],order=3)
+         ! Adaptive sub-grid integration
+         !fs%RHO(i,j,k)=int_adapt(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],tol=1.0e-3_WP)
+      end do; end do; end do
       ! Synchronize and apply Neumann top and bottom
       call cfg%sync(fs%RHO)
       if (cfg%jproc.eq.1) then
@@ -107,35 +93,20 @@ contains
          fs%RHO=fs%RHO*coeff
       end if
    contains
-      real(WP) function rho(Z)
+      real(WP) function rho(pos,ind)
          implicit none
-         real(WP), intent(in) :: Z
-         real(WP) :: Zclip
-         ! Clip mixture fraction between - and 1
-         Zclip=min(max(Z,0.0_WP),1.0_WP)
-         ! Pure mixing flamelet
-         !rho=rho0*rho1/(rho1*(1.0_WP-Zclip)+rho0*Zclip)
+         real(WP), dimension(3), intent(in) :: pos
+         integer , dimension(3), intent(in) :: ind
+         real(WP) :: Z
+         ! Interpolate Z and clip between 0 and 1
+         Z=min(max(cfg%get_scalar(pos,ind(1),ind(2),ind(3),sc%SC,'n'),0.0_WP),1.0_WP)
          ! Burke-Schumann flamelet
-         if (Zclip.le.Zst) then
-            rho=Zst*rho0*rhost/(rhost*(Zst-Zclip)+rho0*Zclip)
+         if (Z.le.Zst) then
+            rho=Zst*rho0*rhost/(rhost*(Zst-Z)+rho0*Z)
          else
-            rho=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-Zclip)+rhost*(Zclip-Zst))
+            rho=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-Z)+rhost*(Z-Zst))
          end if
       end function rho
-      function minmod(g1,g2) result(g)
-         implicit none
-         real(WP), intent(in) :: g1,g2
-         real(WP) :: g
-         if (g1*g2.le.0.0_WP) then
-            g=0.0_WP
-         else
-            if (abs(g1).lt.abs(g2)) then
-               g=g1
-            else
-               g=g2
-            end if
-         end if
-      end function minmod
    end subroutine get_rho
    
    
@@ -146,7 +117,7 @@ contains
       
       ! Read in EOS parameters
       initialize_eos: block
-         use mathtools, only: quadrature_rule
+         use integrator, only: integrator_init
          ! EOS parameters
          call param_read('rho0',rho0)
          call param_read('rho1',rho1)
@@ -155,8 +126,7 @@ contains
          if (Zst.le.0.0_WP) Zst=0.0_WP+epsilon(Zst)
          if (Zst.ge.1.0_WP) Zst=1.0_WP-epsilon(Zst)
          ! Prepare quadrature for integrating density
-         nq=5; allocate(xq(nq),wq(nq))
-         call quadrature_rule(nq,xq,wq)
+         call integrator_init()
       end block initialize_eos
       
       ! Initialize disturbances
@@ -197,8 +167,6 @@ contains
             nwaveZ=6
             allocate(wnumbZ(nwaveZ),wshiftZ(nwaveZ))
             wnumbZ=[3.0_WP,4.0_WP,5.0_WP,6.0_WP,7.0_WP,8.0_WP]*twoPi/cfg%zL
-            ! Handle 2D case
-            if (cfg%nz.eq.1) wnumbZ=0.0_WP
             if (cfg%amRoot) then
                do n=1,nwaveZ
                   wshiftZ(n)=random_uniform(lo=-0.5_WP*cfg%zL,hi=+0.5_WP*cfg%zL)
@@ -206,6 +174,8 @@ contains
             end if
             call MPI_BCAST(wshiftZ,nwaveZ,MPI_REAL_WP,0,cfg%comm,ierr)
          end if
+         ! Handle 2D case
+         if (cfg%nz.eq.1) wnumbZ=0.0_WP
          ! Print out initial disturbance
          if (cfg%amRoot) then
             write(message,'("[Initial conditions] =>  NwaveX =",i6)')              nwaveX; call log(message)
@@ -240,7 +210,6 @@ contains
       ! Create a scalar solver
       create_scalar: block
          use vdscalar_class, only: dirichlet,neumann
-         real(WP) :: diffusivity
          ! Create scalar solver
          call sc%initialize(cfg=cfg,name='MixFrac')
          ! Add slight backward bias to CN scheme
@@ -249,8 +218,8 @@ contains
          call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
          call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
          ! Assign constant diffusivity
-         call param_read('Dynamic diffusivity',diffusivity)
-         sc%diff=diffusivity
+         call param_read('Dynamic diffusivity',diff)
+         sc%diff=diff
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Scalar',nst=13)
          ! Setup the solver
@@ -261,7 +230,6 @@ contains
       create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
          use lowmach_class,   only: slip
-         real(WP) :: visc
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Variable density low Mach NS')
          ! Add slight backward bias to CN scheme
@@ -285,7 +253,8 @@ contains
       ! Initialize our mixture fraction field
       initialize_scalar: block
          integer :: i,j,k,nX,nZ
-         real(WP) :: y
+         real(WP) :: y,delta
+         call param_read('Scalar thickness',delta,default=1.0_WP)
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
@@ -298,7 +267,7 @@ contains
                      end do
                   end do
                   ! Hyperbolic tangent
-                  sc%SC(i,j,k)=0.5_WP*(1.0_WP+tanh(y))
+                  sc%SC(i,j,k)=0.5_WP*(1.0_WP+tanh(y/delta))
                end do
             end do
          end do
@@ -307,11 +276,12 @@ contains
       ! Initialize our velocity field
       initialize_velocity: block
          integer :: i,j,k,nX,nZ
-         real(WP) :: y
+         real(WP) :: y,delta
          ! Initialize density from scalar
          call get_rho(); call fs%update_sRHO()
          fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
          ! Initialize velocity field
+         call param_read('Velocity thickness',delta,default=1.0_WP)
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
@@ -324,7 +294,7 @@ contains
                      end do
                   end do
                   ! Hyperbolic tangent
-                  fs%U(i,j,k)=tanh(y)
+                  fs%U(i,j,k)=tanh(y/delta)
                end do
             end do
          end do
@@ -375,6 +345,8 @@ contains
          call mfile%add_column(fs%RHOmax,'RHOmax')
          call mfile%add_column(fs%RHOmin,'RHOmin')
          call mfile%add_column(fs%RHOint,'RHOint')
+         call mfile%add_column(   RHOcvg,'RHOcvg')
+         call mfile%add_column(  time%it,'Subiter')
          call mfile%add_column(fs%divmax,'Maximum divergence')
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
@@ -453,7 +425,10 @@ contains
          ! This is where time-dpt Dirichlet would be enforced
          
          ! Perform sub-iterations
-         do while (time%it.le.time%itmax)
+         !do while (time%it.le.time%itmax)
+         RHOcvg=huge(1.0_WP)
+         time%it=0
+         do while (RHOcvg.gt.1.0e-3_WP)
             
             ! ============= SCALAR SOLVER =======================
             ! Explicit calculation of drhoSC/dt from scalar equation
@@ -473,7 +448,20 @@ contains
             ! ===================================================
             
             ! ============ UPDATE DENSITY========================
-            call get_rho(); call fs%update_sRHO()
+            update_rho: block
+               use mpi_f08,  only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
+               use parallel, only: MPI_REAL_WP
+               integer :: ierr
+               ! Remember RHO
+               resU=fs%RHO
+               ! Calculate new RHO with some under-relaxation
+               call get_rho(); fs%RHO=0.75_WP*fs%RHO+0.25_WP*resU; call fs%update_sRHO()
+               ! Calculate RHO convergence
+               RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
+               ! >>>> HARDCODE DIFFUSIVITY AND VISCOSITY
+               fs%visc=fs%RHO*visc
+               sc%diff=fs%RHO*diff
+            end block update_rho
             ! ===================================================
             
             ! ============ VELOCITY SOLVER ======================
@@ -532,13 +520,6 @@ contains
             time%it=time%it+1
             
          end do
-         
-         ! Could consider doing final scalar step here
-         !call sc%get_drhoSCdt(resSC,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
-         !resSC=time%dt*resSC-(fs%RHO*sc%SC-fs%RHOold*sc%SCold)
-         !call sc%solve_implicit(time%dt,resSC,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
-         !sc%SC=sc%SC+resSC
-         !call sc%apply_bcond(time%t,time%dt)
          
          ! Recompute interpolated velocity and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
