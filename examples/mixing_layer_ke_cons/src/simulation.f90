@@ -6,6 +6,7 @@ module simulation
    use hypre_str_class,   only: hypre_str
    use lowmach_class,     only: lowmach
    use vdscalar_class,    only: vdscalar
+   use accelerator_class, only: accelerator
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use event_class,       only: event
@@ -20,6 +21,7 @@ module simulation
    type(lowmach),     public :: fs
    type(vdscalar),    public :: sc
    type(timetracker), public :: time
+   type(accelerator), public :: accel
    
    !> Ensight postprocessing
    type(ensight) :: ens_out
@@ -27,7 +29,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg
+   real(WP) :: RHOcvg=0.0_WP
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -48,10 +50,6 @@ module simulation
    integer :: nwaveX,nwaveZ
    real(WP) :: wamp
    real(WP), dimension(:), allocatable :: wnumbX,wshiftX,wnumbZ,wshiftZ
-   
-   !> Quadrature rule
-   integer :: nq
-   real(WP), dimension(:), allocatable :: xq,wq
    
 contains
    
@@ -198,6 +196,13 @@ contains
          allocate(resSC(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
       
+      ! Initialize convergence accelerator
+      initialize_accelerator: block
+         call accel%initialize(cfg=cfg,storage_size=6,name='Density solver')
+         accel%beta=0.75_WP
+         accel%k_start=3
+      end block initialize_accelerator
+
       ! Initialize time tracker with 2 subiterations
       initialize_timetracker: block
          time=timetracker(amRoot=cfg%amRoot)
@@ -428,6 +433,7 @@ contains
          !do while (time%it.le.time%itmax)
          RHOcvg=huge(1.0_WP)
          time%it=0
+         call accel%restart(ig=fs%RHO)
          do while (RHOcvg.gt.1.0e-3_WP)
             
             ! ============= SCALAR SOLVER =======================
@@ -454,8 +460,10 @@ contains
                integer :: ierr
                ! Remember RHO
                resU=fs%RHO
-               ! Calculate new RHO with some under-relaxation
-               call get_rho(); fs%RHO=0.75_WP*fs%RHO+0.25_WP*resU; call fs%update_sRHO()
+               ! Calculate RHO using our convergence accelerator
+               call get_rho(); fs%RHO=0.75_WP*fs%RHO+0.25_WP*resU
+               call accel%increment(fs%RHO)
+               call fs%update_sRHO()
                ! Calculate RHO convergence
                RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
                ! >>>> HARDCODE DIFFUSIVITY AND VISCOSITY
