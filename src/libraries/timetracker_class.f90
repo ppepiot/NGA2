@@ -66,7 +66,7 @@ contains
       self%dtold=0.0_WP
       self%tmid =0.0_WP
       self%dtmid=0.0_WP
-      self%it   =1;            self%itmax=1; self%itmin=huge(1)
+      self%it   =1;            self%itmax=1; self%itmin=0
    end function constructor
    
    
