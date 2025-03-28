@@ -201,7 +201,8 @@ contains
          call param_read('Max timestep size',time%dtmax)
          call param_read('Max cfl number',time%cflmax)
          time%dt=time%dtmax
-         call param_read('Subiterations',time%itmax,default=2)
+         call param_read('Subiterations',time%itmax)
+         time%itmin=2
       end block initialize_timetracker
       
       ! Create a scalar solver
@@ -423,7 +424,7 @@ contains
          
          ! Perform sub-iterations until RHO is sufficiently converged
          RHOcvg=huge(1.0_WP); time%it=0; call accel%restart(ig=fs%RHO)
-         do while (RHOcvg.gt.RHOtol.and.time%it.le.time%itmax.or.time%it.lt.2)
+         do while (RHOcvg.gt.RHOtol.and.time%it.lt.time%itmax.or.time%it.lt.time%itmin)
             
             ! ============= SCALAR SOLVER =======================
             ! Explicit calculation of drhoSC/dt from scalar equation
