@@ -53,15 +53,19 @@ contains
    subroutine get_rho()
       use integrator, only: int_adapt,int_order
       implicit none
-      integer  :: i,j,k
-      ! Evaluate rho using adaptive integrator
+      integer :: i,j,k
+      real(WP), dimension(2,2,2) :: Z
+      ! Evaluate rho using adaptive integrator on the dual mesh
+      do k=fs%cfg%kmin_,fs%cfg%kmax_+1; do j=fs%cfg%jmin_,fs%cfg%jmax_+1; do i=fs%cfg%imin_,fs%cfg%imax_+1
+         ! Prepare Z data for rho calculation
+         Z=sc%SC(i-1:i,j-1:j,k-1:k)
+         ! Carry out integration
+         resV(i,j,k)=int_adapt(func=rho_of_x,tol=1.0e-5_WP)
+         !resV(i,j,k)=int_order(func=rho_of_x,order=5)
+      end do; end do; end do
+      ! Reinterpolate on our original mesh
       do k=fs%cfg%kmin_,fs%cfg%kmax_; do j=fs%cfg%jmin_,fs%cfg%jmax_; do i=fs%cfg%imin_,fs%cfg%imax_
-         ! No sub-grid integration
-         !fs%RHO(i,j,k)=rho(pos=[cfg%xm(i),cfg%ym(j),cfg%zm(k)],ind=[i,j,k])
-         ! Sub-grid integration at a fixed order
-         fs%RHO(i,j,k)=int_order(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],order=5)
-         ! Adaptive sub-grid integration
-         !fs%RHO(i,j,k)=int_adapt(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],tol=1.0e-2_WP)
+         fs%RHO(i,j,k)=0.125_WP*sum(resV(i:i+1,j:j+1,k:k+1))
       end do; end do; end do
       ! Synchronize
       call cfg%sync(fs%RHO)
@@ -77,20 +81,23 @@ contains
          end do
       end if
    contains
-      real(WP) function rho(pos,ind)
+      ! Evaluates clipped Burke-Schumann flamelet on a pre-set domain
+      real(WP) function rho_of_x(wx1,wy1,wz1)
          implicit none
-         real(WP), dimension(3), intent(in) :: pos
-         integer , dimension(3), intent(in) :: ind
-         real(WP) :: Z
-         ! Interpolate Z and clip between 0 and 1
-         Z=min(max(cfg%get_scalar(pos,ind(1),ind(2),ind(3),sc%SC,'n'),0.0_WP),1.0_WP)
-         ! Burke-Schumann flamelet
-         if (Z.le.Zst) then
-            rho=Zst*rho0*rhost/(rhost*(Zst-Z)+rho0*Z)
+         real(WP), intent(in) :: wx1,wy1,wz1
+         real(WP) :: wx2,wy2,wz2,myZ
+         ! Prepare tri-linear interpolation weights
+         wx2=1.0_WP-wx1; wy2=1.0_WP-wy1; wz2=1.0_WP-wz1
+         ! Interpolate and clip Z
+         myZ=wz1*(wy1*(wx1*Z(2,2,2)+wx2*Z(1,2,2))+wy2*(wx1*Z(2,1,2)+wx2*Z(1,1,2)))+wz2*(wy1*(wx1*Z(2,2,1)+wx2*Z(1,2,1))+wy2*(wx1*Z(2,1,1)+wx2*Z(1,1,1)))
+         ! Evaluate Burke-Schumann flamelet
+         myZ=min(max(myZ,0.0_WP),1.0_WP)
+         if (myZ.le.Zst) then
+            rho_of_x=Zst*rho0*rhost/(rhost*(Zst-myZ)+rho0*myZ)
          else
-            rho=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-Z)+rhost*(Z-Zst))
+            rho_of_x=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-myZ)+rhost*(myZ-Zst))
          end if
-      end function rho
+      end function rho_of_x
    end subroutine get_rho
    
    
@@ -185,7 +192,7 @@ contains
       ! Initialize convergence accelerator
       initialize_accelerator: block
          call accel%initialize(cfg=cfg,storage_size=6,name='Density solver')
-         accel%beta=0.5_WP ! Under-relaxation improves convergence
+         accel%beta=0.75_WP ! Under-relaxation improves convergence
       end block initialize_accelerator
 
       ! Initialize time tracker with 2 subiterations

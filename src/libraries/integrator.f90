@@ -18,10 +18,9 @@ module integrator
 
    !> Type of the integrand function used to perform integration
    interface
-      real(WP) function integrand_ftype(pos,ind)
+      real(WP) function integrand_ftype(x1,x2,x3)
          import :: WP
-         real(WP), dimension(3), intent(in) :: pos
-         integer , dimension(3), intent(in) :: ind
+         real(WP), intent(in) :: x1,x2,x3
       end function integrand_ftype
    end interface
    
@@ -44,58 +43,39 @@ contains
    end subroutine integrator_init
    
    !> Integrate spatially with adaptivity
-   function int_adapt(func,start,end,ind,tol) result(fint)
+   function int_adapt(func,tol) result(fint)
       implicit none
-      procedure(integrand_ftype)         :: func      !< Function to integrate
-      real(WP), dimension(3), intent(in) :: start,end !< Integration bounds
-      integer , dimension(3), intent(in) :: ind       !< Indices
-      real(WP)              , intent(in) :: tol       !< Tolerance
-      real(WP) :: fint                                !< Calculated integral
-      real(WP) :: cint,err
+      procedure(integrand_ftype) :: func !< Function to integrate
+      real(WP), intent(in) :: tol        !< Relative tolerance
+      real(WP) :: fint,cint,err
       integer  :: i,j,k,n
       ! Evaluate n=1 estimate
-      n=1; fint=func([start+x(n,n)*(end-start)],ind); err=huge(1.0_WP)
+      n=1; fint=func(0.5_WP,0.5_WP,0.5_WP); err=huge(1.0_WP)
       ! Refine until below tolerance
       do while (err.gt.tol.and.n.lt.nmax)
          ! Increment order
          n=n+1
          ! Remember current integral and calculate new estimate
          cint=fint; fint=0.0_WP
-         !do k=1,n; do j=1,n; do i=1,n
-         !   fint=fint+w(n,i)*w(n,j)*w(n,k)*func([start(1)+x(n,i)*(end(1)-start(1)),&
-         !   &                                    start(2)+x(n,j)*(end(2)-start(2)),&
-         !   &                                    start(3)+x(n,k)*(end(3)-start(3))],ind)
-         !end do; end do; end do
-         do j=1,n; do i=1,n
-            fint=fint+w(n,i)*w(n,j)*func([start(1)+x(n,i)*(end(1)-start(1)),&
-            &                             start(2)+x(n,j)*(end(2)-start(2)),&
-            &                             start(3)+0.5_WP*(end(3)-start(3))],ind)
-         end do; end do
+         do k=1,n; do j=1,n; do i=1,n
+            fint=fint+w(n,i)*w(n,j)*w(n,k)*func(x(n,i),x(n,j),x(n,k))
+         end do; end do; end do
          ! Calculate error
          err=abs(fint-cint)
       end do
    end function int_adapt
    
    !> Integrate spatially at a certain order
-   function int_order(func,start,end,ind,order) result(fint)
+   function int_order(func,order) result(fint)
       implicit none
-      procedure(integrand_ftype)         :: func      !< Function to integrate
-      real(WP), dimension(3), intent(in) :: start,end !< Integration bounds
-      integer , dimension(3), intent(in) :: ind       !< Indices
-      integer               , intent(in) :: order     !< Order of integration
-      real(WP) :: fint                                !< Calculated integral
+      procedure(integrand_ftype) :: func !< Function to integrate
+      integer, intent(in) :: order       !< Order of integration
+      real(WP) :: fint
       integer  :: i,j,k
       fint=0.0_WP
-      !do k=1,order; do j=1,order; do i=1,order
-      !   fint=fint+w(order,i)*w(order,j)*w(order,k)*func([start(1)+x(order,i)*(end(1)-start(1)),&
-      !   &                                                start(2)+x(order,j)*(end(2)-start(2)),&
-      !   &                                                start(3)+x(order,k)*(end(3)-start(3))],ind)
-      !end do; end do; end do
-      do j=1,order; do i=1,order
-         fint=fint+w(order,i)*w(order,j)*func([start(1)+x(order,i)*(end(1)-start(1)),&
-         &                                     start(2)+x(order,j)*(end(2)-start(2)),&
-         &                                     start(3)+    0.5_WP*(end(3)-start(3))],ind)
-      end do; end do
+      do k=1,order; do j=1,order; do i=1,order
+         fint=fint+w(order,i)*w(order,j)*w(order,k)*func(x(order,i),x(order,j),x(order,k))
+      end do; end do; end do
    end function int_order
    
 end module integrator
