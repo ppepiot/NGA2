@@ -21,6 +21,9 @@ module accelerator_class
       integer :: m_max                                                  !< Maximum number of fields that can be stored
       integer :: k_start=0                                              !< Starting iteration (default is 0)
       real(WP) :: beta=1.0_WP                                           !< Damping parameter (should be 0<beta<=1, default is 1)
+      real(WP) :: drop_tol=1.0e-5_WP                                    !< Tolerance below which data is dropped for better conditioning
+      real(WP), dimension(:), allocatable :: A,b,work                   !< Storage for linear solvers
+      integer , dimension(:), allocatable :: iwork                      !< Storage for linear solvers
    contains
       procedure :: initialize                                           !< Initialization of the accelerator
       procedure :: increment                                            !< Accelerated increment
@@ -57,7 +60,8 @@ contains
       allocate(this%fold          (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%fold=0.0_WP
       allocate(this%gold          (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%gold=0.0_WP
       allocate(this%tmp           (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%tmp=0.0_WP
-      
+      allocate(this%work(3*this%m_max),this%iwork(this%m_max),this%A(1:this%m_max*(this%m_max+1)/2),this%b(1:this%m_max))
+
       ! Set iteration counter to zero by default
       this%k=0
       
@@ -87,8 +91,10 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: gcur !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(:,:,:), allocatable :: df
       real(WP) :: tmp
-      integer :: n,nn,i,j,k,ierr,info
-      real(WP), dimension(:), allocatable :: A,b
+      integer :: n,i,j,k,ierr,info
+      
+      ! Apply damping on new evaluation
+      gcur=this%beta*gcur+(1.0_WP-this%beta)*this%x
       
       ! Evaluate fcur
       this%fcur=gcur-this%x
@@ -158,19 +164,22 @@ contains
          this%Q(this%m,:,:,:)=df/tmp; this%R(this%m,this%m)=tmp
       end if
       
-      ! Delete data if poorly conditioned
-      !do while (Rcond.gt.this%droptol.and.this%m.gt.1)
-      !   call qr_delete(); this%m=this%m-1
-      !end do
-      
-      ! Solve Ax=b linear system with LAPACK =================
-      ! Form A using R
-      allocate(A(1:this%m*(this%m+1)/2))
+      ! Test conditioning of problem and form A for inversion
       do j=1,this%m; do i=1,this%m
-         A(i+(j-1)*j/2)=this%R(i,j)
+         this%A(i+(j-1)*j/2)=this%R(i,j)
       end do; end do
+      call dtpcon('1','U','N',this%m,this%A,tmp,this%work,this%iwork,info)
+      do while (tmp.lt.this%drop_tol.and.this%m.gt.1)
+         ! Drop data
+         call qr_delete(); this%m=this%m-1
+         ! Recalculate condition number
+         do j=1,this%m; do i=1,this%m
+            this%A(i+(j-1)*j/2)=this%R(i,j)
+         end do; end do
+         call dtpcon('1','U','N',this%m,this%A,tmp,this%work,this%iwork,info)
+      end do
+      
       ! Form b from Q.fcur
-      allocate(b(1:this%m))
       do n=1,this%m
          ! Calculate Q.fcur
          tmp=0.0_WP
@@ -179,33 +188,28 @@ contains
          end do; end do; end do
          call MPI_ALLREDUCE(MPI_IN_PLACE,tmp,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
          ! Store in b
-         b(n)=tmp
+         this%b(n)=tmp
       end do
-      ! Solve
-      call dtptrs('U','N','N',this%m,1,A,b,this%m,info)
-      ! Deallocate A but keep b as it contains the solution
-      deallocate(A)
-      ! ======================================================
+      
+      ! Solve with lapack
+      call dtptrs('U','N','N',this%m,1,this%A,this%b,this%m,info)
       
       ! Update solution
       this%x=gcur
       do n=1,this%m
-         this%x=this%x-b(n)*this%G(n,:,:,:)
+         this%x=this%x-this%b(n)*this%G(n,:,:,:)
       end do
       
-      ! Add damping
-      this%x=this%x-(1.0_WP-this%beta)*this%fcur
-      do n=1,this%m
-         ! Use gcur to calculate Q*R
-         gcur=0.0_WP
-         do nn=1,this%m
-            gcur=gcur+this%Q(nn,:,:,:)*this%R(nn,n)
-         end do
-         this%x=this%x+(1.0_WP-this%beta)*b(n)*gcur
-      end do
+      ! Standard damping method for Anderson acceleration is implemented below
+      ! Tests suggest it's not as good as simply under-relaxing each new eval
+      !this%x=this%x-(1.0_WP-this%beta)*this%fcur
+      !do n=1,this%m
+      !   tmp=sum(this%R(n,1:this%m)*this%b(1:this%m))
+      !   this%x=this%x+(1.0_WP-this%beta)*this%Q(n,:,:,:)*tmp
+      !end do
       
-      ! Deallocate
-      deallocate(b,df)
+      ! Deallocate df
+      deallocate(df)
       
       ! Finally, return solution in gcur for convenience
       gcur=this%x

@@ -12,7 +12,7 @@ module simulation
    use event_class,       only: event
    use monitor_class,     only: monitor
    implicit none
-   private
+   private; public :: simulation_init,simulation_run,simulation_final
    
    !> Single low Mach flow solver and scalar solver and corresponding time tracker
    type(hypre_str),   public :: ps
@@ -29,9 +29,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg=0.0_WP
-   
-   public :: simulation_init,simulation_run,simulation_final
+   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-3_WP
    
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resSC
@@ -39,9 +37,6 @@ module simulation
    
    !> Equation of state
    real(WP) :: Zst,rho0,rho1,rhost
-   
-   !> Initial mass
-   real(WP) :: mass=0.0_WP
    
    !> VISC and DIFF
    real(WP) :: visc,diff
@@ -59,18 +54,18 @@ contains
       use integrator, only: int_adapt,int_order
       implicit none
       integer  :: i,j,k
-      real(WP) :: coeff
       ! Evaluate rho using adaptive integrator
       do k=fs%cfg%kmin_,fs%cfg%kmax_; do j=fs%cfg%jmin_,fs%cfg%jmax_; do i=fs%cfg%imin_,fs%cfg%imax_
          ! No sub-grid integration
          !fs%RHO(i,j,k)=rho(pos=[cfg%xm(i),cfg%ym(j),cfg%zm(k)],ind=[i,j,k])
          ! Sub-grid integration at a fixed order
-         fs%RHO(i,j,k)=int_order(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],order=3)
+         fs%RHO(i,j,k)=int_order(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],order=5)
          ! Adaptive sub-grid integration
-         !fs%RHO(i,j,k)=int_adapt(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],tol=1.0e-3_WP)
+         !fs%RHO(i,j,k)=int_adapt(func=rho,start=[cfg%x(i),cfg%y(j),cfg%z(k)],end=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],ind=[i,j,k],tol=1.0e-2_WP)
       end do; end do; end do
-      ! Synchronize and apply Neumann top and bottom
+      ! Synchronize
       call cfg%sync(fs%RHO)
+      ! Apply Neumann top and bottom
       if (cfg%jproc.eq.1) then
          do j=cfg%jmino,cfg%jmin-1
             fs%RHO(:,j,:)=fs%RHO(:,cfg%jmin,:)
@@ -80,15 +75,6 @@ contains
          do j=cfg%jmax+1,cfg%jmaxo
             fs%RHO(:,j,:)=fs%RHO(:,cfg%jmax,:)
          end do
-      end if
-      ! Rescale rho to preserve its integral
-      if (mass.eq.0.0_WP) then
-         ! First time, just calculate mass
-         call cfg%integrate(fs%RHO,integral=mass)
-      else
-         ! Mass is non-zero, rescale to conserve it
-         call cfg%integrate(fs%RHO,integral=coeff); coeff=mass/coeff
-         fs%RHO=fs%RHO*coeff
       end if
    contains
       real(WP) function rho(pos,ind)
@@ -199,8 +185,7 @@ contains
       ! Initialize convergence accelerator
       initialize_accelerator: block
          call accel%initialize(cfg=cfg,storage_size=6,name='Density solver')
-         accel%beta=0.75_WP
-         accel%k_start=3
+         accel%beta=0.5_WP ! Under-relaxation improves convergence
       end block initialize_accelerator
 
       ! Initialize time tracker with 2 subiterations
@@ -242,8 +227,8 @@ contains
          ! Assign constant viscosity
          call param_read('Dynamic viscosity',visc); fs%visc=visc
          ! Define boundary conditions
-         call fs%add_bcond(name='yp',type=slip,face='y',dir=+1,canCorrect=.false.,locator=yp_locator)
-         call fs%add_bcond(name='ym',type=slip,face='y',dir=-1,canCorrect=.false.,locator=ym_locator)
+         call fs%add_bcond(name='yp',type=slip,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+         call fs%add_bcond(name='ym',type=slip,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -429,12 +414,9 @@ contains
          ! Apply time-varying Dirichlet conditions
          ! This is where time-dpt Dirichlet would be enforced
          
-         ! Perform sub-iterations
-         !do while (time%it.le.time%itmax)
-         RHOcvg=huge(1.0_WP)
-         time%it=0
-         call accel%restart(ig=fs%RHO)
-         do while (RHOcvg.gt.1.0e-3_WP)
+         ! Perform sub-iterations until RHO is sufficiently converged
+         RHOcvg=huge(1.0_WP); time%it=0; call accel%restart(ig=fs%RHO)
+         do while (RHOcvg.gt.RHOtol.and.time%it.le.time%itmax)
             
             ! ============= SCALAR SOLVER =======================
             ! Explicit calculation of drhoSC/dt from scalar equation
@@ -461,14 +443,11 @@ contains
                ! Remember RHO
                resU=fs%RHO
                ! Calculate RHO using our convergence accelerator
-               call get_rho(); fs%RHO=0.75_WP*fs%RHO+0.25_WP*resU
-               call accel%increment(fs%RHO)
-               call fs%update_sRHO()
-               ! Calculate RHO convergence
+               call get_rho(); call accel%increment(fs%RHO); call fs%update_sRHO()
+               ! Check RHO convergence
                RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
-               ! >>>> HARDCODE DIFFUSIVITY AND VISCOSITY
-               fs%visc=fs%RHO*visc
-               sc%diff=fs%RHO*diff
+               ! >>>> FORCE CONSTANT KINEMATIC DIFFUSIVITY AND VISCOSITY
+               fs%visc=fs%RHO*visc; sc%diff=fs%RHO*diff
             end block update_rho
             ! ===================================================
             
