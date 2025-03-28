@@ -58,7 +58,7 @@ contains
       ! Evaluate rho using adaptive integrator on the dual mesh
       do k=fs%cfg%kmin_,fs%cfg%kmax_+1; do j=fs%cfg%jmin_,fs%cfg%jmax_+1; do i=fs%cfg%imin_,fs%cfg%imax_+1
          ! Prepare Z data for rho calculation
-         Z=sc%SC(i-1:i,j-1:j,k-1:k)
+         Z=min(max(sc%SC(i-1:i,j-1:j,k-1:k),0.0_WP),1.0_WP)
          ! Carry out integration
          resV(i,j,k)=int_adapt(func=rho_of_x,tol=1.0e-5_WP)
          !resV(i,j,k)=int_order(func=rho_of_x,order=5)
@@ -91,7 +91,7 @@ contains
          ! Interpolate and clip Z
          myZ=wz1*(wy1*(wx1*Z(2,2,2)+wx2*Z(1,2,2))+wy2*(wx1*Z(2,1,2)+wx2*Z(1,1,2)))+wz2*(wy1*(wx1*Z(2,2,1)+wx2*Z(1,2,1))+wy2*(wx1*Z(2,1,1)+wx2*Z(1,1,1)))
          ! Evaluate Burke-Schumann flamelet
-         myZ=min(max(myZ,0.0_WP),1.0_WP)
+         !myZ=min(max(myZ,0.0_WP),1.0_WP)
          if (myZ.le.Zst) then
             rho_of_x=Zst*rho0*rhost/(rhost*(Zst-myZ)+rho0*myZ)
          else
@@ -423,7 +423,7 @@ contains
          
          ! Perform sub-iterations until RHO is sufficiently converged
          RHOcvg=huge(1.0_WP); time%it=0; call accel%restart(ig=fs%RHO)
-         do while (RHOcvg.gt.RHOtol.and.time%it.le.time%itmax)
+         do while (RHOcvg.gt.RHOtol.and.time%it.le.time%itmax.or.time%it.lt.2)
             
             ! ============= SCALAR SOLVER =======================
             ! Explicit calculation of drhoSC/dt from scalar equation
