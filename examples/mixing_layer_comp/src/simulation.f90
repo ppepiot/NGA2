@@ -4,8 +4,8 @@ module simulation
    use geometry,          only: cfg
    use ddadi_class,       only: ddadi
    use hypre_str_class,   only: hypre_str
-   use lowmach_class,     only: lowmach
-   use vdscalar_class,    only: vdscalar
+   use compress_class,    only: compress
+   use energy_class,      only: energy
    use accelerator_class, only: accelerator
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
@@ -14,12 +14,12 @@ module simulation
    implicit none
    private; public :: simulation_init,simulation_run,simulation_final
    
-   !> Single low Mach flow solver and scalar solver and corresponding time tracker
+   !> Single compressible flow solver and scalar solver and corresponding time tracker
    type(hypre_str),   public :: ps
    type(ddadi),       public :: vs
    type(ddadi),       public :: ss
-   type(lowmach),     public :: fs
-   type(vdscalar),    public :: sc
+   type(compress),    public :: fs
+   type(energy),      public :: sc
    type(timetracker), public :: time
    type(accelerator), public :: accel
    
@@ -32,11 +32,11 @@ module simulation
    real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-3_WP
    
    !> Private work arrays
-   real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resSC
-   real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi
+   real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE
+   real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi,C2
    
    !> Equation of state
-   real(WP) :: Zst,rho0,rho1,rhost
+   real(WP) :: gamma
    
    !> VISC and DIFF
    real(WP) :: visc,diff
@@ -49,57 +49,33 @@ module simulation
 contains
    
    
-   !> Obtain density from equation of state based on Burke-Schumann
+   !> Obtain density from equation of state
    subroutine get_rho()
-      use integrator, only: int_adapt,int_order
       implicit none
       integer :: i,j,k
-      real(WP), dimension(2,2,2) :: Z
-      ! Evaluate rho using adaptive integrator on the dual mesh
-      do k=fs%cfg%kmin_,fs%cfg%kmax_+1; do j=fs%cfg%jmin_,fs%cfg%jmax_+1; do i=fs%cfg%imin_,fs%cfg%imax_+1
-         ! Prepare Z data for rho calculation
-         Z=min(max(sc%SC(i-1:i,j-1:j,k-1:k),0.0_WP),1.0_WP)
-         ! Carry out integration
-         resV(i,j,k)=int_adapt(func=rho_of_x,tol=1.0e-5_WP)
-         !resV(i,j,k)=int_order(func=rho_of_x,order=5)
-      end do; end do; end do
-      ! Reinterpolate on our original mesh
-      do k=fs%cfg%kmin_,fs%cfg%kmax_; do j=fs%cfg%jmin_,fs%cfg%jmax_; do i=fs%cfg%imin_,fs%cfg%imax_
-         fs%RHO(i,j,k)=0.125_WP*sum(resV(i:i+1,j:j+1,k:k+1))
-      end do; end do; end do
-      ! Synchronize
-      call cfg%sync(fs%RHO)
-      ! Apply Neumann top and bottom
-      if (cfg%jproc.eq.1) then
-         do j=cfg%jmino,cfg%jmin-1
-            fs%RHO(:,j,:)=fs%RHO(:,cfg%jmin,:)
+      do k=fs%cfg%kmino_,fs%cfg%kmaxo_
+         do j=fs%cfg%jmino_,fs%cfg%jmaxo_
+            do i=fs%cfg%imino_,fs%cfg%imaxo_
+               fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(gamma-1.0_WP))
+            end do
          end do
-      end if
-      if (cfg%jproc.eq.cfg%npy) then
-         do j=cfg%jmax+1,cfg%jmaxo
-            fs%RHO(:,j,:)=fs%RHO(:,cfg%jmax,:)
-         end do
-      end if
-   contains
-      ! Evaluates clipped Burke-Schumann flamelet on a pre-set domain
-      real(WP) function rho_of_x(wx1,wy1,wz1)
-         implicit none
-         real(WP), intent(in) :: wx1,wy1,wz1
-         real(WP) :: wx2,wy2,wz2,myZ
-         ! Prepare tri-linear interpolation weights
-         wx2=1.0_WP-wx1; wy2=1.0_WP-wy1; wz2=1.0_WP-wz1
-         ! Interpolate and clip Z
-         myZ=wz1*(wy1*(wx1*Z(2,2,2)+wx2*Z(1,2,2))+wy2*(wx1*Z(2,1,2)+wx2*Z(1,1,2)))+wz2*(wy1*(wx1*Z(2,2,1)+wx2*Z(1,2,1))+wy2*(wx1*Z(2,1,1)+wx2*Z(1,1,1)))
-         ! Evaluate Burke-Schumann flamelet
-         !myZ=min(max(myZ,0.0_WP),1.0_WP)
-         if (myZ.le.Zst) then
-            rho_of_x=Zst*rho0*rhost/(rhost*(Zst-myZ)+rho0*myZ)
-         else
-            rho_of_x=(1.0_WP-Zst)*rhost*rho1/(rho1*(1.0_WP-myZ)+rhost*(myZ-Zst))
-         end if
-      end function rho_of_x
+      end do
    end subroutine get_rho
    
+
+   !> Obtain speed of sound squared from equation of state
+   subroutine get_c2()
+      implicit none
+      integer :: i,j,k
+      do k=fs%cfg%kmino_,fs%cfg%kmaxo_
+         do j=fs%cfg%jmino_,fs%cfg%jmaxo_
+            do i=fs%cfg%imino_,fs%cfg%imaxo_
+               C2(i,j,k)=gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
+            end do
+         end do
+      end do
+   end subroutine get_c2
+
    
    !> Initialization of problem solver
    subroutine simulation_init
@@ -108,16 +84,8 @@ contains
       
       ! Read in EOS parameters
       initialize_eos: block
-         use integrator, only: integrator_init
          ! EOS parameters
-         call param_read('rho0',rho0)
-         call param_read('rho1',rho1)
-         call param_read('rhost',rhost)
-         call param_read('Zst',Zst)
-         if (Zst.le.0.0_WP) Zst=0.0_WP+epsilon(Zst)
-         if (Zst.ge.1.0_WP) Zst=1.0_WP-epsilon(Zst)
-         ! Prepare quadrature for integrating density
-         call integrator_init()
+         call param_read('gamma',gamma)
       end block initialize_eos
       
       ! Initialize disturbances
@@ -180,13 +148,14 @@ contains
       
       ! Allocate work arrays
       allocate_work_arrays: block
-         allocate(resU (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(resV (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(resW (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Ui   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Vi   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Wi   (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(resSC(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resU(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resV(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resW(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Ui  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Vi  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Wi  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(resE(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(C2  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
       
       ! Initialize convergence accelerator
@@ -205,11 +174,11 @@ contains
          time%itmin=2
       end block initialize_timetracker
       
-      ! Create a scalar solver
-      create_scalar: block
-         use vdscalar_class, only: dirichlet,neumann
-         ! Create scalar solver
-         call sc%initialize(cfg=cfg,name='MixFrac')
+      ! Create a energy solver
+      create_energy: block
+         use energy_class, only: dirichlet,neumann
+         ! Create energy solver
+         call sc%initialize(cfg=cfg,name='Energy')
          ! Add slight backward bias to CN scheme
          sc%theta=sc%theta!+1.0e-2_WP
          ! Define boundary conditions
@@ -219,17 +188,17 @@ contains
          call param_read('Dynamic diffusivity',diff)
          sc%diff=diff
          ! Configure implicit scalar solver
-         ss=ddadi(cfg=cfg,name='Scalar',nst=13)
+         ss=ddadi(cfg=cfg,name='Energy',nst=13)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
-      end block create_scalar
+      end block create_energy
       
-      ! Create a low-Mach flow solver with bconds
+      ! Create a compressible flow solver with bconds
       create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
-         use lowmach_class,   only: slip
+         use compress_class,   only: slip
          ! Create flow solver
-         call fs%initialize(cfg=cfg,name='Variable density low Mach NS')
+         call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
          ! Assign constant viscosity
@@ -248,11 +217,11 @@ contains
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
       end block create_velocity_solver
       
-      ! Initialize our mixture fraction field
-      initialize_scalar: block
-         integer :: i,j,k,nX,nZ
+      ! Initialize our energy field
+      initialize_energy: block
+         integer  :: i,j,k,nX,nZ
          real(WP) :: y,delta
-         call param_read('Scalar thickness',delta,default=1.0_WP)
+         call param_read('Energy thickness',delta,default=1.0_WP)
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
@@ -265,11 +234,11 @@ contains
                      end do
                   end do
                   ! Hyperbolic tangent
-                  sc%SC(i,j,k)=0.5_WP*(1.0_WP+tanh(y/delta))
+                  sc%E(i,j,k)=0.5_WP*(1.0_WP+tanh(y/delta))
                end do
             end do
          end do
-      end block initialize_scalar
+      end block initialize_energy
       
       ! Initialize our velocity field
       initialize_velocity: block
@@ -316,7 +285,7 @@ contains
          call ens_out%add_scalar('pressure',fs%P)
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
-         call ens_out%add_scalar('mixfrac',sc%SC)
+         call ens_out%add_scalar('energy',sc%E)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -337,9 +306,9 @@ contains
          call mfile%add_column(fs%Vmax,'Vmax')
          call mfile%add_column(fs%Wmax,'Wmax')
          call mfile%add_column(fs%Pmax,'Pmax')
-         call mfile%add_column(sc%SCmax,'SCmax')
-         call mfile%add_column(sc%SCmin,'SCmin')
-         call mfile%add_column(sc%rhoSCint,'rhoSCint')
+         call mfile%add_column(sc%Emax,'Emax')
+         call mfile%add_column(sc%Emin,'Emin')
+         call mfile%add_column(sc%rhoEint,'rhoEint')
          call mfile%add_column(fs%RHOmax,'RHOmax')
          call mfile%add_column(fs%RHOmin,'RHOmin')
          call mfile%add_column(fs%RHOint,'RHOint')
@@ -409,8 +378,8 @@ contains
          call time%adjust_dt()
          call time%increment()
          
-         ! Remember old scalar, velocity, and density
-         sc%SCold=sc%SC
+         ! Remember old energy, velocity, and density
+         sc%Eold=sc%E
          fs%RHOold=fs%RHO
          fs%sRHOXold=fs%sRHOX
          fs%sRHOYold=fs%sRHOY
@@ -426,24 +395,30 @@ contains
          RHOcvg=huge(1.0_WP); time%it=0; call accel%restart(ig=fs%RHO)
          do while (RHOcvg.gt.RHOtol.and.time%it.lt.time%itmax.or.time%it.lt.time%itmin)
             
-            ! ============= SCALAR SOLVER =======================
-            ! Explicit calculation of drhoSC/dt from scalar equation
-            call sc%get_drhoSCdt(resSC,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            ! ============= ENERGY SOLVER =======================
+            ! Explicit calculation of drhoE/dt from energy equation
+            call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+
+            ! Add pressure dilatation term, storing it
+            call fs%get_pdil(resU); resE=resE+resU
             
             ! Assemble explicit residual
-            resSC=time%dt*resSC-(fs%RHO*sc%SC-fs%RHOold*sc%SCold)
+            resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
             
             ! Form implicit residual
-            call sc%solve_implicit(time%dt,resSC,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
-            sc%SC=sc%SC+resSC
+            sc%E=sc%E+resE
+            
+            ! Remember pressure dilatation in resE
+            resE=resU
             
             ! Apply other boundary conditions on the resulting field
             call sc%apply_bcond(time%t,time%dt)
             ! ===================================================
             
-            ! ============ UPDATE DENSITY========================
+            ! ============ UPDATE DENSITY AND C2 ================
             update_rho: block
                use mpi_f08,  only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
                use parallel, only: MPI_REAL_WP
@@ -456,6 +431,8 @@ contains
                RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
                ! >>>> FORCE CONSTANT KINEMATIC DIFFUSIVITY AND VISCOSITY
                fs%visc=fs%RHO*visc; sc%diff=fs%RHO*diff
+               ! Compute speed of sound squared
+               call get_c2()
             end block update_rho
             ! ===================================================
             
@@ -494,12 +471,11 @@ contains
             ! Correct MFR
             call fs%correct_mfr(dt=time%dt)
             ! Solve Poisson equation
-            call fs%update_laplacian()
+            call fs%update_laplacian(dt=time%dt,c2=C2)
             call fs%get_div(dt=time%dt)
             fs%psolv%rhs=-fs%cfg%vol*fs%div/time%dt
             fs%psolv%sol=0.0_WP
             call fs%psolv%solve()
-            call fs%shift_p(fs%psolv%sol)
             call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
             fs%P=fs%P+fs%psolv%sol
             fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
@@ -509,6 +485,10 @@ contains
             call fs%rho_divide()
             ! Recover U
             call fs%get_U()
+            ! Also update internal energy (resE contains the predicted pressure dilatation term)
+            sc%E=sc%E-time%dt*resE/fs%RHO
+            call fs%get_pdil(resE)
+            sc%E=sc%E+time%dt*resE/fs%RHO
             ! ===================================================
             
             ! Increment sub-iteration
@@ -538,7 +518,7 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(resSC,resU,resV,resW,Ui,Vi,Wi)
+      deallocate(resE,resU,resV,resW,Ui,Vi,Wi)
    end subroutine simulation_final
    
    

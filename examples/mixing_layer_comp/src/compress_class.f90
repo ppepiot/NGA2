@@ -138,6 +138,7 @@ module compress_class
       procedure :: update_laplacian                       !< Update the pressure Laplacian div( f(rho) grad(.))
       procedure :: get_div                                !< Calculate velocity divergence
       procedure :: get_pgrad                              !< Calculate pressure gradient
+      procedure :: get_pdil                               !< Calculate the pressure dilatation term
       procedure :: get_cfl                                !< Calculate maximum CFL
       procedure :: get_max                                !< Calculate maximum field values
       procedure :: interp_vel                             !< Calculate interpolated velocity
@@ -1231,7 +1232,7 @@ contains
                   end do
                end do
                ! Add temporal term
-               this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)-1.0_WP/(dt**2*c2)
+               this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)+1.0_WP/(dt**2*c2(i,j,k))
                ! Scale Laplacian by cell volume
                this%psolv%opr(:,i,j,k)=-this%psolv%opr(:,i,j,k)*this%cfg%vol(i,j,k)
             end do
@@ -1301,7 +1302,28 @@ contains
       call this%cfg%sync(Pgradz)
    end subroutine get_pgrad
    
-
+   
+   !> Calculate the pressure dilatation term
+   subroutine get_pdil(this,pdil)
+      implicit none
+      class(compress), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: pdil   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: i,j,k
+      pdil=0.0_WP
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               pdil(i,j,k)=-this%P(i,j,k)*(sum(this%divp_x(:,i,j,k)*this%Umid(i:i+1,j,k))+&
+               &                           sum(this%divp_y(:,i,j,k)*this%Vmid(i,j:j+1,k))+&
+               &                           sum(this%divp_z(:,i,j,k)*this%Wmid(i,j,k:k+1)))
+            end do
+         end do
+      end do
+      ! Sync it
+      call this%cfg%sync(pdil)
+   end subroutine get_pdil
+   
+   
    !> Calculate the interpolated velocity, including overlap and ghosts
    subroutine interp_vel(this,Ui,Vi,Wi)
       implicit none
@@ -1888,46 +1910,45 @@ contains
    
    !> Calculate the max of our fields
    subroutine get_max(this)
-      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MIN,MPI_MAX
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MIN,MPI_MAX,MPI_IN_PLACE
       use parallel, only: MPI_REAL_WP
       implicit none
       class(compress), intent(inout) :: this
       integer :: i,j,k,ierr
-      real(WP) :: my_RHOmin,my_RHOmax,my_Umax,my_Vmax,my_Wmax,my_Pmax,my_divmax
       
       ! Compute total mass
       call this%cfg%integrate(this%RHO,integral=this%RHOint)
       
       ! Calculate extrema
-      my_RHOmin=+huge(1.0_WP)
-      my_RHOmax=-huge(1.0_WP)
-      my_Pmin=+huge(1.0_WP)
-      my_Pmax=-huge(1.0_WP)
-      my_Umax=0.0_WP; my_Vmax=0.0_WP; my_Wmax=0.0_WP; my_divmax=0.0_WP
+      this%RHOmin=+huge(1.0_WP)
+      this%RHOmax=-huge(1.0_WP)
+      this%Pmin=+huge(1.0_WP)
+      this%Pmax=-huge(1.0_WP)
+      this%Umax=0.0_WP; this%Vmax=0.0_WP; this%Wmax=0.0_WP; this%divmax=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               my_RHOmin=min(my_RHOmin,this%RHO(i,j,k))
-               my_RHOmax=max(my_RHOmax,this%RHO(i,j,k))
-               if (this%cfg%VF(i,j,k).gt.0.0_WP) my_Pmin=min(my_Pmin,this%P(i,j,k))
-               if (this%cfg%VF(i,j,k).gt.0.0_WP) my_Pmax=max(my_Pmax,this%P(i,j,k))
-               my_Umax=max(my_Umax,abs(this%U(i,j,k)),abs(this%Umid(i,j,k)))
-               my_Vmax=max(my_Vmax,abs(this%V(i,j,k)),abs(this%Vmid(i,j,k)))
-               my_Wmax=max(my_Wmax,abs(this%W(i,j,k)),abs(this%Wmid(i,j,k)))
-               if (this%cfg%VF(i,j,k).gt.0.0_WP) my_divmax=max(my_divmax,abs(this%div(i,j,k)))
+               this%RHOmin=min(this%RHOmin,this%RHO(i,j,k))
+               this%RHOmax=max(this%RHOmax,this%RHO(i,j,k))
+               if (this%cfg%VF(i,j,k).gt.0.0_WP) this%Pmin=min(this%Pmin,this%P(i,j,k))
+               if (this%cfg%VF(i,j,k).gt.0.0_WP) this%Pmax=max(this%Pmax,this%P(i,j,k))
+               this%Umax=max(this%Umax,abs(this%U(i,j,k)),abs(this%Umid(i,j,k)))
+               this%Vmax=max(this%Vmax,abs(this%V(i,j,k)),abs(this%Vmid(i,j,k)))
+               this%Wmax=max(this%Wmax,abs(this%W(i,j,k)),abs(this%Wmid(i,j,k)))
+               if (this%cfg%VF(i,j,k).gt.0.0_WP) this%divmax=max(this%divmax,abs(this%div(i,j,k)))
             end do
          end do
       end do
       
       ! Get the parallel max
-      call MPI_ALLREDUCE(my_RHOmin,this%RHOmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_RHOmax,this%RHOmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Umax  ,this%Umax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Vmax  ,this%Vmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Wmax  ,this%Wmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pmin  ,this%Pmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pmax  ,this%Pmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_divmax,this%divmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Umax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Vmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Wmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Pmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Pmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%divmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       
    end subroutine get_max
    
