@@ -219,12 +219,13 @@ contains
       ! Initialize our initial conditions
       initial_conditions: block
          integer :: i,j,k,nX,nZ
-         real(WP) :: y,Ma,delta,rho1,rho2
-         ! Read in Mach number
-         call param_read('Mach number',Ma); fs%P=1.0_WP/(Gamma*Ma**2)
+         real(WP) :: y,delta,rho1,rho2
+         ! Set pressure from Mach number
+         fs%P=1.0_WP/(Gamma*Mach**2)
+         ! Read in density profile
          call param_read('Density thickness',delta,default=1.0_WP)
-         call param_read('rho1',rho1,default=1.0_WP)
-         call param_read('rho2',rho2,default=1.0_WP)
+         call param_read('Density top',rho1,default=1.0_WP)
+         call param_read('Density bottom',rho2,default=1.0_WP)
          ! Initialize density field using tanh and corresponding energy from EOS
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
