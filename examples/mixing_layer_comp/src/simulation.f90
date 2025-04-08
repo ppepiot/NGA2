@@ -36,10 +36,7 @@ module simulation
    real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi,C2
    
    !> Equation of state
-   real(WP) :: gamma
-   
-   !> VISC and DIFF
-   real(WP) :: visc,diff
+   real(WP) :: Gamma,Mach
    
    !> Initial perturbations
    integer :: nwaveX,nwaveZ
@@ -56,7 +53,7 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(gamma-1.0_WP))
+               fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
             end do
          end do
       end do
@@ -70,7 +67,7 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               C2(i,j,k)=gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
+               C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
             end do
          end do
       end do
@@ -85,7 +82,8 @@ contains
       ! Read in EOS parameters
       initialize_eos: block
          ! EOS parameters
-         call param_read('gamma',gamma)
+         call param_read('Gamma',Gamma)
+         call param_read('Mach',Mach)
       end block initialize_eos
       
       ! Initialize disturbances
@@ -174,35 +172,17 @@ contains
          time%itmin=2
       end block initialize_timetracker
       
-      ! Create a energy solver
-      create_energy: block
-         use energy_class, only: dirichlet,neumann
-         ! Create energy solver
-         call sc%initialize(cfg=cfg,name='Energy')
-         ! Add slight backward bias to CN scheme
-         sc%theta=sc%theta!+1.0e-2_WP
-         ! Define boundary conditions
-         call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
-         ! Assign constant diffusivity
-         call param_read('Dynamic diffusivity',diff)
-         sc%diff=diff
-         ! Configure implicit scalar solver
-         ss=ddadi(cfg=cfg,name='Energy',nst=13)
-         ! Setup the solver
-         call sc%setup(implicit_solver=ss)
-      end block create_energy
-      
       ! Create a compressible flow solver with bconds
       create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
-         use compress_class,   only: slip
+         use compress_class,  only: slip
+         real(WP) :: Re
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
-         ! Assign constant viscosity
-         call param_read('Dynamic viscosity',visc); fs%visc=visc
+         ! Assign constant viscosity based on Reynolds number
+         call param_read('Reynolds number',Re); fs%visc=1.0_WP/Re
          ! Define boundary conditions
          call fs%add_bcond(name='yp',type=slip,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
          call fs%add_bcond(name='ym',type=slip,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
@@ -216,39 +196,45 @@ contains
          ! Setup the solver
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
       end block create_velocity_solver
+
+      ! Create a energy solver
+      create_energy: block
+         use energy_class, only: dirichlet,neumann
+         real(WP) :: Pr
+         ! Create energy solver
+         call sc%initialize(cfg=cfg,name='Energy')
+         ! Define boundary conditions
+         call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
+         call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
+         ! Assign constant diffusivity
+         sc%Cv=1.0_WP/(Gamma*(Gamma-1.0_WP)*Mach**2)
+         ! Assign constant diffusivity
+         call param_read('Prandtl number',Pr); sc%diff=sc%Cv*Gamma*fs%visc/Pr
+         ! Configure implicit scalar solver
+         ss=ddadi(cfg=cfg,name='Energy',nst=13)
+         ! Setup the solver
+         call sc%setup(implicit_solver=ss)
+      end block create_energy
       
-      ! Initialize our energy field
-      initialize_energy: block
-         integer  :: i,j,k,nX,nZ
-         real(WP) :: y,delta
-         call param_read('Energy thickness',delta,default=1.0_WP)
+      ! Initialize our initial conditions
+      initial_conditions: block
+         integer :: i,j,k,nX,nZ
+         real(WP) :: y,Ma,delta,rho1,rho2
+         ! Read in Mach number
+         call param_read('Mach number',Ma); fs%P=1.0_WP/(Gamma*Ma**2)
+         call param_read('Density thickness',delta,default=1.0_WP)
+         call param_read('rho1',rho1,default=1.0_WP)
+         call param_read('rho2',rho2,default=1.0_WP)
+         ! Initialize density field using tanh and corresponding energy from EOS
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
-                  ! Distance to the nominal interface position
-                  y=cfg%ym(j)
-                  ! Perturb interface position
-                  do nX=1,nwaveX
-                     do nZ=1,nwaveZ
-                        y=y+wamp*cos(wnumbX(nX)*(cfg%xm(i)-wshiftX(nX)))*cos(wnumbZ(nZ)*(cfg%zm(k)-wshiftZ(nZ)))
-                     end do
-                  end do
-                  ! Hyperbolic tangent
-                  sc%E(i,j,k)=0.5_WP*(1.0_WP+tanh(y/delta))
+                  fs%RHO(i,j,k)=0.5_WP*(rho1+rho2)+0.5_WP*(rho2-rho1)*tanh(y/delta)
+                  sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
                end do
             end do
          end do
-      end block initialize_energy
-      
-      ! Initialize our velocity field
-      initialize_velocity: block
-         integer :: i,j,k,nX,nZ
-         real(WP) :: y,delta
-         ! Initialize density from scalar
-         call get_rho(); call fs%update_sRHO()
-         fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
          ! Initialize velocity field
-         call param_read('Velocity thickness',delta,default=1.0_WP)
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
@@ -261,18 +247,19 @@ contains
                      end do
                   end do
                   ! Hyperbolic tangent
-                  fs%U(i,j,k)=tanh(y/delta)
+                  fs%U(i,j,k)=tanh(y)
                end do
             end do
          end do
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid
+         call fs%update_sRHO(); fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
          call fs%get_Umid()
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
-      end block initialize_velocity
+      end block initial_conditions
       
       ! Add Ensight output
       create_ensight: block
@@ -429,8 +416,6 @@ contains
                call get_rho(); call accel%increment(fs%RHO); call fs%update_sRHO()
                ! Check RHO convergence
                RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
-               ! >>>> FORCE CONSTANT KINEMATIC DIFFUSIVITY AND VISCOSITY
-               fs%visc=fs%RHO*visc; sc%diff=fs%RHO*diff
                ! Compute speed of sound squared
                call get_c2()
             end block update_rho
