@@ -1232,7 +1232,7 @@ contains
                   end do
                end do
                ! Add temporal term
-               this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)+1.0_WP/(dt**2*c2(i,j,k))
+               this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,0),i,j,k)-1.0_WP/(dt**2*c2(i,j,k))
                ! Scale Laplacian by cell volume
                this%psolv%opr(:,i,j,k)=-this%psolv%opr(:,i,j,k)*this%cfg%vol(i,j,k)
             end do

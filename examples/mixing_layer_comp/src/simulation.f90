@@ -53,7 +53,8 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
+               !fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
+               fs%RHO(i,j,k)=1.0_WP/(sc%E(i,j,k)*Gamma*Mach**2*(Gamma-1.0_WP))
             end do
          end do
       end do
@@ -67,7 +68,8 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
+               !C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
+               C2(i,j,k)=huge(1.0_WP)
             end do
          end do
       end do
@@ -83,7 +85,7 @@ contains
       initialize_eos: block
          ! EOS parameters
          call param_read('Gamma',Gamma)
-         call param_read('Mach',Mach)
+         call param_read('Mach number',Mach)
       end block initialize_eos
       
       ! Initialize disturbances
@@ -248,7 +250,7 @@ contains
                      end do
                   end do
                   ! Hyperbolic tangent
-                  fs%U(i,j,k)=tanh(y)
+                  fs%U(i,j,k)=0.5_WP*tanh(y)
                end do
             end do
          end do
@@ -385,25 +387,25 @@ contains
             
             ! ============= ENERGY SOLVER =======================
             ! Explicit calculation of drhoE/dt from energy equation
-            call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
-
+            !call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            
             ! Add pressure dilatation term, storing it
-            call fs%get_pdil(resU); resE=resE+resU
+            !call fs%get_pdil(resU); resE=resE+resU
             
             ! Assemble explicit residual
-            resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
+            !resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
             
             ! Form implicit residual
-            call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            !call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
-            sc%E=sc%E+resE
+            !sc%E=sc%E+resE
             
             ! Remember pressure dilatation in resE
-            resE=resU
+            !resE=resU
             
             ! Apply other boundary conditions on the resulting field
-            call sc%apply_bcond(time%t,time%dt)
+            !call sc%apply_bcond(time%t,time%dt)
             ! ===================================================
             
             ! ============ UPDATE DENSITY AND C2 ================
@@ -472,9 +474,9 @@ contains
             ! Recover U
             call fs%get_U()
             ! Also update internal energy (resE contains the predicted pressure dilatation term)
-            sc%E=sc%E-time%dt*resE/fs%RHO
-            call fs%get_pdil(resE)
-            sc%E=sc%E+time%dt*resE/fs%RHO
+            !sc%E=sc%E-time%dt*resE/fs%RHO
+            !call fs%get_pdil(resE)
+            !sc%E=sc%E+time%dt*resE/fs%RHO
             ! ===================================================
             
             ! Increment sub-iteration
