@@ -11,7 +11,7 @@ nz : 1
 
 # Fluid properties
 Gamma :           1.4
-Mach number :     0.2
+Mach number :     0.01
 Reynolds number : 100
 Prandtl number :  0.7
 

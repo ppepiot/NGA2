@@ -457,7 +457,7 @@ contains
             ! Get rhoU/rhoV/rhoW
             call fs%rho_multiply()
             ! Correct MFR
-            call fs%correct_mfr(dt=time%dt)
+            !call fs%correct_mfr(dt=time%dt)
             ! Solve Poisson equation
             call fs%update_laplacian(dt=time%dt,c2=C2)
             call fs%get_div(dt=time%dt)
@@ -474,9 +474,7 @@ contains
             ! Recover U
             call fs%get_U()
             ! Also update internal energy (resE contains the predicted pressure dilatation term)
-            sc%E=sc%E-time%dt*resE/fs%RHO
-            call fs%get_pdil(resE)
-            sc%E=sc%E+time%dt*resE/fs%RHO
+            resU=resE; call fs%get_pdil(resE); sc%E=sc%E+time%dt*(resE-resU)/fs%RHO
             ! ===================================================
             
             ! Increment sub-iteration
