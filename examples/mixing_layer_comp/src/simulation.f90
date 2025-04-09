@@ -53,8 +53,8 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               !fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
-               fs%RHO(i,j,k)=1.0_WP/(sc%E(i,j,k)*Gamma*Mach**2*(Gamma-1.0_WP))
+               fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
+               !fs%RHO(i,j,k)=1.0_WP/(sc%E(i,j,k)*Gamma*Mach**2*(Gamma-1.0_WP))
             end do
          end do
       end do
@@ -68,8 +68,8 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               !C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
-               C2(i,j,k)=huge(1.0_WP)
+               C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
+               !C2(i,j,k)=huge(1.0_WP)
             end do
          end do
       end do
@@ -389,8 +389,8 @@ contains
             ! Explicit calculation of drhoE/dt from energy equation
             call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
-            ! Add pressure dilatation term, storing it
-            call fs%get_pdil(resU); resE=resE+resU
+            ! Add pressure dilatation term
+            call fs%get_pdil(P=fs%P,Pdil=resU); resE=resE+resU
             
             ! Assemble explicit residual
             resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
@@ -400,9 +400,6 @@ contains
             
             ! Apply this residual
             sc%E=sc%E+resE
-            
-            ! Remember pressure dilatation in resE
-            resE=resU
             
             ! Apply other boundary conditions on the resulting field
             call sc%apply_bcond(time%t,time%dt)
@@ -416,7 +413,8 @@ contains
                ! Remember RHO
                resU=fs%RHO
                ! Calculate RHO using our convergence accelerator
-               call get_rho(); call accel%increment(fs%RHO); call fs%update_sRHO()
+               !call get_rho(); call accel%increment(fs%RHO); call fs%update_sRHO()
+               call get_rho(); fs%RHO=0.75_WP*(fs%RHO+resU); call fs%update_sRHO()
                ! Check RHO convergence
                RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
                ! Compute speed of sound squared
@@ -473,8 +471,8 @@ contains
             call fs%rho_divide()
             ! Recover U
             call fs%get_U()
-            ! Also update internal energy (resE contains the predicted pressure dilatation term)
-            resU=resE; call fs%get_pdil(resE); sc%E=sc%E+time%dt*(resE-resU)/fs%RHO
+            ! Also update internal energy
+            call fs%get_pdil(P=fs%psolv%sol,Pdil=resE); sc%E=sc%E+time%dt*resE/fs%RHO
             ! ===================================================
             
             ! Increment sub-iteration

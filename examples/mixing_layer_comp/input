@@ -11,12 +11,12 @@ nz : 1
 
 # Fluid properties
 Gamma :           1.4
-Mach number :     0.01
-Reynolds number : 100
+Mach number :     0.6
+Reynolds number : 200
 Prandtl number :  0.7
 
 # Layer densities
-Density top :       2
+Density top :       1
 Density bottom :    1
 Density thickness : 1
 
@@ -33,7 +33,7 @@ wshiftZ : -8.34759E-02 -2.91318E-02  7.96336E-02  2.36764E-02 -6.54504E-02 -4.67
 # Time integration
 Max timestep size : 1e-1
 Max cfl number :    0.8
-Subiterations :     20
+Subiterations :     50
 
 # Pressure solver
 Pressure tolerance : 1e-6

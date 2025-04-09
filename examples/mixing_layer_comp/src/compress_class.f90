@@ -1304,23 +1304,24 @@ contains
    
    
    !> Calculate the pressure dilatation term
-   subroutine get_pdil(this,pdil)
+   subroutine get_pdil(this,P,Pdil)
       implicit none
       class(compress), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: pdil   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: P      !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: Pdil   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
-      pdil=0.0_WP
+      Pdil=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               pdil(i,j,k)=-this%P(i,j,k)*(sum(this%divp_x(:,i,j,k)*this%Umid(i:i+1,j,k))+&
-               &                           sum(this%divp_y(:,i,j,k)*this%Vmid(i,j:j+1,k))+&
-               &                           sum(this%divp_z(:,i,j,k)*this%Wmid(i,j,k:k+1)))
+               pdil(i,j,k)=-(sum(this%divp_x(:,i,j,k)*this%Umid(i:i+1,j,k))+&
+               &             sum(this%divp_y(:,i,j,k)*this%Vmid(i,j:j+1,k))+&
+               &             sum(this%divp_z(:,i,j,k)*this%Wmid(i,j,k:k+1)))*P(i,j,k)
             end do
          end do
       end do
       ! Sync it
-      call this%cfg%sync(pdil)
+      call this%cfg%sync(Pdil)
    end subroutine get_pdil
    
    
