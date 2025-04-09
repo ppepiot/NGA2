@@ -29,7 +29,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-3_WP
+   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-5_WP
    
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE
@@ -161,9 +161,9 @@ contains
       ! Initialize convergence accelerator
       initialize_accelerator: block
          call accel%initialize(cfg=cfg,storage_size=6,name='Density solver')
-         accel%beta=0.75_WP ! Under-relaxation improves convergence
+         accel%beta=1.0_WP ! Under-relaxation may improve convergence
       end block initialize_accelerator
-
+      
       ! Initialize time tracker with 2 subiterations
       initialize_timetracker: block
          time=timetracker(amRoot=cfg%amRoot)
@@ -406,20 +406,14 @@ contains
             ! ===================================================
             
             ! ============ UPDATE DENSITY AND C2 ================
-            update_rho: block
-               use mpi_f08,  only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
-               use parallel, only: MPI_REAL_WP
-               integer :: ierr
-               ! Remember RHO
-               resU=fs%RHO
-               ! Calculate RHO using our convergence accelerator
-               !call get_rho(); call accel%increment(fs%RHO); call fs%update_sRHO()
-               call get_rho(); fs%RHO=0.75_WP*(fs%RHO+resU); call fs%update_sRHO()
-               ! Check RHO convergence
-               RHOcvg=maxval(abs(resU-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
-               ! Compute speed of sound squared
-               call get_c2()
-            end block update_rho
+            ! Remember RHO
+            resE=fs%RHO
+            
+            ! Calculate RHO predictor
+            call get_rho(); call fs%update_sRHO()
+            
+            ! Compute speed of sound squared
+            call get_c2()
             ! ===================================================
             
             ! ============ VELOCITY SOLVER ======================
@@ -473,9 +467,18 @@ contains
             ! Recover U
             call fs%get_U()
             ! Also update internal energy
-            call fs%get_pdil(P=fs%psolv%sol,Pdil=resE); sc%E=sc%E+time%dt*resE/fs%RHO
+            call fs%get_pdil(P=fs%psolv%sol,Pdil=resU); sc%E=sc%E+time%dt*resU/fs%RHO
             ! ===================================================
             
+            ! ============= CVG CHECKING ========================
+            residual_check: block
+               use mpi_f08,  only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
+               use parallel, only: MPI_REAL_WP
+               integer :: ierr
+               RHOcvg=maxval(abs(resE-fs%RHO)/fs%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,RHOcvg,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
+            end block residual_check
+            ! ===================================================
+
             ! Increment sub-iteration
             time%it=time%it+1
             
