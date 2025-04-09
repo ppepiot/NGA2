@@ -387,25 +387,25 @@ contains
             
             ! ============= ENERGY SOLVER =======================
             ! Explicit calculation of drhoE/dt from energy equation
-            !call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Add pressure dilatation term, storing it
-            !call fs%get_pdil(resU); resE=resE+resU
+            call fs%get_pdil(resU); resE=resE+resU
             
             ! Assemble explicit residual
-            !resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
+            resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
             
             ! Form implicit residual
-            !call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
-            !sc%E=sc%E+resE
+            sc%E=sc%E+resE
             
             ! Remember pressure dilatation in resE
-            !resE=resU
+            resE=resU
             
             ! Apply other boundary conditions on the resulting field
-            !call sc%apply_bcond(time%t,time%dt)
+            call sc%apply_bcond(time%t,time%dt)
             ! ===================================================
             
             ! ============ UPDATE DENSITY AND C2 ================
@@ -474,9 +474,9 @@ contains
             ! Recover U
             call fs%get_U()
             ! Also update internal energy (resE contains the predicted pressure dilatation term)
-            !sc%E=sc%E-time%dt*resE/fs%RHO
-            !call fs%get_pdil(resE)
-            !sc%E=sc%E+time%dt*resE/fs%RHO
+            sc%E=sc%E-time%dt*resE/fs%RHO
+            call fs%get_pdil(resE)
+            sc%E=sc%E+time%dt*resE/fs%RHO
             ! ===================================================
             
             ! Increment sub-iteration
