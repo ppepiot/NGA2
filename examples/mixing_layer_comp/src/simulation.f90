@@ -106,9 +106,11 @@ contains
             call param_read('wnumbX',wnumbX)
             call param_read('wshiftX',wshiftX)
          else
-            nwaveX=6
+            nwaveX=10
             allocate(wnumbX(nwaveX),wshiftX(nwaveX))
-            wnumbX=[3.0_WP,4.0_WP,5.0_WP,6.0_WP,7.0_WP,8.0_WP]*twoPi/cfg%xL
+            do n=1,nwaveX
+               wnumbX(n)=real(n,WP)*twoPi/cfg%xL
+            end do
             if (cfg%amRoot) then
                do n=1,nwaveX
                   wshiftX(n)=random_uniform(lo=-0.5_WP*cfg%xL,hi=+0.5_WP*cfg%xL)
@@ -123,9 +125,11 @@ contains
             call param_read('wnumbZ',wnumbZ)
             call param_read('wshiftZ',wshiftZ)
          else
-            nwaveZ=6
+            nwaveZ=10
             allocate(wnumbZ(nwaveZ),wshiftZ(nwaveZ))
-            wnumbZ=[3.0_WP,4.0_WP,5.0_WP,6.0_WP,7.0_WP,8.0_WP]*twoPi/cfg%zL
+            do n=1,nwaveZ
+               wnumbZ(n)=real(n,WP)*twoPi/cfg%zL
+            end do
             if (cfg%amRoot) then
                do n=1,nwaveZ
                   wshiftZ(n)=random_uniform(lo=-0.5_WP*cfg%zL,hi=+0.5_WP*cfg%zL)
@@ -255,21 +259,11 @@ contains
                end do
             end do
          end do
-         do k=cfg%kmino_,cfg%kmaxo_
-            do j=cfg%jmino_,cfg%jmaxo_
-               do i=cfg%imino_,cfg%imaxo_
-                  fs%psolv%rhs(i,j,k)=-fs%cfg%vol(i,j,k)*(sum(fs%divp_x(:,i,j,k)*fs%U(i:i+1,j,k))+&
-                  &                                       sum(fs%divp_y(:,i,j,k)*fs%V(i,j:j+1,k))+&
-                  &                                       sum(fs%divp_z(:,i,j,k)*fs%W(i,j,k:k+1)))
-                  fs%psolv%sol(i,j,k)=0.0_WP
-               end do
-            end do
-         end do
-         call fs%psolv%solve()
-         call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
-         fs%U=fs%U-resU
-         fs%V=fs%V-resV
-         fs%W=fs%W-resW
+         call cfg%sync(fs%U) ! Only needed if U above isn't truly periodic...
+         do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
+            fs%psolv%rhs(i,j,k)=-fs%cfg%vol(i,j,k)*sum(fs%divp_x(:,i,j,k)*fs%U(i:i+1,j,k))
+         end do; end do; end do
+         call fs%psolv%solve(); call fs%get_pgrad(fs%psolv%sol,resU,resV,resW); fs%U=fs%U-resU; fs%V=fs%V-resV; fs%W=fs%W-resW
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid

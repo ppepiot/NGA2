@@ -16,19 +16,12 @@ Reynolds number : 200
 Prandtl number :  0.7
 
 # Layer densities
-Density top :       1
+Density top :       2
 Density bottom :    1
 Density thickness : 1
 
 # Disturbance amplitude
-Wave amplitude : 0.1
-
-NwaveX  :  6
-wnumbX  :  1.88496E-01  2.51327E-01  3.14159E-01  3.76991E-01  4.39823E-01  5.02655E-01
-wshiftX :  3.49079E+01  1.53296E+01 -2.81199E+01  4.98116E+01  1.74395E+01  1.65963E+01
-NwaveZ  :  6
-wnumbZ  :  1.88496E-01  2.51327E-01  3.14159E-01  3.76991E-01  4.39823E-01  5.02655E-01
-wshiftZ :  3.14112E+01  2.05803E+01 -2.57530E+01  3.65332E+01 -1.10563E+01  2.47545E+01
+Wave amplitude : 1e-2
 
 # Time integration
 Max timestep size : 0.5
