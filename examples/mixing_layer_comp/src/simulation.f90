@@ -33,7 +33,7 @@ module simulation
    
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE
-   real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi,C2
+   real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi,C2,Ma
    
    !> Equation of state
    real(WP) :: Gamma,Mach
@@ -156,6 +156,7 @@ contains
          allocate(Wi  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resE(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(C2  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(Ma  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
       
       ! Initialize convergence accelerator
@@ -237,7 +238,7 @@ contains
                end do
             end do
          end do
-         ! Initialize velocity field
+         ! Initialize velocity field, corrected to be divergence-free
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
@@ -254,6 +255,21 @@ contains
                end do
             end do
          end do
+         do k=cfg%kmino_,cfg%kmaxo_
+            do j=cfg%jmino_,cfg%jmaxo_
+               do i=cfg%imino_,cfg%imaxo_
+                  fs%psolv%rhs(i,j,k)=-fs%cfg%vol(i,j,k)*(sum(fs%divp_x(:,i,j,k)*fs%U(i:i+1,j,k))+&
+                  &                                       sum(fs%divp_y(:,i,j,k)*fs%V(i,j:j+1,k))+&
+                  &                                       sum(fs%divp_z(:,i,j,k)*fs%W(i,j,k:k+1)))
+                  fs%psolv%sol(i,j,k)=0.0_WP
+               end do
+            end do
+         end do
+         call fs%psolv%solve()
+         call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
+         fs%U=fs%U-resU
+         fs%V=fs%V-resV
+         fs%W=fs%W-resW
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid
@@ -262,6 +278,8 @@ contains
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
+         ! Compute local Mach number
+         call get_c2(); Ma=sqrt((Ui**2+Vi**2+Wi**2)/C2)
       end block initial_conditions
       
       ! Add Ensight output
@@ -276,6 +294,7 @@ contains
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
          call ens_out%add_scalar('energy',sc%E)
+         call ens_out%add_scalar('Mach',Ma)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -296,6 +315,7 @@ contains
          call mfile%add_column(fs%Vmax,'Vmax')
          call mfile%add_column(fs%Wmax,'Wmax')
          call mfile%add_column(fs%Pmax,'Pmax')
+         call mfile%add_column(fs%Pmin,'Pmin')
          call mfile%add_column(sc%Emax,'Emax')
          call mfile%add_column(sc%Emin,'Emin')
          call mfile%add_column(sc%rhoEint,'rhoEint')
@@ -468,6 +488,8 @@ contains
             call fs%get_U()
             ! Also update internal energy
             call fs%get_pdil(P=fs%psolv%sol,Pdil=resU); sc%E=sc%E+time%dt*resU/fs%RHO
+            ! Recompute speed of sound
+            call get_c2()
             ! ===================================================
             
             ! ============= CVG CHECKING ========================
@@ -487,6 +509,9 @@ contains
          ! Recompute interpolated velocity and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
+
+         ! Compute Mach number
+         Ma=sqrt((Ui**2+Vi**2+Wi**2)/C2)
          
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
@@ -506,7 +531,7 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(resE,resU,resV,resW,Ui,Vi,Wi)
+      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma)
    end subroutine simulation_final
    
    
