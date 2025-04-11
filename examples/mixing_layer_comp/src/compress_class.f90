@@ -140,6 +140,7 @@ module compress_class
       procedure :: get_div                                !< Calculate velocity divergence
       procedure :: get_pgrad                              !< Calculate pressure gradient
       procedure :: get_pdil                               !< Calculate the pressure dilatation term
+      procedure :: get_visc_heating                       !< Calculate the viscous heating term
       procedure :: get_cfl                                !< Calculate maximum CFL
       procedure :: get_max                                !< Calculate maximum field values
       procedure :: interp_vel                             !< Calculate interpolated velocity
@@ -158,6 +159,7 @@ module compress_class
       procedure :: rho_divide                             !< Calculate Umid from rhoU, sRHOX, and sRHOXold
       procedure :: get_U                                  !< Calculate U from Umid and Uold
       procedure :: addsrc_gravity                         !< Gravitational body force
+      procedure :: add_viscartif                          !< Add artifical viscosity to the bulk viscosity
    end type compress
    
    
@@ -1330,6 +1332,79 @@ contains
    end subroutine get_pdil
    
    
+   !> Calculate the viscous heating term
+   subroutine get_visc_heating(this,visc_heating)
+      implicit none
+      class(compress), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: visc_heating   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: i,j,k
+      real(WP) :: dila,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
+      real(WP), dimension(:,:,:), allocatable :: U_,V_,W_,XY,YZ,ZX
+      ! Zero out viscous heating arrays
+      visc_heating=0.0_WP
+      ! Allocate and compute mid velocities
+      allocate(U_(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); U_=0.5_WP*(this%U+this%Uold)
+      allocate(V_(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); V_=0.5_WP*(this%V+this%Vold)
+      allocate(W_(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); W_=0.5_WP*(this%W+this%Wold)
+      ! First accumulate naturally cell-centered terms
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               ! Get velocity gradient and dilatation
+               dudx=sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))
+               dvdy=sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))
+               dwdz=sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))
+               dila=dudx+dvdy+dwdz
+               ! Txx*dudx at cell center
+               visc_heating(i,j,k)=visc_heating(i,j,k)+dudx*(this%viscs(i,j,k)*(2.0_WP*dudx-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
+               ! Tyy*dvdy at cell center
+               visc_heating(i,j,k)=visc_heating(i,j,k)+dvdy*(this%viscs(i,j,k)*(2.0_WP*dvdy-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
+               ! Tzz*dwdz at cell center
+               visc_heating(i,j,k)=visc_heating(i,j,k)+dwdz*(this%viscs(i,j,k)*(2.0_WP*dwdz-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
+            end do
+         end do
+      end do
+      ! Allocate storage for edge-centered terms
+      allocate(XY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(YZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(ZX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      ! Calculate all edge-centered terms
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               ! Get velocity gradient
+               dudy=sum(this%grdu_y(:,i,j,k)*U_(i,j-1:j,k))
+               dudz=sum(this%grdu_z(:,i,j,k)*U_(i,j,k-1:k))
+               dvdx=sum(this%grdv_x(:,i,j,k)*V_(i-1:i,j,k))
+               dvdz=sum(this%grdv_z(:,i,j,k)*V_(i,j,k-1:k))
+               dwdx=sum(this%grdw_x(:,i,j,k)*W_(i-1:i,j,k))
+               dwdy=sum(this%grdw_y(:,i,j,k)*W_(i,j-1:j,k))
+               ! Txy*(dudy+dvdx) at xy edge
+               XY(i,j,k)=sum(this%itp_xy(:,:,i,j,k)*this%viscs(i-1:i,j-1:j,k))*(dudy+dvdx)**2
+               ! Tyz*(dvdz+dwdy) at yz edge
+               YZ(i,j,k)=sum(this%itp_yz(:,:,i,j,k)*this%viscs(i,j-1:j,k-1:k))*(dvdz+dwdy)**2
+               ! Tzx*(dwdx+dudx) at zx edge
+               ZX(i,j,k)=sum(this%itp_xz(:,:,i,j,k)*this%viscs(i-1:i,j,k-1:k))*(dwdx+dudz)**2
+            end do
+         end do
+      end do
+      ! Interpolate edge-centered terms to the cell center
+	   do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               visc_heating(i,j,k)=visc_heating(i,j,k)+0.25_WP*sum(XY(i:i+1,j:j+1,k))
+               visc_heating(i,j,k)=visc_heating(i,j,k)+0.25_WP*sum(YZ(i,j:j+1,k:k+1))
+               visc_heating(i,j,k)=visc_heating(i,j,k)+0.25_WP*sum(ZX(i:i+1,j,k:k+1))
+            end do
+         end do
+      end do
+      ! Sync result
+      call this%cfg%sync(visc_heating)
+      ! Deallocate
+      deallocate(U_,V_,W_,XY,YZ,ZX)
+   end subroutine get_visc_heating
+   
+   
    !> Calculate the interpolated velocity, including overlap and ghosts
    subroutine interp_vel(this,Ui,Vi,Wi)
       implicit none
@@ -1865,6 +1940,33 @@ contains
       deallocate(dudy,dudz,dvdx,dvdz,dwdx,dwdy)
       
    end subroutine get_vorticity
+   
+
+   !> Add artificial viscosity to bulk viscosity
+   subroutine add_viscartif(this)
+      use messager, only: die
+      implicit none
+      class(compress), intent(inout) :: this
+      !integer :: i,j,k
+      !real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi
+      
+      ! Prepare work arrays
+      !allocate(Ui(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      !allocate(Vi(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      !allocate(Wi(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      
+      ! Interpolate velocity to cell-center
+      !call this%interp_vel(Ui,Vi,Wi)
+      
+      ! Calculate laplacian(laplacian(Ui))
+      !do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+      !   laplapU(i,:,:)=((Ui(i+1,:,:)-Ui(i,:,:))/this%cfg%dxm(i+1)-(Ui(i,:,:)-Ui(i-1,:,:))/this%cfg%dxm(i))/this%cfg%dx(i)
+      !end do
+      !call this%cfg%sync(lap1)
+      !if (.not.this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) lap1(this%cfg%imaxo-1,:,:)=lap1(this%cfg%imaxo,:,:)
+      !if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1)            lap1(this%cfg%imino+1,:,:)=lap1(this%cfg%imino,:,:)
+      
+   end subroutine add_viscartif
    
    
    !> Calculate the CFL

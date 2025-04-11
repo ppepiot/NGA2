@@ -398,6 +398,9 @@ contains
             ! Add pressure dilatation term
             call fs%get_pdil(P=fs%P,Pdil=resU); resE=resE+resU
             
+            ! Add viscous heating term
+            call fs%get_visc_heating(visc_heating=resU); resE=resE+resU
+            
             ! Assemble explicit residual
             resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
             
