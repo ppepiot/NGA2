@@ -391,7 +391,7 @@ contains
             
             ! ============= ENERGY SOLVER =======================
             ! Explicit calculation of drhoE/dt from energy equation
-            call sc%get_drhoEdt(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%get_drhoEdt(resE,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Add pressure dilatation term
             call fs%get_pdil(P=fs%P,Pdil=resU); resE=resE+resU
@@ -400,7 +400,7 @@ contains
             resE=time%dt*resE-(fs%RHO*sc%E-fs%RHOold*sc%Eold)
             
             ! Form implicit residual
-            call sc%solve_implicit(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%solve_implicit(time%dt,resE,fs%RHO,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
             sc%E=sc%E+resE
