@@ -6,7 +6,6 @@ module simulation
    use hypre_str_class,   only: hypre_str
    use compress_class,    only: compress
    use energy_class,      only: energy
-   use accelerator_class, only: accelerator
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use event_class,       only: event
@@ -21,7 +20,6 @@ module simulation
    type(compress),    public :: fs
    type(energy),      public :: sc
    type(timetracker), public :: time
-   type(accelerator), public :: accel
    
    !> Ensight postprocessing
    type(ensight) :: ens_out
@@ -54,7 +52,6 @@ contains
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
                fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
-               !fs%RHO(i,j,k)=1.0_WP/(sc%E(i,j,k)*Gamma*Mach**2*(Gamma-1.0_WP))
             end do
          end do
       end do
@@ -69,7 +66,6 @@ contains
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
                C2(i,j,k)=Gamma*fs%P(i,j,k)/fs%RHO(i,j,k)
-               !C2(i,j,k)=huge(1.0_WP)
             end do
          end do
       end do
@@ -162,12 +158,6 @@ contains
          allocate(C2  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Ma  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
-      
-      ! Initialize convergence accelerator
-      initialize_accelerator: block
-         call accel%initialize(cfg=cfg,storage_size=6,name='Density solver')
-         accel%beta=1.0_WP ! Under-relaxation may improve convergence
-      end block initialize_accelerator
       
       ! Initialize time tracker with 2 subiterations
       initialize_timetracker: block
@@ -396,12 +386,12 @@ contains
          ! This is where time-dpt Dirichlet would be enforced
          
          ! Perform sub-iterations until RHO is sufficiently converged
-         RHOcvg=huge(1.0_WP); time%it=0; call accel%restart(ig=fs%RHO)
+         RHOcvg=huge(1.0_WP); time%it=0
          do while (RHOcvg.gt.RHOtol.and.time%it.lt.time%itmax.or.time%it.lt.time%itmin)
             
             ! ============= ENERGY SOLVER =======================
             ! Explicit calculation of drhoE/dt from energy equation
-            call sc%get_drhoEdt(resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
+            call sc%get_drhoEdt(time%dt,resE,fs%RHO,fs%RHOold,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Add pressure dilatation term
             call fs%get_pdil(P=fs%P,Pdil=resU); resE=resE+resU

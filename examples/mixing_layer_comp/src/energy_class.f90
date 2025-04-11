@@ -60,6 +60,11 @@ module energy_class
       real(WP), dimension(:,:,:,:), allocatable :: div_x,div_y,div_z        !< Divergence of energy flux
       real(WP), dimension(:,:,:,:), allocatable :: grd_x,grd_y,grd_z        !< Gradient of temperature
       
+      ! Bquick positivity enforcement
+      logical :: force_positive=.true.
+	   real(WP), dimension(:,:,:,:), allocatable :: bitp_xp,bitp_yp,bitp_zp  !< Plus  interpolation for E - backup
+      real(WP), dimension(:,:,:,:), allocatable :: bitp_xm,bitp_ym,bitp_zm  !< Minus interpolation for E - backup
+      
       ! Masking info for metric modification
       integer, dimension(:,:,:), allocatable :: mask        !< Integer array used for modifying E metrics
       
@@ -337,6 +342,16 @@ contains
          this%grd_z=0.0_WP
       end if
       
+      ! Finally, remember quick metrics
+      if (this%force_positive) then
+         allocate(this%bitp_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_xp=this%itp_xp
+         allocate(this%bitp_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_xm=this%itp_xm
+         allocate(this%bitp_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_yp=this%itp_yp
+         allocate(this%bitp_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_ym=this%itp_ym
+         allocate(this%bitp_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_zp=this%itp_zp
+         allocate(this%bitp_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)); this%bitp_zm=this%itp_zm
+      end if
+      
    end subroutine adjust_metrics
    
    
@@ -511,9 +526,10 @@ contains
    
    
    !> Calculate the explicit rhoE time derivative given passed RHO/RHOold/rhoU/rhoV/rhoW
-   subroutine get_drhoEdt(this,drhoEdt,RHO,RHOold,rhoU,rhoV,rhoW)
+   subroutine get_drhoEdt(this,dt,drhoEdt,RHO,RHOold,rhoU,rhoV,rhoW)
       implicit none
       class(energy), intent(inout) :: this
+      real(WP), intent(in) :: dt
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: drhoEdt!< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: RHO    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: RHOold !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
@@ -529,7 +545,12 @@ contains
       allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       ! Allocate and compute mid energy
-      allocate(E_  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); E_=0.5_WP*(this%E+this%Eold)
+      allocate(E_(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); E_=0.5_WP*(this%E+this%Eold)
+      ! If positivity is enforced, reset metrics
+      if (this%force_positive) then
+         this%itp_xp=this%bitp_xp; this%itp_yp=this%bitp_yp; this%itp_zp=this%bitp_zp
+         this%itp_xm=this%bitp_xm; this%itp_ym=this%bitp_ym; this%itp_zm=this%bitp_zm
+      end if
       ! Flux of rhoE
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
@@ -556,13 +577,68 @@ contains
             end do
          end do
       end do
-      ! Deallocate flux arrays
-      deallocate(FX,FY,FZ,E_)
       ! Sync residual
       call this%cfg%sync(drhoEdt)
+      ! If positivity is enforced, take a second pass
+      if (this%force_positive) then
+         ! Estimate new energy
+         E_=(RHOold*this%Eold+dt*drhoEdt)/RHO
+         call this%cfg%sync(E_)
+         ! Adjust metrics to enforce positivity
+         do k=this%cfg%kmin_,this%cfg%kmax_+1
+            do j=this%cfg%jmin_,this%cfg%jmax_+1
+               do i=this%cfg%imin_,this%cfg%imax_+1
+                  if (any(E_(i-1:i,j,k).le.0.0_WP)) then
+                     this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
+                  if (any(E_(i,j-1:j,k).le.0.0_WP)) then
+                     this%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
+                  if (any(E_(i,j,k-1:k).le.0.0_WP)) then
+                     this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
+               end do
+            end do
+         end do
+         ! Recompute mid-time energy
+         E_=0.5_WP*(this%E+this%Eold)
+         ! Flux of rhoE
+         do k=this%cfg%kmin_,this%cfg%kmax_+1
+            do j=this%cfg%jmin_,this%cfg%jmax_+1
+               do i=this%cfg%imin_,this%cfg%imax_+1
+                  FX(i,j,k)=-0.5_WP*(rhoU(i,j,k)+abs(rhoU(i,j,k)))*sum(this%itp_xp(:,i,j,k)*E_(i-2:i  ,j,k)) &
+                  &         -0.5_WP*(rhoU(i,j,k)-abs(rhoU(i,j,k)))*sum(this%itp_xm(:,i,j,k)*E_(i-1:i+1,j,k)) &
+                  &         +sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k))*sum(this%grd_x(:,i,j,k)*E_(i-1:i,j,k))/this%Cv
+                  FY(i,j,k)=-0.5_WP*(rhoV(i,j,k)+abs(rhoV(i,j,k)))*sum(this%itp_yp(:,i,j,k)*E_(i,j-2:j  ,k)) &
+                  &         -0.5_WP*(rhoV(i,j,k)-abs(rhoV(i,j,k)))*sum(this%itp_ym(:,i,j,k)*E_(i,j-1:j+1,k)) &
+                  &         +sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k))*sum(this%grd_y(:,i,j,k)*E_(i,j-1:j,k))/this%Cv
+                  FZ(i,j,k)=-0.5_WP*(rhoW(i,j,k)+abs(rhoW(i,j,k)))*sum(this%itp_zp(:,i,j,k)*E_(i,j,k-2:k  )) &
+                  &         -0.5_WP*(rhoW(i,j,k)-abs(rhoW(i,j,k)))*sum(this%itp_zm(:,i,j,k)*E_(i,j,k-1:k+1)) &
+                  &         +sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k))*sum(this%grd_z(:,i,j,k)*E_(i,j,k-1:k))/this%Cv
+               end do
+            end do
+         end do
+         ! Time derivative of rhoE
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  drhoEdt(i,j,k)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
+                  &              sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
+                  &              sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))
+               end do
+            end do
+         end do
+         ! Sync residual
+         call this%cfg%sync(drhoEdt)
+      end if
+      ! Deallocate flux arrays
+      deallocate(FX,FY,FZ,E_)
    end subroutine get_drhoEdt
    
-
+   
    !> Calculate the int, min, and max of our E field
    subroutine get_max(this,rho)
       use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN,MPI_IN_PLACE
