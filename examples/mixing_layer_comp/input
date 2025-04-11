@@ -10,10 +10,11 @@ ny : 512  !128
 nz : 1    !128
 
 # Fluid properties
-Gamma :           1.4
-Mach number :     2.0
-Reynolds number : 200
-Prandtl number :  0.7
+Gamma :               1.4
+Mach number :         2.0
+Reynolds number :     200
+Prandtl number :      0.7
+Bulk to shear ratio : 0.6
 
 # Layer densities
 Density top :       1

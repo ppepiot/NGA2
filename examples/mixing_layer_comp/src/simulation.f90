@@ -33,8 +33,9 @@ module simulation
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE
    real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi,C2,Ma
    
-   !> Equation of state
+   !> Equation of state and other properties
    real(WP) :: Gamma,Mach
+   real(WP) :: visc,diff,bulk2shear
    
    !> Initial perturbations
    integer :: nwaveX,nwaveZ
@@ -173,13 +174,14 @@ contains
       create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
          use compress_class,  only: slip
-         real(WP) :: Re
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
          ! Assign constant viscosity based on Reynolds number
-         call param_read('Reynolds number',Re); fs%visc=1.0_WP/Re
+         call param_read('Reynolds number',visc); visc=1.0_WP/visc
+         call param_read('Bulk to shear ratio',bulk2shear)
+         fs%viscs=visc; fs%viscb=bulk2shear*fs%viscs
          ! Define boundary conditions
          call fs%add_bcond(name='yp',type=slip,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
          call fs%add_bcond(name='ym',type=slip,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
@@ -206,7 +208,7 @@ contains
          ! Assign constant diffusivity
          sc%Cv=1.0_WP/(Gamma*(Gamma-1.0_WP)*Mach**2)
          ! Assign constant diffusivity
-         call param_read('Prandtl number',Pr); sc%diff=sc%Cv*Gamma*fs%visc/Pr
+         call param_read('Prandtl number',Pr); sc%diff=sc%Cv*Gamma*visc/Pr
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Energy',nst=13)
          ! Setup the solver
