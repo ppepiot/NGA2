@@ -6,6 +6,7 @@ module simulation
    use hypre_str_class,   only: hypre_str
    use compress_class,    only: compress
    use energy_class,      only: energy
+   use sgsmodel_class,    only: sgsmodel
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use event_class,       only: event
@@ -20,6 +21,11 @@ module simulation
    type(compress),    public :: fs
    type(energy),      public :: sc
    type(timetracker), public :: time
+   
+   !> SGS modeling
+   logical        :: use_sgs
+   type(sgsmodel) :: sgs
+   real(WP), dimension(:,:,:,:,:), allocatable :: gradU
    
    !> Ensight postprocessing
    type(ensight) :: ens_out
@@ -268,6 +274,15 @@ contains
          call get_c2(); Ma=sqrt((Ui**2+Vi**2+Wi**2)/C2)
       end block initial_conditions
       
+      ! Create an LES model
+      create_sgs: block
+         call param_read('Use SGS model',use_sgs)
+         if (use_sgs) then
+            allocate(gradU(1:3,1:3,cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+            sgs=sgsmodel(cfg=fs%cfg,umask=fs%umask,vmask=fs%vmask,wmask=fs%wmask)
+         end if
+      end block create_sgs
+      
       ! Add Ensight output
       create_ensight: block
          ! Create Ensight output from cfg
@@ -280,6 +295,8 @@ contains
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
          call ens_out%add_scalar('energy',sc%E)
+         call ens_out%add_scalar('viscb',fs%viscb)
+         call ens_out%add_scalar('viscs',fs%viscs)
          call ens_out%add_scalar('Mach',Ma)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
@@ -386,6 +403,20 @@ contains
          
          ! Apply time-varying Dirichlet conditions
          ! This is where time-dpt Dirichlet would be enforced
+         
+         ! ============= SUBGRID SCALE MODELING ==============
+         if (use_sgs) then
+            sgs_modeling: block
+               use sgsmodel_class, only: vreman,localartif
+               integer :: i,j,k
+               call fs%get_gradU(gradU)
+               !call sgs%get_visc(type=vreman,dt=time%dt,rho=fs%RHO,gradu=gradU)
+               !fs%viscs=visc+sgs%visc
+               call sgs%get_visc(type=localartif,dt=time%dt,rho=fs%RHO,gradu=gradU)
+               fs%viscb=bulk2shear*visc+sgs%visc
+            end block sgs_modeling
+         end if
+         ! ===================================================
          
          ! Perform sub-iterations until RHO is sufficiently converged
          RHOcvg=huge(1.0_WP); time%it=0
@@ -520,7 +551,7 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma)
+      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma,gradU)
    end subroutine simulation_final
    
    

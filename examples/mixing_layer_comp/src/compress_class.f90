@@ -159,7 +159,6 @@ module compress_class
       procedure :: rho_divide                             !< Calculate Umid from rhoU, sRHOX, and sRHOXold
       procedure :: get_U                                  !< Calculate U from Umid and Uold
       procedure :: addsrc_gravity                         !< Gravitational body force
-      procedure :: add_viscartif                          !< Add artifical viscosity to the bulk viscosity
    end type compress
    
    
@@ -1940,33 +1939,6 @@ contains
       deallocate(dudy,dudz,dvdx,dvdz,dwdx,dwdy)
       
    end subroutine get_vorticity
-   
-
-   !> Add artificial viscosity to bulk viscosity
-   subroutine add_viscartif(this)
-      use messager, only: die
-      implicit none
-      class(compress), intent(inout) :: this
-      !integer :: i,j,k
-      !real(WP), dimension(:,:,:), allocatable :: Ui,Vi,Wi
-      
-      ! Prepare work arrays
-      !allocate(Ui(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      !allocate(Vi(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      !allocate(Wi(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      
-      ! Interpolate velocity to cell-center
-      !call this%interp_vel(Ui,Vi,Wi)
-      
-      ! Calculate laplacian(laplacian(Ui))
-      !do i=this%cfg%imino_+1,this%cfg%imaxo_-1
-      !   laplapU(i,:,:)=((Ui(i+1,:,:)-Ui(i,:,:))/this%cfg%dxm(i+1)-(Ui(i,:,:)-Ui(i-1,:,:))/this%cfg%dxm(i))/this%cfg%dx(i)
-      !end do
-      !call this%cfg%sync(lap1)
-      !if (.not.this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) lap1(this%cfg%imaxo-1,:,:)=lap1(this%cfg%imaxo,:,:)
-      !if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1)            lap1(this%cfg%imino+1,:,:)=lap1(this%cfg%imino,:,:)
-      
-   end subroutine add_viscartif
    
    
    !> Calculate the CFL
