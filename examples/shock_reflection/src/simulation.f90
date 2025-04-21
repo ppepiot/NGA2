@@ -166,7 +166,7 @@ contains
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
-         fs%viscb=0.01_WP
+         !fs%viscb=0.01_WP
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -184,7 +184,7 @@ contains
          real(WP) :: Pr
          ! Create energy solver
          call sc%initialize(cfg=cfg,name='Energy')
-         sc%diff=0.01_WP
+         !sc%diff=0.01_WP
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Energy',nst=13)
          ! Setup the solver
@@ -201,7 +201,7 @@ contains
                   ! Setup normal shock at t=0
                   fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
                   fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i),cfg%ym(j),0.0_WP)
+                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i),cfg%ym(j),0.0_WP)-us
                   fs%V  (i,j,k)=        u2y     *Hshock(cfg%xm(i),cfg%y (j),0.0_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
@@ -211,7 +211,7 @@ contains
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid
-         call fs%update_sRHO(); fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
+         call fs%update_faceRHO(); fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
          call fs%get_Umid()
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
@@ -225,7 +225,7 @@ contains
          call param_read('Y sponge',yspg)
          spg=iterator(cfg,'Sponge zone',sponge_locator)
       end block create_sponge
-
+      
       ! Create an LES model
       create_sgs: block
          call param_read('Use SGS model',use_sgs)
@@ -410,7 +410,7 @@ contains
             resE=fs%RHO
             
             ! Calculate RHO predictor
-            call get_rho(); call fs%update_sRHO()
+            call get_rho(); call fs%update_faceRHO()
             
             ! Compute speed of sound squared
             call get_c2()
@@ -418,10 +418,10 @@ contains
             
             ! ============ VELOCITY SOLVER ======================
             ! Compute Umid
-            call fs%get_Umid()
+            !call fs%get_Umid()
             
             ! Get rhoU/rhoV/rhoW
-            call fs%rho_multiply()
+            !call fs%rho_multiply()
             
             ! Explicit calculation of drho*u/dt from NS
             call fs%get_dmomdt(resU,resV,resW)
@@ -458,7 +458,7 @@ contains
             !      ! Corresponding internal energy
             !      sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
             !   end do
-            !   call fs%update_sRHO()
+            !   call fs%update_faceRHO()
             !   call get_c2()
             !end block sponge_update
             
@@ -475,10 +475,10 @@ contains
             call fs%psolv%solve()
             call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
             fs%P=fs%P+fs%psolv%sol
-            fs%RHO=fs%RHO+fs%psolv%sol/C2; call fs%update_sRHO()
-            fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
-            fs%rhoV=fs%rhoV-time%dt*resV*((1.0_WP-fs%theta)*fs%sRHOYold**2+fs%theta*fs%sRHOY**2)/((fs%sRHOY+fs%sRHOYold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOY)
-            fs%rhoW=fs%rhoW-time%dt*resW*((1.0_WP-fs%theta)*fs%sRHOZold**2+fs%theta*fs%sRHOZ**2)/((fs%sRHOZ+fs%sRHOZold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOZ)
+            fs%RHO=fs%RHO+fs%psolv%sol/C2; call fs%update_faceRHO()
+            fs%rhoU=fs%rhoU-time%dt*resU
+            fs%rhoV=fs%rhoV-time%dt*resV
+            fs%rhoW=fs%rhoW-time%dt*resW
             ! Recover Umid
             call fs%rho_divide()
             ! Recover U

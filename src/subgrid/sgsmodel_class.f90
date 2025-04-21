@@ -25,7 +25,7 @@ module sgsmodel_class
       ! Safe index bounds
       integer :: imin_in,jmin_in,kmin_in                        !< Safe min in each direction
       integer :: imax_in,jmax_in,kmax_in                        !< Safe max in each direction
-
+      
       ! Some model parameters
       real(WP) :: Cs_ref=0.17_WP
       real(WP) :: Cartif=1.0_WP,Cartif_vort=1.0e2_WP
@@ -561,7 +561,7 @@ contains
       allocate(fvisc(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); fvisc=this%visc
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
+           do i=this%cfg%imin_,this%cfg%imax_
                this%visc(i,j,k)=sum(this%filtern(:,:,:,i,j,k)*fvisc(i-1:i+1,j-1:j+1,k-1:k+1))
             end do
          end do

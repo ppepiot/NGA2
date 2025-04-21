@@ -197,9 +197,9 @@ contains
                call fv_itp_build(n=3,x=this%cfg%z(k-2:k+1),xp=this%cfg%z(k),coeff=this%itp_zp(:,i,j,k))
                call fv_itp_build(n=3,x=this%cfg%z(k-1:k+2),xp=this%cfg%z(k),coeff=this%itp_zm(:,i,j,k))
                ! Replace by pure upwind
-               !this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !this%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               this%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
             end do
          end do
       end do

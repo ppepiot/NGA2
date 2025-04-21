@@ -55,10 +55,13 @@ module compress_class
       real(WP) :: correctable_area                        !< Area of bcond that can be corrected
       type(bcond), pointer :: first_bc                    !< List of bcond for our solver
       
-      ! Square root of face density
-      real(WP), dimension(:,:,:), allocatable :: sRHOX    !< Square root of density field at x-face
-      real(WP), dimension(:,:,:), allocatable :: sRHOY    !< Square root of density field at y-face
-      real(WP), dimension(:,:,:), allocatable :: sRHOZ    !< Square root of density field at z-face
+      ! Face densities
+      real(WP), dimension(:,:,:), allocatable :: sRHOX    !< Square root of density field interpolated to x-face
+      real(WP), dimension(:,:,:), allocatable :: sRHOY    !< Square root of density field interpolated to y-face
+      real(WP), dimension(:,:,:), allocatable :: sRHOZ    !< Square root of density field interpolated to z-face
+      real(WP), dimension(:,:,:), allocatable :: RHOX    !< Density field interpolated to x-face with stabilized scheme
+      real(WP), dimension(:,:,:), allocatable :: RHOY    !< Density field interpolated to y-face with stabilized scheme
+      real(WP), dimension(:,:,:), allocatable :: RHOZ    !< Density field interpolated to z-face with stabilized scheme
       
       ! Old square root of face density
       real(WP), dimension(:,:,:), allocatable :: sRHOXold !< Old square root of density field at x-face
@@ -153,7 +156,7 @@ module compress_class
       procedure :: correct_mfr                            !< Correct for mfr mismatch to ensure global conservation
       procedure :: shift_p                                !< Shift pressure to have zero average
       procedure :: solve_implicit                         !< Solve for the velocity residuals implicitly
-      procedure :: update_sRHO                            !< Calculate sqrt of face density from density
+      procedure :: update_faceRHO                         !< Calculate face density from density
       procedure :: get_Umid                               !< Calculate Umid from U and Uold
       procedure :: rho_multiply                           !< Calculate rhoU from Umid, sRHOX, and sRHOXold
       procedure :: rho_divide                             !< Calculate Umid from rhoU, sRHOX, and sRHOXold
@@ -191,6 +194,9 @@ contains
       allocate(this%sRHOX   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOX=0.0_WP
       allocate(this%sRHOY   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOY=0.0_WP
       allocate(this%sRHOZ   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOZ=0.0_WP
+      allocate(this%RHOX    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOX=0.0_WP
+      allocate(this%RHOY    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOY=0.0_WP
+      allocate(this%RHOZ    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOZ=0.0_WP
       allocate(this%RHOold  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOold  =0.0_WP
       allocate(this%sRHOXold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOXold=0.0_WP
       allocate(this%sRHOYold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOYold=0.0_WP
@@ -1223,7 +1229,7 @@ contains
       real(WP), intent(in) :: dt
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: c2    !< Speed of sound squared
       integer :: i,j,k,s1,s2
-      ! Setup the scaled Laplacian operator from  metrics: lap(*)=-vol.div( f(rho) grad(*))
+      ! Setup the scaled Laplacian operator from  metrics: lap(*)=-vol.div( grad(*))
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -1232,9 +1238,9 @@ contains
                ! Tranverse the stencil and recompute Laplacian
                do s1=0,1
                   do s2=-1,0
-                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)*((1.0_WP-this%theta)*this%sRHOXold(i+s1,j,k)**2+this%theta*this%sRHOX(i+s1,j,k)**2)/((this%sRHOX(i+s1,j,k)+this%sRHOXold(i+s1,j,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOX(i+s1,j,k))
-                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)*((1.0_WP-this%theta)*this%sRHOYold(i,j+s1,k)**2+this%theta*this%sRHOY(i,j+s1,k)**2)/((this%sRHOY(i,j+s1,k)+this%sRHOYold(i,j+s1,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOY(i,j+s1,k))
-                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)*((1.0_WP-this%theta)*this%sRHOZold(i,j,k+s1)**2+this%theta*this%sRHOZ(i,j,k+s1)**2)/((this%sRHOZ(i,j,k+s1)+this%sRHOZold(i,j,k+s1)*(1.0_WP-this%theta)/this%theta)*this%sRHOZ(i,j,k+s1))
+                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)
+                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)
+                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)
                   end do
                end do
                ! Add temporal term
@@ -2402,30 +2408,57 @@ contains
    end subroutine solve_implicit
    
    
-   !> Compute sRHOX/Y/Z from this%RHO field
-   subroutine update_sRHO(this)
+   !> Compute (s)RHOX/Y/Z from this%RHO field
+   subroutine update_faceRHO(this)
       implicit none
       class(compress), intent(inout) :: this
       integer :: i,j,k
-      ! Calculate square root of face densities
+      ! Calculate face densities
       do k=this%cfg%kmino_  ,this%cfg%kmaxo_
          do j=this%cfg%jmino_  ,this%cfg%jmaxo_
             do i=this%cfg%imino_+1,this%cfg%imaxo_
+               ! Square root of centered interpolate of rho
                this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
+               ! Centered interpolate of rho
+               !this%RHOX(i,j,k)=sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))
+               ! Upwind interpolate of rho
+               if (this%Umid(i,j,k).ge.0.0_WP) then
+                  this%RHOX(i,j,k)=this%RHO(i-1,j,k)
+               else
+                  this%RHOX(i,j,k)=this%RHO(i  ,j,k)
+               end if
             end do
          end do
       end do
       do k=this%cfg%kmino_  ,this%cfg%kmaxo_
          do j=this%cfg%jmino_+1,this%cfg%jmaxo_
             do i=this%cfg%imino_  ,this%cfg%imaxo_
+               ! Square root of centered interpolate of rho
                this%sRHOY(i,j,k)=sqrt(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k)))
+               ! Centered interpolate of rho
+               !this%RHOY(i,j,k)=sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))
+               ! Upwind interpolate of rho
+               if (this%Vmid(i,j,k).ge.0.0_WP) then
+                  this%RHOY(i,j,k)=this%RHO(i,j-1,k)
+               else
+                  this%RHOY(i,j,k)=this%RHO(i,j  ,k)
+               end if
             end do
          end do
       end do
       do k=this%cfg%kmino_+1,this%cfg%kmaxo_
          do j=this%cfg%jmino_  ,this%cfg%jmaxo_
             do i=this%cfg%imino_  ,this%cfg%imaxo_
+               ! Square root of centered interpolate of rho
                this%sRHOZ(i,j,k)=sqrt(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k)))
+               ! Centered interpolate of rho
+               !this%RHOZ(i,j,k)=sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))
+               ! Upwind interpolate of rho
+               if (this%Wmid(i,j,k).ge.0.0_WP) then
+                  this%RHOZ(i,j,k)=this%RHO(i,j,k-1)
+               else
+                  this%RHOZ(i,j,k)=this%RHO(i,j,k  )
+               end if
             end do
          end do
       end do
@@ -2433,11 +2466,17 @@ contains
       if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%sRHOX(this%cfg%imino,:,:)=sqrt(this%RHO(this%cfg%imino,:,:))
       if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%sRHOY(:,this%cfg%jmino,:)=sqrt(this%RHO(:,this%cfg%jmino,:))
       if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%sRHOZ(:,:,this%cfg%kmino)=sqrt(this%RHO(:,:,this%cfg%kmino))
+      if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%RHOX (this%cfg%imino,:,:)=this%RHO(this%cfg%imino,:,:)
+      if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%RHOY (:,this%cfg%jmino,:)=this%RHO(:,this%cfg%jmino,:)
+      if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%RHOZ (:,:,this%cfg%kmino)=this%RHO(:,:,this%cfg%kmino)
       ! Synchronize boundaries
       call this%cfg%sync(this%sRHOX)
       call this%cfg%sync(this%sRHOY)
       call this%cfg%sync(this%sRHOZ)
-   end subroutine update_sRHO
+      call this%cfg%sync(this%RHOX)
+      call this%cfg%sync(this%RHOY)
+      call this%cfg%sync(this%RHOZ)
+   end subroutine update_faceRHO
    
    
    !> Get Umid from U and Uold
@@ -2454,9 +2493,9 @@ contains
    subroutine rho_multiply(this)
       implicit none
       class(compress), intent(inout) :: this
-      this%rhoU=(this%theta*this%sRHOX**2+(1.0_WP-this%theta)*this%sRHOXold**2)*this%Umid
-      this%rhoV=(this%theta*this%sRHOY**2+(1.0_WP-this%theta)*this%sRHOYold**2)*this%Vmid
-      this%rhoW=(this%theta*this%sRHOZ**2+(1.0_WP-this%theta)*this%sRHOZold**2)*this%Wmid
+      this%rhoU=this%RHOX*this%Umid
+      this%rhoV=this%RHOY*this%Vmid
+      this%rhoW=this%RHOZ*this%Wmid
    end subroutine rho_multiply
    
    
@@ -2464,9 +2503,9 @@ contains
    subroutine rho_divide(this)
       implicit none
       class(compress), intent(inout) :: this
-      this%Umid=this%rhoU/(this%theta*this%sRHOX**2+(1.0_WP-this%theta)*this%sRHOXold**2)
-      this%Vmid=this%rhoV/(this%theta*this%sRHOY**2+(1.0_WP-this%theta)*this%sRHOYold**2)
-      this%Wmid=this%rhoW/(this%theta*this%sRHOZ**2+(1.0_WP-this%theta)*this%sRHOZold**2)
+      this%Umid=this%rhoU/this%RHOX
+      this%Vmid=this%rhoV/this%RHOY
+      this%Wmid=this%rhoW/this%RHOZ
    end subroutine rho_divide
    
    
