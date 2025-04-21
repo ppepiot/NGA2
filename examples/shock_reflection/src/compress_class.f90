@@ -2420,13 +2420,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
                ! Centered interpolate of rho
-               !this%RHOX(i,j,k)=sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))
+               this%RHOX(i,j,k)=0.5_WP*(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))+sum(this%itpr_x(:,i,j,k)*this%RHOold(i-1:i,j,k)))
                ! Upwind interpolate of rho
-               if (this%Umid(i,j,k).ge.0.0_WP) then
-                  this%RHOX(i,j,k)=this%RHO(i-1,j,k)
-               else
-                  this%RHOX(i,j,k)=this%RHO(i  ,j,k)
-               end if
+               !if (this%Umid(i,j,k).ge.0.0_WP) then
+               !   this%RHOX(i,j,k)=0.5_WP*(this%RHO(i-1,j,k)+this%RHOold(i-1,j,k))
+               !else
+               !   this%RHOX(i,j,k)=0.5_WP*(this%RHO(i  ,j,k)+this%RHOold(i  ,j,k))
+               !end if
             end do
          end do
       end do
@@ -2436,13 +2436,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOY(i,j,k)=sqrt(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k)))
                ! Centered interpolate of rho
-               !this%RHOY(i,j,k)=sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))
+               this%RHOY(i,j,k)=0.5_WP*(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))+sum(this%itpr_y(:,i,j,k)*this%RHOold(i,j-1:j,k)))
                ! Upwind interpolate of rho
-               if (this%Vmid(i,j,k).ge.0.0_WP) then
-                  this%RHOY(i,j,k)=this%RHO(i,j-1,k)
-               else
-                  this%RHOY(i,j,k)=this%RHO(i,j  ,k)
-               end if
+               !if (this%Vmid(i,j,k).ge.0.0_WP) then
+               !   this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j-1,k)+this%RHOold(i,j-1,k))
+               !else
+               !   this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j  ,k)+this%RHOold(i,j  ,k))
+               !end if
             end do
          end do
       end do
@@ -2452,13 +2452,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOZ(i,j,k)=sqrt(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k)))
                ! Centered interpolate of rho
-               !this%RHOZ(i,j,k)=sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))
+               this%RHOZ(i,j,k)=0.5_WP*(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))+sum(this%itpr_z(:,i,j,k)*this%RHOold(i,j,k-1:k)))
                ! Upwind interpolate of rho
-               if (this%Wmid(i,j,k).ge.0.0_WP) then
-                  this%RHOZ(i,j,k)=this%RHO(i,j,k-1)
-               else
-                  this%RHOZ(i,j,k)=this%RHO(i,j,k  )
-               end if
+               !if (this%Wmid(i,j,k).ge.0.0_WP) then
+               !   this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k-1)+this%RHOold(i,j,k-1))
+               !else
+               !   this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k  )+this%RHOold(i,j,k  ))
+               !end if
             end do
          end do
       end do
@@ -2466,9 +2466,9 @@ contains
       if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%sRHOX(this%cfg%imino,:,:)=sqrt(this%RHO(this%cfg%imino,:,:))
       if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%sRHOY(:,this%cfg%jmino,:)=sqrt(this%RHO(:,this%cfg%jmino,:))
       if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%sRHOZ(:,:,this%cfg%kmino)=sqrt(this%RHO(:,:,this%cfg%kmino))
-      if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%RHOX (this%cfg%imino,:,:)=this%RHO(this%cfg%imino,:,:)
-      if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%RHOY (:,this%cfg%jmino,:)=this%RHO(:,this%cfg%jmino,:)
-      if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%RHOZ (:,:,this%cfg%kmino)=this%RHO(:,:,this%cfg%kmino)
+      if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%RHOX (this%cfg%imino,:,:)=0.5_WP*(this%RHO(this%cfg%imino,:,:)+this%RHOold(this%cfg%imino,:,:))
+      if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%RHOY (:,this%cfg%jmino,:)=0.5_WP*(this%RHO(:,this%cfg%jmino,:)+this%RHOold(:,this%cfg%jmino,:))
+      if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%RHOZ (:,:,this%cfg%kmino)=0.5_WP*(this%RHO(:,:,this%cfg%kmino)+this%RHOold(:,:,this%cfg%kmino))
       ! Synchronize boundaries
       call this%cfg%sync(this%sRHOX)
       call this%cfg%sync(this%sRHOY)

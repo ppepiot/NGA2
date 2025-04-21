@@ -201,7 +201,7 @@ contains
                   ! Setup normal shock at t=0
                   fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
                   fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i),cfg%ym(j),0.0_WP)-us
+                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i),cfg%ym(j),0.0_WP)!-us
                   fs%V  (i,j,k)=        u2y     *Hshock(cfg%xm(i),cfg%y (j),0.0_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
