@@ -1238,9 +1238,9 @@ contains
                ! Tranverse the stencil and recompute Laplacian
                do s1=0,1
                   do s2=-1,0
-                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)
-                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)
-                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)
+                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)*((1.0_WP-this%theta)*this%sRHOXold(i+s1,j,k)**2+this%theta*this%sRHOX(i+s1,j,k)**2)/((this%sRHOX(i+s1,j,k)+this%sRHOXold(i+s1,j,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOX(i+s1,j,k))
+                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)*((1.0_WP-this%theta)*this%sRHOYold(i,j+s1,k)**2+this%theta*this%sRHOY(i,j+s1,k)**2)/((this%sRHOY(i,j+s1,k)+this%sRHOYold(i,j+s1,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOY(i,j+s1,k))
+                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)*((1.0_WP-this%theta)*this%sRHOZold(i,j,k+s1)**2+this%theta*this%sRHOZ(i,j,k+s1)**2)/((this%sRHOZ(i,j,k+s1)+this%sRHOZold(i,j,k+s1)*(1.0_WP-this%theta)/this%theta)*this%sRHOZ(i,j,k+s1))
                   end do
                end do
                ! Add temporal term
@@ -2420,13 +2420,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
                ! Centered interpolate of rho
-               this%RHOX(i,j,k)=0.5_WP*(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))+sum(this%itpr_x(:,i,j,k)*this%RHOold(i-1:i,j,k)))
+               !this%RHOX(i,j,k)=0.5_WP*(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))+sum(this%itpr_x(:,i,j,k)*this%RHOold(i-1:i,j,k)))
                ! Upwind interpolate of rho
-               !if (this%Umid(i,j,k).ge.0.0_WP) then
-               !   this%RHOX(i,j,k)=0.5_WP*(this%RHO(i-1,j,k)+this%RHOold(i-1,j,k))
-               !else
-               !   this%RHOX(i,j,k)=0.5_WP*(this%RHO(i  ,j,k)+this%RHOold(i  ,j,k))
-               !end if
+               if (this%Umid(i,j,k).ge.0.0_WP) then
+                  this%RHOX(i,j,k)=0.5_WP*(this%RHO(i-1,j,k)+this%RHOold(i-1,j,k))
+               else
+                  this%RHOX(i,j,k)=0.5_WP*(this%RHO(i  ,j,k)+this%RHOold(i  ,j,k))
+               end if
             end do
          end do
       end do
@@ -2436,13 +2436,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOY(i,j,k)=sqrt(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k)))
                ! Centered interpolate of rho
-               this%RHOY(i,j,k)=0.5_WP*(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))+sum(this%itpr_y(:,i,j,k)*this%RHOold(i,j-1:j,k)))
+               !this%RHOY(i,j,k)=0.5_WP*(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))+sum(this%itpr_y(:,i,j,k)*this%RHOold(i,j-1:j,k)))
                ! Upwind interpolate of rho
-               !if (this%Vmid(i,j,k).ge.0.0_WP) then
-               !   this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j-1,k)+this%RHOold(i,j-1,k))
-               !else
-               !   this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j  ,k)+this%RHOold(i,j  ,k))
-               !end if
+               if (this%Vmid(i,j,k).ge.0.0_WP) then
+                  this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j-1,k)+this%RHOold(i,j-1,k))
+               else
+                  this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j  ,k)+this%RHOold(i,j  ,k))
+               end if
             end do
          end do
       end do
@@ -2452,13 +2452,13 @@ contains
                ! Square root of centered interpolate of rho
                this%sRHOZ(i,j,k)=sqrt(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k)))
                ! Centered interpolate of rho
-               this%RHOZ(i,j,k)=0.5_WP*(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))+sum(this%itpr_z(:,i,j,k)*this%RHOold(i,j,k-1:k)))
+               !this%RHOZ(i,j,k)=0.5_WP*(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))+sum(this%itpr_z(:,i,j,k)*this%RHOold(i,j,k-1:k)))
                ! Upwind interpolate of rho
-               !if (this%Wmid(i,j,k).ge.0.0_WP) then
-               !   this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k-1)+this%RHOold(i,j,k-1))
-               !else
-               !   this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k  )+this%RHOold(i,j,k  ))
-               !end if
+               if (this%Wmid(i,j,k).ge.0.0_WP) then
+                  this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k-1)+this%RHOold(i,j,k-1))
+               else
+                  this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k  )+this%RHOold(i,j,k  ))
+               end if
             end do
          end do
       end do
