@@ -59,9 +59,10 @@ module compress_class
       real(WP), dimension(:,:,:), allocatable :: sRHOX    !< Square root of density field interpolated to x-face
       real(WP), dimension(:,:,:), allocatable :: sRHOY    !< Square root of density field interpolated to y-face
       real(WP), dimension(:,:,:), allocatable :: sRHOZ    !< Square root of density field interpolated to z-face
-      real(WP), dimension(:,:,:), allocatable :: RHOX    !< Density field interpolated to x-face with stabilized scheme
-      real(WP), dimension(:,:,:), allocatable :: RHOY    !< Density field interpolated to y-face with stabilized scheme
-      real(WP), dimension(:,:,:), allocatable :: RHOZ    !< Density field interpolated to z-face with stabilized scheme
+      real(WP), dimension(:,:,:), allocatable :: RHOX     !< Density field interpolated to x-face with stabilized scheme
+      real(WP), dimension(:,:,:), allocatable :: RHOY     !< Density field interpolated to y-face with stabilized scheme
+      real(WP), dimension(:,:,:), allocatable :: RHOZ     !< Density field interpolated to z-face with stabilized scheme
+      !real(WP), dimension(:,:,:), allocatable :: rsmooth  !< Density smoothness indicator for stabilization
       
       ! Old square root of face density
       real(WP), dimension(:,:,:), allocatable :: sRHOXold !< Old square root of density field at x-face
@@ -103,6 +104,8 @@ module compress_class
       ! Metrics
       real(WP), dimension(:,:,:,:,:), allocatable :: itp_xy,itp_yz,itp_xz !< Interpolation for viscosity
       real(WP), dimension(:,:,:,:), allocatable :: itpr_x,itpr_y,itpr_z   !< Interpolation for density
+      real(WP), dimension(:,:,:,:), allocatable :: itp_xp,itp_yp,itp_zp   !< QUICK plus  interpolation for density
+      real(WP), dimension(:,:,:,:), allocatable :: itp_xm,itp_ym,itp_zm   !< QUICK minus interpolation for density
       real(WP), dimension(:,:,:,:), allocatable :: itpu_x,itpu_y,itpu_z   !< Interpolation for U
       real(WP), dimension(:,:,:,:), allocatable :: itpv_x,itpv_y,itpv_z   !< Interpolation for V
       real(WP), dimension(:,:,:,:), allocatable :: itpw_x,itpw_y,itpw_z   !< Interpolation for W
@@ -156,6 +159,7 @@ module compress_class
       procedure :: correct_mfr                            !< Correct for mfr mismatch to ensure global conservation
       procedure :: shift_p                                !< Shift pressure to have zero average
       procedure :: solve_implicit                         !< Solve for the velocity residuals implicitly
+      !procedure :: get_rsmooth                            !< Compute density smoothness indicator (0 is smooth, 1 is not smooth)
       procedure :: update_faceRHO                         !< Calculate face density from density
       procedure :: get_Umid                               !< Calculate Umid from U and Uold
       procedure :: rho_multiply                           !< Calculate rhoU from Umid, sRHOX, and sRHOXold
@@ -201,6 +205,7 @@ contains
       allocate(this%sRHOXold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOXold=0.0_WP
       allocate(this%sRHOYold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOYold=0.0_WP
       allocate(this%sRHOZold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%sRHOZold=0.0_WP
+      !allocate(this%rsmooth (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%rsmooth=0.0_WP
       
       ! Allocate flow variables
       allocate(this%P   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%P=0.0_WP
@@ -302,6 +307,7 @@ contains
    
    !> Metric initialization with no awareness of walls nor bcond
    subroutine init_metrics(this)
+      use mathtools, only: fv_itp_build
       implicit none
       class(compress), intent(inout) :: this
       integer :: i,j,k,st1,st2
@@ -332,6 +338,34 @@ contains
          do j=this%cfg%jmino_  ,this%cfg%jmaxo_
             do i=this%cfg%imino_  ,this%cfg%imaxo_
                this%itpr_z(:,i,j,k)=this%cfg%dzmi(k)*[this%cfg%zm(k)-this%cfg%z(k),this%cfg%z(k)-this%cfg%zm(k-1)] !< Linear interpolation in z from [xm,ym,zm] to [xm,ym,z]
+            end do
+         end do
+      end do
+      
+      ! Allocate finite difference density interpolation coefficients
+      allocate(this%itp_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%itp_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%itp_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%itp_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%itp_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      allocate(this%itp_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      ! Create energy interpolation coefficients to cell faces
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               ! Interpolation to x-face
+               call fv_itp_build(n=3,x=this%cfg%x(i-2:i+1),xp=this%cfg%x(i),coeff=this%itp_xp(:,i,j,k))
+               call fv_itp_build(n=3,x=this%cfg%x(i-1:i+2),xp=this%cfg%x(i),coeff=this%itp_xm(:,i,j,k))
+               ! Interpolation to y-face
+               call fv_itp_build(n=3,x=this%cfg%y(j-2:j+1),xp=this%cfg%y(j),coeff=this%itp_yp(:,i,j,k))
+               call fv_itp_build(n=3,x=this%cfg%y(j-1:j+2),xp=this%cfg%y(j),coeff=this%itp_ym(:,i,j,k))
+               ! Interpolation to z-face
+               call fv_itp_build(n=3,x=this%cfg%z(k-2:k+1),xp=this%cfg%z(k),coeff=this%itp_zp(:,i,j,k))
+               call fv_itp_build(n=3,x=this%cfg%z(k-1:k+2),xp=this%cfg%z(k),coeff=this%itp_zm(:,i,j,k))
+               ! Replace by pure upwind
+               !this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               !his%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               !this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
             end do
          end do
       end do
@@ -551,6 +585,41 @@ contains
       !      end do
       !   end do
       !end do
+      
+      ! Adjust density interpolation to reflect Dirichlet boundaries
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               ! X face
+               if (this%mask(i-1,j,k).eq.2) then
+                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm(-1,i,j,k)=1.0_WP
+                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp(-1,i,j,k)=1.0_WP
+               end if
+               if (this%mask(i  ,j,k).eq.2) then
+                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm( 0,i,j,k)=1.0_WP
+                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp( 0,i,j,k)=1.0_WP
+               end if
+               ! Y face
+               if (this%mask(i,j-1,k).eq.2) then
+                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym(-1,i,j,k)=1.0_WP
+                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp(-1,i,j,k)=1.0_WP
+               end if
+               if (this%mask(i,j  ,k).eq.2) then
+                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym( 0,i,j,k)=1.0_WP
+                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp( 0,i,j,k)=1.0_WP
+               end if
+               ! Z face
+               if (this%mask(i,j,k-1).eq.2) then
+                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm(-1,i,j,k)=1.0_WP
+                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp(-1,i,j,k)=1.0_WP
+               end if
+               if (this%mask(i,j,k  ).eq.2) then
+                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm( 0,i,j,k)=1.0_WP
+                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp( 0,i,j,k)=1.0_WP
+               end if
+            end do
+         end do
+      end do
       
       ! Adjust interpolation coefficients to cell centers in the presence of walls (only walls!)
       do k=this%cfg%kmino_,this%cfg%kmaxo_
@@ -2408,71 +2477,111 @@ contains
    end subroutine solve_implicit
    
    
+   !> RHO smoothness measure
+   !subroutine get_rsmooth(this,gradu)
+   !   implicit none
+   !   class(compress), intent(inout) :: this
+   !   real(WP), dimension(1:,1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: gradu !< Velocity gradient tensor
+   !   integer :: i,j,k
+   !   real(WP) :: grad,dila,vort,umagi,rx,ry,rz
+   !   real(WP) :: lambda=0.5_WP
+   !   do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
+   !      do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
+   !         do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+   !            ! Inverse of velocity magnitude
+   !            umagi=1.0_WP/(sqrt(0.5_WP*this%U(i,j,k)**2+0.5_WP*this%U(i+1,j,k)**2&
+   !            &                 +0.5_WP*this%V(i,j,k)**2+0.5_WP*this%V(i,j+1,k)**2&
+   !            &                 +0.5_WP*this%W(i,j,k)**2+0.5_WP*this%W(i,j,k+1)**2)+1.0e-15_WP)
+   !            ! Compute adimensional dilatation
+   !            dila=gradu(1,1,i,j,k)+gradu(2,2,i,j,k)+gradu(3,3,i,j,k)
+   !            dila=dila*this%cfg%meshsize(i,j,k)*umagi
+   !            ! Compute adimensional vorticity
+   !            vort=(gradu(2,3,i,j,k)-gradu(3,2,i,j,k))**2+(gradu(3,1,i,j,k)-gradu(1,3,i,j,k))**2+(gradu(1,2,i,j,k)-gradu(2,1,i,j,k))**2
+   !            vort=vort*this%cfg%meshsize(i,j,k)*umagi
+   !            ! Compute adimensional RHO smoothness
+   !            rx=(abs(this%cfg%dxmi(i+1)*(this%RHO(i+1,j,k)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dxmi(i)*(this%RHO(i,j,k)-this%RHO(i-1,j,k)))+1.0e-40_WP)
+   !            ry=(abs(this%cfg%dymi(j+1)*(this%RHO(i,j+1,k)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dymi(j)*(this%RHO(i,j,k)-this%RHO(i,j-1,k)))+1.0e-40_WP)
+   !            rz=(abs(this%cfg%dzmi(k+1)*(this%RHO(i,j,k+1)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dzmi(k)*(this%RHO(i,j,k)-this%RHO(i,j,k-1)))+1.0e-40_WP)
+   !            !if (min(rx,ry,rz).le.lambda.or.max(rx,ry,rz).ge.1.0_WP/lambda) then
+   !            if (max(rx,ry,rz).ge.1.0_WP/lambda) then
+   !            !if (min(rx,ry,rz).le.lambda) then
+   !               ! Small or large ratio indicates unsmooth density, set indicator to 1
+   !               this%rsmooth(i,j,k)=0.0_WP
+   !            else
+   !               ! Otherwise, ratio is within reason, set indicator to 0
+   !               this%rsmooth(i,j,k)=1.0_WP
+   !            end if
+   !         end do
+   !      end do
+   !   end do
+   !   call this%cfg%sync(this%rsmooth)
+   !   if (.not.this%cfg%xper) then
+   !      if (this%cfg%iproc.eq.1)            this%rsmooth(this%cfg%imino,:,:)=this%rsmooth(this%cfg%imino+1,:,:)
+   !      if (this%cfg%iproc.eq.this%cfg%npx) this%rsmooth(this%cfg%imaxo,:,:)=this%rsmooth(this%cfg%imaxo-1,:,:)
+   !   end if
+   !   if (.not.this%cfg%yper) then
+   !      if (this%cfg%jproc.eq.1)            this%rsmooth(:,this%cfg%jmino,:)=this%rsmooth(:,this%cfg%jmino+1,:)
+   !      if (this%cfg%jproc.eq.this%cfg%npy) this%rsmooth(:,this%cfg%jmaxo,:)=this%rsmooth(:,this%cfg%jmaxo-1,:)
+   !   end if
+   !   if (.not.this%cfg%zper) then
+   !      if (this%cfg%kproc.eq.1)            this%rsmooth(:,:,this%cfg%kmino)=this%rsmooth(:,:,this%cfg%kmino+1)
+   !      if (this%cfg%kproc.eq.this%cfg%npz) this%rsmooth(:,:,this%cfg%kmaxo)=this%rsmooth(:,:,this%cfg%kmaxo-1)
+   !   end if
+   !end subroutine get_rsmooth
+   
+   
    !> Compute (s)RHOX/Y/Z from this%RHO field
    subroutine update_faceRHO(this)
       implicit none
       class(compress), intent(inout) :: this
       integer :: i,j,k
-      ! Calculate face densities
-      do k=this%cfg%kmino_  ,this%cfg%kmaxo_
-         do j=this%cfg%jmino_  ,this%cfg%jmaxo_
-            do i=this%cfg%imino_+1,this%cfg%imaxo_
-               ! Square root of centered interpolate of rho
-               this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
-               ! Centered interpolate of rho
-               !this%RHOX(i,j,k)=0.5_WP*(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k))+sum(this%itpr_x(:,i,j,k)*this%RHOold(i-1:i,j,k)))
-               ! Upwind interpolate of rho
+      ! Calculate square root of centered RHO interpolation at faces
+      do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_+1,this%cfg%imaxo_
+         this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
+      end do; end do; end do
+      do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_+1,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%sRHOY(i,j,k)=sqrt(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k)))
+      end do; end do; end do
+      do k=this%cfg%kmino_+1,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%sRHOZ(i,j,k)=sqrt(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k)))
+      end do; end do; end do
+      call this%cfg%sync(this%sRHOX); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%sRHOX(this%cfg%imino,:,:)=sqrt(this%RHO(this%cfg%imino,:,:))
+      call this%cfg%sync(this%sRHOY); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%sRHOY(:,this%cfg%jmino,:)=sqrt(this%RHO(:,this%cfg%jmino,:))
+      call this%cfg%sync(this%sRHOZ); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%sRHOZ(:,:,this%cfg%kmino)=sqrt(this%RHO(:,:,this%cfg%kmino))
+      ! Calculate biased RHO interpolation at faces
+      this%RHOX=0.5_WP*(this%sRHOX**2+this%sRHOXold**2) ! Initialize values everywhere using
+      this%RHOY=0.5_WP*(this%sRHOY**2+this%sRHOYold**2) ! the centered interpolation already
+      this%RHOZ=0.5_WP*(this%sRHOZ**2+this%sRHOZold**2) ! performed to get sRHOX/Y/Z arrays
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               ! X-face
                if (this%Umid(i,j,k).ge.0.0_WP) then
-                  this%RHOX(i,j,k)=0.5_WP*(this%RHO(i-1,j,k)+this%RHOold(i-1,j,k))
+                  this%RHOX(i,j,k)=0.5_WP*(sum(this%itp_xp(:,i,j,k)*this%RHO   (i-2:i  ,j,k))&
+                  &                       +sum(this%itp_xp(:,i,j,k)*this%RHOold(i-2:i  ,j,k)))
                else
-                  this%RHOX(i,j,k)=0.5_WP*(this%RHO(i  ,j,k)+this%RHOold(i  ,j,k))
+                  this%RHOX(i,j,k)=0.5_WP*(sum(this%itp_xm(:,i,j,k)*this%RHO   (i-1:i+1,j,k))&
+                  &                       +sum(this%itp_xm(:,i,j,k)*this%RHOold(i-1:i+1,j,k)))
                end if
-            end do
-         end do
-      end do
-      do k=this%cfg%kmino_  ,this%cfg%kmaxo_
-         do j=this%cfg%jmino_+1,this%cfg%jmaxo_
-            do i=this%cfg%imino_  ,this%cfg%imaxo_
-               ! Square root of centered interpolate of rho
-               this%sRHOY(i,j,k)=sqrt(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k)))
-               ! Centered interpolate of rho
-               !this%RHOY(i,j,k)=0.5_WP*(sum(this%itpr_y(:,i,j,k)*this%RHO(i,j-1:j,k))+sum(this%itpr_y(:,i,j,k)*this%RHOold(i,j-1:j,k)))
-               ! Upwind interpolate of rho
+               ! Y-face
                if (this%Vmid(i,j,k).ge.0.0_WP) then
-                  this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j-1,k)+this%RHOold(i,j-1,k))
+                  this%RHOY(i,j,k)=0.5_WP*(sum(this%itp_yp(:,i,j,k)*this%RHO   (i,j-2:j  ,k))&
+                  &                       +sum(this%itp_yp(:,i,j,k)*this%RHOold(i,j-2:j  ,k)))
                else
-                  this%RHOY(i,j,k)=0.5_WP*(this%RHO(i,j  ,k)+this%RHOold(i,j  ,k))
+                  this%RHOY(i,j,k)=0.5_WP*(sum(this%itp_ym(:,i,j,k)*this%RHO   (i,j-1:j+1,k))&
+                  &                       +sum(this%itp_ym(:,i,j,k)*this%RHOold(i,j-1:j+1,k)))
                end if
-            end do
-         end do
-      end do
-      do k=this%cfg%kmino_+1,this%cfg%kmaxo_
-         do j=this%cfg%jmino_  ,this%cfg%jmaxo_
-            do i=this%cfg%imino_  ,this%cfg%imaxo_
-               ! Square root of centered interpolate of rho
-               this%sRHOZ(i,j,k)=sqrt(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k)))
-               ! Centered interpolate of rho
-               !this%RHOZ(i,j,k)=0.5_WP*(sum(this%itpr_z(:,i,j,k)*this%RHO(i,j,k-1:k))+sum(this%itpr_z(:,i,j,k)*this%RHOold(i,j,k-1:k)))
-               ! Upwind interpolate of rho
+               ! Z-face
                if (this%Wmid(i,j,k).ge.0.0_WP) then
-                  this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k-1)+this%RHOold(i,j,k-1))
+                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%itp_zp(:,i,j,k)*this%RHO   (i,j,k-2:k  ))&
+                  &                       +sum(this%itp_zp(:,i,j,k)*this%RHOold(i,j,k-2:k  )))
                else
-                  this%RHOZ(i,j,k)=0.5_WP*(this%RHO(i,j,k  )+this%RHOold(i,j,k  ))
+                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%itp_zm(:,i,j,k)*this%RHO   (i,j,k-1:k+1))&
+                  &                       +sum(this%itp_zm(:,i,j,k)*this%RHOold(i,j,k-1:k+1)))
                end if
             end do
          end do
       end do
-      ! Handle non-periodic borders
-      if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%sRHOX(this%cfg%imino,:,:)=sqrt(this%RHO(this%cfg%imino,:,:))
-      if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%sRHOY(:,this%cfg%jmino,:)=sqrt(this%RHO(:,this%cfg%jmino,:))
-      if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%sRHOZ(:,:,this%cfg%kmino)=sqrt(this%RHO(:,:,this%cfg%kmino))
-      if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%RHOX (this%cfg%imino,:,:)=0.5_WP*(this%RHO(this%cfg%imino,:,:)+this%RHOold(this%cfg%imino,:,:))
-      if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%RHOY (:,this%cfg%jmino,:)=0.5_WP*(this%RHO(:,this%cfg%jmino,:)+this%RHOold(:,this%cfg%jmino,:))
-      if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%RHOZ (:,:,this%cfg%kmino)=0.5_WP*(this%RHO(:,:,this%cfg%kmino)+this%RHOold(:,:,this%cfg%kmino))
-      ! Synchronize boundaries
-      call this%cfg%sync(this%sRHOX)
-      call this%cfg%sync(this%sRHOY)
-      call this%cfg%sync(this%sRHOZ)
       call this%cfg%sync(this%RHOX)
       call this%cfg%sync(this%RHOY)
       call this%cfg%sync(this%RHOZ)
