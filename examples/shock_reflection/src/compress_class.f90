@@ -2557,27 +2557,21 @@ contains
             do i=this%cfg%imin_,this%cfg%imax_
                ! X-face
                if (this%Umid(i,j,k).ge.0.0_WP) then
-                  this%RHOX(i,j,k)=0.5_WP*(sum(this%itp_xp(:,i,j,k)*this%RHO   (i-2:i  ,j,k))&
-                  &                       +sum(this%itp_xp(:,i,j,k)*this%RHOold(i-2:i  ,j,k)))
+                  this%RHOX(i,j,k)=sum(this%itp_xp(:,i,j,k)*this%RHO(i-2:i  ,j,k))*this%theta+sum(this%itp_xp(:,i,j,k)*this%RHOold(i-2:i  ,j,k))*(1.0_WP-this%theta)
                else
-                  this%RHOX(i,j,k)=0.5_WP*(sum(this%itp_xm(:,i,j,k)*this%RHO   (i-1:i+1,j,k))&
-                  &                       +sum(this%itp_xm(:,i,j,k)*this%RHOold(i-1:i+1,j,k)))
+                  this%RHOX(i,j,k)=sum(this%itp_xm(:,i,j,k)*this%RHO(i-1:i+1,j,k))*this%theta+sum(this%itp_xm(:,i,j,k)*this%RHOold(i-1:i+1,j,k))*(1.0_WP-this%theta)
                end if
                ! Y-face
                if (this%Vmid(i,j,k).ge.0.0_WP) then
-                  this%RHOY(i,j,k)=0.5_WP*(sum(this%itp_yp(:,i,j,k)*this%RHO   (i,j-2:j  ,k))&
-                  &                       +sum(this%itp_yp(:,i,j,k)*this%RHOold(i,j-2:j  ,k)))
+                  this%RHOY(i,j,k)=sum(this%itp_yp(:,i,j,k)*this%RHO(i,j-2:j  ,k))*this%theta+sum(this%itp_yp(:,i,j,k)*this%RHOold(i,j-2:j  ,k))*(1.0_WP-this%theta)
                else
-                  this%RHOY(i,j,k)=0.5_WP*(sum(this%itp_ym(:,i,j,k)*this%RHO   (i,j-1:j+1,k))&
-                  &                       +sum(this%itp_ym(:,i,j,k)*this%RHOold(i,j-1:j+1,k)))
+                  this%RHOY(i,j,k)=sum(this%itp_ym(:,i,j,k)*this%RHO(i,j-1:j+1,k))*this%theta+sum(this%itp_ym(:,i,j,k)*this%RHOold(i,j-1:j+1,k))*(1.0_WP-this%theta)
                end if
                ! Z-face
                if (this%Wmid(i,j,k).ge.0.0_WP) then
-                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%itp_zp(:,i,j,k)*this%RHO   (i,j,k-2:k  ))&
-                  &                       +sum(this%itp_zp(:,i,j,k)*this%RHOold(i,j,k-2:k  )))
+                  this%RHOZ(i,j,k)=sum(this%itp_zp(:,i,j,k)*this%RHO(i,j,k-2:k  ))*this%theta+sum(this%itp_zp(:,i,j,k)*this%RHOold(i,j,k-2:k  ))*(1.0_WP-this%theta)
                else
-                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%itp_zm(:,i,j,k)*this%RHO   (i,j,k-1:k+1))&
-                  &                       +sum(this%itp_zm(:,i,j,k)*this%RHOold(i,j,k-1:k+1)))
+                  this%RHOZ(i,j,k)=sum(this%itp_zm(:,i,j,k)*this%RHO(i,j,k-1:k+1))*this%theta+sum(this%itp_zm(:,i,j,k)*this%RHOold(i,j,k-1:k+1))*(1.0_WP-this%theta)
                end if
             end do
          end do
