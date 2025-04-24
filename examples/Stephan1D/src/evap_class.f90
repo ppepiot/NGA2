@@ -4,7 +4,7 @@ module evap_class
    use string,            only: str_medium
    use config_class,      only: config
    use timetracker_class, only: timetracker
-   use vfs_class,         only: vfs
+   use vfs_class,         only: vfs,VFlo,VFhi
    use tpscalar_class,    only: Lphase,Gphase
    implicit none
    private
@@ -87,7 +87,7 @@ contains
    
    !> Object initializer
    subroutine initialize(this,cfg,vf,itp_x,itp_y,itp_z,div_x,div_y,div_z,name)
-      use messager,  only: die
+      use messager, only: die
       implicit none
       class(evap), intent(inout) :: this
       class(config), target, intent(in) :: cfg
@@ -403,7 +403,7 @@ contains
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
-                  if (this%vf%VF(i,j,k).lt.1) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
+                  if (this%vf%VF(i,j,k).lt.VFhi) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
                end do
             end do
          end do
@@ -414,7 +414,7 @@ contains
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
-                  if (this%vf%VF(i,j,k).gt.0) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
+                  if (this%vf%VF(i,j,k).gt.VFlo) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
                end do
             end do
          end do
@@ -541,7 +541,7 @@ contains
    !    do k=this%cfg%kmin_,this%cfg%kmax_
    !       do j=this%cfg%jmin_,this%cfg%jmax_
    !          do i=this%cfg%imin_,this%cfg%imax_
-   !             if (this%vf%VF(i,j,k).lt.1) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
+   !             if (this%vf%VF(i,j,k).lt.VFhi) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
    !          end do
    !       end do
    !    end do
@@ -552,7 +552,7 @@ contains
    !    do k=this%cfg%kmin_,this%cfg%kmax_
    !       do j=this%cfg%jmin_,this%cfg%jmax_
    !          do i=this%cfg%imin_,this%cfg%imax_
-   !             if (this%vf%VF(i,j,k).gt.0) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
+   !             if (this%vf%VF(i,j,k).gt.VFlo) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
    !          end do
    !       end do
    !    end do
@@ -588,17 +588,17 @@ contains
       
       ! Check the dimensions
       if (this%nCell(1).gt.1) then
-         stxm=-2; stxp=+2
+         stxm=-extp_stc; stxp=+extp_stc
       else
          stxm= 0; stxp= 0
       end if
       if (this%nCell(2).gt.1) then
-         stym=-2; styp=+2
+         stym=-extp_stc; styp=+extp_stc
       else
          stym= 0; styp= 0
       end if
       if (this%nCell(3).gt.1) then
-         stzm=-2; stzp=+2
+         stzm=-extp_stc; stzp=+extp_stc
       else
          stzm= 0; stzp= 0
       end if
@@ -628,12 +628,15 @@ contains
                   if (this%vf%VF(i,j,k).ne.real(phase,WP)) then
                      d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
                      w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*norm2(d)**2.0_WP
+                     ! if (norm2(d).gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/norm2(d)
                   end if
                end do
             end do
          end do
          ! Normalize the weights
          w=w/sum(w)
+         ! Initialize with zero
+         A(ihat,jhat,khat)=0.0_WP
          ! Loop over the stencil
          do stz=stzm,stzp
             k=khat+stz
@@ -642,7 +645,7 @@ contains
                do stx=stxm,stxp
                   i=ihat+stx
                   ! Update the interfacial value
-                  if (this%vf%VF(i,j,k).ne.real(phase,WP)) A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
+                  A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
                end do
             end do
          end do
@@ -665,7 +668,10 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: A     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: A_grd !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: index,index_pure,i,j,k
-
+      real(WP) :: grdX,grdY,grdZ
+      real(WP) :: grdm,grdp
+      ! Initialize with zeros
+      A_grd=0.0_WP
       ! Loop over the pure cells within the stencil
       do index=1,sum(this%vf%band_count(1:extp_stc))
          ! Offset for the interfacial cells' index
@@ -676,13 +682,42 @@ contains
          k=this%vf%band_map(3,index_pure)
          ! Calculate the Gauss gradient
          if (this%vf%VF(i,j,k).ne.real(phase,WP)) then
-            A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
-            &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
-            &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
+            ! A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
+            ! &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
+            ! &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
+            grdm=this%cfg%dxmi(i  )*(A(i  ,j,k)-A(i-1,j,k))
+            grdp=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i  ,j,k))
+            grdX=minmod(grdm,grdp)
+            grdm=this%cfg%dymi(j  )*(A(i,j  ,k)-A(i,j-1,k))
+            grdp=this%cfg%dymi(j+1)*(A(i,j+1,k)-A(i,j ,k))
+            grdY=minmod(grdm,grdp)
+            grdm=this%cfg%dzmi(k  )*(A(i,j,k  )-A(i,j,k-1))
+            grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
+            grdZ=minmod(grdm,grdp)
+            A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
          end if
       end do
       ! Sync it
       call this%cfg%sync(A_grd)
+
+      contains
+      
+         !> Minmod gradient
+         function minmod(g1,g2) result(g)
+            implicit none
+            real(WP), intent(in) :: g1,g2
+            real(WP) :: g
+            if (g1*g2.le.0.0_WP) then
+               g=0.0_WP
+            else
+               if (abs(g1).lt.abs(g2)) then
+                  g=g1
+               else
+                  g=g2
+               end if
+            end if
+         end function minmod
+
    end subroutine get_grad
 
 
