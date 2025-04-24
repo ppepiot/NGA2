@@ -44,6 +44,7 @@ module simulation
    real(WP) :: Gamma
    real(WP) :: Ms,Xs0,theta,delta,sintheta,costheta
    real(WP) :: M2,p2,rho2,a2,u2,u2x,u2y,p1,rho1,a1,us
+   logical  :: static_shock
    
    !> Sponge zone
    real(WP) :: yspg
@@ -105,7 +106,8 @@ contains
          call param_read('Shock Mach',Ms)
          call param_read('Shock angle',theta); theta=theta*Pi/180.0_WP; costheta=cos(theta); sintheta=sin(theta)
          call param_read('Shock position',Xs0)
-         call param_read('Shock thickness',delta)
+         call param_read('Shock thickness',delta,default=1.2_WP*cfg%min_meshsize)
+         call param_read('Static shock',static_shock)
          ! Generate preshock conditions
          rho1=1.0_WP                                                   ! This is our reference density
          p1=0.25_WP*rho1/gamma*((gamma+1.0_WP)*Ms/(Ms**2-1.0_WP))**2   ! We choose p1 to ensure that u2=1
@@ -122,6 +124,7 @@ contains
          u2y=-u2*sintheta
          ! Output shock info
          if (cfg%amRoot) then
+            write(message,'("[     Shock  thickness] => delta=",es12.5)') delta; call log(message)
             write(message,'("[     Shock conditions] =>    Ms=",es12.5)')    Ms; call log(message)
             write(message,'("[     Shock conditions] =>    Vs=",es12.5)')    us; call log(message)
             write(message,'("[     Shock conditions] => theta=",es12.5)') theta; call log(message)
@@ -162,11 +165,14 @@ contains
       ! Create a compressible flow solver with bconds
       create_velocity_solver: block
          use hypre_str_class, only: pcg_pfmg2
+         use compress_class,  only: dirichlet,clipped_neumann
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
-         !fs%viscb=0.01_WP
+         ! Define boundary conditions
+         call fs%add_bcond(name='xm',type=dirichlet      ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
+         call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.false.,locator=xp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -180,11 +186,13 @@ contains
       
       ! Create a energy solver
       create_energy: block
-         use energy_class, only: neumann
+         use energy_class, only: neumann,dirichlet
          real(WP) :: Pr
          ! Create energy solver
          call sc%initialize(cfg=cfg,name='Energy')
-         !sc%diff=0.01_WP
+         ! Define boundary conditions
+         call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
+         call sc%add_bcond(name='xp',type=neumann  ,locator=xp_locator   ,dir='+x')
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Energy',nst=13)
          ! Setup the solver
@@ -201,17 +209,21 @@ contains
                   ! Setup normal shock at t=0
                   fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
                   fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i),cfg%ym(j),0.0_WP)!-us
+                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i)-delta,cfg%ym(j),0.0_WP)  ! Seems like u should be shifted a bit?
                   fs%V  (i,j,k)=        u2y     *Hshock(cfg%xm(i),cfg%y (j),0.0_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
                end do
             end do
          end do
+         ! If static shock, shift velocity
+         if (static_shock) fs%U=fs%U-us
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Get Umid/Vmid/Wmid
-         call fs%update_faceRHO(); fs%RHOold=fs%RHO; fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
+         call fs%update_faceRHO(); fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
+         call fs%update_faceRHO() !< Call it again because RHO* uses sRHO*old...
+         fs%Uold=fs%U
          call fs%get_Umid()
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
@@ -306,6 +318,36 @@ contains
          isIn=.false.
          if (pg%ym(j).ge.yspg) isIn=.true.
       end function sponge_locator
+      
+      !> Function that localizes x- boundary
+      function xm_locator(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (i.eq.pg%imin) isIn=.true.
+      end function xm_locator
+      
+      !> Function that localizes x- boundary for a scalar
+      function xm_locator_sc(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (i.eq.pg%imin-1) isIn=.true.
+      end function xm_locator_sc
+      
+      !> Function that localizes x+ boundary
+      function xp_locator(pg,i,j,k) result(isIn)
+         use pgrid_class, only: pgrid
+         class(pgrid), intent(in) :: pg
+         integer, intent(in) :: i,j,k
+         logical :: isIn
+         isIn=.false.
+         if (i.eq.pg%imax+1) isIn=.true.
+      end function xp_locator
       
    end subroutine simulation_init
    

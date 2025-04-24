@@ -36,7 +36,7 @@ contains
             x(i)=real(i-1,WP)/real(nx,WP)*Lx
          end do
          do j=1,ny+1
-            y(j)=real(j-1,WP)/real(ny,WP)*Ly
+            y(j)=real(j-1,WP)/real(ny,WP)*Ly-0.5_WP*Ly
          end do
          do k=1,nz+1
             z(k)=real(k-1,WP)/real(nz,WP)*Lz-0.5_WP*Lz
@@ -57,7 +57,19 @@ contains
       
       ! Create masks for this config
       create_walls: block
+         integer :: i,j,k
+         real(WP) :: Xwall,Hwall
          cfg%VF=1.0_WP
+         ! Add a wall in the middle
+         call param_read('Wall start',Xwall)
+         call param_read('Wall height',Hwall)
+         do k=cfg%kmino_,cfg%kmaxo_
+            do j=cfg%jmino_,cfg%jmaxo_
+               do i=cfg%imino_,cfg%imaxo_
+                  if (abs(cfg%y(j)).lt.Hwall.and.cfg%x(i).gt.Xwall) cfg%VF(i,j,k)=0.0_WP
+               end do
+            end do
+         end do
       end block create_walls
       
    end subroutine geometry_init
