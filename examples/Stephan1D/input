@@ -33,7 +33,8 @@ Latent heat                   : 2.26e6
 Max timestep size : 1.1e-2
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Max time          : 0.05 ! 1.173
+Scalar time step  : 1.1e-4
+Max time          : 1.173
 
 # Evaporation
 Max pseudo timestep size : 9e-6
@@ -46,4 +47,4 @@ Pressure tolerance : 1e-6
 Pressure iteration : 50
 
 # Ensight output
-Ensight output period : 0.05
+Ensight output period : 1.1e-1 ! 0.05

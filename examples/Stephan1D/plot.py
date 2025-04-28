@@ -47,4 +47,6 @@ plt.grid(which='major', axis='both', color='k', linestyle='--', linewidth=0.6, a
 legends = ax.legend([r'$Analytical$', r'$Numerical$'], frameon=False, loc='lower right', fontsize=10)
 ax.add_artist(legends)
 plt.tight_layout()
+ax.set_xlim(0, 0.12)
+ax.set_ylim(0, 0.22)
 plt.savefig('./x_vs_t.pdf')

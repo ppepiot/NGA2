@@ -24,7 +24,7 @@ module simulation
    type(vfs),         public :: vf
    type(tpscalar),    public :: sc
    type(evap),        public :: evp
-   type(timetracker), public :: time
+   type(timetracker), public :: time,timeSC
    
    !> Ensight postprocessing
    type(surfmesh) :: smesh
@@ -32,7 +32,7 @@ module simulation
    type(event)    :: ens_evt
    
    !> Simulation monitor file
-   type(monitor) :: mfile,cflfile,scfile,evpfile
+   type(monitor) :: mfile,cflfile,scfile,evpfile,Pefile
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -170,7 +170,7 @@ contains
       
       ! Allocate work arrays
       allocate_work_arrays: block
-         allocate(resSC (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3))
+         allocate(resSC (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:2))
          allocate(resU  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resV  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resW  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
@@ -193,6 +193,10 @@ contains
          call param_read('Sub-iterations',time%itmax)
          ! time%t=t0
          time%dt=time%dtmax
+         timeSC=timetracker(amRoot=cfg%amRoot,name='SC Time')
+         call param_read('Scalar time step',timeSC%dtmax)
+         timeSC%tmax=time%tmax
+         timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
       
       
@@ -211,7 +215,6 @@ contains
          integer, parameter :: amr_ref_lvl=4
          ! Create a VOF solver
          call vf%initialize(cfg=cfg,reconstruction_method=lvira,transport_method=flux_storage,nband=6,name='VOF')
-         vf%nband=6
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
@@ -278,7 +281,7 @@ contains
       create_and_initialize_flow_solver: block
          use hypre_str_class, only: gmres_pfmg2
          use mathtools,       only: Pi
-         use tpns_class,      only: clipped_neumann,dirichlet,bcond
+         use tpns_class,      only: clipped_neumann,bcond
          type(bcond), pointer :: mybc
          ! Create flow solver
          fs=tpns(cfg=cfg,name='Two-phase NS')
@@ -294,7 +297,6 @@ contains
          ! Assign acceleration of gravity
          call param_read('Gravity',fs%gravity)
          ! Boundary conditions
-         !call fs%add_bcond(name='xm',type=dirichlet,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
          call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
          ! call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
          ! call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
@@ -367,6 +369,10 @@ contains
                end do
             end do
          end do
+         where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+            sc%SC(:,:,:,iTl)=T_sat
+            sc%SC(:,:,:,iTg)=T_sat
+         end where
          ! Apply boundary conditions
          call sc%get_bcond('xm',mybc)
          do n=1,mybc%itr%no_
@@ -423,8 +429,7 @@ contains
          call evp%pure_interfacial_extp(Gphase,Tg_grd)
          ! Interface jump condition
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            ! evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
-            evp%mdotdp=0.00036801467319354816
+            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
          else where
             evp%mdotdp=0.0_WP
          end where
@@ -480,6 +485,7 @@ contains
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
          call vf%get_max()
+         call sc%get_Pe(time%dt)
          call sc%get_max()
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
@@ -512,6 +518,17 @@ contains
          call cflfile%add_column(fs%CFLv_y,'Viscous yCFL')
          call cflfile%add_column(fs%CFLv_z,'Viscous zCFL')
          call cflfile%write()
+         ! Create Pe monitor
+         Pefile=monitor(sc%cfg%amRoot,'Pe')
+         call Pefile%add_column(time%n,'Timestep number')
+         call Pefile%add_column(time%t,'Time')
+         call Pefile%add_column(sc%Pel_x,'L xPe')
+         call Pefile%add_column(sc%Pel_y,'L yPe')
+         call Pefile%add_column(sc%Pel_z,'L zPe')
+         call Pefile%add_column(sc%Peg_x,'G xPe')
+         call Pefile%add_column(sc%Peg_y,'G yPe')
+         call Pefile%add_column(sc%Peg_z,'G zPe')
+         call Pefile%write()
          ! Create scalar monitor
          scfile=monitor(sc%cfg%amRoot,'scalar')
          call scfile%add_column(time%n,'Timestep number')
@@ -619,47 +636,61 @@ contains
                where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.VFlo) sc%SC(:,:,:,nsc)=(sc%PVFold(:,:,:,sc%phase(nsc))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
                where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
             end do
-            
-            ! Explicit calculation of dVOFSC/dt from scalar diffusion
-            call sc%get_dSCdt_dff(dSCdt=resSC)
-            do nsc=1,sc%nscalar
-               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.VFlo) resSC(:,:,:,nsc)=time%dt*resSC(:,:,:,nsc)/sc%PVF(:,:,:,sc%phase(nsc))
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
-            end do
-
-            ! Form implicit diffusive residual
-            call sc%solve_implicit_diff(time%dt,resSC)
-
-            ! Advance scalar diffusion
-            sc%SC=sc%SC+resSC
-
-            ! Apply boundary conditions
             where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
                sc%SC(:,:,:,iTl)=T_sat
                sc%SC(:,:,:,iTg)=T_sat
             end where
-            call sc%apply_bcond(time%t,time%dt)
 
-            ! One-field temperature
-            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+            do while (timeSC%t.lt.time%t)
 
-            ! Debug
-            ! Tg_grd=0.0_WP
-            ! Tl_grd=0.0_WP
-            ! do k=sc%cfg%kmin_,sc%cfg%kmax_
-            !    do j=sc%cfg%jmin_,sc%cfg%jmax_
-            !       do i=sc%cfg%imin_,sc%cfg%imax_
-            !          if (vf%VF(i,j,k).gt.VFlo.and.vf%VF(i,j,k).lt.VFhi) then
-            !             ! Tg_grd(i,j,k)=(sc%SC(i-1,j,k,iTg)-sc%SC(i-2,j,k,iTg))*sc%cfg%dxmi(i-1)
-            !             ! Tl_grd(i,j,k)=(sc%SC(i+2,j,k,iTl)-sc%SC(i+1,j,k,iTl))*sc%cfg%dxmi(i+2)
-            !             Tg_grd(i,j,k)=(T_w-T_sat)/sc%cfg%xm(i)
-            !             Tl_grd(i,j,k)=0.0_WP
-            !          end if
-            !       end do
-            !    end do
-            ! end do
-            ! call sc%cfg%sync(Tg_grd)
-            ! call sc%cfg%sync(Tl_grd)
+               call timeSC%increment()
+               sc%SCold=sc%SC
+
+               ! Get the Peclet number
+               call sc%get_Pe(timeSC%dt)
+
+               ! Explicit calculation of dVOFSC/dt from scalar diffusion
+               call sc%get_dSCdt_dff(dSCdt=resSC)
+               do nsc=1,sc%nscalar
+                  where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.VFlo) resSC(:,:,:,nsc)=timeSC%dt*resSC(:,:,:,nsc)/sc%PVF(:,:,:,sc%phase(nsc))
+                  where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
+               end do
+
+               ! Form implicit diffusive residual
+               call sc%solve_implicit_diff(timeSC%dt,resSC)
+
+               ! Advance scalar diffusion
+               sc%SC=sc%SC+resSC
+
+               ! Apply boundary conditions
+               where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+                  sc%SC(:,:,:,iTl)=T_sat
+                  sc%SC(:,:,:,iTg)=T_sat
+               end where
+               call sc%apply_bcond(timeSC%t,timeSC%dt)
+
+               ! One-field temperature
+               T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+
+               ! Debug
+               ! Tg_grd=0.0_WP
+               ! Tl_grd=0.0_WP
+               ! do k=sc%cfg%kmin_,sc%cfg%kmax_
+               !    do j=sc%cfg%jmin_,sc%cfg%jmax_
+               !       do i=sc%cfg%imin_,sc%cfg%imax_
+               !          if (vf%VF(i,j,k).gt.VFlo.and.vf%VF(i,j,k).lt.VFhi) then
+               !             ! Tg_grd(i,j,k)=(sc%SC(i-1,j,k,iTg)-sc%SC(i-2,j,k,iTg))*sc%cfg%dxmi(i-1)
+               !             ! Tl_grd(i,j,k)=(sc%SC(i+2,j,k,iTl)-sc%SC(i+1,j,k,iTl))*sc%cfg%dxmi(i+2)
+               !             Tg_grd(i,j,k)=(T_w-T_sat)/sc%cfg%xm(i)
+               !             Tl_grd(i,j,k)=0.0_WP
+               !          end if
+               !       end do
+               !    end do
+               ! end do
+               ! call sc%cfg%sync(Tg_grd)
+               ! call sc%cfg%sync(Tl_grd)
+
+            end do
 
          end block advance_scalar
 
@@ -672,8 +703,7 @@ contains
 
          ! Interface jump conditions
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            ! evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
-            evp%mdotdp=0.00036801467319354816
+            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
          else where
             evp%mdotdp=0.0_WP
          end where
@@ -768,6 +798,7 @@ contains
          call mfile%write()
          call cflfile%write()
          call scfile%write()
+         call Pefile%write()
          call evpfile%write()
          
       end do
