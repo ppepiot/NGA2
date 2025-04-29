@@ -4,9 +4,9 @@ Partition : 2 2 1
 # Mesh definition
 Lx : 0.001
 Ly : 0.001
-Lz : 7.8125e-06  ! 3.90625e-06
-nx : 128 ! 256
-ny : 128 ! 256
+Lz : 7.8125e-06
+nx : 128
+ny : 128
 nz : 1
 
 # Case parameters
@@ -30,10 +30,10 @@ Saturation temperature        : 373.15
 Latent heat                   : 2.26e6
 
 # Time integration
-Max timestep size : 1.1e-2
+Max timestep size : 4e-3
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 1.1e-4
+Scalar time step  : 4e-5
 Max time          : 1.173
 
 # Evaporation
@@ -43,8 +43,9 @@ Max pseudo time steps    : 10
 Mass flux tolerence      : 1e-22
 
 # Pressure solver
-Pressure tolerance : 1e-6
-Pressure iteration : 50
+Pressure tolerance    : 1e-6
+Pressure iteration    : 50
+Max coarsening levels : 12
 
 # Ensight output
-Ensight output period : 1.1e-1 ! 0.05
+Ensight output period : 0.1 ! 0.05

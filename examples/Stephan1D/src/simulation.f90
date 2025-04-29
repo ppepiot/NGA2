@@ -32,7 +32,7 @@ module simulation
    type(event)    :: ens_evt
    
    !> Simulation monitor file
-   type(monitor) :: mfile,cflfile,scfile,evpfile,Pefile
+   type(monitor) :: mfile,cflfile,scfile,evpfile
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -305,11 +305,11 @@ contains
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
          ! ps%maxlevel=16
-         ps%maxlevel=12
-         ! ps%maxlevel=5
-         ! ps%maxlevel=2
+         ! ps%maxlevel=12
+         ! ps%maxlevel=9
          call param_read('Pressure iteration',ps%maxit)
          call param_read('Pressure tolerance',ps%rcvg)
+         call param_read('Max coarsening levels',ps%maxlevel)
          ! Implicit velocity solver
          vs=ddadi(cfg=cfg,name='Velocity',nst=7)
          ! Setup the solver
@@ -433,6 +433,7 @@ contains
          else where
             evp%mdotdp=0.0_WP
          end where
+         print*,maxval(evp%mdotdp)
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
          ! Initialize the liquid and gas side mass fluxes
@@ -485,7 +486,6 @@ contains
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
          call vf%get_max()
-         call sc%get_Pe(time%dt)
          call sc%get_max()
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
@@ -518,17 +518,6 @@ contains
          call cflfile%add_column(fs%CFLv_y,'Viscous yCFL')
          call cflfile%add_column(fs%CFLv_z,'Viscous zCFL')
          call cflfile%write()
-         ! Create Pe monitor
-         Pefile=monitor(sc%cfg%amRoot,'Pe')
-         call Pefile%add_column(time%n,'Timestep number')
-         call Pefile%add_column(time%t,'Time')
-         call Pefile%add_column(sc%Pel_x,'L xPe')
-         call Pefile%add_column(sc%Pel_y,'L yPe')
-         call Pefile%add_column(sc%Pel_z,'L zPe')
-         call Pefile%add_column(sc%Peg_x,'G xPe')
-         call Pefile%add_column(sc%Peg_y,'G yPe')
-         call Pefile%add_column(sc%Peg_z,'G zPe')
-         call Pefile%write()
          ! Create scalar monitor
          scfile=monitor(sc%cfg%amRoot,'scalar')
          call scfile%add_column(time%n,'Timestep number')
@@ -645,9 +634,6 @@ contains
 
                call timeSC%increment()
                sc%SCold=sc%SC
-
-               ! Get the Peclet number
-               call sc%get_Pe(timeSC%dt)
 
                ! Explicit calculation of dVOFSC/dt from scalar diffusion
                call sc%get_dSCdt_dff(dSCdt=resSC)
@@ -798,7 +784,6 @@ contains
          call mfile%write()
          call cflfile%write()
          call scfile%write()
-         call Pefile%write()
          call evpfile%write()
          
       end do

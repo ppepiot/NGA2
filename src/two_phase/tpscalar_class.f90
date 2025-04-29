@@ -82,10 +82,6 @@ module tpscalar_class
       
       ! Monitoring quantities
       real(WP), dimension(:), allocatable :: SCmax,SCmin,SCint           !< Maximum and minimum, integral scalar
-
-      ! Peclet numbers
-      real(WP) :: Pel_x,Pel_y,Pel_z                                      !< Liquid Peclect numbers
-      real(WP) :: Peg_x,Peg_y,Peg_z                                      !< Gas Peclect numbers
       
    contains
       procedure :: initialize                                            !< Initialization of the scalar solver
@@ -101,7 +97,6 @@ module tpscalar_class
       procedure :: get_max                                               !< Calculate maximum and integral field values
       procedure :: solve_implicit_diff                                   !< Solve for the diffusive scalar residuals implicitly
       procedure :: get_face_apt                                          !< Calculate the phase specific face apertures
-      procedure :: get_Pe
    end type tpscalar
    
    
@@ -913,55 +908,6 @@ contains
       end do
       deallocate(tmp)
    end subroutine get_max
-
-   
-   !> Calculate the Pe
-   subroutine get_Pe(this,dt)
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
-      use parallel,  only: MPI_REAL_WP
-      implicit none
-      class(tpscalar), intent(inout) :: this
-      real(WP), intent(in)  :: dt
-      integer :: i,j,k,ierr
-      real(WP) :: my_Pe_x,my_Pe_y,my_Pe_z
-      
-      ! Set the Pes to zero
-      my_Pe_x=0.0_WP; my_Pe_y=0.0_WP; my_Pe_z=0.0_WP
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
-               my_Pe_x=max(my_Pe_x,4.0_WP*this%diff(i,j,k,Lphase)*this%cfg%dxi(i)**2)
-               my_Pe_y=max(my_Pe_y,4.0_WP*this%diff(i,j,k,Lphase)*this%cfg%dyi(j)**2)
-               my_Pe_z=max(my_Pe_z,4.0_WP*this%diff(i,j,k,Lphase)*this%cfg%dzi(k)**2)
-            end do
-         end do
-      end do
-      my_Pe_x=my_Pe_x*dt; my_Pe_y=my_Pe_y*dt; my_Pe_z=my_Pe_z*dt
-      
-      ! Get the parallel max
-      call MPI_ALLREDUCE(my_Pe_x,this%Pel_x,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pe_y,this%Pel_y,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pe_z,this%Pel_z,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-
-      ! Set the Pes to zero
-      my_Pe_x=0.0_WP; my_Pe_y=0.0_WP; my_Pe_z=0.0_WP
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
-               my_Pe_x=max(my_Pe_x,4.0_WP*this%diff(i,j,k,Gphase)*this%cfg%dxi(i)**2)
-               my_Pe_y=max(my_Pe_y,4.0_WP*this%diff(i,j,k,Gphase)*this%cfg%dyi(j)**2)
-               my_Pe_z=max(my_Pe_z,4.0_WP*this%diff(i,j,k,Gphase)*this%cfg%dzi(k)**2)
-            end do
-         end do
-      end do
-      my_Pe_x=my_Pe_x*dt; my_Pe_y=my_Pe_y*dt; my_Pe_z=my_Pe_z*dt
-      
-      ! Get the parallel max
-      call MPI_ALLREDUCE(my_Pe_x,this%Peg_x,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pe_y,this%Peg_y,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_Pe_z,this%Peg_z,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      
-   end subroutine get_Pe
 
 
    !> Print out info for tpscalar solver
