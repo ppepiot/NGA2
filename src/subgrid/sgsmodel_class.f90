@@ -28,7 +28,7 @@ module sgsmodel_class
       
       ! Some model parameters
       real(WP) :: Cs_ref=0.17_WP
-      real(WP) :: Cartif=1.0_WP,Cartif_vort=1.0e2_WP
+      real(WP) :: Cartif=10.0_WP,Cartif_vort=1.0e2_WP
       
       ! LM and MM tensor norms and eddy viscosity
       real(WP), dimension(:,:,:), allocatable :: LM,MM          !< LM and MM tensor norms

@@ -55,8 +55,11 @@ module energy_class
       
       ! Metrics
       real(WP), dimension(:,:,:,:), allocatable :: itp_x,itp_y,itp_z        !< Interpolation of diffusivity to the face
-      real(WP), dimension(:,:,:,:), allocatable :: itp_xp,itp_yp,itp_zp     !< QUICK plus  interpolation for E
-      real(WP), dimension(:,:,:,:), allocatable :: itp_xm,itp_ym,itp_zm     !< QUICK minus interpolation for E
+      real(WP), dimension(:,:,:,:), allocatable :: itpe_x,itpe_y,itpe_z      !< 2nd order centered interpolation for energy
+      real(WP), dimension(:,:,:,:), allocatable :: up2_xp,up2_yp,up2_zp      !< 2nd order upwind interpolation for energy (+)
+      real(WP), dimension(:,:,:,:), allocatable :: up2_xm,up2_ym,up2_zm      !< 2nd order upwind interpolation for energy (+)
+      real(WP), dimension(:,:,:,:), allocatable :: weno_xp,weno_yp,weno_zp   !< WENO interpolation for energy (+)
+      real(WP), dimension(:,:,:,:), allocatable :: weno_xm,weno_ym,weno_zm   !< WENO interpolation for energy (-)
       real(WP), dimension(:,:,:,:), allocatable :: div_x,div_y,div_z        !< Divergence of energy flux
       real(WP), dimension(:,:,:,:), allocatable :: grd_x,grd_y,grd_z        !< Gradient of temperature
       
@@ -75,6 +78,7 @@ module energy_class
       procedure :: apply_bcond                              !< Apply all boundary conditions
       procedure :: init_metrics                             !< Initialize metrics
       procedure :: adjust_metrics                           !< Adjust metrics
+      procedure :: prepare_weno                             !< Prepare weno interpolation coefficients
       procedure :: get_drhoEdt                              !< Calculate drhoE/dt
       procedure :: get_max                                  !< Calculate stats of our energy
       procedure :: solve_implicit                           !< Solve for the energy residuals implicitly
@@ -177,32 +181,65 @@ contains
       end do
       
       ! Allocate finite difference energy interpolation coefficients
-      allocate(this%itp_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
-      allocate(this%itp_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
-      allocate(this%itp_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
-      allocate(this%itp_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
-      allocate(this%itp_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
-      allocate(this%itp_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
-      ! Create energy interpolation coefficients to cell faces
+      allocate(this%itpe_x(-1:0,this%cfg%imino_+1:this%cfg%imaxo_,this%cfg%jmino_  :this%cfg%jmaxo_,this%cfg%kmino_  :this%cfg%kmaxo_)) !< X-face-centered
+      allocate(this%itpe_y(-1:0,this%cfg%imino_  :this%cfg%imaxo_,this%cfg%jmino_+1:this%cfg%jmaxo_,this%cfg%kmino_  :this%cfg%kmaxo_)) !< Y-face-centered
+      allocate(this%itpe_z(-1:0,this%cfg%imino_  :this%cfg%imaxo_,this%cfg%jmino_  :this%cfg%jmaxo_,this%cfg%kmino_+1:this%cfg%kmaxo_)) !< Z-face-centered
+      ! Create energy interpolation coefficients to cell face in x
+      do k=this%cfg%kmino_  ,this%cfg%kmaxo_
+         do j=this%cfg%jmino_  ,this%cfg%jmaxo_
+            do i=this%cfg%imino_+1,this%cfg%imaxo_
+               this%itpe_x(:,i,j,k)=this%cfg%dxmi(i)*[this%cfg%xm(i)-this%cfg%x(i),this%cfg%x(i)-this%cfg%xm(i-1)] !< Linear interpolation in x from [xm,ym,zm] to [x,ym,zm]
+            end do
+         end do
+      end do
+      ! Create energy interpolation coefficients to cell face in y
+      do k=this%cfg%kmino_  ,this%cfg%kmaxo_
+         do j=this%cfg%jmino_+1,this%cfg%jmaxo_
+            do i=this%cfg%imino_  ,this%cfg%imaxo_
+               this%itpe_y(:,i,j,k)=this%cfg%dymi(j)*[this%cfg%ym(j)-this%cfg%y(j),this%cfg%y(j)-this%cfg%ym(j-1)] !< Linear interpolation in y from [xm,ym,zm] to [xm,y,zm]
+            end do
+         end do
+      end do
+      ! Create energy interpolation coefficients to cell face in z
+      do k=this%cfg%kmino_+1,this%cfg%kmaxo_
+         do j=this%cfg%jmino_  ,this%cfg%jmaxo_
+            do i=this%cfg%imino_  ,this%cfg%imaxo_
+               this%itpe_z(:,i,j,k)=this%cfg%dzmi(k)*[this%cfg%zm(k)-this%cfg%z(k),this%cfg%z(k)-this%cfg%zm(k-1)] !< Linear interpolation in z from [xm,ym,zm] to [xm,ym,z]
+            end do
+         end do
+      end do
+      
+      ! Allocate 2nd order upwind energy interpolation coefficients
+      allocate(this%up2_xp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%up2_xm( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%up2_yp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%up2_ym( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%up2_zp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      allocate(this%up2_zm( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      ! Create 2nd order upwind energy interpolation coefficients to cell faces
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
             do i=this%cfg%imin_,this%cfg%imax_+1
                ! Interpolation to x-face
-               call fv_itp_build(n=3,x=this%cfg%x(i-2:i+1),xp=this%cfg%x(i),coeff=this%itp_xp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%x(i-1:i+2),xp=this%cfg%x(i),coeff=this%itp_xm(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%x(i-2:i  ),xp=this%cfg%x(i),coeff=this%up2_xp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%x(i  :i+2),xp=this%cfg%x(i),coeff=this%up2_xm(:,i,j,k))
                ! Interpolation to y-face
-               call fv_itp_build(n=3,x=this%cfg%y(j-2:j+1),xp=this%cfg%y(j),coeff=this%itp_yp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%y(j-1:j+2),xp=this%cfg%y(j),coeff=this%itp_ym(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%y(j-2:j  ),xp=this%cfg%y(j),coeff=this%up2_yp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%y(j  :j+2),xp=this%cfg%y(j),coeff=this%up2_ym(:,i,j,k))
                ! Interpolation to z-face
-               call fv_itp_build(n=3,x=this%cfg%z(k-2:k+1),xp=this%cfg%z(k),coeff=this%itp_zp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%z(k-1:k+2),xp=this%cfg%z(k),coeff=this%itp_zm(:,i,j,k))
-               ! Replace by pure upwind
-               !this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !this%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               call fv_itp_build(n=2,x=this%cfg%z(k-2:k  ),xp=this%cfg%z(k),coeff=this%up2_zp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%z(k  :k+2),xp=this%cfg%z(k),coeff=this%up2_zm(:,i,j,k))
             end do
          end do
       end do
+      
+      ! Allocate WENO3 energy interpolation coefficients
+      allocate(this%weno_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%weno_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%weno_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%weno_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%weno_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      allocate(this%weno_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
       
       ! Allocate finite volume divergence operators
       allocate(this%div_x(0:+1,this%cfg%imin_:this%cfg%imax_,this%cfg%jmin_:this%cfg%jmax_,this%cfg%kmin_:this%cfg%kmax_)) !< Cell-centered
@@ -270,30 +307,30 @@ contains
             do i=this%cfg%imin_,this%cfg%imax_+1
                ! X face
                if (this%mask(i-1,j,k).eq.2) then
-                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm(-1,i,j,k)=1.0_WP
-                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp(-1,i,j,k)=1.0_WP
+                  this%up2_xm(:,i,j,k)=0.0_WP; this%up2_xm(-1,i,j,k)=1.0_WP
+                  this%up2_xp(:,i,j,k)=0.0_WP; this%up2_xp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i  ,j,k).eq.2) then
-                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm( 0,i,j,k)=1.0_WP
-                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp( 0,i,j,k)=1.0_WP
+                  this%up2_xm(:,i,j,k)=0.0_WP; this%up2_xm( 0,i,j,k)=1.0_WP
+                  this%up2_xp(:,i,j,k)=0.0_WP; this%up2_xp( 0,i,j,k)=1.0_WP
                end if
                ! Y face
                if (this%mask(i,j-1,k).eq.2) then
-                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym(-1,i,j,k)=1.0_WP
-                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp(-1,i,j,k)=1.0_WP
+                  this%up2_ym(:,i,j,k)=0.0_WP; this%up2_ym(-1,i,j,k)=1.0_WP
+                  this%up2_yp(:,i,j,k)=0.0_WP; this%up2_yp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i,j  ,k).eq.2) then
-                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym( 0,i,j,k)=1.0_WP
-                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp( 0,i,j,k)=1.0_WP
+                  this%up2_ym(:,i,j,k)=0.0_WP; this%up2_ym( 0,i,j,k)=1.0_WP
+                  this%up2_yp(:,i,j,k)=0.0_WP; this%up2_yp( 0,i,j,k)=1.0_WP
                end if
                ! Z face
                if (this%mask(i,j,k-1).eq.2) then
-                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm(-1,i,j,k)=1.0_WP
-                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp(-1,i,j,k)=1.0_WP
+                  this%up2_zm(:,i,j,k)=0.0_WP; this%up2_zm(-1,i,j,k)=1.0_WP
+                  this%up2_zp(:,i,j,k)=0.0_WP; this%up2_zp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i,j,k  ).eq.2) then
-                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm( 0,i,j,k)=1.0_WP
-                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp( 0,i,j,k)=1.0_WP
+                  this%up2_zm(:,i,j,k)=0.0_WP; this%up2_zm( 0,i,j,k)=1.0_WP
+                  this%up2_zp(:,i,j,k)=0.0_WP; this%up2_zp( 0,i,j,k)=1.0_WP
                end if
             end do
          end do
@@ -510,6 +547,54 @@ contains
    end subroutine apply_bcond
    
    
+   !> Prepare WENO stencil
+   subroutine prepare_weno(this,e)
+      use mathtools, only: fv_itp_build
+      implicit none
+      class(energy), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: e !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), parameter :: eps=1.0e-15_WP
+      integer :: i,j,k
+      real(WP) :: w
+      ! Analyze passed E array and prepare interpolation coefficients
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               ! X-face
+               w=weno_weight((abs(e(i-1,j,k)-e(i-2,j,k))+eps)/(abs(e(i  ,j,k)-e(i-1,j,k))+eps))
+               this%weno_xp(:,i,j,k)=(       w)*[this%up2_xp(-2,i,j,k),this%up2_xp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpe_x(-1,i,j,k),this%itpe_x( 0,i,j,k)]
+               w=weno_weight((abs(e(i+1,j,k)-e(i  ,j,k))+eps)/(abs(e(i  ,j,k)-e(i-1,j,k))+eps))
+               this%weno_xm(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_xm( 0,i,j,k),this%up2_xm(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpe_x(-1,i,j,k),this%itpe_x( 0,i,j,k),0.0_WP               ]
+               ! Y-face
+               w=weno_weight((abs(e(i,j-1,k)-e(i,j-2,k))+eps)/(abs(e(i,j  ,k)-e(i,j-1,k))+eps))
+               this%weno_yp(:,i,j,k)=(       w)*[this%up2_yp(-2,i,j,k),this%up2_yp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpe_y(-1,i,j,k),this%itpe_y( 0,i,j,k)]
+               w=weno_weight((abs(e(i,j+1,k)-e(i,j  ,k))+eps)/(abs(e(i,j  ,k)-e(i,j-1,k))+eps))
+               this%weno_ym(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_ym( 0,i,j,k),this%up2_ym(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpe_y(-1,i,j,k),this%itpe_y( 0,i,j,k),0.0_WP               ]
+               ! Z-face
+               w=weno_weight((abs(e(i,j,k-1)-e(i,j,k-2))+eps)/(abs(e(i,j,k  )-e(i,j,k-1))+eps))
+               this%weno_zp(:,i,j,k)=(       w)*[this%up2_zp(-2,i,j,k),this%up2_zp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpe_z(-1,i,j,k),this%itpe_z( 0,i,j,k)]
+               w=weno_weight((abs(e(i,j,k+1)-e(i,j,k  ))+eps)/(abs(e(i,j,k  )-e(i,j,k-1))+eps))
+               this%weno_zm(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_zm( 0,i,j,k),this%up2_zm(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpe_z(-1,i,j,k),this%itpe_z( 0,i,j,k),0.0_WP               ]
+            end do
+         end do
+      end do
+   contains
+      real(WP) function weno_weight(ratio)
+         implicit none
+         real(WP), intent(in) :: ratio
+         real(WP), parameter :: lambda=0.13_WP ! Switching parameter
+         real(WP), parameter :: delta=0.01_WP  ! Switching thickness
+         weno_weight=(1.0_WP-tanh((ratio-lambda)/delta))/3.0_WP+(1.0_WP-tanh((ratio-1.0_WP/lambda)/delta))/6.0_WP
+      end function weno_weight
+   end subroutine prepare_weno
+   
+   
    !> Calculate the explicit rhoE time derivative given passed RHO/RHOold/rhoU/rhoV/rhoW
    subroutine get_drhoEdt(this,drhoEdt,rhoU,rhoV,rhoW)
       implicit none
@@ -532,14 +617,14 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
             do i=this%cfg%imin_,this%cfg%imax_+1
-               FX(i,j,k)=-0.5_WP*(rhoU(i,j,k)+abs(rhoU(i,j,k)))*sum(this%itp_xp(:,i,j,k)*E_(i-2:i  ,j,k)) &
-               &         -0.5_WP*(rhoU(i,j,k)-abs(rhoU(i,j,k)))*sum(this%itp_xm(:,i,j,k)*E_(i-1:i+1,j,k)) &
+               FX(i,j,k)=-0.5_WP*(rhoU(i,j,k)+abs(rhoU(i,j,k)))*sum(this%weno_xp(:,i,j,k)*E_(i-2:i  ,j,k)) &
+               &         -0.5_WP*(rhoU(i,j,k)-abs(rhoU(i,j,k)))*sum(this%weno_xm(:,i,j,k)*E_(i-1:i+1,j,k)) &
                &         +sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k))*sum(this%grd_x(:,i,j,k)*E_(i-1:i,j,k))/this%Cv
-               FY(i,j,k)=-0.5_WP*(rhoV(i,j,k)+abs(rhoV(i,j,k)))*sum(this%itp_yp(:,i,j,k)*E_(i,j-2:j  ,k)) &
-               &         -0.5_WP*(rhoV(i,j,k)-abs(rhoV(i,j,k)))*sum(this%itp_ym(:,i,j,k)*E_(i,j-1:j+1,k)) &
+               FY(i,j,k)=-0.5_WP*(rhoV(i,j,k)+abs(rhoV(i,j,k)))*sum(this%weno_yp(:,i,j,k)*E_(i,j-2:j  ,k)) &
+               &         -0.5_WP*(rhoV(i,j,k)-abs(rhoV(i,j,k)))*sum(this%weno_ym(:,i,j,k)*E_(i,j-1:j+1,k)) &
                &         +sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k))*sum(this%grd_y(:,i,j,k)*E_(i,j-1:j,k))/this%Cv
-               FZ(i,j,k)=-0.5_WP*(rhoW(i,j,k)+abs(rhoW(i,j,k)))*sum(this%itp_zp(:,i,j,k)*E_(i,j,k-2:k  )) &
-               &         -0.5_WP*(rhoW(i,j,k)-abs(rhoW(i,j,k)))*sum(this%itp_zm(:,i,j,k)*E_(i,j,k-1:k+1)) &
+               FZ(i,j,k)=-0.5_WP*(rhoW(i,j,k)+abs(rhoW(i,j,k)))*sum(this%weno_zp(:,i,j,k)*E_(i,j,k-2:k  )) &
+               &         -0.5_WP*(rhoW(i,j,k)-abs(rhoW(i,j,k)))*sum(this%weno_zm(:,i,j,k)*E_(i,j,k-1:k+1)) &
                &         +sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k))*sum(this%grd_z(:,i,j,k)*E_(i,j,k-1:k))/this%Cv
             end do
          end do
@@ -616,15 +701,15 @@ contains
                do std=0,1
                   ! Loop over plus interpolation stencil
                   do sti=-2,0
-                     this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)+0.5_WP*dt*this%div_x(std,i,j,k)*0.5_WP*(rhoU(i+std,j,k)+abs(rhoU(i+std,j,k)))*this%itp_xp(sti,i+std,j,k)
-                     this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)+0.5_WP*dt*this%div_y(std,i,j,k)*0.5_WP*(rhoV(i,j+std,k)+abs(rhoV(i,j+std,k)))*this%itp_yp(sti,i,j+std,k)
-                     this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)+0.5_WP*dt*this%div_z(std,i,j,k)*0.5_WP*(rhoW(i,j,k+std)+abs(rhoW(i,j,k+std)))*this%itp_zp(sti,i,j,k+std)
+                     this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)+0.5_WP*dt*this%div_x(std,i,j,k)*0.5_WP*(rhoU(i+std,j,k)+abs(rhoU(i+std,j,k)))*this%weno_xp(sti,i+std,j,k)
+                     this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)+0.5_WP*dt*this%div_y(std,i,j,k)*0.5_WP*(rhoV(i,j+std,k)+abs(rhoV(i,j+std,k)))*this%weno_yp(sti,i,j+std,k)
+                     this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)+0.5_WP*dt*this%div_z(std,i,j,k)*0.5_WP*(rhoW(i,j,k+std)+abs(rhoW(i,j,k+std)))*this%weno_zp(sti,i,j,k+std)
                   end do
                   ! Loop over minus interpolation stencil
                   do sti=-1,+1
-                     this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)+0.5_WP*dt*this%div_x(std,i,j,k)*0.5_WP*(rhoU(i+std,j,k)-abs(rhoU(i+std,j,k)))*this%itp_xm(sti,i+std,j,k)
-                     this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)+0.5_WP*dt*this%div_y(std,i,j,k)*0.5_WP*(rhoV(i,j+std,k)-abs(rhoV(i,j+std,k)))*this%itp_ym(sti,i,j+std,k)
-                     this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)+0.5_WP*dt*this%div_z(std,i,j,k)*0.5_WP*(rhoW(i,j,k+std)-abs(rhoW(i,j,k+std)))*this%itp_zm(sti,i,j,k+std)
+                     this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(sti+std,0,0),i,j,k)+0.5_WP*dt*this%div_x(std,i,j,k)*0.5_WP*(rhoU(i+std,j,k)-abs(rhoU(i+std,j,k)))*this%weno_xm(sti,i+std,j,k)
+                     this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,sti+std,0),i,j,k)+0.5_WP*dt*this%div_y(std,i,j,k)*0.5_WP*(rhoV(i,j+std,k)-abs(rhoV(i,j+std,k)))*this%weno_ym(sti,i,j+std,k)
+                     this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,sti+std),i,j,k)+0.5_WP*dt*this%div_z(std,i,j,k)*0.5_WP*(rhoW(i,j,k+std)-abs(rhoW(i,j,k+std)))*this%weno_zm(sti,i,j,k+std)
                   end do
                end do
             end do
