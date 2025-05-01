@@ -18,7 +18,7 @@ Wall height : 0.5
 Shock Mach :       10
 Shock angle :      0
 Shock position :   2!0.1667  !2
-Static shock :     .false.
+Static shock :     .true.
 
 # Fluid properties
 Gamma : 1.4
