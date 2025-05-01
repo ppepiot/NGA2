@@ -34,7 +34,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-3_WP
+   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-6_WP
    
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE

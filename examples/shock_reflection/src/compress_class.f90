@@ -1446,14 +1446,13 @@ contains
    end subroutine get_pdil
    
    
-   !> Calculate the viscous heating term
+   !> Calculate discretely consistent viscous heating term
    subroutine get_visc_heating(this,visc_heating)
       implicit none
       class(compress), intent(inout) :: this
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: visc_heating   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      integer :: i,j,k
-      real(WP) :: dila,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
       real(WP), dimension(:,:,:), allocatable :: U_,V_,W_,XY,YZ,ZX
+      integer :: i,j,k
       ! Zero out viscous heating arrays
       visc_heating=0.0_WP
       ! Allocate and compute mid velocities
@@ -1464,17 +1463,21 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               ! Get velocity gradient and dilatation
-               dudx=sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))
-               dvdy=sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))
-               dwdz=sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))
-               dila=dudx+dvdy+dwdz
-               ! Txx*dudx at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dudx*(this%viscs(i,j,k)*(2.0_WP*dudx-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
-               ! Tyy*dvdy at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dvdy*(this%viscs(i,j,k)*(2.0_WP*dvdy-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
-               ! Tzz*dwdz at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dwdz*(this%viscs(i,j,k)*(2.0_WP*dwdz-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
+               ! Txx*du/dx
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdu_x(:,i,j,k)*this%Umid(i:i+1,j,k))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
+               ! Tyy*dv/dy
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdv_y(:,i,j,k)*this%Vmid(i,j:j+1,k))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
+               ! Tzz*dw/dz
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdw_z(:,i,j,k)*this%Wmid(i,j,k:k+1))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))+sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
             end do
          end do
       end do
@@ -1486,19 +1489,12 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
             do i=this%cfg%imin_,this%cfg%imax_+1
-               ! Get velocity gradient
-               dudy=sum(this%grdu_y(:,i,j,k)*U_(i,j-1:j,k))
-               dudz=sum(this%grdu_z(:,i,j,k)*U_(i,j,k-1:k))
-               dvdx=sum(this%grdv_x(:,i,j,k)*V_(i-1:i,j,k))
-               dvdz=sum(this%grdv_z(:,i,j,k)*V_(i,j,k-1:k))
-               dwdx=sum(this%grdw_x(:,i,j,k)*W_(i-1:i,j,k))
-               dwdy=sum(this%grdw_y(:,i,j,k)*W_(i,j-1:j,k))
                ! Txy*(dudy+dvdx) at xy edge
-               XY(i,j,k)=sum(this%itp_xy(:,:,i,j,k)*this%viscs(i-1:i,j-1:j,k))*(dudy+dvdx)**2
+               XY(i,j,k)=sum(this%itp_xy(:,:,i,j,k)*this%viscs(i-1:i,j-1:j,k))*(sum(this%grdu_y(:,i,j,k)*U_(i,j-1:j,k))+sum(this%grdv_x(:,i,j,k)*V_(i-1:i,j,k)))*(sum(this%grdu_y(:,i,j,k)*this%Umid(i,j-1:j,k))+sum(this%grdv_x(:,i,j,k)*this%Vmid(i-1:i,j,k)))
                ! Tyz*(dvdz+dwdy) at yz edge
-               YZ(i,j,k)=sum(this%itp_yz(:,:,i,j,k)*this%viscs(i,j-1:j,k-1:k))*(dvdz+dwdy)**2
+               YZ(i,j,k)=sum(this%itp_yz(:,:,i,j,k)*this%viscs(i,j-1:j,k-1:k))*(sum(this%grdv_z(:,i,j,k)*V_(i,j,k-1:k))+sum(this%grdw_y(:,i,j,k)*W_(i,j-1:j,k)))*(sum(this%grdv_z(:,i,j,k)*this%Vmid(i,j,k-1:k))+sum(this%grdw_y(:,i,j,k)*this%Wmid(i,j-1:j,k)))
                ! Tzx*(dwdx+dudx) at zx edge
-               ZX(i,j,k)=sum(this%itp_xz(:,:,i,j,k)*this%viscs(i-1:i,j,k-1:k))*(dwdx+dudz)**2
+               ZX(i,j,k)=sum(this%itp_xz(:,:,i,j,k)*this%viscs(i-1:i,j,k-1:k))*(sum(this%grdw_x(:,i,j,k)*W_(i-1:i,j,k))+sum(this%grdu_z(:,i,j,k)*U_(i,j,k-1:k)))*(sum(this%grdw_x(:,i,j,k)*this%Wmid(i-1:i,j,k))+sum(this%grdu_z(:,i,j,k)*this%Umid(i,j,k-1:k)))
             end do
          end do
       end do
