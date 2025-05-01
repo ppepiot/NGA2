@@ -56,8 +56,9 @@ contains
    !> Function that returns a smooth Heaviside representation of exact shock
    function Hshock(x,y,t) result(H)
       real(WP), intent(in)  :: x,y,t
-      real(WP) :: H
-      H=0.5_WP+0.5_WP*tanh((sintheta*y-costheta*(x-Xs0-u2x*t))/delta)
+      real(WP) :: H,val
+      val=(sintheta*y-costheta*(x-Xs0-u2x*t))/delta
+      H=1.0_WP/(1.0_WP+exp(-val))
    end function Hshock
    
    
@@ -106,7 +107,7 @@ contains
          call param_read('Shock Mach',Ms)
          call param_read('Shock angle',theta); theta=theta*Pi/180.0_WP; costheta=cos(theta); sintheta=sin(theta)
          call param_read('Shock position',Xs0)
-         call param_read('Shock thickness',delta,default=1.3_WP*cfg%min_meshsize)
+         call param_read('Shock thickness',delta,default=0.58_WP*cfg%min_meshsize)
          call param_read('Static shock',static_shock)
          ! Generate preshock conditions
          rho1=1.0_WP                                                   ! This is our reference density
@@ -210,9 +211,9 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Setup normal shock at t=0
-                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
+                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i)-0.4_WP*delta,cfg%ym(j),0.0_WP)  ! Shift rho a bit
                   fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i)-delta,cfg%ym(j),0.0_WP)  ! Seems like u should be shifted a bit?
+                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i)-2.2_WP*delta,cfg%ym(j),0.0_WP)  ! Shift u a bit
                   fs%V  (i,j,k)=        u2y     *Hshock(cfg%xm(i),cfg%y (j),0.0_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))

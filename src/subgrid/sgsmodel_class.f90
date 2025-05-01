@@ -522,7 +522,7 @@ contains
       real(WP), dimension(:,:,:), allocatable :: fvisc
       integer :: i,j,k
       real(WP) :: dila,vort,grad_dila
-      real(WP), parameter :: max_cfl=2.0_WP
+      real(WP), parameter :: max_cfl=1.0_WP
       ! Zero out array
       this%visc=0.0_WP
       ! Compute artificial bulk viscosity based on gradU provided
