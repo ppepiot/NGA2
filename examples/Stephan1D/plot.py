@@ -1,4 +1,5 @@
 # Import libraries
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -7,8 +8,7 @@ import math
 Lx = 0.001
 Ly = 0.001
 Lz = 7.8125e-06
-H = 1e-4
-tI      = 0.027
+tI      = 10
 beta    = 0.067819663373413
 alpha_g = 0.025 / (0.597 * 2030)
 Tw      = 383.15
@@ -21,14 +21,9 @@ data = np.loadtxt('./monitor/simulation', skiprows=2)
 t = data[:, 1 ]
 t = tI + t
 x = data[:, 11] * 1000
-vol_l = data[:, 10]
-u = data[:, 4]
-print(min(u))
-
-# Analytical solution
-x_ext = 2 * beta * np.sqrt(alpha_g * t) * 1000
-vol_l_ext = (Lx - H) * Ly * Lz
-u_ext = beta * np.sqrt(alpha_g / t)
+u = data[:, 12]
+x_ext = data[:, 13] * 1000
+u_ext = data[:, 14]
 
 # Use latex font
 plt.rcParams['text.usetex'] = True

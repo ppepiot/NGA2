@@ -46,7 +46,9 @@ module simulation
    !> Problem definition
    real(WP) :: H0
    integer  :: iTl,iTg,iYv
-   real(WP) :: k_l,k_g,Cp_l,Cp_g,h_lg,T_sat,T_w,beta,t0,x_itf
+   real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
+   real(WP) :: T_w,beta,t0
+   real(WP) :: x_itf,u_itf,x_itf_ext,u_itf_ext
    real(WP) :: mdotdp,prhs_int
    
 contains
@@ -161,6 +163,24 @@ contains
       if (k.eq.pg%kmax+1) isIn=.true.
    end function zp_locator
    
+
+   !> Function that governs the 1D Stephan beta
+   function f_beta(b)
+      use mathtools, only: Pi
+      real(WP) :: b
+      real(WP) :: f_beta
+      f_beta=b*exp(b**2)*erf(b)-Cp_g*(T_w-T_sat)/(h_lg*sqrt(Pi))
+   end function
+   
+
+   !> Derivative of the function that governs the 1D Stephan beta
+   function fp_beta(b)
+      use mathtools, only: Pi
+      real(WP) :: b
+      real(WP) :: fp_beta
+      fp_beta=(1.0_WP+2.0_WP*b**2)*exp(b**2)*erf(b)+2.0_WP*b/sqrt(Pi)
+   end function
+
    
    !> Initialization of problem solver
    subroutine simulation_init
@@ -198,6 +218,49 @@ contains
          timeSC%tmax=time%tmax
          timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
+
+
+      ! Read problem inputs
+      read_inputs: block
+         call param_read('Liquid density',rho_l)
+         call param_read('Gas density',rho_g)
+         call param_read('Saturation temperature',T_sat)
+         call param_read('Latent heat',h_lg)
+         call param_read('Liquid thermal conductivity',k_l)
+         call param_read('Liquid specific heat capacity',Cp_l)
+         call param_read('Gas thermal conductivity',k_g)
+         call param_read('Gas specific heat capacity',Cp_g)
+         call param_read('Wall temperature',T_w)
+         alpha_l=k_l/(rho_l*Cp_l)
+         alpha_g=k_g/(rho_g*Cp_g)
+      end block read_inputs
+
+
+      ! Analytical solution
+      analytical_solution: block
+         use mpi_f08,  only: MPI_BCAST
+         use parallel, only: MPI_REAL_WP
+         real(WP) :: err,tol,beta0
+         integer :: it,itmax,ierr
+         if (cfg%amRoot) then
+            itmax=200
+            tol=1e-7
+            err=10*tol
+            it=0
+            beta=1
+            do while (err.ge.tol)
+               it=it+1
+               if (it.ge.itmax) exit
+               beta0=beta
+               beta=beta0-f_beta(beta0)/fp_beta(beta0)
+               err=abs((beta-beta0)/beta0)
+            end do
+            print*,'1D Stephan beta = ',beta
+            print*,'Relative error = ',err
+            print*,'Newton-Raphson iterations = ',it
+         end if
+         call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
+      end block analytical_solution
       
       
       ! Initialize our VOF solver and field
@@ -222,8 +285,8 @@ contains
          ! call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
          ! call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
          ! call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
-         ! Initialize to a droplet
-         call param_read('Vapor region width',H0)
+         ! Initialize the VOF field
+         H0=2.0_WP*beta*sqrt(alpha_g*t0)
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
             do j=vf%cfg%jmino_,vf%cfg%jmaxo_
                do i=vf%cfg%imino_,vf%cfg%imaxo_
@@ -289,8 +352,8 @@ contains
          call param_read('Liquid dynamic viscosity',fs%visc_l)
          call param_read('Gas dynamic viscosity',fs%visc_g)
          ! Assign constant density to each phase
-         call param_read('Liquid density',fs%rho_l)
-         call param_read('Gas density',fs%rho_g)
+         fs%rho_l=rho_l
+         fs%rho_g=rho_g
          ! Read in surface tension coefficient
          call param_read('Surface tension coefficient',fs%sigma)
          fs%contact_angle=fs%contact_angle*Pi/180.0_WP
@@ -314,20 +377,10 @@ contains
          vs=ddadi(cfg=cfg,name='Velocity',nst=7)
          ! Setup the solver
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
-         ! Read thermal properties
-         call param_read('Saturation temperature',T_sat)
-         call param_read('Latent heat',h_lg)
-         call param_read('Liquid thermal conductivity',k_l)
-         call param_read('Liquid specific heat capacity',Cp_l)
-         call param_read('Gas thermal conductivity',k_g)
-         call param_read('Gas specific heat capacity',Cp_g)
-         ! Read problem parameters
-         call param_read('Wall temperature',T_w)
-         call param_read('1D Stephan beta',beta)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
          ! where (vf%VF.gt.VFlo)
-         !    fs%U=2.0_WP*beta*sqrt(k_g/(fs%rho_g*Cp_g))
+         !    fs%U=beta*sqrt(alpha_g/t0)
          ! end where
          ! Apply boundary conditions
          call fs%apply_bcond(time%t,time%dt)
@@ -354,8 +407,8 @@ contains
          ! call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
          sc%phase =[Lphase,Gphase]
-         sc%diff(:,:,:,iTl)=k_l/(fs%rho_l*Cp_l)
-         sc%diff(:,:,:,iTg)=k_g/(fs%rho_g*Cp_g)
+         sc%diff(:,:,:,iTl)=alpha_l
+         sc%diff(:,:,:,iTg)=alpha_g
          ! Initialize the linear solver
          ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ! Setup the solver
@@ -433,13 +486,46 @@ contains
          else where
             evp%mdotdp=0.0_WP
          end where
-         print*,maxval(evp%mdotdp)
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
          ! Initialize the liquid and gas side mass fluxes
          call evp%init_mfluxLG()
       end block create_evp
       
+
+      ! Update the interface location and velocity
+      update_interface_location: block
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
+      use parallel,  only: MPI_REAL_WP
+         integer :: i,j,ierr
+         real(WP) :: my_x_itf,my_u_itf,vol,my_vol
+         my_x_itf=0.0_WP
+         my_u_itf=0.0_WP
+         do i=vf%cfg%imin_,vf%cfg%imax_
+            if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
+               my_x_itf=vf%cfg%xm(i)
+               exit
+            end if
+         end do
+         call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
+         my_vol=0.0_WP
+         do j=vf%cfg%jmin_,vf%cfg%jmax_
+            do i=vf%cfg%imin_,vf%cfg%imax_
+               if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
+                  my_vol=my_vol+fs%cfg%vol(i,j,1)
+                  my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
+                  exit
+               end if
+            end do
+         end do
+         call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+         call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+         u_itf=u_itf/vol
+      end block update_interface_location
+
+      ! Update the analytical solution
+      x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t+t0))
+      u_itf_ext=beta*sqrt(alpha_g/(time%t+t0))
 
       ! Create surfmesh object for interface polygon output
       create_smesh: block
@@ -501,6 +587,9 @@ contains
          call mfile%add_column(vf%VFmin,'VOF minimum')
          call mfile%add_column(vf%VFint,'VOF integral')
          call mfile%add_column(x_itf,'x_itf')
+         call mfile%add_column(u_itf,'u_itf')
+         call mfile%add_column(x_itf_ext,'x_itf_ext')
+         call mfile%add_column(u_itf_ext,'u_itf_ext')
          call mfile%add_column(fs%divmax,'Maximum divergence')
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
@@ -587,22 +676,6 @@ contains
          ! VOF solver step
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
-
-         ! Update the interface location
-         update_interface_location: block
-         use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX
-         use parallel,  only: MPI_REAL_WP
-            integer :: i,ierr
-            real(WP) :: my_x_itf
-            my_x_itf=0.0_WP
-            do i=vf%cfg%imin_,vf%cfg%imax_
-               if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-                  my_x_itf=vf%cfg%xm(i)
-                  exit
-               end if
-            end do
-            call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-         end block update_interface_location
 
          ! Transport scalars
          advance_scalar: block
@@ -777,6 +850,40 @@ contains
             call ens_out%write_data(time%t)
          end if
          
+         ! Update the interface location and velocity
+         update_interface_location: block
+            use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
+            use parallel,  only: MPI_REAL_WP
+            integer :: i,j,ierr
+            real(WP) :: my_x_itf,my_u_itf,vol,my_vol
+            my_x_itf=0.0_WP
+            my_u_itf=0.0_WP
+            do i=vf%cfg%imin_,vf%cfg%imax_
+               if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
+                  my_x_itf=vf%cfg%xm(i)
+                  exit
+               end if
+            end do
+            call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
+            my_vol=0.0_WP
+            do j=vf%cfg%jmin_,vf%cfg%jmax_
+               do i=vf%cfg%imin_,vf%cfg%imax_
+                  if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
+                     my_vol=my_vol+fs%cfg%vol(i,j,1)
+                     my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
+                     exit
+                  end if
+               end do
+            end do
+            call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+            call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+            u_itf=u_itf/vol
+         end block update_interface_location
+
+         ! Update the analytical solution
+         x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t+t0))
+         u_itf_ext=beta*sqrt(alpha_g/(time%t+t0))
+
          ! Perform and output monitoring
          call fs%get_max()
          call vf%get_max()

@@ -33,6 +33,10 @@ contains
          call param_read('Lx',Lx); call param_read('nx',nx); allocate(x(nx+1))
          call param_read('Ly',Ly); call param_read('ny',ny); allocate(y(ny+1))
          call param_read('Lz',Lz); call param_read('nz',nz); allocate(z(nz+1))
+
+         ! Handle 1D/2D
+         if (ny.eq.1) Ly=Lx/nx
+         if (nz.eq.1) Lz=Lx/nx
          
          ! Create simple rectilinear grid
          do i=1,nx+1

@@ -2,17 +2,15 @@
 Partition : 2 2 1
 
 # Mesh definition
-Lx : 0.001
 Ly : 0.001
-Lz : 7.8125e-06
+Lx : 0.001
+Lz : 0
 nx : 128
 ny : 128
 nz : 1
 
 # Case parameters
-Vapor region width : 1e-4
 Wall temperature   : 383.15
-1D Stephan beta    : 0.067819663373413
 Initial time       : 0.027
 
 # Fluid properties
@@ -34,7 +32,7 @@ Max timestep size : 4e-3
 Max cfl number    : 0.9
 Sub-iterations    : 2
 Scalar time step  : 4e-5
-Max time          : 1.173
+Max time          : 1
 
 # Evaporation
 Max pseudo timestep size : 9e-6
@@ -48,4 +46,4 @@ Pressure iteration    : 50
 Max coarsening levels : 12
 
 # Ensight output
-Ensight output period : 0.1 ! 0.05
+Ensight output period : 0.1
