@@ -2,11 +2,11 @@
 Partition : 2 2 1
 
 # Mesh definition
-Ly : 0.001
 Lx : 0.001
+Ly : 0.0005 ! 0.001
 Lz : 0
 nx : 128
-ny : 128
+ny : 64 ! 128
 nz : 1
 
 # Case parameters
@@ -43,7 +43,7 @@ Mass flux tolerence      : 1e-22
 # Pressure solver
 Pressure tolerance    : 1e-6
 Pressure iteration    : 50
-Max coarsening levels : 12
+Max coarsening levels : 10 ! 12
 
 # Ensight output
 Ensight output period : 0.1
