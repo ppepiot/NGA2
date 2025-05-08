@@ -35,7 +35,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-6_WP
+   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-4_WP
    
    !> Monitoring of conservation
    type(monitor) :: consfile
@@ -194,7 +194,7 @@ contains
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
-         fs%theta=fs%theta!+1.0e-2_WP
+         fs%theta=fs%theta+1.0e-2_WP
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -527,7 +527,8 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma,gradU)
+      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma)
+      if (use_sgsb.or.use_sgss) deallocate(gradU)
    end subroutine simulation_final
    
    
