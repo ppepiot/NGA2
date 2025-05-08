@@ -374,8 +374,12 @@ contains
             sgs_modeling: block
                use sgsmodel_class, only: vreman,localartif
                call fs%get_gradU(gradU)
-               if (use_sgsb) call sgsb%get_visc(type=localartif,dt=time%dt,rho=fs%RHO,gradu=gradU); fs%viscb=fs%viscb+sgsb%visc
-               if (use_sgss) call sgss%get_visc(type=vreman    ,dt=time%dt,rho=fs%RHO,gradu=gradU); fs%viscs=fs%viscs+sgss%visc
+               if (use_sgsb) then
+                  call sgsb%get_visc(type=localartif,dt=time%dt,rho=fs%RHO,gradu=gradU); fs%viscb=fs%viscb+sgsb%visc
+               end if
+               if (use_sgss) then
+                  call sgss%get_visc(type=vreman    ,dt=time%dt,rho=fs%RHO,gradu=gradU); fs%viscs=fs%viscs+sgss%visc
+               end if
             end block sgs_modeling
          end if
          ! ===================================================
