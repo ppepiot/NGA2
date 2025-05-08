@@ -1,0 +1,17 @@
+set term qt size 1200,400
+
+set multiplot layout 1,2 columns
+
+set xlabel "Time" font ",18"
+set xtics font ",14"
+set ylabel "Kinetic Energy" font ",18"
+set ytics font ",14"
+p 'dns.tke' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_nosgs/conservation' u 2:($6/$4) w l t 'no LAD' lw 3 lc 'red', 'monitor/conservation' u 2:($6/$4) w l t 'with LAD' lw 3 lc 'blue'
+
+set xlabel "Time" font ",18"
+set xtics font ",14"
+set ylabel "Solenoidal dissipation" font ",18"
+set ytics font ",14"
+p 'dns.eps' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_nosgs/conservation' u 2:($9/$3) w l t 'no LAD' lw 3 lc 'red', 'monitor/conservation' u 2:($9/$3) w l t 'with LAD' lw 3 lc 'blue'
+
+unset multiplot

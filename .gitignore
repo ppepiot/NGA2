@@ -64,3 +64,6 @@ examples/*/input*~
 !examples/collapse/collapse.png
 !examples/collapse/collapse_render.pvsm
 !examples/shock_droplet/shock_drop_nondim.m
+!examples/compressible_taylor_green/dns.eps
+!examples/compressible_taylor_green/dns.tke
+!examples/compressible_taylor_green/plot.me
