@@ -6,12 +6,12 @@ set xlabel "Time" font ",18"
 set xtics font ",14"
 set ylabel "Kinetic Energy" font ",18"
 set ytics font ",14"
-p 'dns.tke' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_nosgs/conservation' u 2:($6/$4) w l t 'no LAD' lw 3 lc 'red', 'monitor/conservation' u 2:($6/$4) w l t 'with LAD' lw 3 lc 'blue'
+p 'dns.tke' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_128/conservation' u 2:($6/$4) w l t '128^3' lw 3 lc 'blue', 'monitor/conservation' u 2:($6/$4) w l t '64^3' lw 3 lc 'red'
 
 set xlabel "Time" font ",18"
 set xtics font ",14"
 set ylabel "Solenoidal dissipation" font ",18"
 set ytics font ",14"
-p 'dns.eps' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_nosgs/conservation' u 2:($9/$3) w l t 'no LAD' lw 3 lc 'red', 'monitor/conservation' u 2:($9/$3) w l t 'with LAD' lw 3 lc 'blue'
+p 'dns.eps' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor_128/conservation' u 2:($9/$3) w l t '128^3' lw 3 lc 'blue', 'monitor/conservation' u 2:($9/$3) w l t '64^3' lw 3 lc 'red'
 
 unset multiplot

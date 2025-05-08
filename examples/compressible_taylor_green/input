@@ -2,9 +2,9 @@
 Partition : 8 1 1
 
 # Mesh definition
-nx : 128
-ny : 128
-nz : 128
+nx : 64 !128
+ny : 64 !128
+nz : 64 !128
 
 # Flow definition
 Gamma :    1.4
@@ -18,7 +18,7 @@ Use bSGS model : .true.
 Use sSGS model : .false.
 
 # Time integration
-Max timestep size : 2.5e-2
+Max timestep size : 5e-2 !2.5e-2
 Max cfl number :    1.0
 Max time :          20
 Subiterations :     50
@@ -29,4 +29,4 @@ Pressure tolerance : 1e-6
 Pressure iteration : 100
 
 # Ensight output
-Ensight output period : 2e-1
+Ensight output period : 1e-1
