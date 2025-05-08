@@ -35,7 +35,7 @@ module simulation
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile
-   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-4_WP
+   real(WP) :: RHOcvg=0.0_WP,RHOtol=1.0e-6_WP
    
    !> Monitoring of conservation
    type(monitor) :: consfile
@@ -86,7 +86,7 @@ contains
       do k=fs%cfg%kmino_,fs%cfg%kmaxo_
          do j=fs%cfg%jmino_,fs%cfg%jmaxo_
             do i=fs%cfg%imino_,fs%cfg%imaxo_
-               fs%viscs(i,j,k)=Reynolds**(-1.0_WP)*(1.4042_WP*(sc%E(i,j,k)/sc%Cv)**1.5_WP)/((sc%E(i,j,k)/sc%Cv)+0.40417_WP)
+               fs%viscs(i,j,k)=Reynolds**(-1.0_WP)*(1.4042_WP*(sc%E(i,j,k)/sc%Cv)**1.5_WP)/(sc%E(i,j,k)/sc%Cv+0.4042_WP)
             end do
          end do
       end do
@@ -194,7 +194,7 @@ contains
          ! Create flow solver
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
-         fs%theta=fs%theta+1.0e-2_WP
+         fs%theta=fs%theta!+1.0e-2_WP
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -227,8 +227,8 @@ contains
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
-                  fs%P(i,j,k)=1.0_WP/(Gamma*Mach)+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
-                  sc%E(i,j,k)=1.0_WP/((Gamma-1.0_WP)*Gamma*Mach**2.0_WP)
+                  fs%P(i,j,k)=1.0_WP/(Gamma*Mach**2)+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
+                  sc%E(i,j,k)=1.0_WP/((Gamma-1.0_WP)*Gamma*Mach**2)
                   fs%RHO(i,j,k)=fs%P(i,j,k)/(sc%E(i,j,k)*(Gamma-1.0_WP))
                   fs%U(i,j,k)=+sin(fs%cfg%x (i))*cos(fs%cfg%ym(j))*cos(fs%cfg%zm(k))
                   fs%V(i,j,k)=-cos(fs%cfg%xm(i))*sin(fs%cfg%y (j))*cos(fs%cfg%zm(k))

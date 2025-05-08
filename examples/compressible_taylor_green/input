@@ -14,15 +14,15 @@ Prandtl :  0.71
 Bulk to shear ratio : 0.0
 
 # Do we use SGS modeling
-Use bSGS model : .true.
-Use sSGS model : .true.
+Use bSGS model : .false.
+Use sSGS model : .false.
 
 # Time integration
 Max timestep size : 2.5e-2
 Max cfl number :    1.0
 Max time :          20
 Subiterations :     50
-Relaxation coeff:   0.6
+Relaxation coeff:   1
 
 # Pressure solver
 Pressure tolerance : 1e-6
