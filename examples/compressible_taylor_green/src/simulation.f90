@@ -39,7 +39,7 @@ module simulation
    
    !> Monitoring of conservation
    type(monitor) :: consfile
-   real(WP) :: rhoKEint,dkdt,dedt,sdiss,bdiss,sdiss_sgs,bdiss_sgs,pdil
+   real(WP) :: rhoKEint,dkdt,dedt,sdiss,ddiss,sdiss_sgss,ddiss_sgss,ddiss_sgsb,pdil
    
    !> Private work arrays
    real(WP), dimension(:,:,:), allocatable :: resU,resV,resW,resE
@@ -119,25 +119,31 @@ contains
       end block calculate_e
       ! Calculate dissipations
       calculate_dissipations: block
+         ! Get resolved+sgs dilatational and solenoidal dissipations
+         call fs%get_dilatational_dissipation(diss=resW); call cfg%integrate(resW,integral=ddiss)
+         call fs%get_solenoidal_dissipation  (diss=resW); call cfg%integrate(resW,integral=sdiss)
          ! Remember viscosities
          resU=fs%viscs
          resV=fs%viscb
-         ! Set viscosities to shear-only/bulk-only and re-calculate viscous heating
-         fs%viscs=resU  ; fs%viscb=0.0_WP; call fs%get_visc_heating(visc_heating=resW); call cfg%integrate(resW,integral=sdiss)
-         fs%viscs=0.0_WP; fs%viscb=resV  ; call fs%get_visc_heating(visc_heating=resW); call cfg%integrate(resW,integral=bdiss)
-         ! Set viscosities to SGS shear-only/bulk-only and re-calculate viscous heating
+         ! Get sgs dilatational dissipation from sgsb
          if (use_sgsb) then
-            fs%viscs=0.0_WP; fs%viscb=sgsb%visc; call fs%get_visc_heating(visc_heating=resW); call cfg%integrate(resW,integral=bdiss_sgs)
-            bdiss=bdiss-bdiss_sgs
+            fs%viscs=0.0_WP; fs%viscb=sgsb%visc
+            call fs%get_dilatational_dissipation(diss=resW); call cfg%integrate(resW,integral=ddiss_sgsb)
          else
-            bdiss_sgs=0.0_WP
+            ddiss_sgsb=0.0_WP
          end if
+         ! Get sgs dilatational and solenoidal dissipations from sgss
          if (use_sgss) then
-            fs%viscs=sgss%visc; fs%viscb=0.0_WP; call fs%get_visc_heating(visc_heating=resW); call cfg%integrate(resW,integral=sdiss_sgs)
-            sdiss=sdiss-sdiss_sgs
+            fs%viscs=sgss%visc; fs%viscb=0.0_WP
+            call fs%get_dilatational_dissipation(diss=resW); call cfg%integrate(resW,integral=ddiss_sgss)
+            call fs%get_solenoidal_dissipation  (diss=resW); call cfg%integrate(resW,integral=sdiss_sgss)
          else
-            sdiss_sgs=0.0_WP
+            ddiss_sgss=0.0_WP
+            sdiss_sgss=0.0_WP
          end if
+         ! Compute resolved dissipations
+         ddiss=ddiss-ddiss_sgsb-ddiss_sgss
+         sdiss=sdiss-sdiss_sgss
          ! Set viscosities back
          fs%viscs=resU
          fs%viscb=resV
@@ -330,9 +336,10 @@ contains
          call consfile%add_column(dkdt,'dkdt')
          call consfile%add_column(dedt,'dedt')
          call consfile%add_column(sdiss,'sdiss')
-         call consfile%add_column(bdiss,'bdiss')
-         call consfile%add_column(sdiss_sgs,'sdiss_sgs')
-         call consfile%add_column(bdiss_sgs,'bdiss_sgs')
+         call consfile%add_column(ddiss,'ddiss')
+         call consfile%add_column(ddiss_sgsb,'ddiss_sgsb')
+         call consfile%add_column(sdiss_sgss,'sdiss_sgss')
+         call consfile%add_column(ddiss_sgss,'ddiss_sgss')
          call consfile%add_column(pdil,'pdil')
          call consfile%write()
       end block create_monitor
