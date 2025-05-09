@@ -13,7 +13,7 @@ module simulation
    use surfmesh_class,    only: surfmesh
    use event_class,       only: event
    use monitor_class,     only: monitor
-   use irl_fortran_interface, only: TagAccVM_SepVM_type
+   use mathtools,         only: Pi
    implicit none
    private
    
@@ -44,25 +44,25 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: Tl_grd,Tg_grd
    
    !> Problem definition
-   real(WP) :: H0
+   real(WP) :: R0,R,R_ext,V_b
+   real(WP), dimension(3) :: center
    integer  :: iTl,iTg,iYv
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
-   real(WP) :: T_w,beta,t0
-   real(WP) :: x_itf,u_itf,x_itf_ext,u_itf_ext
+   real(WP) :: T_inf,beta,f_b_cnst,t0
    real(WP) :: mdotdp,prhs_int
    
 contains
 
 
    !> Function that defines a level set function
-   function levelset_vapor(xyz,t) result(G)
+   function levelset_bubble(xyz,t) result(G)
       implicit none
       real(WP), dimension(3),intent(in) :: xyz
       real(WP), intent(in) :: t
       real(WP) :: G
-      ! Create the drop
-      G=xyz(1)-H0
-   end function levelset_vapor
+      ! Create the bubble
+      G=norm2(xyz-center)-R0
+   end function levelset_bubble
 
 
    !> Function that localizes the x- boundary
@@ -164,21 +164,44 @@ contains
    end function zp_locator
    
 
-   !> Function that governs the 1D Stephan beta
+   ! Integrand function for beta equation
+   function integrand(z,b)
+      real(WP), intent(in) :: z,b
+      real(WP) :: integrand
+      integrand=exp(-b**2*((1.0_WP-z)**(-2)-2.0_WP*(1.0_WP-rho_g/rho_l)*z-1.0_WP))
+   end function integrand
+
+
+   ! Simpson's rule integration
+   function Simpson(integrand,b,zmin,zmax,n)
+      interface
+      function integrand(x1,x2)
+            use precision, only: WP
+            real(WP), intent(in) :: x1,x2
+            real(WP) :: integrand
+         end function integrand
+      end interface
+      real(WP), intent(in) :: b
+      real(WP), intent(in) :: zmin,zmax
+      integer,  intent(in) :: n
+      real(WP) :: Simpson
+      integer  :: i
+      real(WP) :: h
+      h=(zmax-zmin)/real(n,WP)
+      Simpson=integrand(zmin,b)-integrand(zmax,b)
+      do i=0,n-2,2
+         Simpson=Simpson+4.0_WP*integrand(zmin+(i+1)*h,b)+2.0_WP*integrand(zmin+(i+2)*h,b)
+      end do
+      Simpson=Simpson*h/3.0_WP
+   end function Simpson
+
+
+   !> Function that governs beta
    function f_beta(b)
       use mathtools, only: Pi
-      real(WP) :: b
+      real(WP), intent(in) :: b
       real(WP) :: f_beta
-      f_beta=b*exp(b**2)*erf(b)-Cp_g*(T_w-T_sat)/(h_lg*sqrt(Pi))
-   end function
-   
-
-   !> Derivative of the function that governs the 1D Stephan beta
-   function fp_beta(b)
-      use mathtools, only: Pi
-      real(WP) :: b
-      real(WP) :: fp_beta
-      fp_beta=(1.0_WP+2.0_WP*b**2)*exp(b**2)*erf(b)+2.0_WP*b/sqrt(Pi)
+      f_beta=2.0_WP*b**2*Simpson(integrand,b,0.0_WP,1.0_WP,20)-f_b_cnst
    end function
 
    
@@ -230,9 +253,10 @@ contains
          call param_read('Liquid specific heat capacity',Cp_l)
          call param_read('Gas thermal conductivity',k_g)
          call param_read('Gas specific heat capacity',Cp_g)
-         call param_read('Wall temperature',T_w)
+         call param_read('Far-field temperature',T_inf)
          alpha_l=k_l/(rho_l*Cp_l)
          alpha_g=k_g/(rho_g*Cp_g)
+         f_b_cnst=(rho_l*Cp_l*(T_inf-T_sat))/(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))
       end block read_inputs
 
 
@@ -240,24 +264,36 @@ contains
       analytical_solution: block
          use mpi_f08,  only: MPI_BCAST
          use parallel, only: MPI_REAL_WP
-         real(WP) :: err,tol,beta0
+         real(WP) :: err,tol
+         real(WP) :: beta0,betaL,betaR,fL,fR,fM
          integer :: it,itmax,ierr
+         logical :: convergence
          if (cfg%amRoot) then
+            convergence=.false.
             itmax=200
-            tol=1e-7
-            err=10*tol
-            it=0
-            beta=1
-            do while (err.ge.tol)
-               it=it+1
-               if (it.ge.itmax) exit
-               beta0=beta
-               beta=beta0-f_beta(beta0)/fp_beta(beta0)
-               err=abs((beta-beta0)/beta0)
+            tol=1e-9
+            betaL=0.0_WP
+            betaR=1.0_WP
+            do it=1,itmax
+               beta=0.5_WP*(betaL+betaR)
+               fM=f_beta(beta)
+               err=abs(fM)
+               if (err.lt.tol) then
+                  convergence=.true.
+                  exit
+               end if
+               fL=f_beta(betaL)
+               fR=f_beta(betaR)
+               if (fL*fM.lt.0.0_WP) then
+                  betaR=beta
+                else
+                  betaL=beta
+                endif
             end do
-            print*,'1D Stephan beta = ',beta
-            print*,'Relative error = ',err
-            print*,'Newton-Raphson iterations = ',it
+            print*,'Convergence = ',convergence
+            print*,'beta =',beta
+            print*,'Absolute error =',err
+            print*,'Bi-section iterations =',it
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -266,11 +302,7 @@ contains
       ! Initialize our VOF solver and field
       create_and_initialize_vof: block
          use mms_geom,  only: cube_refine_vol
-         use vfs_class, only: lvira,VFhi,VFlo,flux_storage,neumann
-         use mathtools, only: Pi
-         use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX
-         use parallel,  only: MPI_REAL_WP
-         real(WP) :: my_x_itf
+         use vfs_class, only: lvira,flux_storage,neumann
          integer :: i,j,k,n,si,sj,sk,ierr
          real(WP), dimension(3,8) :: cube_vertex
          real(WP), dimension(3) :: v_cent,a_cent
@@ -281,12 +313,13 @@ contains
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
-         ! call vf%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
-         ! call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
+         call vf%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
+         call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
+         call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
+         call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
-         H0=2.0_WP*beta*sqrt(alpha_g*t0)
+         call param_read('Bubble center',center)
+         R0=2.0_WP*beta*sqrt(alpha_l*t0)
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
             do j=vf%cfg%jmino_,vf%cfg%jmaxo_
                do i=vf%cfg%imino_,vf%cfg%imaxo_
@@ -301,7 +334,7 @@ contains
                   end do
                   ! Call adaptive refinement code to get volume and barycenters recursively
                   vol=0.0_WP; area=0.0_WP; v_cent=0.0_WP; a_cent=0.0_WP
-                  call cube_refine_vol(cube_vertex,vol,area,v_cent,a_cent,levelset_vapor,0.0_WP,amr_ref_lvl)
+                  call cube_refine_vol(cube_vertex,vol,area,v_cent,a_cent,levelset_bubble,0.0_WP,amr_ref_lvl)
                   vf%VF(i,j,k)=vol/vf%cfg%vol(i,j,k)
                   if (vf%VF(i,j,k).ge.VFlo.and.vf%VF(i,j,k).le.VFhi) then
                      vf%Lbary(:,i,j,k)=v_cent
@@ -329,14 +362,6 @@ contains
          call vf%get_curvature()
          ! Reset moments to guarantee compatibility with interface reconstruction
          call vf%reset_volume_moments()
-         ! Initialize the interface location
-         do i=vf%cfg%imin_,vf%cfg%imax_
-            if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-               my_x_itf=vf%cfg%xm(i)
-               exit
-            end if
-         end do
-         call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
       end block create_and_initialize_vof
       
       
@@ -344,7 +369,7 @@ contains
       create_and_initialize_flow_solver: block
          use hypre_str_class, only: gmres_pfmg2
          use mathtools,       only: Pi
-         use tpns_class,      only: clipped_neumann,bcond
+         use tpns_class,      only: clipped_neumann,slip,bcond
          type(bcond), pointer :: mybc
          ! Create flow solver
          fs=tpns(cfg=cfg,name='Two-phase NS')
@@ -360,16 +385,17 @@ contains
          ! Assign acceleration of gravity
          call param_read('Gravity',fs%gravity)
          ! Boundary conditions
+         ! call fs%add_bcond(name='xm',type=slip           ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
+         call fs%add_bcond(name='xm',type=clipped_neumann,face='x',dir=-1,canCorrect=.true.,locator=xm_locator)
          call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
-         ! call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
-         ! call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
-         ! call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
-         ! call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
+         ! call fs%add_bcond(name='ym',type=slip           ,face='y',dir=-1,canCorrect=.false.,locator=ym_locator)
+         call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
+         call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+         ! call fs%add_bcond(name='zm',type=slip           ,face='z',dir=-1,canCorrect=.false.,locator=zm_locator)
+         call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
+         call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
-         ! ps%maxlevel=16
-         ! ps%maxlevel=12
-         ! ps%maxlevel=9
          call param_read('Pressure iteration',ps%maxit)
          call param_read('Pressure tolerance',ps%rcvg)
          call param_read('Max coarsening levels',ps%maxlevel)
@@ -379,9 +405,6 @@ contains
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
-         ! where (vf%VF.gt.VFlo)
-         !    fs%U=beta*sqrt(alpha_g/t0)
-         ! end where
          ! Apply boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Calculate cell-centered velocities and divergence
@@ -395,16 +418,20 @@ contains
          use param, only: param_read
          use tpscalar_class,  only: bcond,neumann,dirichlet
          type(bcond), pointer :: mybc
-         integer :: i,j,k,n
+         real(WP) :: radius
+         integer  :: i,j,k,n
          ! Create scalar solver
          call sc%initialize(cfg=cfg,nscalar=2,name='tpscalar')
          ! Boundary conditinos
-         call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
-         call sc%add_bcond(name='xp',type=neumann  ,locator=xp_locator   ,dir='+x')
-         ! call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
-         ! call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
+         ! call sc%add_bcond(name='xm',type=neumann  ,locator=xm_locator_sc,dir='-x')
+         call sc%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
+         call sc%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
+         ! call sc%add_bcond(name='ym',type=neumann  ,locator=ym_locator_sc,dir='-y')
+         call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
+         call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
+         ! call sc%add_bcond(name='zm',type=neumann  ,locator=zm_locator_sc,dir='-z')
+         call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
+         call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
          sc%phase =[Lphase,Gphase]
          sc%diff(:,:,:,iTl)=alpha_l
@@ -417,8 +444,9 @@ contains
          do i=sc%cfg%imino_,sc%cfg%imaxo_
             do j=sc%cfg%jmino_,sc%cfg%jmaxo_
                do k=sc%cfg%kmino_,sc%cfg%kmaxo_
-                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_sat
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+                  radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
+                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_sat
                end do
             end do
          end do
@@ -427,13 +455,44 @@ contains
             sc%SC(:,:,:,iTg)=T_sat
          end where
          ! Apply boundary conditions
-         call sc%get_bcond('xm',mybc)
-         do n=1,mybc%itr%no_
-            i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-            sc%SC(i,j,k,iTl)=0.0_WP
-            sc%SC(i,j,k,iTg)=T_w
-         end do
-         ! Initialize the phase specific density and VOF
+         ! call sc%get_bcond('xp',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         ! call sc%get_bcond('yp',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         ! call sc%get_bcond('zp',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         ! call sc%get_bcond('xm',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         ! call sc%get_bcond('ym',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         ! call sc%get_bcond('zm',mybc)
+         ! do n=1,mybc%itr%no_
+         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+         !    sc%SC(i,j,k,iTl)=T_inf
+         !    sc%SC(i,j,k,iTg)=0
+         ! end do
+         call sc%apply_bcond(time%t,time%dt)
+         ! Initialize the phasic density and VOF
          sc%Prho(Lphase)=fs%rho_l
          sc%Prho(Gphase)=fs%rho_g
          sc%PVF(:,:,:,Lphase)=vf%VF
@@ -456,23 +515,6 @@ contains
          ! Get densities from the flow solver
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
-         ! Debug
-         ! Tg_grd=0.0_WP
-         ! Tl_grd=0.0_WP
-         ! do k=sc%cfg%kmin_,sc%cfg%kmax_
-         !    do j=sc%cfg%jmin_,sc%cfg%jmax_
-         !       do i=sc%cfg%imin_,sc%cfg%imax_
-         !          if (vf%VF(i,j,k).gt.VFlo.and.vf%VF(i,j,k).lt.VFhi) then
-         !             ! Tg_grd(i,j,k)=(sc%SC(i-1,j,k,iTg)-sc%SC(i-2,j,k,iTg))*sc%cfg%dxmi(i-1)
-         !             ! Tl_grd(i,j,k)=(sc%SC(i+2,j,k,iTl)-sc%SC(i+1,j,k,iTl))*sc%cfg%dxmi(i+2)
-         !             Tg_grd(i,j,k)=(T_w-T_sat)/sc%cfg%xm(i)
-         !             Tl_grd(i,j,k)=0.0_WP
-         !          end if
-         !       end do
-         !    end do
-         ! end do
-         ! call sc%cfg%sync(Tg_grd)
-         ! call sc%cfg%sync(Tl_grd)
          ! Get temperature gradient
          call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
          call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
@@ -481,7 +523,7 @@ contains
          call evp%pure_interfacial_extp(Gphase,Tg_grd)
          ! Interface jump condition
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+            evp%mdotdp=-(k_g*Tg_grd-k_l*Tl_grd)/h_lg 
          else where
             evp%mdotdp=0.0_WP
          end where
@@ -489,42 +531,16 @@ contains
          call evp%get_mflux()
          ! Initialize the liquid and gas side mass fluxes
          call evp%init_mfluxLG()
+         ! Get the interface normal
+         call evp%get_normal()
       end block create_evp
-      
 
-      ! Update the interface location and velocity
-      update_interface_location: block
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
-      use parallel,  only: MPI_REAL_WP
-         integer :: i,j,ierr
-         real(WP) :: my_x_itf,my_u_itf,vol,my_vol
-         my_x_itf=0.0_WP
-         my_u_itf=0.0_WP
-         do i=vf%cfg%imin_,vf%cfg%imax_
-            if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-               my_x_itf=vf%cfg%xm(i)
-               exit
-            end if
-         end do
-         call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-         my_vol=0.0_WP
-         do j=vf%cfg%jmin_,vf%cfg%jmax_
-            do i=vf%cfg%imin_,vf%cfg%imax_
-               if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
-                  my_vol=my_vol+fs%cfg%vol(i,j,1)
-                  my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
-                  exit
-               end if
-            end do
-         end do
-         call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-         call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-         u_itf=u_itf/vol
-      end block update_interface_location
 
-      ! Update the analytical solution
-      x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t+t0))
-      u_itf_ext=beta*sqrt(alpha_g/(time%t+t0))
+      ! Initialize bubble radius
+      call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+      R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
+      R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
+
 
       ! Create surfmesh object for interface polygon output
       create_smesh: block
@@ -537,7 +553,7 @@ contains
       create_ensight: block
          integer :: nsc
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='Stephan1D')
+         ens_out=ensight(cfg=cfg,name='Bubble_vapor')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -585,10 +601,8 @@ contains
          call mfile%add_column(vf%VFmax,'VOF maximum')
          call mfile%add_column(vf%VFmin,'VOF minimum')
          call mfile%add_column(vf%VFint,'VOF integral')
-         call mfile%add_column(x_itf,'x_itf')
-         call mfile%add_column(u_itf,'u_itf')
-         call mfile%add_column(x_itf_ext,'x_itf_ext')
-         call mfile%add_column(u_itf_ext,'u_itf_ext')
+         call mfile%add_column(R,'R')
+         call mfile%add_column(R_ext,'R_ext')
          call mfile%add_column(fs%divmax,'Maximum divergence')
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
@@ -637,7 +651,7 @@ contains
    end subroutine simulation_init
    
    
-   !> Perform an NGA2 simulation - this mimicks NGA's old time integration for multiphase
+   !> Perform an NGA2 simulation-this mimicks NGA's old time integration for multiphase
    subroutine simulation_run
       use tpns_class, only: static_contact,harmonic_visc
       use mathtools, only: Pi
@@ -679,8 +693,6 @@ contains
          ! Transport scalars
          advance_scalar: block
             integer :: nsc
-            ! Debug
-            integer :: i,j,k
 
             ! Update the phas-specific VOF
             sc%PVF(:,:,:,Lphase)=vf%VF
@@ -730,24 +742,6 @@ contains
                ! One-field temperature
                T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
 
-               ! Debug
-               ! Tg_grd=0.0_WP
-               ! Tl_grd=0.0_WP
-               ! do k=sc%cfg%kmin_,sc%cfg%kmax_
-               !    do j=sc%cfg%jmin_,sc%cfg%jmax_
-               !       do i=sc%cfg%imin_,sc%cfg%imax_
-               !          if (vf%VF(i,j,k).gt.VFlo.and.vf%VF(i,j,k).lt.VFhi) then
-               !             ! Tg_grd(i,j,k)=(sc%SC(i-1,j,k,iTg)-sc%SC(i-2,j,k,iTg))*sc%cfg%dxmi(i-1)
-               !             ! Tl_grd(i,j,k)=(sc%SC(i+2,j,k,iTl)-sc%SC(i+1,j,k,iTl))*sc%cfg%dxmi(i+2)
-               !             Tg_grd(i,j,k)=(T_w-T_sat)/sc%cfg%xm(i)
-               !             Tl_grd(i,j,k)=0.0_WP
-               !          end if
-               !       end do
-               !    end do
-               ! end do
-               ! call sc%cfg%sync(Tg_grd)
-               ! call sc%cfg%sync(Tl_grd)
-
             end do
 
          end block advance_scalar
@@ -761,7 +755,7 @@ contains
 
          ! Interface jump conditions
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+            evp%mdotdp=-(k_g*Tg_grd-k_l*Tl_grd)/h_lg
          else where
             evp%mdotdp=0.0_WP
          end where
@@ -849,39 +843,10 @@ contains
             call ens_out%write_data(time%t)
          end if
          
-         ! Update the interface location and velocity
-         update_interface_location: block
-            use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
-            use parallel,  only: MPI_REAL_WP
-            integer :: i,j,ierr
-            real(WP) :: my_x_itf,my_u_itf,vol,my_vol
-            my_x_itf=0.0_WP
-            my_u_itf=0.0_WP
-            do i=vf%cfg%imin_,vf%cfg%imax_
-               if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-                  my_x_itf=vf%cfg%xm(i)
-                  exit
-               end if
-            end do
-            call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-            my_vol=0.0_WP
-            do j=vf%cfg%jmin_,vf%cfg%jmax_
-               do i=vf%cfg%imin_,vf%cfg%imax_
-                  if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
-                     my_vol=my_vol+fs%cfg%vol(i,j,1)
-                     my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
-                     exit
-                  end if
-               end do
-            end do
-            call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-            call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-            u_itf=u_itf/vol
-         end block update_interface_location
-
-         ! Update the analytical solution
-         x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t+t0))
-         u_itf_ext=beta*sqrt(alpha_g/(time%t+t0))
+         ! Update bubble radius
+         call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+         R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
+         R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
 
          ! Perform and output monitoring
          call fs%get_max()
@@ -901,14 +866,14 @@ contains
    subroutine simulation_final
       implicit none
       
-      ! Get rid of all objects - need destructors
+      ! Get rid of all objects-need destructors
       ! monitor
       ! ensight
       ! bcond
       ! timetracker
       
       ! Deallocate work arrays
-      deallocate(resU,resV,resW,Ui,Vi,Wi,resSC,T)
+      deallocate(resU,resV,resW,Ui,Vi,Wi,resSC,T,Tl_grd,Tg_grd)
 
    end subroutine simulation_final
    
