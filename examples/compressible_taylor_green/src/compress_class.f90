@@ -86,7 +86,6 @@ module compress_class
       real(WP), dimension(:,:,:), allocatable :: P        !< Pressure array
       
       ! Old flow variables
-      real(WP), dimension(:,:,:), allocatable :: Pold     !< Old pressure array
       real(WP), dimension(:,:,:), allocatable :: RHOold   !< Old density array
       real(WP), dimension(:,:,:), allocatable :: Uold     !< Old U velocity array
       real(WP), dimension(:,:,:), allocatable :: Vold     !< Old V velocity array
@@ -222,7 +221,6 @@ contains
       allocate(this%Wmid(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Wmid=0.0_WP
       
       ! Allocate old flow variables
-      allocate(this%Pold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Pold=0.0_WP
       allocate(this%Uold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Uold=0.0_WP
       allocate(this%Vold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Vold=0.0_WP
       allocate(this%Wold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Wold=0.0_WP
@@ -1200,7 +1198,7 @@ contains
                &         +this%viscs(i,j,k)*(sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k)) &
                &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
                &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))) &
-               &         -0.5_WP*(this%P(i,j,k)+this%Pold(i,j,k))
+               &         -this%P(i,j,k)
                ! Fluxes on y-face
                i=ii; j=jj; k=kk
                FY(i,j,k)=-sum(this%itpv_x(:,i,j,k)*this%rhoV(i-1:i,j,k))*sum(this%itpu_y(:,i,j,k)*this%Umid(i,j-1:j,k)) &
@@ -1239,7 +1237,7 @@ contains
                &         +this%viscs(i,j,k)*(sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k)) &
                &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
                &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))) &
-               &         -0.5_WP*(this%P(i,j,k)+this%Pold(i,j,k))
+               &         -this%P(i,j,k)
                ! Fluxes on z-face
                i=ii; j=jj; k=kk
                FZ(i,j,k)=-sum(this%itpw_y(:,i,j,k)*this%rhoW(i,j-1:j,k))*sum(this%itpv_z(:,i,j,k)*this%Vmid(i,j,k-1:k)) &
@@ -1278,7 +1276,7 @@ contains
                &         +this%viscs(i,j,k)*(sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))+sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1)) &
                &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
                &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))) &
-               &         -0.5_WP*(this%P(i,j,k)+this%Pold(i,j,k))
+               &         -this%P(i,j,k)
             end do
          end do
       end do
@@ -1317,9 +1315,9 @@ contains
                ! Tranverse the stencil and recompute Laplacian
                do s1=0,1
                   do s2=-1,0
-                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+0.5_WP*this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)*((1.0_WP-this%theta)*this%sRHOXold(i+s1,j,k)**2+this%theta*this%sRHOX(i+s1,j,k)**2)/((this%sRHOX(i+s1,j,k)+this%sRHOXold(i+s1,j,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOX(i+s1,j,k))
-                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+0.5_WP*this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)*((1.0_WP-this%theta)*this%sRHOYold(i,j+s1,k)**2+this%theta*this%sRHOY(i,j+s1,k)**2)/((this%sRHOY(i,j+s1,k)+this%sRHOYold(i,j+s1,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOY(i,j+s1,k))
-                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+0.5_WP*this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)*((1.0_WP-this%theta)*this%sRHOZold(i,j,k+s1)**2+this%theta*this%sRHOZ(i,j,k+s1)**2)/((this%sRHOZ(i,j,k+s1)+this%sRHOZold(i,j,k+s1)*(1.0_WP-this%theta)/this%theta)*this%sRHOZ(i,j,k+s1))
+                     this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)=this%psolv%opr(this%psolv%stmap(s1+s2,0,0),i,j,k)+this%divp_x(s1,i,j,k)*this%divu_x(s2,i+s1,j,k)*((1.0_WP-this%theta)*this%sRHOXold(i+s1,j,k)**2+this%theta*this%sRHOX(i+s1,j,k)**2)/((this%sRHOX(i+s1,j,k)+this%sRHOXold(i+s1,j,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOX(i+s1,j,k))
+                     this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)=this%psolv%opr(this%psolv%stmap(0,s1+s2,0),i,j,k)+this%divp_y(s1,i,j,k)*this%divv_y(s2,i,j+s1,k)*((1.0_WP-this%theta)*this%sRHOYold(i,j+s1,k)**2+this%theta*this%sRHOY(i,j+s1,k)**2)/((this%sRHOY(i,j+s1,k)+this%sRHOYold(i,j+s1,k)*(1.0_WP-this%theta)/this%theta)*this%sRHOY(i,j+s1,k))
+                     this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)=this%psolv%opr(this%psolv%stmap(0,0,s1+s2),i,j,k)+this%divp_z(s1,i,j,k)*this%divw_z(s2,i,j,k+s1)*((1.0_WP-this%theta)*this%sRHOZold(i,j,k+s1)**2+this%theta*this%sRHOZ(i,j,k+s1)**2)/((this%sRHOZ(i,j,k+s1)+this%sRHOZold(i,j,k+s1)*(1.0_WP-this%theta)/this%theta)*this%sRHOZ(i,j,k+s1))
                   end do
                end do
                ! Add temporal term

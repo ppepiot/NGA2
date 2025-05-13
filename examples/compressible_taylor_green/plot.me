@@ -7,14 +7,34 @@ set xlabel "Time" font ",18"
 set xtics 5 font ",14"
 set ylabel "Kinetic Energy" font ",18"
 set ytics font ",14"
-p 'dns.tke' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor/conservation' u 2:($6/$4) w l t '64^3' lw 3 lc 'red'
+p 'dns.tke' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5,\
+'monitor_32/conservation' u 2:($6/$4) w l t '32^3' lw 3 lc 'green',\
+'monitor_64/conservation' u 2:($6/$4) w l t '64^3' lw 3 lc 'red',\
+'monitor_128/conservation' u 2:($6/$4) w l t '128^3' lw 3 lc 'blue',\
+'monitor_256/conservation' u 2:($6/$4) w l t '256^3' lw 3 lc 'purple',\
+'monitor/conservation' u 2:($6/$4) w l t 'Current' lw 3 lc 'orange'
 
 set ylabel "Solenoidal dissipation" font ",18"
 set ytics font ",14"
-p 'dns.epss' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor/conservation' u 2:($9/$3) w l t 'Res' lw 3 lc 'red'
+p 'dns.epss' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5,\
+'monitor_32/conservation' u 2:($9/$3) w l t '32^3 Res' lw 3 lc 'green',\
+'monitor_64/conservation' u 2:($9/$3) w l t '64^3 Res' lw 3 lc 'red',\
+'monitor_128/conservation' u 2:($9/$3) w l t '128^3 Res' lw 3 lc 'blue',\
+'monitor_256/conservation' u 2:($9/$3) w l t '256^3 Res' lw 3 lc 'purple',\
+'monitor/conservation' u 2:($9/$3) w l t 'Current Res' lw 3 lc 'orange'
 
-set ylabel "Solenoidal dissipation" font ",18"
+set ylabel "Dilatational dissipation" font ",18"
 set ytics font ",14"
-p 'dns.epsd' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5, 'monitor/conservation' u 2:($10/$3) w l t 'Res' lw 3 lc 'red', 'monitor/conservation' u 2:(($10+$11)/$3) w l t 'Res+SGS' lw 3 lc 'red' dt '..'
+p 'dns.epsd' u 1:2 t 'DNS' pt 7 lc 'black' ps 1.5,\
+'monitor_32/conservation' u 2:($10/$3) w l t '32^3 Res' lw 3 lc 'green',\
+'monitor_32/conservation' u 2:(($10+$11)/$3) w l t '32^3 Res+SGS' lw 3 lc 'green' dt '..',\
+'monitor_64/conservation' u 2:($10/$3) w l t '64^3 Res' lw 3 lc 'red',\
+'monitor_64/conservation' u 2:(($10+$11)/$3) w l t '64^3 Res+SGS' lw 3 lc 'red' dt '..',\
+'monitor_128/conservation' u 2:($10/$3) w l t '128^3 Res' lw 3 lc 'blue',\
+'monitor_128/conservation' u 2:(($10+$11)/$3) w l t '128^3 Res+SGS' lw 3 lc 'blue' dt '..',\
+'monitor_256/conservation' u 2:($10/$3) w l t '256^3 Res' lw 3 lc 'purple',\
+'monitor_256/conservation' u 2:(($10+$11)/$3) w l t '256^3 Res+SGS' lw 3 lc 'purple' dt '..',\
+'monitor/conservation' u 2:($10/$3) w l t 'Current Res' lw 3 lc 'orange',\
+'monitor/conservation' u 2:(($10+$11)/$3) w l t 'Current Res+SGS' lw 3 lc 'orange' dt '..'
 
 unset multiplot

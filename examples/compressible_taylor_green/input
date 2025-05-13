@@ -2,9 +2,9 @@
 Partition : 8 1 1
 
 # Mesh definition
-nx : 64 !128
-ny : 64 !128
-nz : 64 !128
+nx : 64 !256 !128 !64 !32
+ny : 64 !256 !128 !64 !32
+nz : 64 !256 !128 !64 !32
 
 # Flow definition
 Gamma :    1.4
@@ -18,7 +18,7 @@ Use bSGS model : .true.
 Use sSGS model : .false.
 
 # Time integration
-Max timestep size : 5e-2 !2.5e-2
+Max timestep size : 5e-2 !1e-2 !2.5e-2 !5e-2 !1e-1
 Max cfl number :    1.0
 Max time :          20
 Subiterations :     50

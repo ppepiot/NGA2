@@ -150,7 +150,7 @@ contains
       end block calculate_dissipations
       ! Calculate pressure dilatation
       calculate_pdil: block
-         resU=0.5_WP*(fs%P+fs%Pold); call fs%get_pdil(P=resU,Pdil=resV); call cfg%integrate(resV,integral=pdil)
+         resU=fs%P; call fs%get_pdil(P=resU,Pdil=resV); call cfg%integrate(resV,integral=pdil)
       end block calculate_pdil
    end subroutine analyze_conservation
    
@@ -252,7 +252,6 @@ contains
          fs%Uold=fs%U
          fs%Vold=fs%V
          fs%Wold=fs%W
-         fs%Pold=fs%P
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
@@ -368,7 +367,6 @@ contains
          fs%Uold=fs%U
          fs%Vold=fs%V
          fs%Wold=fs%W
-         fs%Pold=fs%P
          
          ! Apply time-varying Dirichlet conditions
          
@@ -413,7 +411,7 @@ contains
             call sc%get_drhoEdt(resE,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Add pressure dilatation term
-            resU=0.5_WP*(fs%P+fs%Pold); call fs%get_pdil(P=resU,Pdil=resV); resE=resE+resV
+            call fs%get_pdil(P=fs%P,Pdil=resV); resE=resE+resV
             
             ! Add viscous heating term
             call fs%get_visc_heating(visc_heating=resU); resE=resE+resU
@@ -486,15 +484,15 @@ contains
             fs%RHO=fs%RHO+fs%psolv%sol/C2; call fs%update_faceRHO()
             ! Correct mass flux
             call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
-            fs%rhoU=fs%rhoU-0.5_WP*time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
-            fs%rhoV=fs%rhoV-0.5_WP*time%dt*resV*((1.0_WP-fs%theta)*fs%sRHOYold**2+fs%theta*fs%sRHOY**2)/((fs%sRHOY+fs%sRHOYold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOY)
-            fs%rhoW=fs%rhoW-0.5_WP*time%dt*resW*((1.0_WP-fs%theta)*fs%sRHOZold**2+fs%theta*fs%sRHOZ**2)/((fs%sRHOZ+fs%sRHOZold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOZ)
+            fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
+            fs%rhoV=fs%rhoV-time%dt*resV*((1.0_WP-fs%theta)*fs%sRHOYold**2+fs%theta*fs%sRHOY**2)/((fs%sRHOY+fs%sRHOYold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOY)
+            fs%rhoW=fs%rhoW-time%dt*resW*((1.0_WP-fs%theta)*fs%sRHOZold**2+fs%theta*fs%sRHOZ**2)/((fs%sRHOZ+fs%sRHOZold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOZ)
             ! Recover Umid
             call fs%rho_divide()
             ! Recover U
             call fs%get_U()
             ! Also update internal energy
-            call fs%get_pdil(P=fs%psolv%sol,Pdil=resU); sc%E=sc%E+0.5_WP*time%dt*resU/fs%RHO
+            call fs%get_pdil(P=fs%psolv%sol,Pdil=resU); sc%E=sc%E+time%dt*resU/fs%RHO
             ! ===================================================
             
             ! ============= CVG CHECKING ========================
