@@ -41,16 +41,23 @@ module simulation
    
    !> Equation of state and shock properties
    real(WP) :: Gamma
-   real(WP) :: delta
    real(WP) :: M2,p2,rho2,a2,u2
    real(WP) :: M1,p1,rho1,a1,u1
+
+   !> Fluid properties
+   real(WP) :: Reynolds=1.0_WP,Prandtl,bulk2shear
+   
+   !> Postprocessing of dissipation
+   type(monitor) :: dissfile
+   real(WP), dimension(:,:,:), allocatable :: sdiss,ddiss
+   real(WP) :: sdiss_int,ddiss_int
    
 contains
    
    
    !> Function that returns a smooth Heaviside representation of exact shock
-   real(WP) function Hshock(x)
-      real(WP), intent(in) :: x
+   real(WP) function Hshock(x,delta)
+      real(WP), intent(in) :: x,delta
       Hshock=1.0_WP/(1.0_WP+exp(-x/delta))
    end function Hshock
    
@@ -83,6 +90,32 @@ contains
    end subroutine get_c2
    
    
+   !> Sutherland's law for viscosity as a function of temperature
+   subroutine get_visc()
+      implicit none
+      integer :: i,j,k
+      do k=fs%cfg%kmino_,fs%cfg%kmaxo_
+         do j=fs%cfg%jmino_,fs%cfg%jmaxo_
+            do i=fs%cfg%imino_,fs%cfg%imaxo_
+               fs%viscs(i,j,k)=Reynolds**(-1.0_WP)*(1.4042_WP*(sc%E(i,j,k)/sc%Cv)**1.5_WP)/(sc%E(i,j,k)/sc%Cv+0.4042_WP)
+            end do
+         end do
+      end do
+      ! Constant kinematic viscosity
+      fs%viscs=fs%RHO
+      ! Constant dynamic viscosity
+      !fs%visc=1.0_WP
+   end subroutine get_visc
+   
+   
+   !> Calculate dissipations
+   subroutine get_dissipation()
+      implicit none
+      ! Get full dilatational and solenoidal dissipations
+      call fs%get_dilatational_dissipation(diss=ddiss); call cfg%integrate(ddiss,integral=ddiss_int); ddiss_int=ddiss_int/(cfg%yL*cfg%zL)
+      call fs%get_solenoidal_dissipation  (diss=sdiss); call cfg%integrate(sdiss,integral=sdiss_int); sdiss_int=sdiss_int/(cfg%yL*cfg%zL)
+   end subroutine get_dissipation
+   
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -98,10 +131,9 @@ contains
          call param_read('Gamma',gamma)
          ! Read in minimal shock information
          call param_read('Mach',M1)
-         call param_read('Shock thickness',delta,default=0.7_WP*cfg%min_meshsize)
          ! Generate preshock conditions
          rho1=1.0_WP
-         p1=0.25_WP*rho1/gamma*((gamma+1.0_WP)*M1/(M1**2-1.0_WP))**2 ! Ensures that u2=1
+         p1=0.25_WP*rho1/gamma*((gamma+1.0_WP)*M1/(M1**2-1.0_WP))**2 ! Ensures that |u2-u1|=1
          a1=sqrt(gamma*p1/rho1)
          ! Generate pre-shock velocity
          u1=M1*a1
@@ -113,7 +145,6 @@ contains
          M2=u2/a2
          ! Output shock info
          if (cfg%amRoot) then
-            write(message,'("[     Shock  thickness] => delta=",es12.5)') delta; call log(message)
             write(message,'("[Pre -shock conditions] =>  rho1=",es12.5)')  rho1; call log(message)
             write(message,'("[Pre -shock conditions] =>    p1=",es12.5)')    p1; call log(message)
             write(message,'("[Pre -shock conditions] =>    u1=",es12.5)')    u1; call log(message)
@@ -138,6 +169,8 @@ contains
          allocate(resE(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(C2  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Ma  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(sdiss(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(ddiss(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
       
       ! Initialize time tracker with 2 subiterations
@@ -160,7 +193,8 @@ contains
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
-         !fs%viscb=0.02_WP
+         ! Assign viscosity for Re_1=1
+         call param_read('Bulk to shear ratio',bulk2shear)
          ! Define boundary conditions
          !call fs%add_bcond(name='xm',type=dirichlet      ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
          !call fs%add_bcond(name='xp',type=dirichlet      ,face='x',dir=+1,canCorrect=.false.,locator=xp_locator)
@@ -182,6 +216,9 @@ contains
          real(WP) :: Pr
          ! Create energy solver
          call sc%initialize(cfg=cfg,name='Energy')
+         ! Set Cv such that T1=1
+         sc%Cv=p1/(rho1*(Gamma-1.0_WP))
+         call param_read('Prandtl',Prandtl)
          ! Define boundary conditions
          !call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
          !call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
@@ -200,9 +237,9 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Setup normal shock at t=0
-                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i)+0.3_WP*delta)  ! Shift rho a bit
-                  fs%U  (i,j,k)=u1  +(u2  -u1  )*Hshock(cfg%x (i)+2.0_WP*delta)  ! Shift u a bit
-                  fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i))
+                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i)+0.40_WP,delta=1.13_WP)  ! Shift rho a bit
+                  fs%U  (i,j,k)=u1  +(u2  -u1  )*Hshock(cfg%x (i)+2.35_WP,delta=1.10_WP)  ! Shift u a bit
+                  fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i)+0.02_WP,delta=1.00_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
                end do
@@ -254,7 +291,9 @@ contains
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
          call ens_out%add_scalar('energy',sc%E)
-         call ens_out%add_scalar('viscb',sgs%visc)
+         call ens_out%add_scalar('sdiss',sdiss)
+         call ens_out%add_scalar('ddiss',ddiss)
+         if (use_sgs) call ens_out%add_scalar('viscb',sgs%visc)
          call ens_out%add_scalar('Mach',Ma)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
@@ -266,6 +305,7 @@ contains
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
          call sc%get_max(fs%RHO)
+         call get_dissipation()
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
          call mfile%add_column(time%n,'Timestep number')
@@ -289,6 +329,14 @@ contains
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
          call mfile%write()
+         ! Create dissipation monitor
+         dissfile=monitor(fs%cfg%amRoot,'dissipation')
+         call dissfile%add_column(time%n,'Timestep number')
+         call dissfile%add_column(time%t,'Time')
+         call dissfile%add_column(time%dt,'Timestep size')
+         call dissfile%add_column(sdiss_int,'Solenoidal dissipation')
+         call dissfile%add_column(ddiss_int,'Dilatational dissipation')
+         call dissfile%write()
          ! Create CFL monitor
          cflfile=monitor(fs%cfg%amRoot,'cfl')
          call cflfile%add_column(time%n,'Timestep number')
@@ -362,6 +410,11 @@ contains
          
          ! Apply time-varying Dirichlet conditions
          
+         ! ============= RECOMPUTE VISCOSITY =================
+         call get_visc(); fs%viscb=bulk2shear*fs%viscs
+         sc%diff=sc%Cv*Gamma*fs%viscs/Prandtl
+         ! ===================================================
+         
          ! ============= SUBGRID SCALE MODELING ==============
          if (use_sgs) then
             sgs_modeling: block
@@ -371,6 +424,10 @@ contains
                fs%viscb=sgs%visc
             end block sgs_modeling
          end if
+         ! ===================================================
+         
+         ! ============= RECOMPUTE DIFFUSIVITY ===============
+         sc%diff=sc%Cv*Gamma*fs%viscs/Prandtl
          ! ===================================================
          
          ! ============= PREPARE WENO SCHEMES ================
@@ -403,9 +460,7 @@ contains
             call sc%solve_implicit(time%dt,resE,fs%RHO,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
-            print*,'E on right pre update',sc%E(cfg%imax+1,cfg%jmin,cfg%kmin)
             sc%E=sc%E+resE*time%relax
-            print*,'E on right past update',sc%E(cfg%imax+1,cfg%jmin,cfg%kmin)
             
             ! Apply other boundary conditions on the resulting field
             call sc%apply_bcond(time%t,time%dt)
@@ -416,9 +471,7 @@ contains
             resE=fs%RHO
             
             ! Calculate RHO predictor
-            print*,'rho on right pre update',fs%RHO(cfg%imax+1,cfg%jmin,cfg%kmin)
             call get_rho(); call fs%update_faceRHO()
-            print*,'rho on right post update',fs%RHO(cfg%imax+1,cfg%jmin,cfg%kmin)
             
             ! Compute speed of sound squared at mid time
             call get_c2()
@@ -450,7 +503,7 @@ contains
             ! Apply other boundary conditions
             call fs%apply_bcond(time%t,time%dt)
             ! ===================================================
-            print*,'u before proj',fs%U(cfg%imax+1,cfg%jmin,cfg%kmin),fs%Umid(cfg%imax+1,cfg%jmin,cfg%kmin),fs%rhoU(cfg%imax+1,cfg%jmin,cfg%kmin)
+            
             ! ============ PRESSURE SOLVER ======================
             ! Compute Umid
             call fs%get_Umid()
@@ -463,13 +516,9 @@ contains
             fs%psolv%sol=0.0_WP
             call fs%psolv%solve()
             ! Correct pressure
-            print*,'P on right pre corrector',fs%P(cfg%imax+1,cfg%jmin,cfg%kmin)
             fs%P=fs%P+fs%psolv%sol
-            print*,'P on right post corrector',fs%P(cfg%imax+1,cfg%jmin,cfg%kmin)
             ! Correct density
-            print*,'rho on right pre corrector',fs%RHO(cfg%imax+1,cfg%jmin,cfg%kmin)
             fs%RHO=fs%RHO+fs%psolv%sol/C2; call fs%update_faceRHO()
-            print*,'rho on right post corrector',fs%RHO(cfg%imax+1,cfg%jmin,cfg%kmin)
             ! Correct mass flux
             call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
             fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
@@ -482,7 +531,7 @@ contains
             ! Also update internal energy
             call fs%get_pdil(P=fs%psolv%sol,Pdil=resU); sc%E=sc%E+time%dt*resU/fs%RHO
             ! ===================================================
-            print*,'u after proj',fs%U(cfg%imax+1,cfg%jmin,cfg%kmin),fs%Umid(cfg%imax+1,cfg%jmin,cfg%kmin),fs%rhoU(cfg%imax+1,cfg%jmin,cfg%kmin)
+            
             ! ============= CVG CHECKING ========================
             residual_check: block
                use mpi_f08,  only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
@@ -510,7 +559,9 @@ contains
          ! Perform and output monitoring
          call fs%get_max()
          call sc%get_max(fs%RHO)
+         call get_dissipation()
          call mfile%write()
+         call dissfile%write()
          call cflfile%write()
          
       end do
@@ -522,7 +573,8 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma,gradU)
+      deallocate(resE,resU,resV,resW,Ui,Vi,Wi,Ma,ddiss,sdiss)
+      if (use_sgs) deallocate(gradU)
    end subroutine simulation_final
    
    
