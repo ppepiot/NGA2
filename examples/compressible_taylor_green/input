@@ -14,7 +14,7 @@ Prandtl :  0.71
 Bulk to shear ratio : 0.0
 
 # Do we use SGS modeling
-Use bSGS model : .true.
+Use bSGS model : .false.
 Use sSGS model : .false.
 
 # Time integration
