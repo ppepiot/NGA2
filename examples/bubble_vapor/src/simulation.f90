@@ -41,7 +41,6 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: resU,resV,resW
    real(WP), dimension(:,:,:),   allocatable :: Ui,Vi,Wi
    real(WP), dimension(:,:,:),   allocatable :: T
-   real(WP), dimension(:,:,:),   allocatable :: Tl_grd,Tg_grd
    
    !> Problem definition
    real(WP) :: R0,R,R_ext,V_b
@@ -221,8 +220,6 @@ contains
          allocate(Vi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(T     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Tl_grd(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); Tl_grd=0.0_WP
-         allocate(Tg_grd(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); Tg_grd=0.0_WP
       end block allocate_work_arrays
       
       
@@ -520,18 +517,14 @@ contains
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
          ! Get temperature gradient
-         call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-         call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-         ! Extrapolate temperature gradient to interface
-         call evp%pure_interfacial_extp(Lphase,Tl_grd)
-         call evp%pure_interfacial_extp(Gphase,Tg_grd)
+         call evp%get_temperature_grad(sc%SC(:,:,:,iTl),sc%SC(:,:,:,iTg))
          ! Interface jump conditions
          evp%mdotdp=0.0_WP
          do k=evp%cfg%kmin_,evp%cfg%kmax_
             do j=evp%cfg%jmin_,evp%cfg%jmax_
                do i=evp%cfg%imin_,evp%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     ! evp%mdotdp=-(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+                     ! evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
                      evp%mdotdp(i,j,k)=3e-3
                   end if
                end do
@@ -584,8 +577,8 @@ contains
          call ens_out%add_scalar('divergence',fs%div)
          call ens_out%add_scalar('Temperature',T)
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
-         call ens_out%add_scalar('Tl_grd',Tl_grd)
-         call ens_out%add_scalar('Tg_grd',Tg_grd)
+         call ens_out%add_scalar('Tl_grd',evp%Tl_grd)
+         call ens_out%add_scalar('Tg_grd',evp%Tg_grd)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -759,11 +752,7 @@ contains
          end block advance_scalar
 
          ! Get temperature gradient
-         call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-         call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-         ! Extrapolate temperature gradient to interface
-         call evp%pure_interfacial_extp(Lphase,Tl_grd)
-         call evp%pure_interfacial_extp(Gphase,Tg_grd)
+         call evp%get_temperature_grad(sc%SC(:,:,:,iTl),sc%SC(:,:,:,iTg))
 
          ! Interface jump conditions
          evp%mdotdp=0.0_WP
@@ -771,7 +760,7 @@ contains
             do j=evp%cfg%jmin_,evp%cfg%jmax_
                do i=evp%cfg%imin_,evp%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     ! evp%mdotdp=-(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+                     ! evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
                      evp%mdotdp(i,j,k)=3e-3
                   end if
                end do
@@ -892,7 +881,7 @@ contains
       ! timetracker
       
       ! Deallocate work arrays
-      deallocate(resU,resV,resW,Ui,Vi,Wi,resSC,T,Tl_grd,Tg_grd)
+      deallocate(resU,resV,resW,Ui,Vi,Wi,resSC,T)
 
    end subroutine simulation_final
    

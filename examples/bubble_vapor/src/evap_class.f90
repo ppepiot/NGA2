@@ -63,6 +63,7 @@ module evap_class
       real(WP), dimension(:,:,:,:), allocatable :: mfluxLG,mfluxLG_old !< Liquid/Gas side shifted evaporation mass flux scaled by the surface density
       real(WP), dimension(:,:,:),   allocatable :: div_src             !< Evaporatin source term (div(U) = div_src)
       real(WP), dimension(:,:,:),   allocatable :: div_src_old         !< The old evaporatin source term
+      real(WP), dimension(:,:,:),   allocatable :: Tl_grd,Tg_grd       !< The liquid and gas temperature gradients
 
       ! Pseudo time over which the mflux is being shifted
       type(timetracker), public :: pseudo_time
@@ -100,6 +101,7 @@ module evap_class
       procedure :: add_bcond                                           !< Add a boundary condition
       procedure :: get_bcond                                           !< Get a boundary condition
       procedure :: apply_bcond                                         !< Apply all boundary conditions
+      procedure :: get_temperature_grad                                !< Get the temperature gradient
 
    end type evap
 
@@ -144,6 +146,8 @@ contains
       allocate(this%div_src_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%div_src_old=0.0_WP
       allocate(this%normal     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));this%normal     =0.0_WP
       allocate(this%pseudo_vel (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));this%pseudo_vel =0.0_WP
+      allocate(this%Tl_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%Tl_grd     =0.0_WP
+      allocate(this%Tg_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%Tg_grd     =0.0_WP
       allocate(this%itp(3))
       allocate(this%div(3))
 
@@ -633,6 +637,7 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer  :: i,j,k,ihat,jhat,khat,index,ierr
       real(WP), dimension(:,:,:), allocatable :: w
+      real(WP) :: wsum
       integer :: stxm,stym,stzm
       integer :: stxp,styp,stzp
       integer :: stx,sty,stz
@@ -686,7 +691,8 @@ contains
             end do
          end do
          ! Normalize the weights
-         w=w/sum(w)
+         wsum=sum(W)
+         if (wsum.gt.epsilon(wsum)) w=w/wsum
          ! Initialize with zero
          A(ihat,jhat,khat)=0.0_WP
          ! Loop over the stencil
@@ -854,6 +860,7 @@ contains
       implicit none
       class(evap), intent(inout) :: this
       integer :: i,j,k,dir,n
+      integer :: ii,jj,kk
       type(bcond), pointer :: my_bc
       
       ! Traverse bcond list
@@ -877,6 +884,10 @@ contains
                            this%normal(i,j,k,3)=this%normal(i-my_bc%dir,j,k,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i-my_bc%dir,j,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i-my_bc%dir,j,k,Gphase)
+                           do ii=1,extp_stc
+                              this%Tl_grd(i-ii+1,j,k)=this%Tl_grd(i-my_bc%dir*ii,j,k)
+                              this%Tg_grd(i-ii+1,j,k)=this%Tg_grd(i-my_bc%dir*ii,j,k)
+                           end do
                         end do
                      case ('y')
                         do n=1,my_bc%itr%n_
@@ -886,6 +897,10 @@ contains
                            this%normal(i,j,k,3)=this%normal(i,j-my_bc%dir,k,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j-my_bc%dir,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j-my_bc%dir,k,Gphase)
+                           do jj=1,extp_stc
+                              this%Tl_grd(i,j-jj+1,k)=this%Tl_grd(i,j-my_bc%dir*jj,k)
+                              this%Tg_grd(i,j-jj+1,k)=this%Tg_grd(i,j-my_bc%dir*jj,k)
+                           end do
                         end do
                      case ('z')
                         do n=1,my_bc%itr%n_
@@ -895,6 +910,10 @@ contains
                            this%normal(i,j,k,3)=this%normal(i,j,k-my_bc%dir,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k-my_bc%dir,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k-my_bc%dir,Gphase)
+                           do kk=1,extp_stc
+                              this%Tl_grd(i,j,k-kk+1)=this%Tl_grd(i,j,k-my_bc%dir*kk)
+                              this%Tg_grd(i,j,k-kk+1)=this%Tg_grd(i,j,k-my_bc%dir*kk)
+                           end do
                         end do
                   end select
                   
@@ -936,8 +955,30 @@ contains
       end do
       call this%cfg%sync(this%mfluxLG(:,:,:,Lphase))
       call this%cfg%sync(this%mfluxLG(:,:,:,Gphase))
+      call this%cfg%sync(this%Tl_grd(:,:,:))
+      call this%cfg%sync(this%Tg_grd(:,:,:))
       
    end subroutine apply_bcond
+
+
+   !> Calculate temperature gradients on the liquid and gas sides
+   subroutine get_temperature_grad(this,Tl,Tg)
+      use messager, only: die
+      use mpi_f08,  only: MPI_MAX
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(evap), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: Tl !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: Tg !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      ! Get the temperature gradients
+      call this%get_grad(Lphase,Tl,this%Tl_grd)
+      call this%get_grad(Gphase,Tg,this%Tg_grd)
+      ! Apply boundary conditions
+      call this%apply_bcond()
+      ! Extrapolate the gradients to interface
+      call this%pure_interfacial_extp(Lphase,this%Tl_grd)
+      call this%pure_interfacial_extp(Gphase,this%Tg_grd)
+   end subroutine get_temperature_grad
 
 
    !> Calculate the CFL
@@ -947,9 +988,9 @@ contains
       implicit none
       class(evap), intent(inout) :: this
       real(WP), intent(in)  :: dt
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: U     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: V     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: W     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: U !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: V !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: W !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), intent(out) :: cfl
       integer :: i,j,k,ierr
       real(WP) :: my_CFL

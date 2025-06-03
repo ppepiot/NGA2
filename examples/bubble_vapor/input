@@ -33,7 +33,7 @@ Max timestep size : 1.2 ! 3 ! 1.5
 Max cfl number    : 0.9
 Sub-iterations    : 2
 Scalar time step  : 1.2 ! 3 ! 1.5
-Max time          : 6 ! 100
+Max time          : 0!6 ! 100
 
 # Evaporation
 Max pseudo timestep size : 2.5e-2 ! 0.9 ! 4e-2
