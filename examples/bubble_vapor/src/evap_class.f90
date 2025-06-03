@@ -249,11 +249,11 @@ contains
                   this%normal(i,j,k,dir)=0.0_WP
                   ! Loop over the stencils
                   do stz=-1,1
-                     ! if (.not.(k+stz.ge.this%cfg%kmin.and.k+stz.le.this%cfg%kmax)) cycle
+                     if (.not.(k+stz.ge.this%cfg%kmin.and.k+stz.le.this%cfg%kmax)) cycle
                      do sty=-1,1
-                        ! if (.not.(j+sty.ge.this%cfg%jmin.and.j+sty.le.this%cfg%jmax)) cycle
+                        if (.not.(j+sty.ge.this%cfg%jmin.and.j+sty.le.this%cfg%jmax)) cycle
                         do stx=-1,1
-                           ! if (.not.(i+stx.ge.this%cfg%imin.and.i+stx.le.this%cfg%imax)) cycle
+                           if (.not.(i+stx.ge.this%cfg%imin.and.i+stx.le.this%cfg%imax)) cycle
                            vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
                            this%normal(i,j,k,dir)=this%normal(i,j,k,dir)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,dir)
                         end do
@@ -268,6 +268,66 @@ contains
          end do
       end do
    end subroutine extend_normal
+
+
+   ! !> Extend the interface normal for a smoother transition to zero
+   ! subroutine extend_normal(this)
+   !    implicit none
+   !    class(evap), intent(inout) :: this
+   !    integer  :: n,dir,i,j,k,index,index_pure
+   !    integer  :: stx,sty,stz
+   !    real(WP) :: vol
+   !    real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
+   !    ! Allocate memory for the temporary field
+   !    allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
+   !    ! Loop over the extension levels
+   !    do n=1,ext_lvl
+   !       ! Take a copy of the normal
+   !       normal_tmp=this%normal
+   !          ! Loop over the pure cells within the band
+   !          do index=1,sum(this%vf%band_count(1:ext_lvl))
+   !             ! Offset for the interfacial cells' index
+   !             index_pure=this%vf%band_count(0)+index
+   !             ! Get the cell indices
+   !             i=this%vf%band_map(1,index_pure)
+   !             j=this%vf%band_map(2,index_pure)
+   !             k=this%vf%band_map(3,index_pure)
+   !             ! Initialize with zero
+   !             vol=0.0_WP
+   !             this%normal(i,j,k,3)=0.0_WP
+   !             ! Loop over the stencils
+   !             do stz=-1,1
+   !                if (.not.(k+stz.ge.this%cfg%kmin.and.k+stz.le.this%cfg%kmax)) cycle
+   !                   vol=vol+this%cfg%vol(i,j,k+stz)
+   !                   this%normal(i,j,k,3)=this%normal(i,j,k,3)+this%cfg%vol(i,j,k+stz)*normal_tmp(i,j,k+stz,3)
+   !             end do
+   !             ! Scale by volume
+   !             if (vol.gt.0.0_WP) this%normal(i,j,k,3)=this%normal(i,j,k,3)/vol
+   !             ! Initialize with zero
+   !             vol=0.0_WP
+   !             this%normal(i,j,k,2)=0.0_WP
+   !             do sty=-1,1
+   !                if (.not.(j+sty.ge.this%cfg%jmin.and.j+sty.le.this%cfg%jmax)) cycle
+   !                   vol=vol+this%cfg%vol(i,j+sty,k)
+   !                   this%normal(i,j,k,2)=this%normal(i,j,k,2)+this%cfg%vol(i,j+sty,k)*normal_tmp(i,j+sty,k,2)
+   !             end do
+   !             ! Scale by volume
+   !             if (vol.gt.0.0_WP) this%normal(i,j,k,2)=this%normal(i,j,k,2)/vol
+   !             ! Initialize with zero
+   !             vol=0.0_WP
+   !             this%normal(i,j,k,1)=0.0_WP
+   !             do stx=-1,1
+   !                if (.not.(i+stx.ge.this%cfg%imin.and.i+stx.le.this%cfg%imax)) cycle
+   !                vol=vol+this%cfg%vol(i+stx,j,k)
+   !                this%normal(i,j,k,1)=this%normal(i,j,k,1)+this%cfg%vol(i+stx,j,k)*normal_tmp(i+stx,j,k,1)
+   !             end do
+   !             ! Scale by volume
+   !             if (vol.gt.0.0_WP) this%normal(i,j,k,1)=this%normal(i,j,k,1)/vol
+   !          end do
+   !          ! Sync
+   !          call this%cfg%sync(this%normal(:,:,:,dir))
+   !       end do
+   ! end subroutine extend_normal
 
 
    !> Calculate the pseudo velocity used to shift the evaporation mass flux

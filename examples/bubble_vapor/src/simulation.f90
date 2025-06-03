@@ -524,8 +524,8 @@ contains
             do j=evp%cfg%jmin_,evp%cfg%jmax_
                do i=evp%cfg%imin_,evp%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     ! evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
-                     evp%mdotdp(i,j,k)=3e-3
+                     evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
+                     ! evp%mdotdp(i,j,k)=3e-3
                   end if
                end do
             end do
@@ -542,6 +542,7 @@ contains
 
       ! Initialize bubble radius
       call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+      V_b=8.0_WP*V_b
       R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
       R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
 
@@ -760,8 +761,8 @@ contains
             do j=evp%cfg%jmin_,evp%cfg%jmax_
                do i=evp%cfg%imin_,evp%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     ! evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
-                     evp%mdotdp(i,j,k)=3e-3
+                     evp%mdotdp=-(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
+                     ! evp%mdotdp(i,j,k)=3e-3
                   end if
                end do
             end do
@@ -853,6 +854,7 @@ contains
          
          ! Update bubble radius
          call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+         V_b=8.0_WP*V_b
          R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
          R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
 
