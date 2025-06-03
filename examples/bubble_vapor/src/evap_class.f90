@@ -885,6 +885,7 @@ contains
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i-my_bc%dir,j,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i-my_bc%dir,j,k,Gphase)
                            do ii=1,extp_stc
+                              this%vf%VF(i-ii+1,j,k)=this%vf%VF(i-my_bc%dir*ii,j,k)
                               this%Tl_grd(i-ii+1,j,k)=this%Tl_grd(i-my_bc%dir*ii,j,k)
                               this%Tg_grd(i-ii+1,j,k)=this%Tg_grd(i-my_bc%dir*ii,j,k)
                            end do
@@ -898,6 +899,7 @@ contains
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j-my_bc%dir,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j-my_bc%dir,k,Gphase)
                            do jj=1,extp_stc
+                              this%vf%VF(i,j-jj+1,k)=this%vf%VF(i,j-my_bc%dir*jj,k)
                               this%Tl_grd(i,j-jj+1,k)=this%Tl_grd(i,j-my_bc%dir*jj,k)
                               this%Tg_grd(i,j-jj+1,k)=this%Tg_grd(i,j-my_bc%dir*jj,k)
                            end do
@@ -911,6 +913,7 @@ contains
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k-my_bc%dir,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k-my_bc%dir,Gphase)
                            do kk=1,extp_stc
+                              this%vf%VF(i,j,k-kk+1)=this%vf%VF(i,j,k-my_bc%dir*kk)
                               this%Tl_grd(i,j,k-kk+1)=this%Tl_grd(i,j,k-my_bc%dir*kk)
                               this%Tg_grd(i,j,k-kk+1)=this%Tg_grd(i,j,k-my_bc%dir*kk)
                            end do
