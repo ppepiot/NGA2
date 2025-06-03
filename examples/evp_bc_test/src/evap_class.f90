@@ -14,8 +14,7 @@ module evap_class
    public :: evap,bcond
    
    ! List of known available bcond for this solver
-   integer, parameter, public :: neumann=1                              !< Zero normal gradient
-   integer, parameter, public :: slip=2                                 !< Free-slilp condition
+   integer, parameter, public :: slip=1                                 !< Slilp condition
 
    ! Index shift
    integer, dimension(1:3,1:3) :: ind_shift=reshape([1,0,0,0,1,0,0,0,1], shape(ind_shift))
@@ -263,6 +262,8 @@ contains
             end if
          end do
       end do
+      ! Apply boundary conditions
+      call this%apply_bcond()
    end subroutine extend_normal
 
 
@@ -381,18 +382,11 @@ contains
       allocate(resmfluxL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       allocate(resmfluxG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
 
-      ! Initialize the evaporation mass fluxes on the liquid and gas sides
-      this%mfluxLG(:,:,:,Lphase)=-this%mflux
-      this%mfluxLG(:,:,:,Gphase)= this%mflux
-
       ! Get the interface normal
       call this%get_normal()
 
       ! Extend the interface normal
       call this%extend_normal()
-
-      ! Apply boundary conditions
-      call this%apply_bcond()
 
       ! Get the normalized gradient of VOF
       call this%get_pseudo_vel()
@@ -405,6 +399,13 @@ contains
       
       ! Adjust the pseudo time step
       call this%pseudo_time%adjust_dt()
+      
+      ! Initialize the evaporation mass fluxes on the liquid and gas sides
+      this%mfluxLG(:,:,:,Lphase)=-this%mflux
+      this%mfluxLG(:,:,:,Gphase)= this%mflux
+
+      ! Apply boundary conditions
+      ! call this%apply_bcond()
 
       ! Move the evaporation mass flux away from the interface
       do while (.not.this%pseudo_time%done())
@@ -423,8 +424,32 @@ contains
          this%mfluxLG(:,:,:,Lphase)=this%mfluxLG_old(:,:,:,Lphase)+this%pseudo_time%dt*resmfluxL
          this%mfluxLG(:,:,:,Gphase)=this%mfluxLG_old(:,:,:,Gphase)+this%pseudo_time%dt*resmfluxG
 
-         ! Re-apply boundary conditions
-         call this%apply_bcond()
+         ! debug: block
+         !    real(WP) :: mg,ml
+         !    mg=0.0_WP
+         !    ml=0.0_WP
+         !    do k=this%cfg%kmin,this%cfg%kmax
+         !       do j=this%cfg%jmin,this%cfg%jmax
+         !          do i=this%cfg%imino,this%cfg%imin-1
+         !             if (abs(resmfluxG(i,j,k)).gt.abs(mg)) mg=resmfluxG(i,j,k)
+         !             if (abs(resmfluxL(i,j,k)).gt.abs(ml)) ml=resmfluxL(i,j,k)
+         !          end do
+         !       end do
+         !    end do
+         !    do k=this%cfg%kmin,this%cfg%kmax
+         !       do j=this%cfg%jmin,this%cfg%jmax
+         !          do i=this%cfg%imax+1,this%cfg%imaxo
+         !             if (abs(resmfluxG(i,j,k)).gt.abs(mg)) mg=resmfluxG(i,j,k)
+         !             if (abs(resmfluxL(i,j,k)).gt.abs(ml)) ml=resmfluxL(i,j,k)
+         !          end do
+         !       end do
+         !    end do
+         !    print*,'mfluxL',ml
+         !    print*,'mfluxG',mg
+         ! end block debug
+
+         ! Apply boundary conditions
+         ! call this%apply_bcond()
 
          ! Calculate the integral of the residual error of mfluxL
          my_mflux_int=0.0_WP
@@ -464,29 +489,29 @@ contains
       ! Deallocate mflux residuals
       deallocate(resmfluxL,resmfluxG)
 
-      ! debug: block
-      !    real(WP) :: mg,ml
-      !    mg=0.0_WP
-      !    ml=0.0_WP
-      !    do k=this%cfg%kmin,this%cfg%kmax
-      !       do j=this%cfg%jmin,this%cfg%jmax
-      !          do i=this%cfg%imino,this%cfg%imin-1
-      !             if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
-      !             if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
-      !          end do
-      !       end do
-      !    end do
-      !    do k=this%cfg%kmin,this%cfg%kmax
-      !       do j=this%cfg%jmin,this%cfg%jmax
-      !          do i=this%cfg%imax+1,this%cfg%imaxo
-      !             if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
-      !             if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
-      !          end do
-      !       end do
-      !    end do
-      !    print*,'mfluxL',ml
-      !    print*,'mfluxG',mg
-      ! end block debug
+      debug: block
+         real(WP) :: mg,ml
+         mg=0.0_WP
+         ml=0.0_WP
+         do k=this%cfg%kmin,this%cfg%kmax
+            do j=this%cfg%jmin,this%cfg%jmax
+               do i=this%cfg%imino,this%cfg%imin-1
+                  if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
+                  if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
+               end do
+            end do
+         end do
+         do k=this%cfg%kmin,this%cfg%kmax
+            do j=this%cfg%jmin,this%cfg%jmax
+               do i=this%cfg%imax+1,this%cfg%imaxo
+                  if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
+                  if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
+               end do
+            end do
+         end do
+         print*,'mfluxL',ml
+         print*,'mfluxG',mg
+      end block debug
 
    end subroutine shift_mflux
 
@@ -801,7 +826,6 @@ contains
       new_bc%name=trim(adjustl(name))
       new_bc%type=type
       select case (new_bc%type)
-         case (neumann)
          case (slip)
          case default
             call die('[evap add_bcond] Unknown bcond type')
@@ -866,33 +890,33 @@ contains
             ! Select appropriate action based on the bcond type
             select case (my_bc%type)
                
-               case (neumann,slip)             ! Apply Neumann conditions
+               case (slip)             ! Apply slip condition
                   
                   select case (my_bc%face)
                      case ('x')
                         do n=1,my_bc%itr%n_
                            i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           this%normal(i,j,k,1)=this%normal(i-my_bc%dir,j,k,1)
-                           this%normal(i,j,k,2)=this%normal(i-my_bc%dir,j,k,2)
-                           this%normal(i,j,k,3)=this%normal(i-my_bc%dir,j,k,3)
+                           this%normal(i,j,k,1)=-this%normal(i-my_bc%dir,j,k,1)
+                           this%normal(i,j,k,2)= this%normal(i-my_bc%dir,j,k,2)
+                           this%normal(i,j,k,3)= this%normal(i-my_bc%dir,j,k,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i-my_bc%dir,j,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i-my_bc%dir,j,k,Gphase)
                         end do
                      case ('y')
                         do n=1,my_bc%itr%n_
                            i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           this%normal(i,j,k,1)=this%normal(i,j-my_bc%dir,k,1)
-                           this%normal(i,j,k,2)=this%normal(i,j-my_bc%dir,k,2)
-                           this%normal(i,j,k,3)=this%normal(i,j-my_bc%dir,k,3)
+                           this%normal(i,j,k,1)= this%normal(i,j-my_bc%dir,k,1)
+                           this%normal(i,j,k,2)=-this%normal(i,j-my_bc%dir,k,2)
+                           this%normal(i,j,k,3)= this%normal(i,j-my_bc%dir,k,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j-my_bc%dir,k,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j-my_bc%dir,k,Gphase)
                         end do
                      case ('z')
                         do n=1,my_bc%itr%n_
                            i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           this%normal(i,j,k,1)=this%normal(i,j,k-my_bc%dir,1)
-                           this%normal(i,j,k,2)=this%normal(i,j,k-my_bc%dir,2)
-                           this%normal(i,j,k,3)=this%normal(i,j,k-my_bc%dir,3)
+                           this%normal(i,j,k,1)= this%normal(i,j,k-my_bc%dir,1)
+                           this%normal(i,j,k,2)= this%normal(i,j,k-my_bc%dir,2)
+                           this%normal(i,j,k,3)=-this%normal(i,j,k-my_bc%dir,3)
                            this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k-my_bc%dir,Lphase)
                            this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k-my_bc%dir,Gphase)
                         end do
@@ -901,27 +925,6 @@ contains
                case default
                   call die('[evap apply_bcond] Unknown bcond type')
             end select
-
-            ! If needed, no penetration
-            if (my_bc%type.eq.slip) then
-               select case (my_bc%face)
-               case ('x')
-                  do n=1,my_bc%itr%n_
-                     i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                     this%normal(i,j,k,1)=-this%normal(i-my_bc%dir,j,k,1)
-                  end do
-               case ('y')
-                  do n=1,my_bc%itr%n_
-                     i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                     this%normal(i,j,k,2)=-this%normal(i,j-my_bc%dir,k,2)
-                  end do
-               case ('z')
-                  do n=1,my_bc%itr%n_
-                     i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                     this%normal(i,j,k,3)=-this%normal(i,j,k-my_bc%dir,3)
-                  end do
-               end select
-            end if
             
          end if
          

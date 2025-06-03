@@ -319,7 +319,7 @@ contains
          call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
          call param_read('Bubble center',center)
-         R0=2.0_WP*beta*sqrt(alpha_l*t0)
+         R0=0.1_WP
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
             do j=vf%cfg%jmino_,vf%cfg%jmaxo_
                do i=vf%cfg%imino_,vf%cfg%imaxo_
@@ -346,8 +346,6 @@ contains
                end do
             end do
          end do
-         ! Apply boundary conditions
-         ! call vf%apply_bcond(time%t,time%dt)
          ! Update the band
          call vf%update_band()
          ! Perform interface reconstruction from VOF field
@@ -444,7 +442,7 @@ contains
             do j=sc%cfg%jmino_,sc%cfg%jmaxo_
                do k=sc%cfg%kmino_,sc%cfg%kmaxo_
                   radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
-                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf!-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
                   if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_sat
                end do
             end do
@@ -514,8 +512,8 @@ contains
          evp%pseudo_time%dt=evp%pseudo_time%dtmax
          ! Boundary conditions
          call evp%add_bcond(name='xm',type=slip,face='x',dir=-1,locator=xm_locator_sc)
-         call evp%add_bcond(name='ym',type=slip,face='y',dir=-1,locator=ym_locator_sc)
-         call evp%add_bcond(name='zm',type=slip,face='z',dir=-1,locator=zm_locator_sc)
+         call evp%add_bcond(name='ym',type=slip,face='y',dir=-1,locator=xm_locator_sc)
+         call evp%add_bcond(name='zm',type=slip,face='z',dir=-1,locator=xm_locator_sc)
          ! Get densities from the flow solver
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
@@ -548,9 +546,9 @@ contains
 
 
       ! Initialize bubble radius
-      call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-      R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
-      R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
+      ! call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+      ! R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
+      ! R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
 
 
       ! Create surfmesh object for interface polygon output
@@ -564,7 +562,7 @@ contains
       create_ensight: block
          integer :: nsc
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='Bubble_vapor')
+         ens_out=ensight(cfg=cfg,name='evp_bc_test')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -863,9 +861,9 @@ contains
          end if
          
          ! Update bubble radius
-         call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-         R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
-         R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
+         ! call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+         ! R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
+         ! R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
 
          ! Perform and output monitoring
          call fs%get_max()

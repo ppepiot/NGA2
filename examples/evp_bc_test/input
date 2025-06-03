@@ -1,16 +1,16 @@
 # Parallelization
-Partition : 2 2 2 
+Partition : 1 1 1
 
 # Mesh definition
-Lx : 4 ! 7.5
-Ly : 4 ! 7.5
-Lz : 4 ! 7.5
-nx : 128 ! 256 ! 128 ! 256
-ny : 128 ! 256 ! 128 ! 256
-nz : 128 ! 256 ! 128 ! 256
+Lx : 1
+Ly : 0.05
+Lz : 0.05
+nx : 20
+ny : 1
+nz : 1
 
 # Case parameters
-Bubble center         : 0 0 0
+Bubble center         : 0.15 0 0
 Far-field temperature : 3
 Initial time          : 20
 
