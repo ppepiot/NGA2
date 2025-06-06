@@ -165,20 +165,24 @@ contains
       do k=this%cfg%kmin_-1,this%cfg%kmax_+1
          do j=this%cfg%jmin_-1,this%cfg%jmax_+1
             do i=this%cfg%imin_-1,this%cfg%imax_+1
-               ! Prepare WENO scheme for RHO transport
+               ! Prepare WENO scheme for mass transport
                w=weno_weight((abs(this%RHO(i-1,j,k)-this%RHO(i-2,j,k))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
                w=weno_weight((abs(this%RHO(i+1,j,k)-this%RHO(i  ,j,k))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
                w=weno_weight((abs(this%RHO(i,j-1,k)-this%RHO(i,j-2,k))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
                w=weno_weight((abs(this%RHO(i,j+1,k)-this%RHO(i,j  ,k))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
                w=weno_weight((abs(this%RHO(i,j,k-1)-this%RHO(i,j,k-2))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
                w=weno_weight((abs(this%RHO(i,j,k+1)-this%RHO(i,j,k  ))+eps)/(abs(this%RHO(i,j,k)-this%RHO(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-               ! Calculate mass flux
+               ! WENO-based mass fluxes
                FRX(i,j,k)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHO(i-2:i  ,j,k)) &
                &          -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHO(i-1:i+1,j,k))
                FRY(i,j,k)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wyp*this%RHO(i,j-2:j  ,k)) &
                &          -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wym*this%RHO(i,j-1:j+1,k))
                FRZ(i,j,k)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wzp*this%RHO(i,j,k-2:k  )) &
                &          -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wzm*this%RHO(i,j,k-1:k+1))
+               ! Centered mass fluxes
+               !FRX(i,j,k)=-0.5_WP*this%U(i,j,k)*sum(this%RHO(i-1:i,j,k))
+               !FRY(i,j,k)=-0.5_WP*this%V(i,j,k)*sum(this%RHO(i,j-1:j,k))
+               !FRZ(i,j,k)=-0.5_WP*this%W(i,j,k)*sum(this%RHO(i,j,k-1:k))
             end do
          end do
       end do
@@ -205,7 +209,21 @@ contains
                FVZ(i,j,k)=0.25_WP*sum(FRZ(i,j-1:j,k))*sum(this%V(i,j,k-1:k))
                FWX(i,j,k)=0.25_WP*sum(FRX(i,j,k-1:k))*sum(this%W(i-1:i,j,k))
                FWY(i,j,k)=0.25_WP*sum(FRY(i,j,k-1:k))*sum(this%W(i,j-1:j,k))
-               ! Internal energy fluxes
+               ! Prepare WENO scheme for internal energy transport
+               !w=weno_weight((abs(this%E(i-1,j,k)-this%E(i-2,j,k))+eps)/(abs(this%E(i,j,k)-this%E(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+               !w=weno_weight((abs(this%E(i+1,j,k)-this%E(i  ,j,k))+eps)/(abs(this%E(i,j,k)-this%E(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+               !w=weno_weight((abs(this%E(i,j-1,k)-this%E(i,j-2,k))+eps)/(abs(this%E(i,j,k)-this%E(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+               !w=weno_weight((abs(this%E(i,j+1,k)-this%E(i,j  ,k))+eps)/(abs(this%E(i,j,k)-this%E(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+               !w=weno_weight((abs(this%E(i,j,k-1)-this%E(i,j,k-2))+eps)/(abs(this%E(i,j,k)-this%E(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+               !w=weno_weight((abs(this%E(i,j,k+1)-this%E(i,j,k  ))+eps)/(abs(this%E(i,j,k)-this%E(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+               ! WENO-based internal energy fluxes
+               !FEX(i,j,k)=0.5_WP*(FRX(i,j,k)-abs(-FRX(i,j,k)))*sum(wxp*this%E(i-2:i  ,j,k)) &
+               !&         +0.5_WP*(FRX(i,j,k)+abs(-FRX(i,j,k)))*sum(wxm*this%E(i-1:i+1,j,k))
+               !FEY(i,j,k)=0.5_WP*(FRY(i,j,k)-abs(-FRY(i,j,k)))*sum(wyp*this%E(i,j-2:j  ,k)) &
+               !&         +0.5_WP*(FRY(i,j,k)+abs(-FRY(i,j,k)))*sum(wym*this%E(i,j-1:j+1,k))
+               !FEZ(i,j,k)=0.5_WP*(FRZ(i,j,k)-abs(-FRZ(i,j,k)))*sum(wzp*this%E(i,j,k-2:k  )) &
+               !&         +0.5_WP*(FRZ(i,j,k)+abs(-FRZ(i,j,k)))*sum(wzm*this%E(i,j,k-1:k+1))
+               ! Centered internal energy fluxes
                FEX(i,j,k)=0.5_WP*FRX(i,j,k)*sum(this%E(i-1:i,j,k))
                FEY(i,j,k)=0.5_WP*FRY(i,j,k)*sum(this%E(i,j-1:j,k))
                FEZ(i,j,k)=0.5_WP*FRZ(i,j,k)*sum(this%E(i,j,k-1:k))
@@ -447,7 +465,7 @@ contains
       this%CFLa_y=maxC*dt*this%dyi
       this%CFLa_z=maxC*dt*this%dzi
       ! Compute viscous CFLs
-      maxvisc=maxval(this%visc); call MPI_ALLREDUCE(MPI_IN_PLACE,maxvisc,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      maxvisc=maxval(this%visc/this%RHO); call MPI_ALLREDUCE(MPI_IN_PLACE,maxvisc,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       this%CFLv_x=4.0_WP*maxvisc*dt*this%dxi**2
       this%CFLv_y=4.0_WP*maxvisc*dt*this%dyi**2
       this%CFLv_z=4.0_WP*maxvisc*dt*this%dzi**2
