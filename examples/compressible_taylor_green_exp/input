@@ -13,9 +13,9 @@ Reynolds : 1600
 Prandtl :  0.71
 
 # Time integration
-Max timestep size : 0.01
+Max timestep size : 0.04
 Max cfl number :    10.0
 Max time :          10
 
 # Ensight output
-Ensight output period : 1e-1
+Ensight output period : 1e-2
