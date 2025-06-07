@@ -145,7 +145,7 @@ contains
       
       ! Allocate work arrays
       allocate_work_arrays: block
-         allocate(dQdt(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:fs%nQ,1:2))
+         allocate(dQdt(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:fs%nQ,1:4))
          allocate(Ui(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Vi(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
@@ -196,8 +196,14 @@ contains
                   fs%U  (i,j,k)=1.0_WP!+sin(fs%cfg%x (i))*cos(fs%cfg%ym(j))*cos(fs%cfg%zm(k))
                   fs%V  (i,j,k)=0.0_WP!-cos(fs%cfg%xm(i))*sin(fs%cfg%y (j))*cos(fs%cfg%zm(k))
                   fs%W  (i,j,k)=0.0_WP
-                  if (fs%VF(i,j,k).gt.0.0_WP) fs%RHOL(i,j,k)=1000.0_WP
-                  if (fs%VF(i,j,k).lt.1.0_WP) fs%RHOG(i,j,k)=1.0_WP
+                  if (fs%VF(i,j,k).gt.0.0_WP) then
+                     fs%RHOL(i,j,k)=1.0_WP+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
+                     fs%EL(i,j,k)=1.0_WP+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
+                  end if
+                  if (fs%VF(i,j,k).lt.1.0_WP) then
+                     fs%RHOG(i,j,k)=1.0_WP+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
+                     fs%EG(i,j,k)=1.0_WP+(cos(2.0_WP*fs%cfg%xm(i))+cos(2.0_WP*fs%cfg%ym(j)))*(cos(2.0_WP*fs%cfg%zm(k))+2.0_WP)/16.0_WP
+                  end if
                end do
             end do
          end do
@@ -205,6 +211,8 @@ contains
          !call fs%get_momentum(); fs%RHOE=fs%RHO*fs%E; fs%T=fs%E/fs%Cv
          fs%Q(:,:,:,1)=        fs%VF *fs%RHOL
          fs%Q(:,:,:,2)=(1.0_WP-fs%VF)*fs%RHOG
+         fs%Q(:,:,:,3)=fs%Q(:,:,:,1)*fs%EL
+         fs%Q(:,:,:,4)=fs%Q(:,:,:,2)*fs%EG
          ! Interpolate velocity, compute speed of sound and local Mach number
          call fs%interp_vel(Ui,Vi,Wi)
          C=0.0_WP!sqrt(Gamma*(Gamma-1.0_WP)*fs%E)
@@ -223,6 +231,8 @@ contains
          call ens_out%add_scalar('VOF' ,fs%VF)
          call ens_out%add_scalar('RHOl',fs%RHOL)
          call ens_out%add_scalar('RHOg',fs%RHOG)
+         call ens_out%add_scalar('El',fs%EL)
+         call ens_out%add_scalar('Eg',fs%EG)
          !call ens_out%add_scalar('density' ,fs%RHO)
          !call ens_out%add_scalar('energy'  ,fs%E)
          !call ens_out%add_scalar('pressure',fs%P)
@@ -258,6 +268,10 @@ contains
          call mfile%add_column(fs%RHOLmin,'min(RHOL)')
          call mfile%add_column(fs%RHOGmax,'max(RHOG)')
          call mfile%add_column(fs%RHOGmin,'min(RHOG)')
+         call mfile%add_column(fs%ELmax,'max(EL)')
+         call mfile%add_column(fs%ELmin,'min(EL)')
+         call mfile%add_column(fs%EGmax,'max(EG)')
+         call mfile%add_column(fs%EGmin,'min(EG)')
          call mfile%add_column(fs%VFmax,'VFmax')
          call mfile%add_column(fs%VFmin,'VFmin')
          call mfile%write()
@@ -280,8 +294,10 @@ contains
          call consfile%add_column(time%n,'Timestep number')
          call consfile%add_column(time%t,'Time')
          call consfile%add_column(fs%VFint  ,'Volume')
-         call consfile%add_column(fs%RHOLint,'int(RHOL)')
-         call consfile%add_column(fs%RHOGint,'int(RHOG)')
+         call consfile%add_column(fs%Qint(1),'Liquid mass')
+         call consfile%add_column(fs%Qint(2),'Gas mass')
+         call consfile%add_column(fs%Qint(3),'Liquid energy')
+         call consfile%add_column(fs%Qint(4),'Gas energy')
          !call consfile%add_column(fs%RHOint ,'Mass'  )
          !call consfile%add_column(fs%RHOUint,'U Momentum')
          !call consfile%add_column(fs%RHOVint,'V Momentum')
@@ -320,9 +336,13 @@ contains
          
          ! Remember conserved variables, volume moments, and interface
          fs%Qold =fs%Q
-         fs%VFold=fs%VF
-         fs%BLold=fs%BL
-         fs%BGold=fs%BG
+         
+         ! Remember phasic quantities
+         fs%RHOLold=fs%RHOL; fs%ELold=fs%EL
+         fs%RHOGold=fs%RHOG; fs%EGold=fs%EG
+         
+         ! Remember volume moments and interface
+         fs%VFold=fs%VF; fs%BLold=fs%BL; fs%BGold=fs%BG
          copy_plic_to_old: block
             use irl_fortran_interface, only: copy
             integer :: i,j,k
@@ -331,20 +351,109 @@ contains
             end do; end do; end do
          end block copy_plic_to_old
          
-         ! Advance equations
-         call fs%advance(dt=time%dt)
+         ! Tag cells for semi-Lagrangian transport
+         call fs%SLtag()
          
-         ! Recompute primitive variables
+         ! Perform first semi-Lagrangian transport step =====================================================
+         call fs%SLstep(dt=0.5_WP*time%dt,U=fs%U,V=fs%V,W=fs%W)
+         !call fs%build_interface()
+         
+         ! First RK step ====================================================================================
+         ! Get non-SL RHS and increment
+         call fs%rhs(dQdt(:,:,:,:,1)); fs%Q=fs%Qold+0.5_WP*time%dt*dQdt(:,:,:,:,1)
+         ! Increment Q with SL terms
+         call fs%SLincrement()
+         ! Recompute phasic variables
          where (fs%VF.gt.0.0_WP)
             fs%RHOL=fs%Q(:,:,:,1)/fs%VF
+            fs%EL=fs%Q(:,:,:,3)/fs%Q(:,:,:,1)
          elsewhere
             fs%RHOL=0.0_WP
+            fs%EL=0.0_WP
          end where
          where (fs%VF.lt.1.0_WP)
             fs%RHOG=fs%Q(:,:,:,2)/(1.0_WP-fs%VF)
+            fs%EG=fs%Q(:,:,:,4)/fs%Q(:,:,:,2)
          elsewhere
             fs%RHOG=0.0_WP
+            fs%EG=0.0_WP
          end where
+         ! Recompute primitive variables
+         !call fs%get_velocity(); fs%E=fs%RHOE/fs%RHO; fs%P=fs%RHOE*(Gamma-1.0_WP); fs%T=fs%E/fs%Cv
+
+         ! Second RK step ===================================================================================
+         ! Get non-SL RHS and increment
+         call fs%rhs(dQdt(:,:,:,:,2)); fs%Q=fs%Qold+0.5_WP*time%dt*dQdt(:,:,:,:,2)
+         ! Increment Q with SL terms
+         call fs%SLincrement()
+         ! Recompute phasic variables
+         where (fs%VF.gt.0.0_WP)
+            fs%RHOL=fs%Q(:,:,:,1)/fs%VF
+            fs%EL=fs%Q(:,:,:,3)/fs%Q(:,:,:,1)
+         elsewhere
+            fs%RHOL=0.0_WP
+            fs%EL=0.0_WP
+         end where
+         where (fs%VF.lt.1.0_WP)
+            fs%RHOG=fs%Q(:,:,:,2)/(1.0_WP-fs%VF)
+            fs%EG=fs%Q(:,:,:,4)/fs%Q(:,:,:,2)
+         elsewhere
+            fs%RHOG=0.0_WP
+            fs%EG=0.0_WP
+         end where
+         ! Recompute primitive variables
+         !call fs%get_velocity(); fs%E=fs%RHOE/fs%RHO; fs%P=fs%RHOE*(Gamma-1.0_WP); fs%T=fs%E/fs%Cv
+         
+         ! Perform second semi-Lagrangian transport step ====================================================
+         call fs%SLstep(dt=1.0_WP*time%dt,U=fs%U,V=fs%V,W=fs%W)
+         call fs%build_interface()
+         
+         ! Third RK step ====================================================================================
+         ! Get non-SL RHS and increment
+         call fs%rhs(dQdt(:,:,:,:,3)); fs%Q=fs%Qold+1.0_WP*time%dt*dQdt(:,:,:,:,3)
+         ! Increment Q with SL terms
+         call fs%SLincrement()
+         ! Recompute phasic variables
+         where (fs%VF.gt.0.0_WP)
+            fs%RHOL=fs%Q(:,:,:,1)/fs%VF
+            fs%EL=fs%Q(:,:,:,3)/fs%Q(:,:,:,1)
+         elsewhere
+            fs%RHOL=0.0_WP
+            fs%EL=0.0_WP
+         end where
+         where (fs%VF.lt.1.0_WP)
+            fs%RHOG=fs%Q(:,:,:,2)/(1.0_WP-fs%VF)
+            fs%EG=fs%Q(:,:,:,4)/fs%Q(:,:,:,2)
+         elsewhere
+            fs%RHOG=0.0_WP
+            fs%EG=0.0_WP
+         end where
+         ! Recompute primitive variables
+         !call fs%get_velocity(); fs%E=fs%RHOE/fs%RHO; fs%P=fs%RHOE*(Gamma-1.0_WP); fs%T=fs%E/fs%Cv
+         
+         ! Fourth RK step ===================================================================================
+         ! Get non-SL RHS and increment
+         call fs%rhs(dQdt(:,:,:,:,4))
+         fs%Q=fs%Qold+time%dt/6.0_WP*(dQdt(:,:,:,:,1)+2.0_WP*dQdt(:,:,:,:,2)+2.0_WP*dQdt(:,:,:,:,3)+dQdt(:,:,:,:,4))
+         ! Increment Q with SL terms
+         call fs%SLincrement()
+         ! Recompute phasic variables
+         where (fs%VF.gt.0.0_WP)
+            fs%RHOL=fs%Q(:,:,:,1)/fs%VF
+            fs%EL=fs%Q(:,:,:,3)/fs%Q(:,:,:,1)
+         elsewhere
+            fs%RHOL=0.0_WP
+            fs%EL=0.0_WP
+         end where
+         where (fs%VF.lt.1.0_WP)
+            fs%RHOG=fs%Q(:,:,:,2)/(1.0_WP-fs%VF)
+            fs%EG=fs%Q(:,:,:,4)/fs%Q(:,:,:,2)
+         elsewhere
+            fs%RHOG=0.0_WP
+            fs%EG=0.0_WP
+         end where
+         ! Recompute primitive variables
+         !call fs%get_velocity(); fs%E=fs%RHOE/fs%RHO; fs%P=fs%RHOE*(Gamma-1.0_WP); fs%T=fs%E/fs%Cv
          
          ! Output to ensight
          if (ens_evt%occurs()) then

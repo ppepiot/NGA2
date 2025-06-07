@@ -29,15 +29,17 @@ module mpcomp_class
       ! Solver name
       character(len=str_medium) :: name='UNNAMED_MPCOMP'
       
-      ! Volume moments, interface, and volume fluxes
+      ! Volume moments, interface, and semi-Lagrangian fluxes
       real(WP), dimension(:,:,:)  , allocatable :: VF,VFold
       real(WP), dimension(:,:,:,:), allocatable :: BL,BLold
       real(WP), dimension(:,:,:,:), allocatable :: BG,BGold
       type(PlanarSep_type), dimension(:,:,:), allocatable :: PLIC,PLICold
       type(SepVM_type),     dimension(:,:,:), allocatable :: FVx,FVy,FVz
+      real(WP), dimension(:,:,:,:), allocatable :: SLFx,SLFy,SLFz
+      real(WP) :: SLdt
       
       ! Tag for semi-Lagrangian fluxing
-      integer, dimension(:,:,:), allocatable :: SLtag
+      integer, dimension(:,:,:), allocatable :: iSL
       
       ! Conserved variables
       integer :: nQ
@@ -45,7 +47,10 @@ module mpcomp_class
       
       ! Flow variables
       real(WP), dimension(:,:,:), allocatable :: U,V,W
-      real(WP), dimension(:,:,:), allocatable :: RHOL,RHOG
+      
+      ! Phasic variables
+      real(WP), dimension(:,:,:), allocatable :: RHOL,RHOG,RHOLold,RHOGold
+      real(WP), dimension(:,:,:), allocatable :: EL,EG,ELold,EGold
       
       ! IRL-native data
       type(ByteBuffer_type) :: send_byte_buffer,recv_byte_buffer
@@ -73,25 +78,34 @@ module mpcomp_class
       real(WP) :: CFLa_x,CFLa_y,CFLa_z                    !< Acoustic CFL numbers
       real(WP) :: CFLv_x,CFLv_y,CFLv_z                    !< Viscous CFL numbers
       
-      ! Monitoring quantities
-      real(WP) :: VFmin,VFmax,VFint                       !< Volume fraction stats
+      ! Monitoring quantities for conserved variables
+      real(WP) :: VFmin,VFmax,VFint
+      real(WP), dimension(:), allocatable :: Qmin,Qmax,Qint
+      
+      ! Monitoring quantities for primitive variables
       real(WP) :: Umax,Vmax,Wmax                          !< Velocity stats
-      real(WP) :: RHOLmin,RHOLmax,RHOLint                 !< Liquid density stats
-      real(WP) :: RHOGmin,RHOGmax,RHOGint                 !< Gas density stats
+      real(WP) :: RHOLmin,RHOLmax                         !< Liquid density stats
+      real(WP) :: RHOGmin,RHOGmax                         !< Gas density stats
+      real(WP) :: ELmin,ELmax                             !< Liquid energy stats
+      real(WP) :: EGmin,EGmax                             !< Gas energy stats
       !real(WP) :: RHOUint,RHOVint,RHOWint                 !< Momentum stats
       !real(WP) :: RHOmin,RHOmax,RHOint                    !< Density stats
       !real(WP) :: Emin,Emax,RHOEint                       !< Internal energy stats
       !real(WP) :: Pmin,Pmax                               !< Pressure stats
       
       ! Timers
-      type(timer) :: tvof                                 !< Timer for VOF transport
+      type(timer) :: trhs                                 !< Timer for RHS calculation (excluding tagged cells)
+      type(timer) :: tsl                                  !< Timer for semi-Lagrangian transport
       type(timer) :: tplic                                !< Timer for PLIC reconstruction
       
    contains
       procedure :: print=>mpcomp_print                    !< Output solver to the screen
       procedure :: initialize                             !< Initialize the flow solver
       procedure :: initialize_irl                         !< Initialize interface with interface reconstruction library
-      procedure :: advance                                !< Advance all equation by dt
+      procedure :: SLtag                                  !< Tag cell for semi-Lagrangian fluxing
+      procedure :: SLstep                                 !< Perform an unsplit semi-Lagrangian transport step
+      procedure :: SLincrement                            !< Increment Q by SLdt*rhs of phasic equations in tagged cells
+      procedure :: rhs                                    !< Compute rhs of our equations except phase-specific advection in untagged cells
       procedure :: build_interface                        !< Build interface from volume moments
       procedure :: get_RHS                                !< Calculate dQ/dt
       procedure :: get_velocity                           !< Calculate velocity from momentum
@@ -138,16 +152,24 @@ contains
       allocate(this%BLold(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%BLold=0.0_WP
       allocate(this%BGold(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%BGold=0.0_WP
       
+      ! Allocate semi-Lagrangian fluxes
+      allocate(this%SLFx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFx=0.0_WP
+      allocate(this%SLFy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFy=0.0_WP
+      allocate(this%SLFz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFz=0.0_WP
+      
       ! Initialize Interface Reconstruction Library and its data
       call this%initialize_irl()
       
       ! Allocate semi-Lagrangian tag
-      allocate(this%SLtag(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%SLtag=0
+      allocate(this%iSL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%iSL=0
       
       ! Allocate and zero out conserved variables
-      this%nQ=2 ! 1:alphal*RHOl,2:alphag*RHOg
+      this%nQ=4 ! 1:alphal*RHOl,2:alphag*RHOg,3:alphal*RHOl*El,4:alphag*RHOg*Eg
       allocate(this%Q   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nQ)); this%Q   =0.0_WP
       allocate(this%Qold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nQ)); this%Qold=0.0_WP
+      
+      ! Conserved variables monitoring
+      allocate(this%Qmin(1:this%nQ),this%Qmax(1:this%nQ),this%Qint(1:this%nQ))
       
       ! Flow variables
       allocate(this%U(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%U=0.0_WP
@@ -157,6 +179,12 @@ contains
       ! Phasic variables
       allocate(this%RHOL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOL=0.0_WP
       allocate(this%RHOG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOG=0.0_WP
+      allocate(this%EL  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%EL  =0.0_WP
+      allocate(this%EG  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%EG  =0.0_WP
+      allocate(this%RHOLold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOLold=0.0_WP
+      allocate(this%RHOGold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOGold=0.0_WP
+      allocate(this%ELold  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%ELold  =0.0_WP
+      allocate(this%EGold  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%EGold  =0.0_WP
       
       !allocate(this%E(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%E=0.0_WP
       !allocate(this%P(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%P=0.0_WP
@@ -221,8 +249,8 @@ contains
          ! PLIC interface
          call new(this%PLIC   (i,j,k),this%planar_separator_allocation   )
          call new(this%PLICold(i,j,k),this%old_planar_separator_allocation)
-         ! PLIC+mesh with connectivity (i.e., link)
-         call new(this%localized_separator_link(i,j,k),this%localized_separator_link_allocation,this%localizer(i,j,k),this%PLIC(i,j,k))
+         ! PLIC+mesh with connectivity (i.e., link) - this uses PLICold
+         call new(this%localized_separator_link(i,j,k),this%localized_separator_link_allocation,this%localizer(i,j,k),this%PLICold(i,j,k))
          ! Mesh with connectivity
          call new(this%localizer_link(i,j,k),this%localizer_link_allocation,this%localizer(i,j,k))
       end do; end do; end do
@@ -280,301 +308,439 @@ contains
    end subroutine initialize_irl
    
    
-   !> Advance all equations by dt
-   subroutine advance(this,dt)
+   !> Tag cell for semi-Lagrangian fluxing based on proximity to 0<VOF<1
+   !> Could become user-specified, use VOFold, or depend on current CFL...
+   subroutine SLtag(this)
       implicit none
       class(mpcomp), intent(inout) :: this
-      real(WP), intent(in) :: dt
-      real(WP), dimension(:,:,:,:), allocatable :: Fx,Fy,Fz
-      
-      ! Allocate phasic mass and energy fluxes (1:RHOL,2:RHOG,3:RHOEL,4:RHOG)
-      allocate(Fx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
-      allocate(Fy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
-      allocate(Fz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
-      
-      ! Start VOF timer
-      call this%tvof%start()
-      
-      ! Tag cell for semi-Lagrangian fluxing
-      tag_cells: block
-         integer :: i,j,k,ii,jj,kk,dir,n
-         integer, dimension(3) :: ind
-         ! Reset tag
-         this%SLtag=0
-         ! First sweep to identify cells with interface
-         do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1; do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1; do i=this%cfg%imino_+1,this%cfg%imaxo_-1
-            ! Flag all mixture cells
-            if (this%VF(i,j,k).ge.VFlo.and.this%VF(i,j,k).le.VFhi) this%SLtag(i,j,k)=1
-            ! Check if cell-face is an interface
-            do dir=1,3; do n=-1,+1,2
-               ind=[i,j,k]; ind(dir)=ind(dir)+n
-               if (this%VF(i,j,k).lt.VFlo.and.this%VF(ind(1),ind(2),ind(3)).gt.VFhi.or.&
-               &   this%VF(i,j,k).gt.VFhi.and.this%VF(ind(1),ind(2),ind(3)).lt.VFlo) this%SLtag(i,j,k)=1
-            end do; end do
-         end do; end do; end do
-         call this%cfg%sync(this%SLtag)
-         ! Second sweep to extend by one cell
-         do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1; do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1; do i=this%cfg%imino_+1,this%cfg%imaxo_-1
-            if (this%SLtag(i,j,k).eq.0) then
-               do kk=k-1,k+1; do jj=j-1,j+1; do ii=i-1,i+1
-                  if (this%SLtag(ii,jj,kk).eq.1) this%SLtag(i,j,k)=2
-               end do; end do; end do
-            end if
-         end do; end do; end do
-         call this%cfg%sync(this%SLtag)
-      end block tag_cells
-      
-      ! Loop over the domain and compute fluxes using semi-Lagrangian algorithm
-      calculate_volume_mass_energy_fluxes: block
-         real(IRL_double), dimension(3,9) :: face
-         type(SepVM_type) :: my_SepVM
-         type(CapDod_type) :: flux_polyhedron
-         type(TagAccVM_SepVM_type) :: detailed_face_flux
-         real(WP), dimension(3) :: lbar,gbar
-         integer , dimension(3) :: ind
-         real(WP) :: w,lvol,gvol,lrho,grho,lrhoe,grhoe
-         integer :: i,j,k,n
-         real(WP), parameter :: eps=1.0e-15_WP
-         real(WP), dimension(-2: 0) :: wxp,wyp,wzp
-         real(WP), dimension(-1:+1) :: wxm,wym,wzm
-         ! Allocate flux polyhedron and detailed face flux
-         call new(flux_polyhedron)
-         call new(detailed_face_flux)
-         ! Loop through all cell faces - extra cell on the left because mass flux will be needed by momentum later
-         do k=this%cfg%kmin_-1,this%cfg%kmax_+1; do j=this%cfg%jmin_-1,this%cfg%jmax_+1; do i=this%cfg%imin_-1,this%cfg%imax_+1
-            ! X flux
-            if (maxval(this%SLtag(i-1:i,j,k)).gt.0) then
-               ! Construct and project face
-               face(:,1)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,5)=project(face(:,1),i,j,k,-dt)
-               face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
-               face(:,3)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,7)=project(face(:,3),i,j,k,-dt)
-               face(:,4)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k+1)]; face(:,8)=project(face(:,4),i,j,k,-dt)
-               face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
-               ! Form flux polyhedron
-               call construct(flux_polyhedron,face)
-               ! Add solenoidal correction
-               call adjustCapToMatchVolume(flux_polyhedron,dt*this%U(i,j,k)*this%dy*this%dz)
-               ! Build detailed geometric flux
-               call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
-               ! Build finite volume fluxes from detailed flux
-               lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
-               do n=0,getSize(detailed_face_flux)-1
-                  ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
-                  call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
-                  lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOL(ind(1),ind(2),ind(3))
-                  gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOG(ind(1),ind(2),ind(3))
-               end do
-               call construct(this%FVx(i,j,k),[lvol,lbar,gvol,gbar])
-               Fx(i,j,k,1)=-lrho /(dt*this%dy*this%dz)
-               Fx(i,j,k,2)=-grho /(dt*this%dy*this%dz)
-               Fx(i,j,k,3)=-lrhoe/(dt*this%dy*this%dz)
-               Fx(i,j,k,4)=-grhoe/(dt*this%dy*this%dz)
-               ! Clear detailed flux
-               call clear(detailed_face_flux)
-            else
-               ! WENO-based mass flux in liquid
-               w=weno_weight((abs(this%RHOL(i-1,j,k)-this%RHOL(i-2,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-               w=weno_weight((abs(this%RHOL(i+1,j,k)-this%RHOL(i  ,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-               Fx(i,j,k,1)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOL(i-2:i  ,j,k)) &
-               &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOL(i-1:i+1,j,k))
-               ! WENO-based mass flux in gas
-               w=weno_weight((abs(this%RHOG(i-1,j,k)-this%RHOG(i-2,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-               w=weno_weight((abs(this%RHOG(i+1,j,k)-this%RHOG(i  ,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-               Fx(i,j,k,2)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOG(i-2:i  ,j,k)) &
-               &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOG(i-1:i+1,j,k))
-               ! Centered energy flux in liquid
-               Fx(i,j,k,3)=0.0_WP
-               ! Centered energy flux in gas
-               Fx(i,j,k,4)=0.0_WP
-               ! Zero out liquid fluxes in pure gas
-               if (maxval(this%VF(i-1:i,j,k)).lt.VFlo) then
-                  Fx(i,j,k,1)=0.0_WP
-                  Fx(i,j,k,3)=0.0_WP
-               end if
-               ! Zero out liquid fluxes in pure gas
-               if (minval(this%VF(i-1:i,j,k)).gt.VFhi) then
-                  Fx(i,j,k,2)=0.0_WP
-                  Fx(i,j,k,4)=0.0_WP
-               end if
-            end if
-            ! Y flux
-            if (maxval(this%SLtag(i,j-1:j,k)).gt.0) then
-               ! Construct and project face
-               face(:,1)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,5)=project(face(:,1),i,j,k,-dt)
-               face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
-               face(:,3)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,7)=project(face(:,3),i,j,k,-dt)
-               face(:,4)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,8)=project(face(:,4),i,j,k,-dt)
-               face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
-               ! Form flux polyhedron
-               call construct(flux_polyhedron,face)
-               ! Add solenoidal correction
-               call adjustCapToMatchVolume(flux_polyhedron,dt*this%V(i,j,k)*this%dx*this%dz)
-               ! Build detailed geometric flux
-               call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
-               ! Build finite volume fluxes from detailed flux
-               lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
-               do n=0,getSize(detailed_face_flux)-1
-                  ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
-                  call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
-                  lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOL(ind(1),ind(2),ind(3))
-                  gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOG(ind(1),ind(2),ind(3))
-               end do
-               call construct(this%FVy(i,j,k),[lvol,lbar,gvol,gbar])
-               Fy(i,j,k,1)=-lrho /(dt*this%dx*this%dz)
-               Fy(i,j,k,2)=-grho /(dt*this%dx*this%dz)
-               Fy(i,j,k,3)=-lrhoe/(dt*this%dx*this%dz)
-               Fy(i,j,k,4)=-grhoe/(dt*this%dx*this%dz)
-               ! Clear detailed flux
-               call clear(detailed_face_flux)
-            end if
-            ! Z flux
-            if (maxval(this%SLtag(i,j,k-1:k)).gt.0) then
-               ! Construct and project face
-               face(:,1)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,5)=project(face(:,1),i,j,k,-dt)
-               face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
-               face(:,3)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,7)=project(face(:,3),i,j,k,-dt)
-               face(:,4)=[this%cfg%x(i+1),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,8)=project(face(:,4),i,j,k,-dt)
-               face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
-               ! Form flux polyhedron
-               call construct(flux_polyhedron,face)
-               ! Add solenoidal correction
-               call adjustCapToMatchVolume(flux_polyhedron,dt*this%W(i,j,k)*this%dx*this%dy)
-               ! Build detailed geometric flux
-               call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
-               ! Build finite volume fluxes from detailed flux
-               lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
-               do n=0,getSize(detailed_face_flux)-1
-                  ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
-                  call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
-                  lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOL(ind(1),ind(2),ind(3))
-                  gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOG(ind(1),ind(2),ind(3))
-               end do
-               call construct(this%FVz(i,j,k),[lvol,lbar,gvol,gbar])
-               Fz(i,j,k,1)=-lrho /(dt*this%dx*this%dy)
-               Fz(i,j,k,2)=-grho /(dt*this%dx*this%dy)
-               Fz(i,j,k,3)=-lrhoe/(dt*this%dx*this%dy)
-               Fz(i,j,k,4)=-grhoe/(dt*this%dx*this%dy)
-               ! Clear detailed flux
-               call clear(detailed_face_flux)
-            end if
-         end do; end do; end do
-      end block calculate_volume_mass_energy_fluxes
-      
-      ! Update volume moments
-      update_volume_moments: block
-         real(WP) :: Lvolold,Gvolold,Lvolinc,Gvolinc,Lvolnew,Gvolnew
-         integer :: i,j,k
-         ! Loop through each cell
-         do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
-            ! Only work at interface
-            if (this%SLtag(i,j,k).eq.0) cycle
-            ! Old liquid and gas volumes
-            Lvolold=        this%VFold(i,j,k) *this%cfg%vol(i,j,k)
-            Gvolold=(1.0_WP-this%VFold(i,j,k))*this%cfg%vol(i,j,k)
-            ! Compute incoming liquid and gas volumes
-            Lvolinc=-getVolumePtr(this%FVx(i+1,j,k),0)+getVolumePtr(this%FVx(i,j,k),0)&
-            &       -getVolumePtr(this%FVy(i,j+1,k),0)+getVolumePtr(this%FVy(i,j,k),0)&
-            &       -getVolumePtr(this%FVz(i,j,k+1),0)+getVolumePtr(this%FVz(i,j,k),0)
-            Gvolinc=-getVolumePtr(this%FVx(i+1,j,k),1)+getVolumePtr(this%FVx(i,j,k),1)&
-            &       -getVolumePtr(this%FVy(i,j+1,k),1)+getVolumePtr(this%FVy(i,j,k),1)&
-            &       -getVolumePtr(this%FVz(i,j,k+1),1)+getVolumePtr(this%FVz(i,j,k),1)
-            ! Compute new liquid and gas volumes
-            Lvolnew=Lvolold+Lvolinc
-            Gvolnew=Gvolold+Gvolinc
-            ! Compute new liquid volume fraction
-            this%VF(i,j,k)=Lvolnew/(Lvolnew+Gvolnew)
-            ! Only work on higher order moments if VF is in [VFlo,VFhi]
-            if (this%VF(i,j,k).lt.VFlo) then
-               this%VF(i,j,k)=0.0_WP
-            else if (this%VF(i,j,k).gt.VFhi) then
-               this%VF(i,j,k)=1.0_WP
-            else
-               ! Compute old barycenters and project forward in time
-               this%BL(:,i,j,k)=(this%BLold(:,i,j,k)*Lvolold-getCentroidPtr(this%FVx(i+1,j,k),0)+getCentroidPtr(this%FVx(i,j,k),0)&
-               &                                            -getCentroidPtr(this%FVy(i,j+1,k),0)+getCentroidPtr(this%FVy(i,j,k),0)&
-               &                                            -getCentroidPtr(this%FVz(i,j,k+1),0)+getCentroidPtr(this%FVz(i,j,k),0))/Lvolnew
-               this%BL(:,i,j,k)=project(this%BL(:,i,j,k),i,j,k,dt)
-               ! Compute old gas phase barycenter and project forward in time
-               this%BG(:,i,j,k)=(this%BGold(:,i,j,k)*Gvolold-getCentroidPtr(this%FVx(i+1,j,k),1)+getCentroidPtr(this%FVx(i,j,k),1)&
-               &                                            -getCentroidPtr(this%FVy(i,j+1,k),1)+getCentroidPtr(this%FVy(i,j,k),1)&
-               &                                            -getCentroidPtr(this%FVz(i,j,k+1),1)+getCentroidPtr(this%FVz(i,j,k),1))/Gvolnew
-               this%BG(:,i,j,k)=project(this%BG(:,i,j,k),i,j,k,dt)
-            end if
-         end do; end do; end do
-         ! Synchronize VF and barycenters
-         call this%cfg%sync(this%VF)
-         call this%cfg%sync(this%BL)
-         call this%cfg%sync(this%BG)
-         ! Fix barycenter synchronization across periodic boundaries
-         if (this%cfg%xper.and.this%cfg%iproc.eq.1           ) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino,this%cfg%imin-1
-            this%BL(1,i,j,k)=this%BL(1,i,j,k)-this%cfg%xL; this%BG(1,i,j,k)=this%BG(1,i,j,k)-this%cfg%xL
-         end do; end do; end do; end if
-         if (this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imax+1,this%cfg%imaxo
-            this%BL(1,i,j,k)=this%BL(1,i,j,k)+this%cfg%xL; this%BG(1,i,j,k)=this%BG(1,i,j,k)+this%cfg%xL
-         end do; end do; end do; end if
-         if (this%cfg%yper.and.this%cfg%jproc.eq.1           ) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino,this%cfg%jmin-1; do i=this%cfg%imino_,this%cfg%imaxo_
-            this%BL(2,i,j,k)=this%BL(2,i,j,k)-this%cfg%yL; this%BG(2,i,j,k)=this%BG(2,i,j,k)-this%cfg%yL
-         end do; end do; end do; end if
-         if (this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmax+1,this%cfg%jmaxo; do i=this%cfg%imino_,this%cfg%imaxo_
-            this%BL(2,i,j,k)=this%BL(2,i,j,k)+this%cfg%yL; this%BG(2,i,j,k)=this%BG(2,i,j,k)+this%cfg%yL
-         end do; end do; end do; end if
-         if (this%cfg%zper.and.this%cfg%kproc.eq.           1) then; do k=this%cfg%kmino,this%cfg%kmin-1; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
-            this%BL(3,i,j,k)=this%BL(3,i,j,k)-this%cfg%zL; this%BG(3,i,j,k)=this%BG(3,i,j,k)-this%cfg%zL
-         end do; end do; end do; end if
-         if (this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) then; do k=this%cfg%kmax+1,this%cfg%kmaxo; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
-            this%BL(3,i,j,k)=this%BL(3,i,j,k)+this%cfg%zL; this%BG(3,i,j,k)=this%BG(3,i,j,k)+this%cfg%zL
-         end do; end do; end do; end if
-         ! Handle 2D barycenters
-         if (this%cfg%nx.eq.1) then; do i=this%cfg%imino_,this%cfg%imaxo_
-            this%BL(1,i,:,:)=this%cfg%xm(i); this%BG(1,i,:,:)=this%cfg%xm(i)
-         end do; end if
-         if (this%cfg%ny.eq.1) then; do j=this%cfg%jmino_,this%cfg%jmaxo_
-            this%BL(2,:,j,:)=this%cfg%ym(j); this%BG(2,:,j,:)=this%cfg%ym(j)
-         end do; end if
-         if (this%cfg%nz.eq.1) then; do k=this%cfg%kmino_,this%cfg%kmaxo_
-            this%BL(3,:,:,k)=this%cfg%zm(k); this%BG(3,:,:,k)=this%cfg%zm(k)
-         end do; end if
-      end block update_volume_moments
-      
-      ! Stop VOF timer
-      call this%tvof%stop()
-      
-      ! Reconstruct the interface
-      call this%build_interface()
-      
-      ! Increment mass and internal energy
-      increment_mass_energy: block
-         integer :: i,j,k
-         do k=this%cfg%kmin_,this%cfg%kmax_
-            do j=this%cfg%jmin_,this%cfg%jmax_
-               do i=this%cfg%imin_,this%cfg%imax_
-                  ! Update alphal*RHOl and alphag*RHOg
-                  this%Q(i,j,k,1)=this%Qold(i,j,k,1)+dt*(this%dxi*(Fx(i+1,j,k,1)-Fx(i,j,k,1))+this%dyi*(Fy(i,j+1,k,1)-Fy(i,j,k,1))+this%dzi*(Fz(i,j,k+1,1)-Fz(i,j,k,1)))
-                  this%Q(i,j,k,2)=this%Qold(i,j,k,2)+dt*(this%dxi*(Fx(i+1,j,k,2)-Fx(i,j,k,2))+this%dyi*(Fy(i,j+1,k,2)-Fy(i,j,k,2))+this%dzi*(Fz(i,j,k+1,2)-Fz(i,j,k,2)))
+      integer :: i,j,k,dir,n
+      integer, dimension(3) :: ind
+      ! Reset tag
+      this%iSL=0
+      ! First sweep to identify cells with interface
+      do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
+         do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
+            do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+               ! Flag all mixture cells
+               if (this%VF(i,j,k).ge.VFlo.and.this%VF(i,j,k).le.VFhi) this%iSL(i,j,k)=1
+               ! Check if cell-face is an interface
+               do dir=1,3
+                  do n=-1,+1,2
+                     ind=[i,j,k]; ind(dir)=ind(dir)+n
+                     if (this%VF(i,j,k).lt.VFlo.and.this%VF(ind(1),ind(2),ind(3)).gt.VFhi.or.&
+                     &   this%VF(i,j,k).gt.VFhi.and.this%VF(ind(1),ind(2),ind(3)).lt.VFlo) this%iSL(i,j,k)=1
+                  end do
                end do
             end do
          end do
-      end block increment_mass_energy
+      end do
+      call this%cfg%sync(this%iSL)
+      ! Second sweep to extend by one cell
+      do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1; do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1; do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+         if (this%iSL(i,j,k).eq.0.and.any(this%iSL(i-1:i+1,j-1:j+1,k-1:k+1).eq.1)) this%iSL(i,j,k)=2
+      end do; end do; end do
+      call this%cfg%sync(this%iSL)
+   end subroutine SLtag
+   
+   
+   !> Perform an unsplit semi-Lagrangian transport step by dt in all cells tagged by this%SLtag>0
+   !> Volume moments are updated and advection fluxes for phasic equations are computed
+   !> Uses VFold, BLold, BGold, PLICold, RHOLold, RHOGold, ELold, EGold
+   !> Transport is done with RK2 using passed (U,V,W)
+   subroutine SLstep(this,dt,U,V,W)
+      implicit none
+      class(mpcomp), intent(inout) :: this
+      real(WP), intent(in) :: dt
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: U
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: V
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: W
+      real(IRL_double), dimension(3,9) :: face
+      type(SepVM_type) :: my_SepVM
+      type(CapDod_type) :: flux_polyhedron
+      type(TagAccVM_SepVM_type) :: detailed_face_flux
+      real(WP), dimension(3) :: lbar,gbar
+      integer , dimension(3) :: ind
+      real(WP) :: lvol,gvol,lrho,grho,lrhoe,grhoe
+      real(WP) :: Lvolold,Gvolold,Lvolinc,Gvolinc,Lvolnew,Gvolnew
+      integer :: i,j,k,n
       
-      ! Synchronize all conserved fields
-      communicate_fields: block
-         integer :: n
-         do n=1,this%nQ
-            call this%cfg%sync(this%Q(:,:,:,n))
+      ! Start semi-Lagrangian timer
+      call this%tsl%start()
+      
+      ! Remember dt used
+      this%SLdt=dt
+      
+      ! Allocate flux polyhedron and detailed face flux
+      call new(flux_polyhedron)
+      call new(detailed_face_flux)
+      
+      ! Zero out semi-Lagrangian fluxes
+      this%SLFx=0.0_WP; this%SLFy=0.0_WP; this%SLFz=0.0_WP
+      
+      ! Loop through all cell faces - extra cell on the left because mass flux will be needed by momentum later
+      do k=this%cfg%kmin_-1,this%cfg%kmax_+1       !
+         do j=this%cfg%jmin_-1,this%cfg%jmax_+1    ! Extra cell on the left will be used by momentum flux later
+            do i=this%cfg%imin_-1,this%cfg%imax_+1 !
+               
+               ! X flux
+               if (maxval(this%iSL(i-1:i,j,k)).gt.0) then
+                  ! Construct and project face
+                  face(:,1)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,5)=project(face(:,1),i,j,k,-dt)
+                  face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
+                  face(:,3)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,7)=project(face(:,3),i,j,k,-dt)
+                  face(:,4)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k+1)]; face(:,8)=project(face(:,4),i,j,k,-dt)
+                  face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
+                  ! Form flux polyhedron
+                  call construct(flux_polyhedron,face)
+                  ! Add solenoidal correction
+                  call adjustCapToMatchVolume(flux_polyhedron,dt*U(i,j,k)*this%dy*this%dz)
+                  ! Build detailed geometric flux
+                  call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
+                  ! Build finite volume fluxes from detailed flux
+                  lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
+                  do n=0,getSize(detailed_face_flux)-1
+                     ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
+                     call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
+                     lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3)); lrhoe=lrhoe+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3))*this%ELold(ind(1),ind(2),ind(3))
+                     gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3)); grhoe=grhoe+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3))*this%EGold(ind(1),ind(2),ind(3))
+                  end do
+                  call construct(this%FVx(i,j,k),[lvol,lbar,gvol,gbar])
+                  this%SLFx(i,j,k,1)=-lrho /(dt*this%dy*this%dz)
+                  this%SLFx(i,j,k,2)=-grho /(dt*this%dy*this%dz)
+                  this%SLFx(i,j,k,3)=-lrhoe/(dt*this%dy*this%dz)
+                  this%SLFx(i,j,k,4)=-grhoe/(dt*this%dy*this%dz)
+                  ! Clear detailed flux
+                  call clear(detailed_face_flux)
+               end if
+               
+               ! Y flux
+               if (maxval(this%iSL(i,j-1:j,k)).gt.0) then
+                  ! Construct and project face
+                  face(:,1)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,5)=project(face(:,1),i,j,k,-dt)
+                  face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
+                  face(:,3)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,7)=project(face(:,3),i,j,k,-dt)
+                  face(:,4)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k+1)]; face(:,8)=project(face(:,4),i,j,k,-dt)
+                  face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
+                  ! Form flux polyhedron
+                  call construct(flux_polyhedron,face)
+                  ! Add solenoidal correction
+                  call adjustCapToMatchVolume(flux_polyhedron,dt*V(i,j,k)*this%dx*this%dz)
+                  ! Build detailed geometric flux
+                  call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
+                  ! Build finite volume fluxes from detailed flux
+                  lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
+                  do n=0,getSize(detailed_face_flux)-1
+                     ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
+                     call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
+                     lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3)); lrhoe=lrhoe+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3))*this%ELold(ind(1),ind(2),ind(3))
+                     gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3)); grhoe=grhoe+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3))*this%EGold(ind(1),ind(2),ind(3))
+                  end do
+                  call construct(this%FVy(i,j,k),[lvol,lbar,gvol,gbar])
+                  this%SLFy(i,j,k,1)=-lrho /(dt*this%dx*this%dz)
+                  this%SLFy(i,j,k,2)=-grho /(dt*this%dx*this%dz)
+                  this%SLFy(i,j,k,3)=-lrhoe/(dt*this%dx*this%dz)
+                  this%SLFy(i,j,k,4)=-grhoe/(dt*this%dx*this%dz)
+                  ! Clear detailed flux
+                  call clear(detailed_face_flux)
+               end if
+               
+               ! Z flux
+               if (maxval(this%iSL(i,j,k-1:k)).gt.0) then
+                  ! Construct and project face
+                  face(:,1)=[this%cfg%x(i  ),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,5)=project(face(:,1),i,j,k,-dt)
+                  face(:,2)=[this%cfg%x(i  ),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,6)=project(face(:,2),i,j,k,-dt)
+                  face(:,3)=[this%cfg%x(i+1),this%cfg%y(j  ),this%cfg%z(k  )]; face(:,7)=project(face(:,3),i,j,k,-dt)
+                  face(:,4)=[this%cfg%x(i+1),this%cfg%y(j+1),this%cfg%z(k  )]; face(:,8)=project(face(:,4),i,j,k,-dt)
+                  face(:,9)=0.25_WP*[sum(face(1,1:4)),sum(face(2,1:4)),sum(face(3,1:4))]; face(:,9)=project(face(:,9),i,j,k,-dt)
+                  ! Form flux polyhedron
+                  call construct(flux_polyhedron,face)
+                  ! Add solenoidal correction
+                  call adjustCapToMatchVolume(flux_polyhedron,dt*W(i,j,k)*this%dx*this%dy)
+                  ! Build detailed geometric flux
+                  call getMoments(flux_polyhedron,this%localized_separator_link(i,j,k),detailed_face_flux)
+                  ! Build finite volume fluxes from detailed flux
+                  lvol=0.0_WP; gvol=0.0_WP; lbar=0.0_WP; gbar=0.0_WP; lrho=0.0_WP; grho=0.0_WP; lrhoe=0.0_WP; grhoe=0.0_WP
+                  do n=0,getSize(detailed_face_flux)-1
+                     ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux,n))
+                     call getSepVMAtIndex(detailed_face_flux,n,my_SepVM)
+                     lvol=lvol+getVolume(my_SepVM,0); lbar=lbar+getCentroid(my_SepVM,0); lrho=lrho+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3)); lrhoe=lrhoe+getVolume(my_SepVM,0)*this%RHOLold(ind(1),ind(2),ind(3))*this%ELold(ind(1),ind(2),ind(3))
+                     gvol=gvol+getVolume(my_SepVM,1); gbar=gbar+getCentroid(my_SepVM,1); grho=grho+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3)); grhoe=grhoe+getVolume(my_SepVM,1)*this%RHOGold(ind(1),ind(2),ind(3))*this%EGold(ind(1),ind(2),ind(3))
+                  end do
+                  call construct(this%FVz(i,j,k),[lvol,lbar,gvol,gbar])
+                  this%SLFz(i,j,k,1)=-lrho /(dt*this%dx*this%dy)
+                  this%SLFz(i,j,k,2)=-grho /(dt*this%dx*this%dy)
+                  this%SLFz(i,j,k,3)=-lrhoe/(dt*this%dx*this%dy)
+                  this%SLFz(i,j,k,4)=-grhoe/(dt*this%dx*this%dy)
+                  ! Clear detailed flux
+                  call clear(detailed_face_flux)
+               end if
+               
+            end do
          end do
-      end block communicate_fields
+      end do
+      
+      ! Update volume moments in tagged cells
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               ! Only work at interface
+               if (this%iSL(i,j,k).eq.0) cycle
+               ! Old liquid and gas volumes
+               Lvolold=        this%VFold(i,j,k) *this%cfg%vol(i,j,k)
+               Gvolold=(1.0_WP-this%VFold(i,j,k))*this%cfg%vol(i,j,k)
+               ! Compute incoming liquid and gas volumes
+               Lvolinc=-getVolumePtr(this%FVx(i+1,j,k),0)+getVolumePtr(this%FVx(i,j,k),0)&
+               &       -getVolumePtr(this%FVy(i,j+1,k),0)+getVolumePtr(this%FVy(i,j,k),0)&
+               &       -getVolumePtr(this%FVz(i,j,k+1),0)+getVolumePtr(this%FVz(i,j,k),0)
+               Gvolinc=-getVolumePtr(this%FVx(i+1,j,k),1)+getVolumePtr(this%FVx(i,j,k),1)&
+               &       -getVolumePtr(this%FVy(i,j+1,k),1)+getVolumePtr(this%FVy(i,j,k),1)&
+               &       -getVolumePtr(this%FVz(i,j,k+1),1)+getVolumePtr(this%FVz(i,j,k),1)
+               ! Compute new liquid and gas volumes
+               Lvolnew=Lvolold+Lvolinc
+               Gvolnew=Gvolold+Gvolinc
+               ! Compute new liquid volume fraction
+               this%VF(i,j,k)=Lvolnew/(Lvolnew+Gvolnew)
+               ! Only work on higher order moments if VF is in [VFlo,VFhi]
+               if (this%VF(i,j,k).lt.VFlo) then
+                  this%VF(i,j,k)=0.0_WP
+               else if (this%VF(i,j,k).gt.VFhi) then
+                  this%VF(i,j,k)=1.0_WP
+               else
+                  ! Compute old barycenters and project forward in time
+                  this%BL(:,i,j,k)=(this%BLold(:,i,j,k)*Lvolold-getCentroidPtr(this%FVx(i+1,j,k),0)+getCentroidPtr(this%FVx(i,j,k),0)&
+                  &                                            -getCentroidPtr(this%FVy(i,j+1,k),0)+getCentroidPtr(this%FVy(i,j,k),0)&
+                  &                                            -getCentroidPtr(this%FVz(i,j,k+1),0)+getCentroidPtr(this%FVz(i,j,k),0))/Lvolnew
+                  this%BL(:,i,j,k)=project(this%BL(:,i,j,k),i,j,k,dt)
+                  ! Compute old gas phase barycenter and project forward in time
+                  this%BG(:,i,j,k)=(this%BGold(:,i,j,k)*Gvolold-getCentroidPtr(this%FVx(i+1,j,k),1)+getCentroidPtr(this%FVx(i,j,k),1)&
+                  &                                            -getCentroidPtr(this%FVy(i,j+1,k),1)+getCentroidPtr(this%FVy(i,j,k),1)&
+                  &                                            -getCentroidPtr(this%FVz(i,j,k+1),1)+getCentroidPtr(this%FVz(i,j,k),1))/Gvolnew
+                  this%BG(:,i,j,k)=project(this%BG(:,i,j,k),i,j,k,dt)
+               end if
+            end do
+         end do
+      end do
+      
+      ! Synchronize VF and barycenters
+      call this%cfg%sync(this%VF); call this%cfg%sync(this%BL); call this%cfg%sync(this%BG)
+      
+      ! Fix barycenter synchronization across periodic boundaries
+      if (this%cfg%xper.and.this%cfg%iproc.eq.1           ) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino,this%cfg%imin-1
+         this%BL(1,i,j,k)=this%BL(1,i,j,k)-this%cfg%xL; this%BG(1,i,j,k)=this%BG(1,i,j,k)-this%cfg%xL
+      end do; end do; end do; end if
+      if (this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imax+1,this%cfg%imaxo
+         this%BL(1,i,j,k)=this%BL(1,i,j,k)+this%cfg%xL; this%BG(1,i,j,k)=this%BG(1,i,j,k)+this%cfg%xL
+      end do; end do; end do; end if
+      if (this%cfg%yper.and.this%cfg%jproc.eq.1           ) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino,this%cfg%jmin-1; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%BL(2,i,j,k)=this%BL(2,i,j,k)-this%cfg%yL; this%BG(2,i,j,k)=this%BG(2,i,j,k)-this%cfg%yL
+      end do; end do; end do; end if
+      if (this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmax+1,this%cfg%jmaxo; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%BL(2,i,j,k)=this%BL(2,i,j,k)+this%cfg%yL; this%BG(2,i,j,k)=this%BG(2,i,j,k)+this%cfg%yL
+      end do; end do; end do; end if
+      if (this%cfg%zper.and.this%cfg%kproc.eq.           1) then; do k=this%cfg%kmino,this%cfg%kmin-1; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%BL(3,i,j,k)=this%BL(3,i,j,k)-this%cfg%zL; this%BG(3,i,j,k)=this%BG(3,i,j,k)-this%cfg%zL
+      end do; end do; end do; end if
+      if (this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) then; do k=this%cfg%kmax+1,this%cfg%kmaxo; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         this%BL(3,i,j,k)=this%BL(3,i,j,k)+this%cfg%zL; this%BG(3,i,j,k)=this%BG(3,i,j,k)+this%cfg%zL
+      end do; end do; end do; end if
+      
+      ! Handle 2D barycenters
+      if (this%cfg%nx.eq.1) then; do i=this%cfg%imino_,this%cfg%imaxo_; this%BL(1,i,:,:)=this%cfg%xm(i); this%BG(1,i,:,:)=this%cfg%xm(i); end do; end if
+      if (this%cfg%ny.eq.1) then; do j=this%cfg%jmino_,this%cfg%jmaxo_; this%BL(2,:,j,:)=this%cfg%ym(j); this%BG(2,:,j,:)=this%cfg%ym(j); end do; end if
+      if (this%cfg%nz.eq.1) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; this%BL(3,:,:,k)=this%cfg%zm(k); this%BG(3,:,:,k)=this%cfg%zm(k); end do; end if
+      
+      ! Stop semi-Lagrangian timer
+      call this%tsl%stop()
       
    contains
-      !> Project function that moves a point p1 in vicinity of (i0,j0,k0) at (this%U,this%V,this%W) for mydt
+      !> Project function that moves a point p1 in vicinity of (i0,j0,k0) at (U,V,%W) for mydt
       function project(p1,i0,j0,k0,mydt) result(p2)
          implicit none
          real(WP), dimension(3), intent(in) :: p1
          real(WP), dimension(3)             :: p2
          integer ,               intent(in) :: i0,j0,k0
          real(WP),               intent(in) :: mydt
-         p2=p1+mydt*this%cfg%get_velocity(        p1    ,i0,j0,k0,this%U,this%V,this%W)
-         p2=p1+mydt*this%cfg%get_velocity(0.5_WP*(p1+p2),i0,j0,k0,this%U,this%V,this%W)
+         p2=p1+mydt*this%cfg%get_velocity(        p1    ,i0,j0,k0,U,V,W)
+         p2=p1+mydt*this%cfg%get_velocity(0.5_WP*(p1+p2),i0,j0,k0,U,V,W)
       end function project
+   end subroutine SLstep
+   
+   
+   !> Add SL RHS for phasic equations
+   subroutine SLincrement(this)
+      implicit none
+      class(mpcomp), intent(inout) :: this
+      integer :: i,j,k,n
+      ! Start rhs timer
+      call this%trhs%start()
+      ! Assemble time derivative for mass and internal energy advection in tagged cells
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               if (this%iSL(i,j,k).gt.0) then
+                  this%Q(i,j,k,1)=this%Q(i,j,k,1)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,1)-this%SLFx(i,j,k,1))+this%dyi*(this%SLFy(i,j+1,k,1)-this%SLFy(i,j,k,1))+this%dzi*(this%SLFz(i,j,k+1,1)-this%SLFz(i,j,k,1)))
+                  this%Q(i,j,k,2)=this%Q(i,j,k,2)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,2)-this%SLFx(i,j,k,2))+this%dyi*(this%SLFy(i,j+1,k,2)-this%SLFy(i,j,k,2))+this%dzi*(this%SLFz(i,j,k+1,2)-this%SLFz(i,j,k,2)))
+                  this%Q(i,j,k,3)=this%Q(i,j,k,3)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,3)-this%SLFx(i,j,k,3))+this%dyi*(this%SLFy(i,j+1,k,3)-this%SLFy(i,j,k,3))+this%dzi*(this%SLFz(i,j,k+1,3)-this%SLFz(i,j,k,3)))
+                  this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,4)-this%SLFx(i,j,k,4))+this%dyi*(this%SLFy(i,j+1,k,4)-this%SLFy(i,j,k,4))+this%dzi*(this%SLFz(i,j,k+1,4)-this%SLFz(i,j,k,4)))
+               end if
+            end do
+         end do
+      end do
+      ! Synchronize phasic fields
+      call this%cfg%sync(this%Q(:,:,:,1))
+      call this%cfg%sync(this%Q(:,:,:,2))
+      call this%cfg%sync(this%Q(:,:,:,3))
+      call this%cfg%sync(this%Q(:,:,:,4))
+      ! Stop rhs timer
+      call this%trhs%stop()
+   end subroutine SLincrement
+   
+   
+   !> Obtain non-SL RHS for all equations except volume
+   subroutine rhs(this,dQdt)
+      implicit none
+      class(mpcomp), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dQdt  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nVAR)
+      real(WP), dimension(:,:,:,:), allocatable :: Fx,Fy,Fz
+      integer :: i,j,k,n
+      real(WP) :: w
+      real(WP), parameter :: eps=1.0e-15_WP
+      real(WP), dimension(-2: 0) :: wxp,wyp,wzp
+      real(WP), dimension(-1:+1) :: wxm,wym,wzm
+      
+      ! Start rhs timer
+      call this%trhs%start()
+      
+      ! Zero out RHS
+      dQdt=0.0_WP
+      
+      ! Allocate phasic mass and energy fluxes and initialize at our semi-Lagrangian fluxes
+      allocate(Fx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
+      allocate(Fy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
+      allocate(Fz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
+      
+      ! ================================================================ !
+      ! ======================== INVISID FLUXES ======================== !
+      ! ================================================================ !
+      
+      ! Calculate face-centered mass fluxes and internal energy fluxes on untagged faces (use SL fluxes on tagged faces)
+      do k=this%cfg%kmin_-1,this%cfg%kmax_+1       !
+         do j=this%cfg%jmin_-1,this%cfg%jmax_+1    ! Extra cell on the left will be used by momentum flux later
+            do i=this%cfg%imin_-1,this%cfg%imax_+1 !
+               ! X face
+               if (maxval(this%iSL(i-1:i,j,k)).eq.0) then
+                  ! WENO-based mass flux in liquid
+                  w=weno_weight((abs(this%RHOL(i-1,j,k)-this%RHOL(i-2,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i+1,j,k)-this%RHOL(i  ,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fx(i,j,k,1)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOL(i-2:i  ,j,k)) &
+                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOL(i-1:i+1,j,k))
+                  ! WENO-based mass flux in gas
+                  w=weno_weight((abs(this%RHOG(i-1,j,k)-this%RHOG(i-2,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i+1,j,k)-this%RHOG(i  ,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fx(i,j,k,2)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOG(i-2:i  ,j,k)) &
+                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOG(i-1:i+1,j,k))
+                  ! Centered energy flux in liquid
+                  Fx(i,j,k,3)=0.5_WP*Fx(i,j,k,1)*sum(this%EL(i-1:i,j,k))
+                  ! Centered energy flux in gas
+                  Fx(i,j,k,4)=0.5_WP*Fx(i,j,k,2)*sum(this%EG(i-1:i,j,k))
+                  ! Zero out liquid fluxes in pure gas
+                  if (maxval(this%VF(i-1:i,j,k)).lt.VFlo) then
+                     Fx(i,j,k,1)=0.0_WP
+                     Fx(i,j,k,3)=0.0_WP
+                  end if
+                  ! Zero out liquid fluxes in pure gas
+                  if (minval(this%VF(i-1:i,j,k)).gt.VFhi) then
+                     Fx(i,j,k,2)=0.0_WP
+                     Fx(i,j,k,4)=0.0_WP
+                  end if
+               else
+                  Fx(i,j,k,:)=this%SLFx(i,j,k,:)
+               end if
+               ! Y face
+               if (maxval(this%iSL(i,j-1:j,k)).eq.0) then
+                  ! WENO-based mass flux in liquid
+                  w=weno_weight((abs(this%RHOL(i,j-1,k)-this%RHOL(i,j-2,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i,j+1,k)-this%RHOL(i,j  ,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fy(i,j,k,1)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wyp*this%RHOL(i,j-2:j  ,k)) &
+                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wym*this%RHOL(i,j-1:j+1,k))
+                  ! WENO-based mass flux in gas
+                  w=weno_weight((abs(this%RHOG(i,j-1,k)-this%RHOG(i,j-2,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i,j+1,k)-this%RHOG(i,j  ,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fy(i,j,k,2)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wyp*this%RHOG(i,j-2:j  ,k)) &
+                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wym*this%RHOG(i,j-1:j+1,k))
+                  ! Centered energy flux in liquid
+                  Fy(i,j,k,3)=0.5_WP*Fy(i,j,k,1)*sum(this%EL(i,j-1:j,k))
+                  ! Centered energy flux in gas
+                  Fy(i,j,k,4)=0.5_WP*Fy(i,j,k,2)*sum(this%EG(i,j-1:j,k))
+                  ! Zero out liquid fluxes in pure gas
+                  if (maxval(this%VF(i,j-1:j,k)).lt.VFlo) then
+                     Fy(i,j,k,1)=0.0_WP
+                     Fy(i,j,k,3)=0.0_WP
+                  end if
+                  ! Zero out liquid fluxes in pure gas
+                  if (minval(this%VF(i,j-1:j,k)).gt.VFhi) then
+                     Fy(i,j,k,2)=0.0_WP
+                     Fy(i,j,k,4)=0.0_WP
+                  end if
+               else
+                  Fy(i,j,k,:)=this%SLFy(i,j,k,:)
+               end if
+               ! Z face
+               if (maxval(this%iSL(i,j,k-1:k)).eq.0) then
+                  ! WENO-based mass flux in liquid
+                  w=weno_weight((abs(this%RHOL(i,j,k-1)-this%RHOL(i,j,k-2))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i,j,k+1)-this%RHOL(i,j,k  ))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fz(i,j,k,1)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wzp*this%RHOL(i,j,k-2:k  )) &
+                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wzm*this%RHOL(i,j,k-1:k+1))
+                  ! WENO-based mass flux in gas
+                  w=weno_weight((abs(this%RHOG(i,j,k-1)-this%RHOG(i,j,k-2))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i,j,k+1)-this%RHOG(i,j,k  ))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fz(i,j,k,2)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wzp*this%RHOG(i,j,k-2:k  )) &
+                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wzm*this%RHOG(i,j,k-1:k+1))
+                  ! Centered energy flux in liquid
+                  Fz(i,j,k,3)=0.5_WP*Fz(i,j,k,1)*sum(this%EL(i,j,k-1:k))
+                  ! Centered energy flux in gas
+                  Fz(i,j,k,4)=0.5_WP*Fz(i,j,k,2)*sum(this%EG(i,j,k-1:k))
+                  ! Zero out liquid fluxes in pure gas
+                  if (maxval(this%VF(i,j,k-1:k)).lt.VFlo) then
+                     Fz(i,j,k,1)=0.0_WP
+                     Fz(i,j,k,3)=0.0_WP
+                  end if
+                  ! Zero out liquid fluxes in pure gas
+                  if (minval(this%VF(i,j,k-1:k)).gt.VFhi) then
+                     Fz(i,j,k,2)=0.0_WP
+                     Fz(i,j,k,4)=0.0_WP
+                  end if
+               else
+                  Fz(i,j,k,:)=this%SLFz(i,j,k,:)
+               end if
+            end do
+         end do
+      end do
+      
+      ! Assemble time derivative for mass and internal energy advection in untagged cells
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               if (this%iSL(i,j,k).eq.0) then
+                  dQdt(i,j,k,1)=this%dxi*(Fx(i+1,j,k,1)-Fx(i,j,k,1))+this%dyi*(Fy(i,j+1,k,1)-Fy(i,j,k,1))+this%dzi*(Fz(i,j,k+1,1)-Fz(i,j,k,1))
+                  dQdt(i,j,k,2)=this%dxi*(Fx(i+1,j,k,2)-Fx(i,j,k,2))+this%dyi*(Fy(i,j+1,k,2)-Fy(i,j,k,2))+this%dzi*(Fz(i,j,k+1,2)-Fz(i,j,k,2))
+                  dQdt(i,j,k,3)=this%dxi*(Fx(i+1,j,k,3)-Fx(i,j,k,3))+this%dyi*(Fy(i,j+1,k,3)-Fy(i,j,k,3))+this%dzi*(Fz(i,j,k+1,3)-Fz(i,j,k,3))
+                  dQdt(i,j,k,4)=this%dxi*(Fx(i+1,j,k,4)-Fx(i,j,k,4))+this%dyi*(Fy(i,j+1,k,4)-Fy(i,j,k,4))+this%dzi*(Fz(i,j,k+1,4)-Fz(i,j,k,4))
+               end if
+            end do
+         end do
+      end do
+      
+      ! ...
+      
+      ! Synchronize all dQdt fields
+      do n=1,this%nQ; call this%cfg%sync(dQdt(:,:,:,n)); end do
+      
+      ! Stop rhs timer
+      call this%trhs%stop()
+      
+   contains
       !> WENO switch function
       real(WP) function weno_weight(ratio)
          implicit none
@@ -583,7 +749,7 @@ contains
          real(WP), parameter :: delta=0.01_WP  ! Switching thickness
          weno_weight=(1.0_WP-tanh((ratio-lambda)/delta))/3.0_WP+(1.0_WP-tanh((ratio-1.0_WP/lambda)/delta))/6.0_WP
       end function weno_weight
-   end subroutine advance
+   end subroutine rhs
    
    
    !> Build the interface from volume moments using PLICnet
@@ -1381,22 +1547,39 @@ contains
       use parallel, only: MPI_REAL_WP
       implicit none
       class(mpcomp), intent(inout) :: this
-      integer :: i,j,k,ierr
-      ! Compute integrals
-      call this%cfg%integrate(this%VF  ,integral=this%VFint  )
-      call this%cfg%integrate(this%RHOL,integral=this%RHOLint)
-      call this%cfg%integrate(this%RHOG,integral=this%RHOGint)
-      !call this%cfg%integrate(this%RHOU,integral=this%RHOUint)
-      !call this%cfg%integrate(this%RHOV,integral=this%RHOVint)
-      !call this%cfg%integrate(this%RHOW,integral=this%RHOWint)
-      !call this%cfg%integrate(this%RHOE,integral=this%RHOEint)
-      ! Calculate extrema
+      integer :: n,i,j,k,ierr
+      
+      ! Compute integrals and extrema of conserved variables
+      call this%cfg%integrate(this%VF,integral=this%VFint)
+      do n=1,this%nQ
+         call this%cfg%integrate(this%Q(:,:,:,n),integral=this%Qint(n))
+      end do
       this%VFmin=+huge(1.0_WP)
       this%VFmax=-huge(1.0_WP)
+      this%Qmin=+huge(1.0_WP)
+      this%Qmax=-huge(1.0_WP)
+      do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
+         this%VFmin=min(this%VFmin,this%VF(i,j,k))
+         this%VFmax=max(this%VFmax,this%VF(i,j,k))
+         do n=1,this%nQ
+            this%Qmin(n)=min(this%Qmin(n),this%Q(i,j,k,n))
+            this%Qmax(n)=max(this%Qmax(n),this%Q(i,j,k,n))
+         end do
+      end do; end do; end do
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Qmin,this%nQ,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Qmax,this%nQ,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      
+      ! Calculate extrema of primitive fields
       this%RHOLmin=+huge(1.0_WP)
       this%RHOLmax=-huge(1.0_WP)
       this%RHOGmin=+huge(1.0_WP)
       this%RHOGmax=-huge(1.0_WP)
+      this%ELmin=+huge(1.0_WP)
+      this%ELmax=-huge(1.0_WP)
+      this%EGmin=+huge(1.0_WP)
+      this%EGmax=-huge(1.0_WP)
       this%Umax=0.0_WP
       this%Vmax=0.0_WP
       this%Wmax=0.0_WP
@@ -1407,15 +1590,17 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               this%VFmin  =min(this%VFmin  ,    this%VF  (i,j,k))
-               this%VFmax  =max(this%VFmax  ,    this%VF  (i,j,k))
-               this%RHOLmin=min(this%RHOLmin,    this%RHOL(i,j,k))
-               this%RHOLmax=max(this%RHOLmax,    this%RHOL(i,j,k))
-               this%RHOGmin=min(this%RHOGmin,    this%RHOG(i,j,k))
-               this%RHOGmax=max(this%RHOGmax,    this%RHOG(i,j,k))
-               this%Umax  =max(this%Umax  ,abs(this%U  (i,j,k)))
-               this%Vmax  =max(this%Vmax  ,abs(this%V  (i,j,k)))
-               this%Wmax  =max(this%Wmax  ,abs(this%W  (i,j,k)))
+               this%RHOLmin=min(this%RHOLmin,this%RHOL(i,j,k))
+               this%RHOLmax=max(this%RHOLmax,this%RHOL(i,j,k))
+               this%RHOGmin=min(this%RHOGmin,this%RHOG(i,j,k))
+               this%RHOGmax=max(this%RHOGmax,this%RHOG(i,j,k))
+               this%ELmin=min(this%ELmin,this%EL(i,j,k))
+               this%ELmax=max(this%ELmax,this%EL(i,j,k))
+               this%EGmin=min(this%EGmin,this%EG(i,j,k))
+               this%EGmax=max(this%EGmax,this%EG(i,j,k))
+               this%Umax=max(this%Umax,abs(this%U(i,j,k)))
+               this%Vmax=max(this%Vmax,abs(this%V(i,j,k)))
+               this%Wmax=max(this%Wmax,abs(this%W(i,j,k)))
                !this%Emin  =min(this%Emin  ,    this%E  (i,j,k) )
                !this%Emax  =max(this%Emax  ,    this%E  (i,j,k) )
                !this%Pmin  =min(this%Pmin  ,    this%P  (i,j,k) )
@@ -1424,12 +1609,14 @@ contains
          end do
       end do
       ! Get the parallel min/max
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOGmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOGmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Umax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Vmax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Wmax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
