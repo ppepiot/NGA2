@@ -236,8 +236,8 @@ contains
          ! Interpolate velocity
          call fs%interp_vel(Ui,Vi,Wi)
          ! Compute speed of sound and local Mach number
-         C=0.0_WP!sqrt(Gamma*(Gamma-1.0_WP)*fs%E)
-         Ma=0.0_WP!sqrt((Ui**2+Vi**2+Wi**2))/C
+         C=sqrt(GammaG*(GammaG-1.0_WP)*fs%E)
+         Ma=sqrt((Ui**2+Vi**2+Wi**2))/C
       end block initial_conditions
       
       ! Add Ensight output
@@ -419,6 +419,13 @@ contains
          ! Recompute primitive variables
          call fs%get_primitive(get_PL,get_TL,get_PG,get_TG)
          
+         ! Interpolate velocity
+         call fs%interp_vel(Ui,Vi,Wi)
+
+         ! Compute speed of sound and local Mach number
+         C=sqrt(GammaG*(GammaG-1.0_WP)*fs%E)
+         Ma=sqrt((Ui**2+Vi**2+Wi**2))/C
+
          ! Output to ensight
          if (ens_evt%occurs()) then
             call fs%update_surfmesh(smesh)
