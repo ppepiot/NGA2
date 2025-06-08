@@ -1308,7 +1308,7 @@ contains
       procedure(Pfunc_type) :: PLfunc,PGfunc
       procedure(Tfunc_type) :: TLfunc,TGfunc
       integer :: i,j,k
-      ! Traverse domain with overlap
+      ! Phasic variables
       do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
          ! Liquid primitive variables
          if (this%VF(i,j,k).gt.VFlo) then
@@ -1334,6 +1334,11 @@ contains
             this%PG  (i,j,k)=0.0_WP
             this%TG  (i,j,k)=0.0_WP
          end if
+         ! Also reset conserved phasic variables for consistency
+         this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k)
+         this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)
+         this%Q(i,j,k,3)=(       this%VF(i,j,k))*this%RHOL(i,j,k)*this%EL(i,j,k)
+         this%Q(i,j,k,4)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)*this%EG(i,j,k)
       end do; end do; end do
       ! Mixture variables
       this%RHO=this%Q(:,:,:,1)+this%Q(:,:,:,2)
