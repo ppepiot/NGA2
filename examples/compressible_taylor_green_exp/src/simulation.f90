@@ -207,20 +207,20 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Mixture velocity
-                  fs%U(i,j,k)=+sin(fs%cfg%x (i))*cos(fs%cfg%ym(j))*cos(fs%cfg%zm(k))
-                  fs%V(i,j,k)=-cos(fs%cfg%xm(i))*sin(fs%cfg%y (j))*cos(fs%cfg%zm(k))
+                  fs%U(i,j,k)=1.0_WP
+                  fs%V(i,j,k)=0.0_WP
                   fs%W(i,j,k)=0.0_WP
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
                      fs%PL  (i,j,k)=1.0_WP/(GammaG*Mach**2)
-                     fs%RHOL(i,j,k)=1000.0_WP
+                     fs%RHOL(i,j,k)=1.0_WP
                      fs%EL  (i,j,k)=(fs%PL(i,j,k)-PLinf)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                   ! Gas variables
                   if (fs%VF(i,j,k).lt.1.0_WP) then
                      fs%PG  (i,j,k)=1.0_WP/(GammaG*Mach**2)
                      fs%RHOG(i,j,k)=1.0_WP
-                     fs%EG  (i,j,k)=fs%PG(i,j,k)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
+                     fs%EG  (i,j,k)=(fs%PG(i,j,k)-PGinf)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
                   end if
                end do
             end do
@@ -409,7 +409,7 @@ contains
          call fs%SLincrement()
          ! Recompute primitive variables
          call fs%get_primitive(get_PL,get_TL,get_PG,get_TG)
-
+         
          ! Fourth RK step ===================================================================================
          ! Get non-SL RHS and increment
          call fs%rhs(dQdt(:,:,:,:,4))
@@ -418,7 +418,7 @@ contains
          call fs%SLincrement()
          ! Recompute primitive variables
          call fs%get_primitive(get_PL,get_TL,get_PG,get_TG)
-
+         
          ! Output to ensight
          if (ens_evt%occurs()) then
             call fs%update_surfmesh(smesh)

@@ -543,9 +543,9 @@ contains
                ! Compute new liquid volume fraction
                this%VF(i,j,k)=Lvolnew/(Lvolnew+Gvolnew)
                ! Only work on higher order moments if VF is in [VFlo,VFhi]
-               if (this%VF(i,j,k).lt.VFlo) then
+               if (this%VF(i,j,k).le.VFlo) then
                   this%VF(i,j,k)=0.0_WP
-               else if (this%VF(i,j,k).gt.VFhi) then
+               else if (this%VF(i,j,k).ge.VFhi) then
                   this%VF(i,j,k)=1.0_WP
                else
                   ! Compute old barycenters and project forward in time
@@ -1311,9 +1311,9 @@ contains
       ! Traverse domain with overlap
       do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
          ! Liquid primitive variables
-         if (this%VF(i,j,k).gt.0.0_WP) then
+         if (this%VF(i,j,k).gt.VFlo) then
             this%RHOL(i,j,k)=this%Q(i,j,k,1)/this%VF(i,j,k)
-            this%EL  (i,j,k)=this%Q(i,j,k,3)/this%Q( i,j,k,1)
+            this%EL  (i,j,k)=this%Q(i,j,k,3)/this%Q (i,j,k,1)
             this%PL  (i,j,k)=PLfunc(this%RHOL(i,j,k),this%EL(i,j,k))
             this%TL  (i,j,k)=TLfunc(this%EL  (i,j,k))
          else
@@ -1323,7 +1323,7 @@ contains
             this%TL  (i,j,k)=0.0_WP
          end if
          ! Gas primitive variables
-         if (this%VF(i,j,k).lt.1.0_WP) then
+         if (this%VF(i,j,k).lt.VFhi) then
             this%RHOG(i,j,k)=this%Q(i,j,k,2)/(1.0_WP-this%VF(i,j,k))
             this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
             this%PG  (i,j,k)=PGfunc(this%RHOG(i,j,k),this%EG(i,j,k))
@@ -1336,6 +1336,7 @@ contains
          end if
       end do; end do; end do
       ! Mixture variables
+      this%RHO=this%Q(:,:,:,1)+this%Q(:,:,:,2)
       call this%get_velocity()
       this%E=(this%Q(:,:,:,3)+this%Q(:,:,:,4))/this%RHO
       this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
@@ -1343,13 +1344,11 @@ contains
    end subroutine get_primitive
    
    
-   !> Calculate velocity from momentum and mixture density
+   !> Calculate velocity from momentum and mixture density, which is not recalculated
    subroutine get_velocity(this)
       implicit none
       class(mpcomp), intent(inout) :: this
       integer :: i,j,k
-      ! Recompute mixture density
-      this%RHO=this%Q(:,:,:,1)+this%Q(:,:,:,2)
       ! Calculate velocity as far as possible
       do k=this%cfg%kmino_+1,this%cfg%kmaxo_
          do j=this%cfg%jmino_+1,this%cfg%jmaxo_
@@ -1383,7 +1382,7 @@ contains
    end subroutine get_velocity
    
    
-   !> Calculate momentum from velocity and mixture density
+   !> Calculate momentum from velocity and mixture density, which is recalculated
    subroutine get_momentum(this)
       implicit none
       class(mpcomp), intent(inout) :: this
@@ -1533,11 +1532,21 @@ contains
       this%TLmin  =+huge(1.0_WP); this%TLmax  =-huge(1.0_WP); this%TGmin  =+huge(1.0_WP); this%TGmax  =-huge(1.0_WP)
       this%Umax=0.0_WP; this%Vmax=0.0_WP; this%Wmax=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
-         this%RHOLmin=min(this%RHOLmin,this%RHOL(i,j,k)); this%RHOLmax=max(this%RHOLmax,this%RHOL(i,j,k)); this%RHOGmin=min(this%RHOGmin,this%RHOG(i,j,k)); this%RHOGmax=max(this%RHOGmax,this%RHOG(i,j,k))
-         this%ELmin  =min(this%ELmin  ,this%EL  (i,j,k)); this%ELmax  =max(this%ELmax  ,this%EL  (i,j,k)); this%EGmin  =min(this%EGmin  ,this%EG  (i,j,k)); this%EGmax  =max(this%EGmax  ,this%EG  (i,j,k))
-         this%PLmin  =min(this%PLmin  ,this%PL  (i,j,k)); this%PLmax  =max(this%PLmax  ,this%PL  (i,j,k)); this%PGmin  =min(this%PGmin  ,this%PG  (i,j,k)); this%PGmax  =max(this%PGmax  ,this%PG  (i,j,k))
-         this%TLmin  =min(this%TLmin  ,this%TL  (i,j,k)); this%TLmax  =max(this%TLmax  ,this%TL  (i,j,k)); this%TGmin  =min(this%TGmin  ,this%TG  (i,j,k)); this%TGmax  =max(this%TGmax  ,this%TG  (i,j,k))
-         this%Umax=max(this%Umax,abs(this%U(i,j,k))); this%Vmax=max(this%Vmax,abs(this%V(i,j,k))); this%Wmax=max(this%Wmax,abs(this%W(i,j,k)))
+         if (this%VF(i,j,k).gt.VFlo) then
+            this%RHOLmin=min(this%RHOLmin,this%RHOL(i,j,k)); this%RHOLmax=max(this%RHOLmax,this%RHOL(i,j,k))
+            this%ELmin  =min(this%ELmin  ,this%EL  (i,j,k)); this%ELmax  =max(this%ELmax  ,this%EL  (i,j,k))
+            this%PLmin  =min(this%PLmin  ,this%PL  (i,j,k)); this%PLmax  =max(this%PLmax  ,this%PL  (i,j,k))
+            this%TLmin  =min(this%TLmin  ,this%TL  (i,j,k)); this%TLmax  =max(this%TLmax  ,this%TL  (i,j,k))
+         end if
+         if (this%VF(i,j,k).lt.VFhi) then
+            this%RHOGmin=min(this%RHOGmin,this%RHOG(i,j,k)); this%RHOGmax=max(this%RHOGmax,this%RHOG(i,j,k))
+            this%EGmin  =min(this%EGmin  ,this%EG  (i,j,k)); this%EGmax  =max(this%EGmax  ,this%EG  (i,j,k))
+            this%PGmin  =min(this%PGmin  ,this%PG  (i,j,k)); this%PGmax  =max(this%PGmax  ,this%PG  (i,j,k))
+            this%TGmin  =min(this%TGmin  ,this%TG  (i,j,k)); this%TGmax  =max(this%TGmax  ,this%TG  (i,j,k))
+         end if
+         this%Umax=max(this%Umax,abs(this%U(i,j,k)))
+         this%Vmax=max(this%Vmax,abs(this%V(i,j,k)))
+         this%Wmax=max(this%Wmax,abs(this%W(i,j,k)))
       end do; end do; end do
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
