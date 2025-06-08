@@ -573,16 +573,14 @@ contains
       integer :: i,j,k,n
       ! Start rhs timer
       call this%trhs%start()
-      ! Assemble time derivative for mass and internal energy advection in tagged cells
+      ! Assemble time derivative for mass and internal energy advection with semi-Lagrangian fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               if (this%iSL(i,j,k).gt.0) then
-                  this%Q(i,j,k,1)=this%Q(i,j,k,1)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,1)-this%SLFx(i,j,k,1))+this%dyi*(this%SLFy(i,j+1,k,1)-this%SLFy(i,j,k,1))+this%dzi*(this%SLFz(i,j,k+1,1)-this%SLFz(i,j,k,1)))
-                  this%Q(i,j,k,2)=this%Q(i,j,k,2)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,2)-this%SLFx(i,j,k,2))+this%dyi*(this%SLFy(i,j+1,k,2)-this%SLFy(i,j,k,2))+this%dzi*(this%SLFz(i,j,k+1,2)-this%SLFz(i,j,k,2)))
-                  this%Q(i,j,k,3)=this%Q(i,j,k,3)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,3)-this%SLFx(i,j,k,3))+this%dyi*(this%SLFy(i,j+1,k,3)-this%SLFy(i,j,k,3))+this%dzi*(this%SLFz(i,j,k+1,3)-this%SLFz(i,j,k,3)))
-                  this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,4)-this%SLFx(i,j,k,4))+this%dyi*(this%SLFy(i,j+1,k,4)-this%SLFy(i,j,k,4))+this%dzi*(this%SLFz(i,j,k+1,4)-this%SLFz(i,j,k,4)))
-               end if
+               this%Q(i,j,k,1)=this%Q(i,j,k,1)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,1)-this%SLFx(i,j,k,1))+this%dyi*(this%SLFy(i,j+1,k,1)-this%SLFy(i,j,k,1))+this%dzi*(this%SLFz(i,j,k+1,1)-this%SLFz(i,j,k,1)))
+               this%Q(i,j,k,2)=this%Q(i,j,k,2)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,2)-this%SLFx(i,j,k,2))+this%dyi*(this%SLFy(i,j+1,k,2)-this%SLFy(i,j,k,2))+this%dzi*(this%SLFz(i,j,k+1,2)-this%SLFz(i,j,k,2)))
+               this%Q(i,j,k,3)=this%Q(i,j,k,3)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,3)-this%SLFx(i,j,k,3))+this%dyi*(this%SLFy(i,j+1,k,3)-this%SLFy(i,j,k,3))+this%dzi*(this%SLFz(i,j,k+1,3)-this%SLFz(i,j,k,3)))
+               this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,4)-this%SLFx(i,j,k,4))+this%dyi*(this%SLFy(i,j+1,k,4)-this%SLFy(i,j,k,4))+this%dzi*(this%SLFz(i,j,k+1,4)-this%SLFz(i,j,k,4)))
             end do
          end do
       end do
@@ -614,16 +612,16 @@ contains
       ! Zero out RHS
       dQdt=0.0_WP
       
-      ! Allocate phasic mass and energy fluxes and initialize at our semi-Lagrangian fluxes
-      allocate(Fx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
-      allocate(Fy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
-      allocate(Fz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4))
+      ! Allocate phasic mass and energy fluxes
+      allocate(Fx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); Fx=0.0_WP
+      allocate(Fy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); Fy=0.0_WP
+      allocate(Fz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); Fz=0.0_WP
       
       ! ================================================================ !
       ! ======================== INVISID FLUXES ======================== !
       ! ================================================================ !
       
-      ! Calculate face-centered mass fluxes and internal energy fluxes on untagged faces (use SL fluxes on tagged faces)
+      ! Calculate face-centered mass fluxes and internal energy fluxes on untagged faces
       do k=this%cfg%kmin_-1,this%cfg%kmax_+1       !
          do j=this%cfg%jmin_-1,this%cfg%jmax_+1    ! Extra cell on the left will be used by momentum flux later
             do i=this%cfg%imin_-1,this%cfg%imax_+1 !
@@ -653,8 +651,6 @@ contains
                      Fx(i,j,k,2)=0.0_WP
                      Fx(i,j,k,4)=0.0_WP
                   end if
-               else
-                  Fx(i,j,k,:)=this%SLFx(i,j,k,:)
                end if
                ! Y face
                if (maxval(this%iSL(i,j-1:j,k)).eq.0) then
@@ -682,8 +678,6 @@ contains
                      Fy(i,j,k,2)=0.0_WP
                      Fy(i,j,k,4)=0.0_WP
                   end if
-               else
-                  Fy(i,j,k,:)=this%SLFy(i,j,k,:)
                end if
                ! Z face
                if (maxval(this%iSL(i,j,k-1:k)).eq.0) then
@@ -711,23 +705,30 @@ contains
                      Fz(i,j,k,2)=0.0_WP
                      Fz(i,j,k,4)=0.0_WP
                   end if
-               else
-                  Fz(i,j,k,:)=this%SLFz(i,j,k,:)
                end if
             end do
          end do
       end do
       
-      ! Assemble time derivative for mass and internal energy advection in untagged cells
+      ! Assemble time derivative for mass and internal energy advection with standard fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               if (this%iSL(i,j,k).eq.0) then
-                  dQdt(i,j,k,1)=this%dxi*(Fx(i+1,j,k,1)-Fx(i,j,k,1))+this%dyi*(Fy(i,j+1,k,1)-Fy(i,j,k,1))+this%dzi*(Fz(i,j,k+1,1)-Fz(i,j,k,1))
-                  dQdt(i,j,k,2)=this%dxi*(Fx(i+1,j,k,2)-Fx(i,j,k,2))+this%dyi*(Fy(i,j+1,k,2)-Fy(i,j,k,2))+this%dzi*(Fz(i,j,k+1,2)-Fz(i,j,k,2))
-                  dQdt(i,j,k,3)=this%dxi*(Fx(i+1,j,k,3)-Fx(i,j,k,3))+this%dyi*(Fy(i,j+1,k,3)-Fy(i,j,k,3))+this%dzi*(Fz(i,j,k+1,3)-Fz(i,j,k,3))
-                  dQdt(i,j,k,4)=this%dxi*(Fx(i+1,j,k,4)-Fx(i,j,k,4))+this%dyi*(Fy(i,j+1,k,4)-Fy(i,j,k,4))+this%dzi*(Fz(i,j,k+1,4)-Fz(i,j,k,4))
-               end if
+               dQdt(i,j,k,1)=this%dxi*(Fx(i+1,j,k,1)-Fx(i,j,k,1))+this%dyi*(Fy(i,j+1,k,1)-Fy(i,j,k,1))+this%dzi*(Fz(i,j,k+1,1)-Fz(i,j,k,1))
+               dQdt(i,j,k,2)=this%dxi*(Fx(i+1,j,k,2)-Fx(i,j,k,2))+this%dyi*(Fy(i,j+1,k,2)-Fy(i,j,k,2))+this%dzi*(Fz(i,j,k+1,2)-Fz(i,j,k,2))
+               dQdt(i,j,k,3)=this%dxi*(Fx(i+1,j,k,3)-Fx(i,j,k,3))+this%dyi*(Fy(i,j+1,k,3)-Fy(i,j,k,3))+this%dzi*(Fz(i,j,k+1,3)-Fz(i,j,k,3))
+               dQdt(i,j,k,4)=this%dxi*(Fx(i+1,j,k,4)-Fx(i,j,k,4))+this%dyi*(Fy(i,j+1,k,4)-Fy(i,j,k,4))+this%dzi*(Fz(i,j,k+1,4)-Fz(i,j,k,4))
+            end do
+         end do
+      end do
+      
+      ! Now add SL fluxes for a complete mass flux
+      do k=this%cfg%kmin_-1,this%cfg%kmax_+1       !
+         do j=this%cfg%jmin_-1,this%cfg%jmax_+1    ! Extra cell on the left will be used by momentum flux later
+            do i=this%cfg%imin_-1,this%cfg%imax_+1 !
+               if (maxval(this%iSL(i-1:i,j,k)).gt.0) Fx(i,j,k,:)=this%SLFx(i,j,k,:)
+               if (maxval(this%iSL(i,j-1:j,k)).gt.0) Fy(i,j,k,:)=this%SLFy(i,j,k,:)
+               if (maxval(this%iSL(i,j,k-1:k)).gt.0) Fz(i,j,k,:)=this%SLFz(i,j,k,:)
             end do
          end do
       end do
