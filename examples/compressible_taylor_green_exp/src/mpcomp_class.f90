@@ -54,12 +54,14 @@ module mpcomp_class
       ! Phasic pressures
       real(WP), dimension(:,:,:), allocatable :: PL,PG
       
+      ! Phasic temperatures
+      real(WP), dimension(:,:,:), allocatable :: TL,TG
+      
       ! Mixture density, energy, pressure, and temperature
       real(WP), dimension(:,:,:), allocatable :: RHO,E,P,T
       
-      ! Viscosities, heat diffusivity, and specific heat
+      ! Viscosities and heat diffusivity
       real(WP), dimension(:,:,:), allocatable :: visc,beta,diff
-      real(WP) :: Cv=1.0_WP
       
       ! Gravitational acceleration
       real(WP), dimension(3) :: gravity=0.0_WP
@@ -84,7 +86,9 @@ module mpcomp_class
       real(WP) :: EGmin,EGmax                             !< Gas energy stats
       real(WP) :: PLmin,PLmax                             !< Liquid pressure stats
       real(WP) :: PGmin,PGmax                             !< Gas pressure stats
-      
+      real(WP) :: TLmin,TLmax                             !< Liquid temperature stats
+      real(WP) :: TGmin,TGmax                             !< Gas temperature stats
+
       ! Timers
       type(timer) :: trhs                                 !< Timer for RHS calculation (excluding tagged cells)
       type(timer) :: tsl                                  !< Timer for semi-Lagrangian transport
@@ -115,6 +119,7 @@ module mpcomp_class
       procedure :: SLincrement                            !< Increment Q by SLdt*rhs of all equations with rhs calculated using stored SL advection fluxes
       procedure :: rhs                                    !< Compute rhs of our equations using standard fluxes
       procedure :: build_interface                        !< Build interface from volume moments
+      procedure :: get_primitive                          !< Calculate phasic and mixture primitive variables from conserved variables
       procedure :: get_velocity                           !< Calculate velocity from momentum
       procedure :: get_momentum                           !< Calculate momentum from velocity
       procedure :: interp_vel                             !< Calculate interpolated velocity
@@ -123,6 +128,22 @@ module mpcomp_class
       procedure :: update_surfmesh                        !< Update a surfmesh object using current polygons
    end type mpcomp
    
+   !> Interfaces for user-defined function
+   abstract interface
+      !> P=EOS(RHO,E)
+      real(WP) function Pfunc_type(RHO,E)
+         import :: WP
+         implicit none
+         real(WP), intent(in) :: RHO
+         real(WP), intent(in) :: E
+      end function Pfunc_type
+      !> T=FUNC(E)
+      real(WP) function Tfunc_type(E)
+         import :: WP
+         implicit none
+         real(WP), intent(in) :: E
+      end function Tfunc_type
+   end interface
    
 contains
    
@@ -196,8 +217,12 @@ contains
       allocate(this%EGold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%EGold=0.0_WP
       
       ! Phasic pressures
-      allocate(this%PL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOL=0.0_WP
-      allocate(this%PG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOG=0.0_WP
+      allocate(this%PL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%PL=0.0_WP
+      allocate(this%PG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%PG=0.0_WP
+      
+      ! Phasic temperatures
+      allocate(this%TL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%TL=0.0_WP
+      allocate(this%TG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%TG=0.0_WP
       
       ! Mixture density, energy, pressure, and temperature
       allocate(this%RHO(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHO=0.0_WP
@@ -1276,6 +1301,48 @@ contains
    end subroutine build_interface
    
    
+   !> Calculate all primitive and mixture variables from updated conserved variables
+   subroutine get_primitive(this,PLfunc,TLfunc,PGfunc,TGfunc)
+      implicit none
+      class(mpcomp), intent(inout) :: this
+      procedure(Pfunc_type) :: PLfunc,PGfunc
+      procedure(Tfunc_type) :: TLfunc,TGfunc
+      integer :: i,j,k
+      ! Traverse domain with overlap
+      do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         ! Liquid primitive variables
+         if (this%VF(i,j,k).gt.0.0_WP) then
+            this%RHOL(i,j,k)=this%Q(i,j,k,1)/this%VF(i,j,k)
+            this%EL  (i,j,k)=this%Q(i,j,k,3)/this%Q( i,j,k,1)
+            this%PL  (i,j,k)=PLfunc(this%RHOL(i,j,k),this%EL(i,j,k))
+            this%TL  (i,j,k)=TLfunc(this%EL  (i,j,k))
+         else
+            this%RHOL(i,j,k)=0.0_WP
+            this%EL  (i,j,k)=0.0_WP
+            this%PL  (i,j,k)=0.0_WP
+            this%TL  (i,j,k)=0.0_WP
+         end if
+         ! Gas primitive variables
+         if (this%VF(i,j,k).lt.1.0_WP) then
+            this%RHOG(i,j,k)=this%Q(i,j,k,2)/(1.0_WP-this%VF(i,j,k))
+            this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
+            this%PG  (i,j,k)=PGfunc(this%RHOG(i,j,k),this%EG(i,j,k))
+            this%TG  (i,j,k)=TGfunc(this%EG  (i,j,k))
+         else
+            this%RHOG(i,j,k)=0.0_WP
+            this%EG  (i,j,k)=0.0_WP
+            this%PG  (i,j,k)=0.0_WP
+            this%TG  (i,j,k)=0.0_WP
+         end if
+      end do; end do; end do
+      ! Mixture variables
+      call this%get_velocity()
+      this%E=(this%Q(:,:,:,3)+this%Q(:,:,:,4))/this%RHO
+      this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
+      this%T=0.0_WP
+   end subroutine get_primitive
+   
+   
    !> Calculate velocity from momentum and mixture density
    subroutine get_velocity(this)
       implicit none
@@ -1460,53 +1527,37 @@ contains
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Qmax,this%nQ,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       
       ! Calculate extrema of primitive fields
-      this%RHOLmin=+huge(1.0_WP)
-      this%RHOLmax=-huge(1.0_WP)
-      this%RHOGmin=+huge(1.0_WP)
-      this%RHOGmax=-huge(1.0_WP)
-      this%ELmin=+huge(1.0_WP)
-      this%ELmax=-huge(1.0_WP)
-      this%EGmin=+huge(1.0_WP)
-      this%EGmax=-huge(1.0_WP)
-      this%PLmin=+huge(1.0_WP)
-      this%PLmax=-huge(1.0_WP)
-      this%PGmin=+huge(1.0_WP)
-      this%PGmax=-huge(1.0_WP)
-      this%Umax=0.0_WP
-      this%Vmax=0.0_WP
-      this%Wmax=0.0_WP
+      this%RHOLmin=+huge(1.0_WP); this%RHOLmax=-huge(1.0_WP); this%RHOGmin=+huge(1.0_WP); this%RHOGmax=-huge(1.0_WP)
+      this%ELmin  =+huge(1.0_WP); this%ELmax  =-huge(1.0_WP); this%EGmin  =+huge(1.0_WP); this%EGmax  =-huge(1.0_WP)
+      this%PLmin  =+huge(1.0_WP); this%PLmax  =-huge(1.0_WP); this%PGmin  =+huge(1.0_WP); this%PGmax  =-huge(1.0_WP)
+      this%TLmin  =+huge(1.0_WP); this%TLmax  =-huge(1.0_WP); this%TGmin  =+huge(1.0_WP); this%TGmax  =-huge(1.0_WP)
+      this%Umax=0.0_WP; this%Vmax=0.0_WP; this%Wmax=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
-         this%RHOLmin=min(this%RHOLmin,this%RHOL(i,j,k))
-         this%RHOLmax=max(this%RHOLmax,this%RHOL(i,j,k))
-         this%RHOGmin=min(this%RHOGmin,this%RHOG(i,j,k))
-         this%RHOGmax=max(this%RHOGmax,this%RHOG(i,j,k))
-         this%ELmin=min(this%ELmin,this%EL(i,j,k))
-         this%ELmax=max(this%ELmax,this%EL(i,j,k))
-         this%EGmin=min(this%EGmin,this%EG(i,j,k))
-         this%EGmax=max(this%EGmax,this%EG(i,j,k))
-         this%PLmin=min(this%PLmin,this%PL(i,j,k))
-         this%PLmax=max(this%PLmax,this%PL(i,j,k))
-         this%PGmin=min(this%PGmin,this%PG(i,j,k))
-         this%PGmax=max(this%PGmax,this%PG(i,j,k))
-         this%Umax=max(this%Umax,abs(this%U(i,j,k)))
-         this%Vmax=max(this%Vmax,abs(this%V(i,j,k)))
-         this%Wmax=max(this%Wmax,abs(this%W(i,j,k)))
+         this%RHOLmin=min(this%RHOLmin,this%RHOL(i,j,k)); this%RHOLmax=max(this%RHOLmax,this%RHOL(i,j,k)); this%RHOGmin=min(this%RHOGmin,this%RHOG(i,j,k)); this%RHOGmax=max(this%RHOGmax,this%RHOG(i,j,k))
+         this%ELmin  =min(this%ELmin  ,this%EL  (i,j,k)); this%ELmax  =max(this%ELmax  ,this%EL  (i,j,k)); this%EGmin  =min(this%EGmin  ,this%EG  (i,j,k)); this%EGmax  =max(this%EGmax  ,this%EG  (i,j,k))
+         this%PLmin  =min(this%PLmin  ,this%PL  (i,j,k)); this%PLmax  =max(this%PLmax  ,this%PL  (i,j,k)); this%PGmin  =min(this%PGmin  ,this%PG  (i,j,k)); this%PGmax  =max(this%PGmax  ,this%PG  (i,j,k))
+         this%TLmin  =min(this%TLmin  ,this%TL  (i,j,k)); this%TLmax  =max(this%TLmax  ,this%TL  (i,j,k)); this%TGmin  =min(this%TGmin  ,this%TG  (i,j,k)); this%TGmax  =max(this%TGmax  ,this%TG  (i,j,k))
+         this%Umax=max(this%Umax,abs(this%U(i,j,k))); this%Vmax=max(this%Vmax,abs(this%V(i,j,k))); this%Wmax=max(this%Wmax,abs(this%W(i,j,k)))
       end do; end do; end do
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOLmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOGmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%RHOGmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PLmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PLmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmin,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Umax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Vmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Wmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%ELmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%EGmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PLmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PLmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%TLmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%TLmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%TGmin  ,1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%TGmax  ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Umax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Vmax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,this%Wmax   ,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       
    end subroutine get_info
    
