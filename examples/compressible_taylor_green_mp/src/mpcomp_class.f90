@@ -706,8 +706,8 @@ contains
       integer :: i,j,k,n
       real(WP) :: w,div
       real(WP), parameter :: eps=1.0e-15_WP
-      real(WP), dimension(-2: 0) :: wxp,wyp,wzp
-      real(WP), dimension(-1:+1) :: wxm,wym,wzm
+      real(WP), dimension(-2: 0) :: wenop
+      real(WP), dimension(-1:+1) :: wenom
       real(WP), dimension(:,:,:), allocatable :: FRX,FRY,FRZ
       real(WP), dimension(:,:,:), allocatable :: FUX,FUY,FUZ
       real(WP), dimension(:,:,:), allocatable :: FVX,FVY,FVZ
@@ -735,15 +735,15 @@ contains
                ! X face
                if (maxval(this%iSL(i-1:i,j,k)).eq.0) then
                   ! WENO-based mass flux in liquid
-                  w=weno_weight((abs(this%RHOL(i-1,j,k)-this%RHOL(i-2,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOL(i+1,j,k)-this%RHOL(i  ,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fx(i,j,k,1)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOL(i-2:i  ,j,k)) &
-                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOL(i-1:i+1,j,k))
+                  w=weno_weight((abs(this%RHOL(i-1,j,k)-this%RHOL(i-2,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i+1,j,k)-this%RHOL(i  ,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fx(i,j,k,1)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wenop*this%RHOL(i-2:i  ,j,k)) &
+                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wenom*this%RHOL(i-1:i+1,j,k))
                   ! WENO-based mass flux in gas
-                  w=weno_weight((abs(this%RHOG(i-1,j,k)-this%RHOG(i-2,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOG(i+1,j,k)-this%RHOG(i  ,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wxm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fx(i,j,k,2)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wxp*this%RHOG(i-2:i  ,j,k)) &
-                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wxm*this%RHOG(i-1:i+1,j,k))
+                  w=weno_weight((abs(this%RHOG(i-1,j,k)-this%RHOG(i-2,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i+1,j,k)-this%RHOG(i  ,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fx(i,j,k,2)=-0.5_WP*(this%U(i,j,k)+abs(this%U(i,j,k)))*sum(wenop*this%RHOG(i-2:i  ,j,k)) &
+                  &           -0.5_WP*(this%U(i,j,k)-abs(this%U(i,j,k)))*sum(wenom*this%RHOG(i-1:i+1,j,k))
                   ! Centered energy flux in liquid
                   Fx(i,j,k,3)=0.5_WP*Fx(i,j,k,1)*sum(this%EL(i-1:i,j,k))
                   ! Centered energy flux in gas
@@ -762,15 +762,15 @@ contains
                ! Y face
                if (maxval(this%iSL(i,j-1:j,k)).eq.0) then
                   ! WENO-based mass flux in liquid
-                  w=weno_weight((abs(this%RHOL(i,j-1,k)-this%RHOL(i,j-2,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOL(i,j+1,k)-this%RHOL(i,j  ,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fy(i,j,k,1)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wyp*this%RHOL(i,j-2:j  ,k)) &
-                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wym*this%RHOL(i,j-1:j+1,k))
+                  w=weno_weight((abs(this%RHOL(i,j-1,k)-this%RHOL(i,j-2,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i,j+1,k)-this%RHOL(i,j  ,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fy(i,j,k,1)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wenop*this%RHOL(i,j-2:j  ,k)) &
+                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wenom*this%RHOL(i,j-1:j+1,k))
                   ! WENO-based mass flux in gas
-                  w=weno_weight((abs(this%RHOG(i,j-1,k)-this%RHOG(i,j-2,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wyp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOG(i,j+1,k)-this%RHOG(i,j  ,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wym=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fy(i,j,k,2)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wyp*this%RHOG(i,j-2:j  ,k)) &
-                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wym*this%RHOG(i,j-1:j+1,k))
+                  w=weno_weight((abs(this%RHOG(i,j-1,k)-this%RHOG(i,j-2,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i,j+1,k)-this%RHOG(i,j  ,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fy(i,j,k,2)=-0.5_WP*(this%V(i,j,k)+abs(this%V(i,j,k)))*sum(wenop*this%RHOG(i,j-2:j  ,k)) &
+                  &           -0.5_WP*(this%V(i,j,k)-abs(this%V(i,j,k)))*sum(wenom*this%RHOG(i,j-1:j+1,k))
                   ! Centered energy flux in liquid
                   Fy(i,j,k,3)=0.5_WP*Fy(i,j,k,1)*sum(this%EL(i,j-1:j,k))
                   ! Centered energy flux in gas
@@ -789,15 +789,15 @@ contains
                ! Z face
                if (maxval(this%iSL(i,j,k-1:k)).eq.0) then
                   ! WENO-based mass flux in liquid
-                  w=weno_weight((abs(this%RHOL(i,j,k-1)-this%RHOL(i,j,k-2))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOL(i,j,k+1)-this%RHOL(i,j,k  ))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fz(i,j,k,1)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wzp*this%RHOL(i,j,k-2:k  )) &
-                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wzm*this%RHOL(i,j,k-1:k+1))
+                  w=weno_weight((abs(this%RHOL(i,j,k-1)-this%RHOL(i,j,k-2))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOL(i,j,k+1)-this%RHOL(i,j,k  ))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fz(i,j,k,1)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wenop*this%RHOL(i,j,k-2:k  )) &
+                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wenom*this%RHOL(i,j,k-1:k+1))
                   ! WENO-based mass flux in gas
-                  w=weno_weight((abs(this%RHOG(i,j,k-1)-this%RHOG(i,j,k-2))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wzp=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                  w=weno_weight((abs(this%RHOG(i,j,k+1)-this%RHOG(i,j,k  ))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wzm=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
-                  Fz(i,j,k,2)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wzp*this%RHOG(i,j,k-2:k  )) &
-                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wzm*this%RHOG(i,j,k-1:k+1))
+                  w=weno_weight((abs(this%RHOG(i,j,k-1)-this%RHOG(i,j,k-2))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                  w=weno_weight((abs(this%RHOG(i,j,k+1)-this%RHOG(i,j,k  ))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                  Fz(i,j,k,2)=-0.5_WP*(this%W(i,j,k)+abs(this%W(i,j,k)))*sum(wenop*this%RHOG(i,j,k-2:k  )) &
+                  &           -0.5_WP*(this%W(i,j,k)-abs(this%W(i,j,k)))*sum(wenom*this%RHOG(i,j,k-1:k+1))
                   ! Centered energy flux in liquid
                   Fz(i,j,k,3)=0.5_WP*Fz(i,j,k,1)*sum(this%EL(i,j,k-1:k))
                   ! Centered energy flux in gas
