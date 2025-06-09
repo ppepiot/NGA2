@@ -53,35 +53,43 @@ contains
    
    
    !> P=EOS(RHO,E) for liquid
-   real(WP) function get_PL(RHOL,EL)
+   real(WP) function get_PL(RHO,E)
       implicit none
-      real(WP), intent(in) :: RHOL,EL
-      get_PL=RHOL*EL*(GammaL-1.0_WP)+PLinf
+      real(WP), intent(in) :: RHO,E
+      get_PL=RHO*E*(GammaL-1.0_WP)-GammaL*PLinf
    end function get_PL
-   
-   
    !> T=f(E) for liquid
-   real(WP) function get_TL(EL)
+   real(WP) function get_TL(E)
       implicit none
-      real(WP), intent(in) :: EL
-      get_TL=EL/CvL
+      real(WP), intent(in) :: E
+      get_TL=E/CvL
    end function get_TL
+   !> C=f(P,RHO) for liquid
+   real(WP) function get_CL(P,RHO)
+      implicit none
+      real(WP), intent(in) :: P,RHO
+      get_CL=sqrt(GammaL*(P+PLinf)/RHO)
+   end function get_CL
    
    
    !> P=EOS(RHO,E) for gas
-   real(WP) function get_PG(RHOG,EG)
+   real(WP) function get_PG(RHO,E)
       implicit none
-      real(WP), intent(in) :: RHOG,EG
-      get_PG=RHOG*EG*(GammaG-1.0_WP)+PGinf
+      real(WP), intent(in) :: RHO,E
+      get_PG=RHO*E*(GammaG-1.0_WP)-GammaL*PGinf
    end function get_PG
-   
-   
    !> T=f(E) for gas
-   real(WP) function get_TG(EG)
+   real(WP) function get_TG(E)
       implicit none
-      real(WP), intent(in) :: EG
-      get_TG=EG/CvG
+      real(WP), intent(in) :: E
+      get_TG=E/CvG
    end function get_TG
+   !> C=f(P,RHO) for gas
+   real(WP) function get_CG(P,RHO)
+      implicit none
+      real(WP), intent(in) :: P,RHO
+      get_CG=sqrt(GammaG*(P+PGinf)/RHO)
+   end function get_CG
    
    
    !> Post-process conservation properties
@@ -185,6 +193,7 @@ contains
       initial_conditions: block
          use mms_geom,     only: initialize_volume_moments
          use mpcomp_class, only: VFlo
+         use random,       only: random_uniform
          integer :: i,j,k
          ! Initialize primary variables
          do k=cfg%kmino_,cfg%kmaxo_
@@ -196,13 +205,13 @@ contains
                   &                              levelset=levelset_drop,time=0.0_WP,level=4,VFlo=VFlo,&
                   &                              VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=1.0_WP
-                  fs%V(i,j,k)=0.0_WP
-                  fs%W(i,j,k)=0.0_WP
+                  fs%U(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%V(i,j,k)=1.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%W(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
                      fs%PL  (i,j,k)=1.0_WP/(GammaG*Mach**2)
-                     fs%RHOL(i,j,k)=1.0_WP
+                     fs%RHOL(i,j,k)=1000.0_WP
                      fs%EL  (i,j,k)=(fs%PL(i,j,k)-PLinf)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                   ! Gas variables
@@ -227,8 +236,13 @@ contains
          ! Interpolate velocity
          call fs%interp_vel(Ui,Vi,Wi)
          ! Compute speed of sound and local Mach number
-         C=sqrt(GammaG*(GammaG-1.0_WP)*fs%E)
-         Ma=sqrt((Ui**2+Vi**2+Wi**2))/C
+         do k=cfg%kmino_,cfg%kmaxo_; do j=cfg%jmino_,cfg%jmaxo_; do i=cfg%imino_,cfg%imaxo_
+            if (fs%VF(i,j,k).gt.0.5_WP) then
+               C(i,j,k)=get_CL(fs%PL(i,j,k),fs%RHOL(i,j,k))
+            else
+               C(i,j,k)=get_CG(fs%PG(i,j,k),fs%RHOG(i,j,k))
+            end if
+         end do; end do; end do
       end block initial_conditions
       
       ! Add Ensight output
@@ -325,7 +339,7 @@ contains
       end block create_monitor
       
    contains
-      !> Function that defines a level set function for a drop problem
+      !> Function that defines a level set function for a sphere
       function levelset_drop(xyz,t) result(G)
          implicit none
          real(WP), dimension(3),intent(in) :: xyz
@@ -348,7 +362,7 @@ contains
          call time%adjust_dt()
          call time%increment()
          
-         ! Remember conserved variables, volume moments, and interface
+         ! Remember conserved variables
          fs%Qold=fs%Q
          
          ! Remember phasic quantities
@@ -418,8 +432,16 @@ contains
          call fs%interp_vel(Ui,Vi,Wi)
          
          ! Compute speed of sound and local Mach number
-         C=sqrt(GammaG*(GammaG-1.0_WP)*fs%E)
-         Ma=sqrt((Ui**2+Vi**2+Wi**2))/C
+         get_soundspeed: block
+            integer :: i,j,k
+            do k=cfg%kmino_,cfg%kmaxo_; do j=cfg%jmino_,cfg%jmaxo_; do i=cfg%imino_,cfg%imaxo_
+               if (fs%VF(i,j,k).gt.0.5_WP) then
+                  C(i,j,k)=get_CL(fs%PL(i,j,k),fs%RHOL(i,j,k))
+               else
+                  C(i,j,k)=get_CG(fs%PG(i,j,k),fs%RHOG(i,j,k))
+               end if
+            end do; end do; end do
+         end block get_soundspeed
          
          ! Output to ensight
          if (ens_evt%occurs()) then
