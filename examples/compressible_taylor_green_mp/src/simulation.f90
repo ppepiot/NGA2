@@ -187,7 +187,6 @@ contains
          use mpcomp_class, only: VFlo
          integer :: i,j,k
          ! Initialize primary variables
-         radius=0.0_WP
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
