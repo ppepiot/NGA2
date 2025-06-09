@@ -18,7 +18,7 @@ Reynolds : 1e10!1600
 Prandtl :  0.71
 
 # Time integration
-Max timestep size : 0.039
+Max timestep size : 0.035
 Max cfl number :    10.0
 Max time :          10
 

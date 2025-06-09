@@ -25,7 +25,7 @@ module simulation
    
    !> Monitoring of conservation
    type(monitor) :: consfile
-   real(WP) :: RHOKint!,RHOSint,DilDiss,SolDiss
+   real(WP) :: RHOKint,RHOSLint,RHOSGint,DilDiss,SolDiss
    
    !> Private work arrays
    real(WP), dimension(:,:,:,:,:), allocatable :: dQdt
@@ -99,11 +99,24 @@ contains
          tmp(i,j,k)=0.25_WP*(sum(fs%Q(i:i+1,j,k,5)*fs%U(i:i+1,j,k))+sum(fs%Q(i,j:j+1,k,6)*fs%V(i,j:j+1,k))+sum(fs%Q(i,j,k:k+1,7)*fs%W(i,j,k:k+1)))
       end do; end do; end do
       call cfg%integrate(tmp,integral=RHOKint)
-      ! Compute entropy
-      !do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-      !   tmp(i,j,k)=fs%Cv*log(fs%P(i,j,k)/fs%RHO(i,j,k)**Gamma)
-      !end do; end do; end do
-      !call cfg%integrate(tmp,integral=RHOSint)
+      ! Compute liquid entropy
+      do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
+         if (fs%VF(i,j,k).gt.0.0_WP) then
+            tmp(i,j,k)=fs%VF(i,j,k)*fs%RHOL(i,j,k)*CvL*log((fs%PL(i,j,k)+PLinf)/fs%RHOL(i,j,k)**GammaL)
+         else
+            tmp(i,j,k)=0.0_WP
+         end if
+      end do; end do; end do
+      call cfg%integrate(tmp,integral=RHOSLint)
+      ! Compute gas entropy
+      do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
+         if (fs%VF(i,j,k).lt.1.0_WP) then
+            tmp(i,j,k)=(1.0_WP-fs%VF(i,j,k))*fs%RHOG(i,j,k)*CvG*log((fs%PG(i,j,k)+PGinf)/fs%RHOG(i,j,k)**GammaG)
+         else
+            tmp(i,j,k)=0.0_WP
+         end if
+      end do; end do; end do
+      call cfg%integrate(tmp,integral=RHOSGint)
       ! Calculate dilatational dissipation
       !do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
       !   tmp(i,j,k)=(fs%beta(i,j,k)+4.0_WP/3.0_WP*fs%visc(i,j,k))*(fs%dxi*(fs%U(i+1,j,k)-fs%U(i,j,k))+fs%dyi*(fs%V(i,j+1,k)-fs%V(i,j,k))+fs%dzi*(fs%W(i,j,k+1)-fs%W(i,j,k)))**2
@@ -172,7 +185,6 @@ contains
       initial_conditions: block
          use mms_geom,     only: initialize_volume_moments
          use mpcomp_class, only: VFlo
-         use random,       only: random_uniform
          integer :: i,j,k
          ! Initialize primary variables
          radius=0.0_WP
@@ -185,9 +197,9 @@ contains
                   &                              levelset=levelset_drop,time=0.0_WP,level=4,VFlo=VFlo,&
                   &                              VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=1.0_WP+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
-                  fs%V(i,j,k)=0.0_WP+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
-                  fs%W(i,j,k)=0.0_WP+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%U(i,j,k)=1.0_WP
+                  fs%V(i,j,k)=0.0_WP
+                  fs%W(i,j,k)=0.0_WP
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
                      fs%PL  (i,j,k)=1.0_WP/(GammaG*Mach**2)
@@ -302,11 +314,12 @@ contains
          call consfile%add_column(fs%Qint(2),'Gas mass')
          call consfile%add_column(fs%Qint(3),'Liquid energy')
          call consfile%add_column(fs%Qint(4),'Gas energy')
+         call consfile%add_column(RHOSLint,'Liquid Entropy')
+         call consfile%add_column(RHOSGint,'Gas Entropy')
          call consfile%add_column(fs%Qint(5),'U Momentum')
          call consfile%add_column(fs%Qint(6),'V Momentum')
          call consfile%add_column(fs%Qint(7),'W Momentum')
          call consfile%add_column(RHOKint,'Kinetic energy')
-         !call consfile%add_column(   RHOSint,'Entropy')
          !call consfile%add_column(DilDiss,'Dilatation dissipation')
          !call consfile%add_column(SolDiss,'Solenoidal dissipation')
          call consfile%write()
