@@ -76,7 +76,7 @@ contains
    real(WP) function get_PG(RHO,E)
       implicit none
       real(WP), intent(in) :: RHO,E
-      get_PG=RHO*E*(GammaG-1.0_WP)-GammaL*PGinf
+      get_PG=RHO*E*(GammaG-1.0_WP)-GammaG*PGinf
    end function get_PG
    !> T=f(E) for gas
    real(WP) function get_TG(E)
@@ -205,20 +205,20 @@ contains
                   &                              levelset=levelset_drop,time=0.0_WP,level=4,VFlo=VFlo,&
                   &                              VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
-                  fs%V(i,j,k)=1.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%U(i,j,k)=0.5_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%V(i,j,k)=0.5_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
                   fs%W(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
                      fs%PL  (i,j,k)=1.0_WP/(GammaG*Mach**2)
                      fs%RHOL(i,j,k)=1000.0_WP
-                     fs%EL  (i,j,k)=(fs%PL(i,j,k)-PLinf)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
+                     fs%EL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PLinf)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                   ! Gas variables
                   if (fs%VF(i,j,k).lt.1.0_WP) then
                      fs%PG  (i,j,k)=1.0_WP/(GammaG*Mach**2)
                      fs%RHOG(i,j,k)=1.0_WP
-                     fs%EG  (i,j,k)=(fs%PG(i,j,k)-PGinf)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
+                     fs%EG  (i,j,k)=(fs%PG(i,j,k)+GammaG*PGinf)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
                   end if
                end do
             end do

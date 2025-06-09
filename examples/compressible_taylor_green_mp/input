@@ -7,8 +7,8 @@ ny : 128
 nz : 128
 
 # Fluid definition
-GammaL :    1.4
-PLinf :     0
+GammaL :    4 !1.4
+PLinf :     100
 GammaG :    1.4
 PGinf :     0
 
@@ -18,7 +18,7 @@ Reynolds : 1e10!1600
 Prandtl :  0.71
 
 # Time integration
-Max timestep size : 0.04 !0.035
+Max timestep size : 0.02 !0.035
 Max cfl number :    10.0
 Max time :          10
 
