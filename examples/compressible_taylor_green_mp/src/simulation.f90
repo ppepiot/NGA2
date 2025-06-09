@@ -242,6 +242,7 @@ contains
             else
                C(i,j,k)=get_CG(fs%PG(i,j,k),fs%RHOG(i,j,k))
             end if
+            Ma(i,j,k)=sqrt(Ui(i,j,k)**2+Vi(i,j,k)**2+Wi(i,j,k)**2)/C(i,j,k)
          end do; end do; end do
       end block initial_conditions
       
@@ -440,6 +441,7 @@ contains
                else
                   C(i,j,k)=get_CG(fs%PG(i,j,k),fs%RHOG(i,j,k))
                end if
+               Ma(i,j,k)=sqrt(Ui(i,j,k)**2+Vi(i,j,k)**2+Wi(i,j,k)**2)/C(i,j,k)
             end do; end do; end do
          end block get_soundspeed
          
