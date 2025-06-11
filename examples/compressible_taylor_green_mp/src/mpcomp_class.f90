@@ -1329,7 +1329,9 @@ contains
             this%TL  (i,j,k)=TLfunc(this%EL  (i,j,k))
          else
             this%RHOL(i,j,k)=0.0_WP
+            this%RHOG(i,j,k)=this%RHO(i,j,k)
             this%EL  (i,j,k)=0.0_WP
+            this%EG  (i,j,k)=this%E(i,j,k)
             this%PL  (i,j,k)=0.0_WP
             this%TL  (i,j,k)=0.0_WP
          end if
@@ -1341,7 +1343,9 @@ contains
             this%TG  (i,j,k)=TGfunc(this%EG  (i,j,k))
          else
             this%RHOG(i,j,k)=0.0_WP
+            this%RHOL(i,j,k)=this%RHO(i,j,k)
             this%EG  (i,j,k)=0.0_WP
+            this%EL  (i,j,k)=this%E(i,j,k)
             this%PG  (i,j,k)=0.0_WP
             this%TG  (i,j,k)=0.0_WP
          end if
@@ -1351,7 +1355,6 @@ contains
          this%Q(i,j,k,3)=(       this%VF(i,j,k))*this%RHOL(i,j,k)*this%EL(i,j,k)
          this%Q(i,j,k,4)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)*this%EG(i,j,k)
       end do; end do; end do
-      call this%get_momentum()
       ! Other mixture variables
       this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
       this%T=0.0_WP
