@@ -186,9 +186,9 @@ contains
       allocate(this%BGold(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%BGold=0.0_WP
       
       ! Allocate semi-Lagrangian fluxes
-      allocate(this%SLFx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nQ)); this%SLFx=0.0_WP
-      allocate(this%SLFy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nQ)); this%SLFy=0.0_WP
-      allocate(this%SLFz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nQ)); this%SLFz=0.0_WP
+      allocate(this%SLFx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFx=0.0_WP
+      allocate(this%SLFy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFy=0.0_WP
+      allocate(this%SLFz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:4)); this%SLFz=0.0_WP
       
       ! Initialize Interface Reconstruction Library and its data
       call this%initialize_irl()
@@ -387,7 +387,6 @@ contains
    
    !> Perform an unsplit semi-Lagrangian transport step by dt in all cells tagged by this%SLtag>0
    !> Volume moments are updated and advection fluxes for phasic equations are computed
-   !> Corresponding momentum fluxes are also computed here.
    !> Uses VFold, BLold, BGold, PLICold, RHOLold, RHOGold, ELold, EGold
    !> Vertex transport is done with RK2 using passed (U,V,W)
    subroutine SLstep(this,dt,U,V,W)
@@ -589,31 +588,6 @@ contains
       if (this%cfg%ny.eq.1) then; do j=this%cfg%jmino_,this%cfg%jmaxo_; this%BL(2,:,j,:)=this%cfg%ym(j); this%BG(2,:,j,:)=this%cfg%ym(j); end do; end if
       if (this%cfg%nz.eq.1) then; do k=this%cfg%kmino_,this%cfg%kmaxo_; this%BL(3,:,:,k)=this%cfg%zm(k); this%BG(3,:,:,k)=this%cfg%zm(k); end do; end if
       
-      ! Calculate cell-centered momentum fluxes
-      do k=this%cfg%kmin_-1,this%cfg%kmax_
-         do j=this%cfg%jmin_-1,this%cfg%jmax_
-            do i=this%cfg%imin_-1,this%cfg%imax_
-               this%SLFx(i,j,k,5)=0.25_WP*(sum(this%SLFx(i:i+1,j,k,1)+this%SLFx(i:i+1,j,k,2)))*sum(U(i:i+1,j,k))
-               this%SLFy(i,j,k,6)=0.25_WP*(sum(this%SLFy(i,j:j+1,k,1)+this%SLFy(i,j:j+1,k,2)))*sum(V(i,j:j+1,k))
-               this%SLFz(i,j,k,7)=0.25_WP*(sum(this%SLFz(i,j,k:k+1,1)+this%SLFz(i,j,k:k+1,2)))*sum(W(i,j,k:k+1))
-            end do
-         end do
-      end do
-      
-      ! Calculate edge-centered momentum fluxes
-      do k=this%cfg%kmin_,this%cfg%kmax_+1
-         do j=this%cfg%jmin_,this%cfg%jmax_+1
-            do i=this%cfg%imin_,this%cfg%imax_+1
-               this%SLFy(i,j,k,5)=0.25_WP*(sum(this%SLFy(i-1:i,j,k,1)+this%SLFy(i-1:i,j,k,2)))*sum(U(i,j-1:j,k))
-               this%SLFz(i,j,k,5)=0.25_WP*(sum(this%SLFz(i-1:i,j,k,1)+this%SLFz(i-1:i,j,k,2)))*sum(U(i,j,k-1:k))
-               this%SLFx(i,j,k,6)=0.25_WP*(sum(this%SLFx(i,j-1:j,k,1)+this%SLFx(i,j-1:j,k,2)))*sum(V(i-1:i,j,k))
-               this%SLFz(i,j,k,6)=0.25_WP*(sum(this%SLFz(i,j-1:j,k,1)+this%SLFz(i,j-1:j,k,2)))*sum(V(i,j,k-1:k))
-               this%SLFx(i,j,k,7)=0.25_WP*(sum(this%SLFx(i,j,k-1:k,1)+this%SLFx(i,j,k-1:k,2)))*sum(W(i-1:i,j,k))
-               this%SLFy(i,j,k,7)=0.25_WP*(sum(this%SLFy(i,j,k-1:k,1)+this%SLFy(i,j,k-1:k,2)))*sum(W(i,j-1:j,k))
-            end do
-         end do
-      end do
-      
       ! Stop semi-Lagrangian timer
       call this%tsl%stop()
       
@@ -636,22 +610,84 @@ contains
       implicit none
       class(mpcomp), intent(inout) :: this
       integer :: i,j,k,n
-      ! Start semi-Lagrangian timer
-      call this%tsl%start()
+      real(WP), dimension(:,:,:), allocatable :: FRX,FRY,FRZ
+      real(WP), dimension(:,:,:), allocatable :: FUX,FUY,FUZ
+      real(WP), dimension(:,:,:), allocatable :: FVX,FVY,FVZ
+      real(WP), dimension(:,:,:), allocatable :: FWX,FWY,FWZ
+      
+      ! Start rhs timer
+      call this%trhs%start()
+      
       ! Assemble time derivative for mass, internal energy, and momentum advection with semi-Lagrangian fluxes
-      do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
-         this%Q(i,j,k,1)=this%Q(i,j,k,1)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,1)-this%SLFx(i  ,j,k,1))+this%dyi*(this%SLFy(i,j+1,k,1)-this%SLFy(i,j  ,k,1))+this%dzi*(this%SLFz(i,j,k+1,1)-this%SLFz(i,j,k  ,1)))
-         this%Q(i,j,k,2)=this%Q(i,j,k,2)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,2)-this%SLFx(i  ,j,k,2))+this%dyi*(this%SLFy(i,j+1,k,2)-this%SLFy(i,j  ,k,2))+this%dzi*(this%SLFz(i,j,k+1,2)-this%SLFz(i,j,k  ,2)))
-         this%Q(i,j,k,3)=this%Q(i,j,k,3)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,3)-this%SLFx(i  ,j,k,3))+this%dyi*(this%SLFy(i,j+1,k,3)-this%SLFy(i,j  ,k,3))+this%dzi*(this%SLFz(i,j,k+1,3)-this%SLFz(i,j,k  ,3)))
-         this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,4)-this%SLFx(i  ,j,k,4))+this%dyi*(this%SLFy(i,j+1,k,4)-this%SLFy(i,j  ,k,4))+this%dzi*(this%SLFz(i,j,k+1,4)-this%SLFz(i,j,k  ,4)))
-         this%Q(i,j,k,5)=this%Q(i,j,k,5)+this%SLdt*(this%dxi*(this%SLFx(i  ,j,k,5)-this%SLFx(i-1,j,k,5))+this%dyi*(this%SLFy(i,j+1,k,5)-this%SLFy(i,j  ,k,5))+this%dzi*(this%SLFz(i,j,k+1,5)-this%SLFz(i,j,k  ,5)))
-         this%Q(i,j,k,6)=this%Q(i,j,k,6)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,6)-this%SLFx(i  ,j,k,6))+this%dyi*(this%SLFy(i,j  ,k,6)-this%SLFy(i,j-1,k,6))+this%dzi*(this%SLFz(i,j,k+1,6)-this%SLFz(i,j,k  ,6)))
-         this%Q(i,j,k,7)=this%Q(i,j,k,7)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,7)-this%SLFx(i  ,j,k,7))+this%dyi*(this%SLFy(i,j+1,k,7)-this%SLFy(i,j  ,k,7))+this%dzi*(this%SLFz(i,j,k  ,7)-this%SLFz(i,j,k-1,7)))
-      end do; end do; end do
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               this%Q(i,j,k,1)=this%Q(i,j,k,1)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,1)-this%SLFx(i  ,j,k,1))+this%dyi*(this%SLFy(i,j+1,k,1)-this%SLFy(i,j  ,k,1))+this%dzi*(this%SLFz(i,j,k+1,1)-this%SLFz(i,j,k  ,1)))
+               this%Q(i,j,k,2)=this%Q(i,j,k,2)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,2)-this%SLFx(i  ,j,k,2))+this%dyi*(this%SLFy(i,j+1,k,2)-this%SLFy(i,j  ,k,2))+this%dzi*(this%SLFz(i,j,k+1,2)-this%SLFz(i,j,k  ,2)))
+               this%Q(i,j,k,3)=this%Q(i,j,k,3)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,3)-this%SLFx(i  ,j,k,3))+this%dyi*(this%SLFy(i,j+1,k,3)-this%SLFy(i,j  ,k,3))+this%dzi*(this%SLFz(i,j,k+1,3)-this%SLFz(i,j,k  ,3)))
+               this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*(this%dxi*(this%SLFx(i+1,j,k,4)-this%SLFx(i  ,j,k,4))+this%dyi*(this%SLFy(i,j+1,k,4)-this%SLFy(i,j  ,k,4))+this%dzi*(this%SLFz(i,j,k+1,4)-this%SLFz(i,j,k  ,4)))
+            end do
+         end do
+      end do
+      
+      ! Allocate multiphase mass flux arrays and populate
+      allocate(FRX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FRX=this%SLFx(:,:,:,1)+this%SLFx(:,:,:,2)
+      allocate(FRY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FRY=this%SLFy(:,:,:,1)+this%SLFy(:,:,:,2)
+      allocate(FRZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FRZ=this%SLFz(:,:,:,1)+this%SLFz(:,:,:,2)
+      
+      ! Allocate momentum fluxes
+      allocate(FUX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FUY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FUZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FVX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FVY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FVZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FWX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FWY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(FWZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      
+      ! Calculate cell-centered momentum fluxes
+      do k=this%cfg%kmin_-1,this%cfg%kmax_
+         do j=this%cfg%jmin_-1,this%cfg%jmax_
+            do i=this%cfg%imin_-1,this%cfg%imax_
+               FUX(i,j,k)=0.25_WP*sum(FRX(i:i+1,j,k))*sum(this%U(i:i+1,j,k))
+               FVY(i,j,k)=0.25_WP*sum(FRY(i,j:j+1,k))*sum(this%V(i,j:j+1,k))
+               FWZ(i,j,k)=0.25_WP*sum(FRZ(i,j,k:k+1))*sum(this%W(i,j,k:k+1))
+            end do
+         end do
+      end do
+      
+      ! Calculate edge-centered momentum fluxes
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               FUY(i,j,k)=0.25_WP*sum(FRY(i-1:i,j,k))*sum(this%U(i,j-1:j,k))
+               FUZ(i,j,k)=0.25_WP*sum(FRZ(i-1:i,j,k))*sum(this%U(i,j,k-1:k))
+               FVX(i,j,k)=0.25_WP*sum(FRX(i,j-1:j,k))*sum(this%V(i-1:i,j,k))
+               FVZ(i,j,k)=0.25_WP*sum(FRZ(i,j-1:j,k))*sum(this%V(i,j,k-1:k))
+               FWX(i,j,k)=0.25_WP*sum(FRX(i,j,k-1:k))*sum(this%W(i-1:i,j,k))
+               FWY(i,j,k)=0.25_WP*sum(FRY(i,j,k-1:k))*sum(this%W(i,j-1:j,k))
+            end do
+         end do
+      end do
+      
+      ! Assemble time derivative for momentum advection using semi-Lagrangian fluxes
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               this%Q(i,j,k,5)=this%Q(i,j,k,5)+this%SLdt*(this%dxi*(FUX(i  ,j,k)-FUX(i-1,j,k))+this%dyi*(FUY(i,j+1,k)-FUY(i,j  ,k))+this%dzi*(FUZ(i,j,k+1)-FUZ(i,j,k  )))
+               this%Q(i,j,k,6)=this%Q(i,j,k,6)+this%SLdt*(this%dxi*(FVX(i+1,j,k)-FVX(i  ,j,k))+this%dyi*(FVY(i,j  ,k)-FVY(i,j-1,k))+this%dzi*(FVZ(i,j,k+1)-FVZ(i,j,k  )))
+               this%Q(i,j,k,7)=this%Q(i,j,k,7)+this%SLdt*(this%dxi*(FWX(i+1,j,k)-FWX(i  ,j,k))+this%dyi*(FWY(i,j+1,k)-FWY(i,j  ,k))+this%dzi*(FWZ(i,j,k  )-FWZ(i,j,k-1)))
+            end do
+         end do
+      end do
+      
       ! Synchronize all dQdt fields
       do n=1,this%nQ; call this%cfg%sync(this%Q(:,:,:,n)); end do
-      ! Stop semi-Lagrangian timer
-      call this%tsl%stop()
+      
+      ! Stop rhs timer
+      call this%trhs%stop()
+      
    end subroutine SLincrement
    
    

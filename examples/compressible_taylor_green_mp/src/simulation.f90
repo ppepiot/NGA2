@@ -32,8 +32,8 @@ module simulation
    real(WP), dimension(:,:,:)    , allocatable :: Ui,Vi,Wi,C,Ma
    
    !> Equation of state and flow conditions
-   real(WP) :: Mach,Reynolds,Prandtl
-   real(WP) :: GammaL,PLinf,CvL,GammaG,PGinf,CvG
+   real(WP) :: Mach
+   real(WP) :: GammaL,PinfL,CvL,RHOL,GammaG,PinfG,CvG,RHOG
    
    !> Drop radius and center
    real(WP) :: radius=1.0_WP
@@ -56,7 +56,7 @@ contains
    real(WP) function get_PL(RHO,E)
       implicit none
       real(WP), intent(in) :: RHO,E
-      get_PL=RHO*E*(GammaL-1.0_WP)-GammaL*PLinf
+      get_PL=RHO*E*(GammaL-1.0_WP)-GammaL*PinfL
    end function get_PL
    !> T=f(E) for liquid
    real(WP) function get_TL(E)
@@ -68,7 +68,7 @@ contains
    real(WP) function get_CL(P,RHO)
       implicit none
       real(WP), intent(in) :: P,RHO
-      get_CL=sqrt(GammaL*(P+PLinf)/RHO)
+      get_CL=sqrt(GammaL*(P+PinfL)/RHO)
    end function get_CL
    
    
@@ -76,7 +76,7 @@ contains
    real(WP) function get_PG(RHO,E)
       implicit none
       real(WP), intent(in) :: RHO,E
-      get_PG=RHO*E*(GammaG-1.0_WP)-GammaG*PGinf
+      get_PG=RHO*E*(GammaG-1.0_WP)-GammaG*PinfG
    end function get_PG
    !> T=f(E) for gas
    real(WP) function get_TG(E)
@@ -88,7 +88,7 @@ contains
    real(WP) function get_CG(P,RHO)
       implicit none
       real(WP), intent(in) :: P,RHO
-      get_CG=sqrt(GammaG*(P+PGinf)/RHO)
+      get_CG=sqrt(GammaG*(P+PinfG)/RHO)
    end function get_CG
    
    
@@ -110,7 +110,7 @@ contains
       ! Compute liquid entropy
       do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
          if (fs%VF(i,j,k).gt.0.0_WP) then
-            tmp(i,j,k)=fs%VF(i,j,k)*fs%RHOL(i,j,k)*CvL*log((fs%PL(i,j,k)+PLinf)/fs%RHOL(i,j,k)**GammaL)
+            tmp(i,j,k)=fs%VF(i,j,k)*fs%RHOL(i,j,k)*CvL*log((fs%PL(i,j,k)+PinfL)/fs%RHOL(i,j,k)**GammaL)
          else
             tmp(i,j,k)=0.0_WP
          end if
@@ -119,7 +119,7 @@ contains
       ! Compute gas entropy
       do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
          if (fs%VF(i,j,k).lt.1.0_WP) then
-            tmp(i,j,k)=(1.0_WP-fs%VF(i,j,k))*fs%RHOG(i,j,k)*CvG*log((fs%PG(i,j,k)+PGinf)/fs%RHOG(i,j,k)**GammaG)
+            tmp(i,j,k)=(1.0_WP-fs%VF(i,j,k))*fs%RHOG(i,j,k)*CvG*log((fs%PG(i,j,k)+PinfG)/fs%RHOG(i,j,k)**GammaG)
          else
             tmp(i,j,k)=0.0_WP
          end if
@@ -156,11 +156,12 @@ contains
       ! Prepare EoS and flow conditions
       initialize_eos: block
          call param_read('GammaL'  ,GammaL  )
-         call param_read('PLinf'   ,PLinf   )
+         call param_read('PinfL'   ,PinfL   )
+         call param_read('RHOL'    ,RHOL    )
          call param_read('GammaG'  ,GammaG  )
+         call param_read('PinfG'   ,PinfG   )
+         call param_read('RHOG'    ,RHOG    )
          call param_read('Mach'    ,Mach    )
-         call param_read('Reynolds',Reynolds)
-         call param_read('Prandtl' ,Prandtl )
          CvL=1.0_WP/(GammaL*(GammaL-1.0_WP)*Mach**2)
          CvG=1.0_WP/(GammaG*(GammaG-1.0_WP)*Mach**2)
       end block initialize_eos
@@ -200,25 +201,23 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Volume moments for a droplet
-                  call initialize_volume_moments(lo=[cfg%x(i  ),cfg%y(j  ),cfg%z(k  )],&
-                  &                              hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
-                  &                              levelset=levelset_drop,time=0.0_WP,level=4,VFlo=VFlo,&
-                  &                              VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
+                  call initialize_volume_moments(lo=[cfg%x(i  ),cfg%y(j  ),cfg%z(k  )],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
+                  levelset=levelset_slab,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=1.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
-                  fs%V(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
-                  fs%W(i,j,k)=0.0_WP!+random_uniform(lo=-1.0e-14_WP,hi=+1.0e-14_WP)
+                  fs%U(i,j,k)=+Mach*sin(cfg%x (i))*cos(cfg%ym(j))*cos(cfg%zm(k))
+                  fs%V(i,j,k)=-Mach*cos(cfg%xm(i))*sin(cfg%y (j))*cos(cfg%zm(k))
+                  fs%W(i,j,k)=0.0_WP
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
-                     fs%PL  (i,j,k)=1.0_WP/(GammaG*Mach**2)
-                     fs%RHOL(i,j,k)=1000.0_WP
-                     fs%EL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PLinf)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
+                     fs%RHOL(i,j,k)=RHOL
+                     fs%PL  (i,j,k)=1.0_WP/GammaL+fs%RHOL(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
+                     fs%EL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PinfL)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                   ! Gas variables
                   if (fs%VF(i,j,k).lt.1.0_WP) then
-                     fs%PG  (i,j,k)=1.0_WP/(GammaG*Mach**2)
-                     fs%RHOG(i,j,k)=1.0_WP
-                     fs%EG  (i,j,k)=(fs%PG(i,j,k)+GammaG*PGinf)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
+                     fs%RHOG(i,j,k)=RHOG
+                     fs%PG  (i,j,k)=1.0_WP/GammaG+fs%RHOG(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
+                     fs%EG  (i,j,k)=(fs%PG(i,j,k)+GammaG*PinfG)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
                   end if
                end do
             end do
@@ -255,13 +254,10 @@ contains
          call param_read('Ensight output period',ens_evt%tper)
          ! Add variables to output
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
-         call ens_out%add_scalar('VOF' ,fs%VF)
-         call ens_out%add_scalar('RHOl',fs%RHOL)
-         call ens_out%add_scalar('RHOg',fs%RHOG)
-         call ens_out%add_scalar('El',fs%EL)
-         call ens_out%add_scalar('Eg',fs%EG)
-         call ens_out%add_scalar('Pl',fs%PL)
-         call ens_out%add_scalar('Pg',fs%PG)
+         call ens_out%add_scalar('VOF',fs%VF)
+         call ens_out%add_scalar('RHO',fs%RHO)
+         call ens_out%add_scalar('E',fs%E)
+         call ens_out%add_scalar('P',fs%P)
          call ens_out%add_scalar('Mach',Ma)
          ! Create surface mesh for PLIC
          smesh=surfmesh(nvar=0,name='plic')
@@ -348,6 +344,15 @@ contains
          real(WP) :: G
          G=radius-sqrt(sum((xyz-center)**2))
       end function levelset_drop
+      !> Function that defines a level set function for a slab
+      function levelset_slab(xyz,t) result(G)
+         use mathtools, only: Pi
+         implicit none
+         real(WP), dimension(3),intent(in) :: xyz
+         real(WP), intent(in) :: t
+         real(WP) :: G
+         G=1.0_WP-abs(xyz(1)-Pi)
+      end function levelset_slab
    end subroutine simulation_init
    
    
