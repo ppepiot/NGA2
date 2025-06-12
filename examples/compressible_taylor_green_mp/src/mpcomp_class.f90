@@ -29,6 +29,14 @@ module mpcomp_class
       ! Solver name
       character(len=str_medium) :: name='UNNAMED_MPCOMP'
       
+      ! Pointers to functions to evaluate P(RHO,E), T(RHO,P), and C(RHO,P)
+      procedure(Pfunc_type), pointer, nopass :: getPL=>NULL()
+      procedure(Tfunc_type), pointer, nopass :: getTL=>NULL()
+      procedure(Cfunc_type), pointer, nopass :: getCL=>NULL()
+      procedure(Pfunc_type), pointer, nopass :: getPG=>NULL()
+      procedure(Tfunc_type), pointer, nopass :: getTG=>NULL()
+      procedure(Cfunc_type), pointer, nopass :: getCG=>NULL()
+      
       ! Volume moments, interface, and semi-Lagrangian fluxes
       real(WP), dimension(:,:,:)  , allocatable :: VF,VFold
       real(WP), dimension(:,:,:,:), allocatable :: BL,BLold
@@ -57,8 +65,8 @@ module mpcomp_class
       ! Phasic temperatures
       real(WP), dimension(:,:,:), allocatable :: TL,TG
       
-      ! Mixture density, energy, pressure, and temperature
-      real(WP), dimension(:,:,:), allocatable :: RHO,E,P,T
+      ! Mixture density, energy, pressure, temperature, and speed of sound
+      real(WP), dimension(:,:,:), allocatable :: RHO,E,P,T,C
       
       ! Viscosities and heat diffusivity
       real(WP), dimension(:,:,:), allocatable :: visc,beta,diff
@@ -130,30 +138,41 @@ module mpcomp_class
    
    !> Interfaces for user-defined function
    abstract interface
-      !> P=EOS(RHO,E)
-      real(WP) function Pfunc_type(RHO,E)
+      !> P=P(RHO,E)
+      pure real(WP) function Pfunc_type(RHO,E)
          import :: WP
          implicit none
          real(WP), intent(in) :: RHO
          real(WP), intent(in) :: E
       end function Pfunc_type
-      !> T=FUNC(E)
-      real(WP) function Tfunc_type(E)
+      !> T=T(RHO,P)
+      pure real(WP) function Tfunc_type(RHO,P)
          import :: WP
          implicit none
-         real(WP), intent(in) :: E
+         real(WP), intent(in) :: RHO
+         real(WP), intent(in) :: P
       end function Tfunc_type
+      !> C=C(RHO,P)
+      pure real(WP) function Cfunc_type(RHO,P)
+         import :: WP
+         implicit none
+         real(WP), intent(in) :: RHO
+         real(WP), intent(in) :: P
+      end function Cfunc_type
    end interface
    
 contains
    
    
    !> Initialization for compressible flow solver
-   subroutine initialize(this,cfg,name)
+   subroutine initialize(this,cfg,getPL,getTL,getCL,getPG,getTG,getCG,name)
       use messager, only: die
       implicit none
       class(mpcomp) :: this
       class(config), target, intent(in) :: cfg
+      procedure(Pfunc_type) :: getPL,getPG
+      procedure(Tfunc_type) :: getTL,getTG
+      procedure(Cfunc_type) :: getCL,getCG
       character(len=*), optional :: name
       integer :: i,j,k
       
@@ -162,6 +181,14 @@ contains
       
       ! Point to config object
       this%cfg=>cfg
+      
+      ! Point to thermodynamic functions
+      this%getPL=>getPL
+      this%getTL=>getTL
+      this%getCL=>getCL
+      this%getPG=>getPG
+      this%getTG=>getTG
+      this%getCG=>getCG
       
       ! Check that config is uniform with at least 3 cells of overlap
       if (this%cfg%no.lt.3) call die('[mpcomp initialize] mpcomp solver requires at least 3 cells of overlap')
@@ -224,11 +251,12 @@ contains
       allocate(this%TL(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%TL=0.0_WP
       allocate(this%TG(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%TG=0.0_WP
       
-      ! Mixture density, energy, pressure, and temperature
+      ! Mixture density, energy, pressure, temperature, and speed of sound
       allocate(this%RHO(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHO=0.0_WP
       allocate(this%E  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%E  =0.0_WP
       allocate(this%P  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%P  =0.0_WP
       allocate(this%T  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%T  =0.0_WP
+      allocate(this%C  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%C  =0.0_WP
       
       ! Fluid viscosities and heat diffusivity
       allocate(this%visc(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%visc=0.0_WP
@@ -1308,11 +1336,10 @@ contains
    
    
    !> Calculate all primitive and mixture variables from updated conserved variables
-   subroutine get_primitive(this,PLfunc,TLfunc,PGfunc,TGfunc)
+   subroutine get_primitive(this)
       implicit none
       class(mpcomp), intent(inout) :: this
-      procedure(Pfunc_type) :: PLfunc,PGfunc
-      procedure(Tfunc_type) :: TLfunc,TGfunc
+      real(WP) :: CL,CG
       integer :: i,j,k
       ! First get mixture velocity
       this%RHO=this%Q(:,:,:,1)+this%Q(:,:,:,2)
@@ -1325,8 +1352,9 @@ contains
          if (this%VF(i,j,k).ge.VFlo) then
             this%RHOL(i,j,k)=this%Q(i,j,k,1)/this%VF(i,j,k)
             this%EL  (i,j,k)=this%Q(i,j,k,3)/this%Q (i,j,k,1)
-            this%PL  (i,j,k)=PLfunc(this%RHOL(i,j,k),this%EL(i,j,k))
-            this%TL  (i,j,k)=TLfunc(this%EL  (i,j,k))
+            this%PL  (i,j,k)=this%getPL(this%RHOL(i,j,k),this%EL(i,j,k))
+            this%TL  (i,j,k)=this%getTL(this%RHOL(i,j,k),this%PL(i,j,k))
+            CL              =this%getCL(this%RHOL(i,j,k),this%PL(i,j,k))
          else
             this%RHOL(i,j,k)=0.0_WP
             this%RHOG(i,j,k)=this%RHO(i,j,k)
@@ -1334,13 +1362,15 @@ contains
             this%EG  (i,j,k)=this%E(i,j,k)
             this%PL  (i,j,k)=0.0_WP
             this%TL  (i,j,k)=0.0_WP
+            CL              =0.0_WP
          end if
          ! Gas primitive variables
          if (this%VF(i,j,k).le.VFhi) then
             this%RHOG(i,j,k)=this%Q(i,j,k,2)/(1.0_WP-this%VF(i,j,k))
             this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
-            this%PG  (i,j,k)=PGfunc(this%RHOG(i,j,k),this%EG(i,j,k))
-            this%TG  (i,j,k)=TGfunc(this%EG  (i,j,k))
+            this%PG  (i,j,k)=this%getPG(this%RHOG(i,j,k),this%EG(i,j,k))
+            this%TG  (i,j,k)=this%getTG(this%RHOG(i,j,k),this%PG(i,j,k))
+            CG              =this%getCG(this%RHOG(i,j,k),this%PG(i,j,k))
          else
             this%RHOG(i,j,k)=0.0_WP
             this%RHOL(i,j,k)=this%RHO(i,j,k)
@@ -1348,12 +1378,15 @@ contains
             this%EL  (i,j,k)=this%E(i,j,k)
             this%PG  (i,j,k)=0.0_WP
             this%TG  (i,j,k)=0.0_WP
+            CG              =0.0_WP
          end if
          ! Also reset conserved phasic variables for consistency
          this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k)
          this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)
          this%Q(i,j,k,3)=(       this%VF(i,j,k))*this%RHOL(i,j,k)*this%EL(i,j,k)
          this%Q(i,j,k,4)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)*this%EG(i,j,k)
+         ! Mixture speed of sound
+         this%C(i,j,k)=sqrt(this%Q(i,j,k,1)*CL/this%RHO(i,j,k)+this%Q(i,j,k,2)*CG/this%RHO(i,j,k))
       end do; end do; end do
       ! Other mixture variables
       this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
@@ -1484,22 +1517,21 @@ contains
    
    
    !> Calculate the CFL
-   subroutine get_cfl(this,dt,C,cfl)
+   subroutine get_cfl(this,dt,cfl)
       use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_IN_PLACE
       use parallel, only: MPI_REAL_WP
       implicit none
       class(mpcomp), intent(inout) :: this
       real(WP), intent(in)  :: dt
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: C !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), intent(out) :: cfl
       integer :: ierr
       real(WP) :: maxvisc,maxC
       ! Compute convective+acoustic CFLs
-      this%CFLc_x=maxval(abs(this%U)+abs(C))*dt*this%dxi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_x,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      this%CFLc_y=maxval(abs(this%V)+abs(C))*dt*this%dyi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_y,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-      this%CFLc_z=maxval(abs(this%W)+abs(C))*dt*this%dzi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_z,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      this%CFLc_x=maxval(abs(this%U)+abs(this%C))*dt*this%dxi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_x,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      this%CFLc_y=maxval(abs(this%V)+abs(this%C))*dt*this%dyi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_y,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      this%CFLc_z=maxval(abs(this%W)+abs(this%C))*dt*this%dzi; call MPI_ALLREDUCE(MPI_IN_PLACE,this%CFLc_z,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       ! Compute acoustic CFLs
-      maxC=maxval(C); call MPI_ALLREDUCE(MPI_IN_PLACE,maxC,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      maxC=maxval(this%C); call MPI_ALLREDUCE(MPI_IN_PLACE,maxC,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       this%CFLa_x=maxC*dt*this%dxi
       this%CFLa_y=maxC*dt*this%dyi
       this%CFLa_z=maxC*dt*this%dzi
