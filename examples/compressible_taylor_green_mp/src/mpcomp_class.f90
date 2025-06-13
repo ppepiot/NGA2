@@ -862,8 +862,8 @@ contains
                dQdt(i,j,k,4)=this%dxi*(Fx(i+1,j,k,4)-Fx(i,j,k,4))+this%dyi*(Fy(i,j+1,k,4)-Fy(i,j,k,4))+this%dzi*(Fz(i,j,k+1,4)-Fz(i,j,k,4))
                ! Pressure dilatation term
                div=this%dxi*(this%U(i+1,j,k)-this%U(i,j,k))+this%dyi*(this%V(i,j+1,k)-this%V(i,j,k))+this%dzi*(this%W(i,j,k+1)-this%W(i,j,k))
-               dQdt(i,j,k,3)=dQdt(i,j,k,3)+(       this%VF(i,j,k))*this%PL(i,j,k)*div
-               dQdt(i,j,k,4)=dQdt(i,j,k,4)+(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)*div
+               dQdt(i,j,k,3)=dQdt(i,j,k,3)-(       this%VF(i,j,k))*this%PL(i,j,k)*div
+               dQdt(i,j,k,4)=dQdt(i,j,k,4)-(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)*div
             end do
          end do
       end do
