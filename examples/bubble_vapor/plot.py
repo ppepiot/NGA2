@@ -23,8 +23,8 @@ plt.rcParams['font.family'] = 'serif'
 # Plot
 
 fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-plt.plot(t, R    , ls='-', lw=2, color='b')
 plt.plot(t, R_ext, ls='-', lw=2, color='k')
+plt.plot(t, R    , ls='-', lw=2, color='b')
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 plt.xlabel(r'$t~(s)$', fontsize=12)
