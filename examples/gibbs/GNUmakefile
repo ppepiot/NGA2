@@ -12,9 +12,11 @@ COMP      = gnu
 EXEBASE   = nga
 
 # Directories that contain user-defined code
-Udirs   := src src/ceq
+Udirs   := src
 
 # Include user-defined sources
+USE_YAML = TRUE
+YAML_DIR = /Users/ppepiot/Research/Codes/Libraries/yaml-fortran
 Upack   += $(foreach dir, $(Udirs), $(wildcard $(dir)/Make.package))
 Ulocs   += $(foreach dir, $(Udirs), $(wildcard $(dir)))
 include $(Upack)
