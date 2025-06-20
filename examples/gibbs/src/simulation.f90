@@ -25,7 +25,7 @@ contains
       use param, only: param_read
       implicit none  
 
-      fpath = param_read('YAML file',fpath)
+      call param_read('YAML file',fpath)
       domain = yaml_open_file(fpath)
       parent = yaml_start_from_map(domain, "parent")
 
