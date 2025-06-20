@@ -7,7 +7,6 @@ module simulation
    private
    
    ! YAML-related variables   
-   character(len=:), allocatable :: fpath
    type(YAMLHandler) :: domain  ! be sure to close
    type(YAMLMap) :: parent
    type(YAMLMap) :: mapper_1
@@ -22,11 +21,14 @@ contains
 
    !> Nothing to initialize
    subroutine simulation_init
-      use param, only: param_read
-      implicit none  
+      use param,  only: param_read
+      use string, only: str_medium
+      implicit none
+      character(len=str_medium) :: yaml_file
 
-      call param_read('YAML file',fpath)
-      domain = yaml_open_file(fpath)
+      call param_read('YAML file',yaml_file)
+      print*,yaml_file
+      domain = yaml_open_file(trim(yaml_file))
       parent = yaml_start_from_map(domain, "parent")
 
       mapper_1 = parent%value_map("child1")
@@ -57,7 +59,6 @@ contains
       call parent%destroy()
       call mapper_2%destroy()
       call yaml_close_file(domain)
-      deallocate(fpath)
 
    end subroutine simulation_init
 

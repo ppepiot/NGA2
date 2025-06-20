@@ -6,6 +6,7 @@ PRECISION = DOUBLE
 USE_MPI   = TRUE
 USE_HYPRE = FALSE
 USE_LAPACK= TRUE
+USE_YAML  = TRUE
 PROFILE   = FALSE
 DEBUG     = FALSE
 COMP      = gnu
@@ -15,8 +16,6 @@ EXEBASE   = nga
 Udirs   := src
 
 # Include user-defined sources
-USE_YAML = TRUE
-YAML_DIR = /Users/ppepiot/Research/Codes/Libraries/yaml-fortran
 Upack   += $(foreach dir, $(Udirs), $(wildcard $(dir)/Make.package))
 Ulocs   += $(foreach dir, $(Udirs), $(wildcard $(dir)))
 include $(Upack)
