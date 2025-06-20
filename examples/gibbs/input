@@ -1,5 +1,5 @@
-# Parallelization
-Partition :	8 1 1
-
 # YAML
-YAML file : test.yaml
+YAML file : gri30.yaml
+
+# Species
+Species : CH4 O2 CO2 H2O
