@@ -29,7 +29,8 @@ subroutine ceq_ind_col(nr,nc,ncs,B,thresh,indcol,info)
 !   info < 0 indicates failure
 
 integer :: lwork, k, jpvt(nc)
-real(kind(1.d0)) :: R(nr,nc), tau(nr+nc), work(3*(nr+nc))
+! real(kind(1.d0)) :: R(nr,nc), tau(nr+nc), work(3*(nr+nc))
+real(kind(1.d0)) :: R(nr,nc), tau(min(nr,nc)), work(3*(nr+nc))
 
 indcol=0
 lwork=size( work )
@@ -37,7 +38,8 @@ R=B
 jpvt=0
 !  perform QR with column pivoting:  B P = Q R
 
-call dgeqpf(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:nr+nc), work(1:lwork), info)
+! call dgeqpf(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:nr+nc), work(1:lwork), info)
+call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)), work(1:lwork), lwork, info)
 
 if( info /=0 ) then
    !write(0,*)'ceq_ind_col2: QR failed, info= ', info
