@@ -767,7 +767,7 @@ contains
       
       ! Point to pressure solver linsol object
       this%psolv=>pressure_solver
-
+      
       ! Set 7-pt stencil map for the pressure solver
       this%psolv%stc(1,:)=[ 0, 0, 0]
       this%psolv%stc(2,:)=[+1, 0, 0]
@@ -825,6 +825,11 @@ contains
          ! Initialize the implicit velocity solver
          call this%implicit%init()
          
+      else
+         
+         ! Point to implicit solver linsol object
+         this%implicit=>NULL()
+         
       end if
       
    end subroutine setup
@@ -875,7 +880,7 @@ contains
       
       ! Now adjust the metrics accordingly
       select case (new_bc%type)
-      case (dirichlet) !< Dirichlet is set one face (i.e., velocit component) at the time
+      case (dirichlet) !< Dirichlet is set one face (i.e., velocity component) at the time
          select case (new_bc%face)
          case ('x')
             do n=1,new_bc%itr%n_
@@ -1896,7 +1901,7 @@ contains
       type(bcond), pointer :: my_bc
       
       ! Evaluate MFR mismatch and velocity correction
-      call this%cfg%integrate(A=drhodt,integral=dMdt)
+      call this%cfg%integrate_without_vf(A=drhodt,integral=dMdt)
       call this%get_mfr()
       mfr_error=sum(this%mfr)+dMdt
       if (abs(mfr_error).lt.10.0_WP*epsilon(1.0_WP).or.abs(this%correctable_area).lt.10.0_WP*epsilon(1.0_WP)) return
@@ -1912,17 +1917,17 @@ contains
             ! Implement based on bcond direction, loop over all cell
             select case (my_bc%face)
             case ('x')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoU(i,j,k)=this%rhoU(i,j,k)+my_bc%rdir*mom_correction
                end do
             case ('y')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoV(i,j,k)=this%rhoV(i,j,k)+my_bc%rdir*mom_correction
                end do
             case ('z')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoW(i,j,k)=this%rhoW(i,j,k)+my_bc%rdir*mom_correction
                end do
@@ -1934,6 +1939,11 @@ contains
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields
+      call this%cfg%sync(this%rhoU)
+      call this%cfg%sync(this%rhoV)
+      call this%cfg%sync(this%rhoW)
       
    end subroutine correct_mfr
    
@@ -1974,6 +1984,23 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: resW !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
       real(WP) :: rhoUp,rhoUm,rhoVp,rhoVm,rhoWp,rhoWm
+      
+      ! If no implicit solver available, just divide by density and return
+      if (.not.associated(this%implicit)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  resU(i,j,k)=resU(i,j,k)/sum(this%itpr_x(:,i,j,k)*this%rho(i-1:i,j,k))
+                  resV(i,j,k)=resV(i,j,k)/sum(this%itpr_y(:,i,j,k)*this%rho(i,j-1:j,k))
+                  resW(i,j,k)=resW(i,j,k)/sum(this%itpr_z(:,i,j,k)*this%rho(i,j,k-1:k))
+               end do
+            end do
+         end do
+         call this%cfg%sync(resU)
+         call this%cfg%sync(resV)
+         call this%cfg%sync(resW)
+         return
+      end if
       
       ! Solve implicit U problem
       do k=this%cfg%kmin_,this%cfg%kmax_
@@ -2145,11 +2172,6 @@ contains
       this%implicit%sol=0.0_WP
       call this%implicit%solve()
       resW=this%implicit%sol
-      
-      ! Sync up all residuals
-      call this%cfg%sync(resU)
-      call this%cfg%sync(resV)
-      call this%cfg%sync(resW)
       
    end subroutine solve_implicit
    
