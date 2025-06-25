@@ -164,7 +164,8 @@ contains
          allocate(CS(ncs))
          allocate(Bg(ns,ng))
          allocate(N(ns))
-         allocate(N_init(ns)); N_init=[2.0_WP,0.0_WP,1.0_WP,0.0_WP]
+         ! allocate(N_init(ns)); N_init=[2.0_WP,0.0_WP,1.0_WP,0.0_WP] ! This causes the constant p and h case to fail
+         allocate(N_init(ns)); N_init=[2.0_WP,2.0_WP,1.0_WP,1.0_WP]
          allocate(c(ng))
          allocate(stats(20))
          ! Print the initial conditions
@@ -176,13 +177,15 @@ contains
          call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5,sys=sys,iret=iret)
          if (iret.lt.0) call die('System initialization failed.')
          ! Get the equilibrium state
-         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,info=info)
+         ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,info=info)
+         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,N_h=N_init,T_h=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,info=info)
          if (info.lt.0) call die('ceq_state failed.')
          ! Print the solution
          print*,'Final number of moles:'
          do isc=1,ns
             print*,trim(sp_names(isc)),': ',N(isc)
          end do
+         print*,'Equilibrium temperature = ',T, '(k)'
       end block ceq
 
    end subroutine simulation_init
