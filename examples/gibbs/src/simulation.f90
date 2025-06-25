@@ -45,7 +45,6 @@ contains
          character(len=:), allocatable :: name
          real(WP), allocatable :: T_range(:)
          real(WP), dimension(:,:), allocatable :: a
-         character(len=str_short), dimension(:), allocatable :: e_names_dummy
          logical :: new_elem
          ! Get the target species from input
          ns=param_getsize('Species')
@@ -81,7 +80,7 @@ contains
          phases=yaml_start_from_sequence(domain,'phases')
          gas=phases%element(0)
          elements=gas%value_sequence('elements',code) ! For some reason I couldn't directly get the element names using yaml-fortran
-         allocate(e_names_dummy(elements%size)); e_names_dummy=''
+         allocate(e_names(elements%size)); e_names=''
          ne=0
          do isc=1,ns
             sp=species(isc)
@@ -93,20 +92,18 @@ contains
                end do
                new_elem=.true.
                do i=1,ne
-                  if (trim(e_names_dummy(i)).eq.trim(name)) then
+                  if (trim(e_names(i)).eq.trim(name)) then
                      new_elem=.false.
                      exit
                   end if
                end do
                if (new_elem) then
                   ne=ne+1
-                  e_names_dummy(ne)=trim(name)
+                  e_names(ne)=trim(name)
                end if
             end do
          end do
-         allocate(e_names(ne))
-         e_names=e_names_dummy(1:ne)
-         deallocate(e_names_dummy)
+         e_names=e_names(1:ne)
          ! Form the element matrix
          allocate(elem_mat(ns,ne)); elem_mat=0.0_WP
          do isc=1,ns
@@ -158,13 +155,12 @@ contains
          type(sys_type), pointer :: sys
          integer :: ncs=0,ng=0
          integer :: lu,iret,info
-         real(WP), dimension(:,:), allocatable :: E,Bg
+         real(WP), dimension(:,:), allocatable :: Bg
          integer,  dimension(:),   allocatable :: CS
          real(WP), dimension(:),   allocatable :: N_init,N,c,stats
          real(WP) :: T,HoR
          integer :: isc
          ! Allocate memory
-         allocate(E(ns,ne))
          allocate(CS(ncs))
          allocate(Bg(ns,ng))
          allocate(N(ns))
