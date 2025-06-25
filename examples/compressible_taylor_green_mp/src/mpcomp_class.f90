@@ -657,8 +657,8 @@ contains
       ! Start rhs timer
       call this%trhs%start()
       
-      ! Increment phasic mass         time derivative with phasic mass            advection term built from semi-Lagrangian fluxes
-      ! Increment phasic total energy time derivative with phasic internal energy advection term built from semi-Lagrangian fluxes
+      ! Increment phasic mass         with phasic mass            advection term built from semi-Lagrangian fluxes
+      ! Increment phasic total energy with phasic internal energy advection term built from semi-Lagrangian fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -673,9 +673,9 @@ contains
       end do
       
       ! Mass fluxes are used to build momentum and kinetic energy fluxes, they need to be communicated and extended because of staggering
-      call this%cfg%sync(this%SLFx(:,:,:,1)); call this%cfg%sync(this%SLFx(:,:,:,2)); if (this%cfg%xper.and.this%cfg%iproc.eq.1) this%SLFx(this%cfg%imin-1,:,:,1:2)=this%SLFx(this%cfg%imin,:,:,1:2); if (this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) this%SLFx(this%cfg%imax+2,:,:,1:2)=this%SLFx(this%cfg%imax+1,:,:,1:2)
-      call this%cfg%sync(this%SLFy(:,:,:,1)); call this%cfg%sync(this%SLFy(:,:,:,2)); if (this%cfg%yper.and.this%cfg%jproc.eq.1) this%SLFy(:,this%cfg%jmin-1,:,1:2)=this%SLFy(:,this%cfg%jmin,:,1:2); if (this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) this%SLFy(:,this%cfg%jmax+2,:,1:2)=this%SLFy(:,this%cfg%jmax+1,:,1:2)
-      call this%cfg%sync(this%SLFz(:,:,:,1)); call this%cfg%sync(this%SLFz(:,:,:,2)); if (this%cfg%zper.and.this%cfg%kproc.eq.1) this%SLFz(:,:,this%cfg%kmin-1,1:2)=this%SLFz(:,:,this%cfg%kmin,1:2); if (this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) this%SLFz(:,:,this%cfg%kmax+2,1:2)=this%SLFz(:,:,this%cfg%kmax+1,1:2)
+      call this%cfg%sync(this%SLFx(:,:,:,1)); call this%cfg%sync(this%SLFx(:,:,:,2)); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%SLFx(this%cfg%imin-1,:,:,1:2)=this%SLFx(this%cfg%imin,:,:,1:2); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) this%SLFx(this%cfg%imax+2,:,:,1:2)=this%SLFx(this%cfg%imax+1,:,:,1:2)
+      call this%cfg%sync(this%SLFy(:,:,:,1)); call this%cfg%sync(this%SLFy(:,:,:,2)); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%SLFy(:,this%cfg%jmin-1,:,1:2)=this%SLFy(:,this%cfg%jmin,:,1:2); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) this%SLFy(:,this%cfg%jmax+2,:,1:2)=this%SLFy(:,this%cfg%jmax+1,:,1:2)
+      call this%cfg%sync(this%SLFz(:,:,:,1)); call this%cfg%sync(this%SLFz(:,:,:,2)); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%SLFz(:,:,this%cfg%kmin-1,1:2)=this%SLFz(:,:,this%cfg%kmin,1:2); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) this%SLFz(:,:,this%cfg%kmax+2,1:2)=this%SLFz(:,:,this%cfg%kmax+1,1:2)
       
       ! Allocate mixture mass fluxes and populate from phasic fluxes
       allocate(FRX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FRX=this%SLFx(:,:,:,1)+this%SLFx(:,:,:,2)
@@ -718,7 +718,7 @@ contains
          end do
       end do
       
-      ! Increment mixture momentum time derivative with momentum advection term built from semi-Lagrangian mass fluxes
+      ! Increment mixture momentum with momentum advection term built from semi-Lagrangian mass fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -754,7 +754,7 @@ contains
          end do
       end do
       
-      ! Increment liquid total energy time derivative with liquid kinetic energy advection term built from semi-Lagrangian mass fluxes
+      ! Increment liquid total energy with liquid kinetic energy advection term built from semi-Lagrangian mass fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -794,7 +794,7 @@ contains
          end do
       end do
       
-      ! Increment gas total energy time derivative with gas kinetic energy advection term built from semi-Lagrangian mass fluxes
+      ! Increment gas total energy with gas kinetic energy advection term built from semi-Lagrangian mass fluxes
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -809,7 +809,7 @@ contains
          end do
       end do
       
-      ! Synchronize all dQdt fields
+      ! Synchronize all Q fields
       do n=1,this%nQ; call this%cfg%sync(this%Q(:,:,:,n)); end do
       
       ! Stop rhs timer
@@ -950,9 +950,9 @@ contains
       end do
       
       ! Mass fluxes are used to build momentum and kinetic energy fluxes, they need to be communicated and extended because of staggering
-      call this%cfg%sync(Fx(:,:,:,1)); call this%cfg%sync(Fx(:,:,:,2)); if (this%cfg%xper.and.this%cfg%iproc.eq.1) Fx(this%cfg%imin-1,:,:,1:2)=Fx(this%cfg%imin,:,:,1:2); if (this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) Fx(this%cfg%imax+2,:,:,1:2)=Fx(this%cfg%imax+1,:,:,1:2)
-      call this%cfg%sync(Fy(:,:,:,1)); call this%cfg%sync(Fy(:,:,:,2)); if (this%cfg%yper.and.this%cfg%jproc.eq.1) Fy(:,this%cfg%jmin-1,:,1:2)=Fy(:,this%cfg%jmin,:,1:2); if (this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) Fy(:,this%cfg%jmax+2,:,1:2)=Fy(:,this%cfg%jmax+1,:,1:2)
-      call this%cfg%sync(Fz(:,:,:,1)); call this%cfg%sync(Fz(:,:,:,2)); if (this%cfg%zper.and.this%cfg%kproc.eq.1) Fz(:,:,this%cfg%kmin-1,1:2)=Fz(:,:,this%cfg%kmin,1:2); if (this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) Fz(:,:,this%cfg%kmax+2,1:2)=Fz(:,:,this%cfg%kmax+1,1:2)
+      call this%cfg%sync(Fx(:,:,:,1)); call this%cfg%sync(Fx(:,:,:,2)); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) Fx(this%cfg%imin-1,:,:,1:2)=Fx(this%cfg%imin,:,:,1:2); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.this%cfg%npx) Fx(this%cfg%imax+2,:,:,1:2)=Fx(this%cfg%imax+1,:,:,1:2)
+      call this%cfg%sync(Fy(:,:,:,1)); call this%cfg%sync(Fy(:,:,:,2)); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) Fy(:,this%cfg%jmin-1,:,1:2)=Fy(:,this%cfg%jmin,:,1:2); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.this%cfg%npy) Fy(:,this%cfg%jmax+2,:,1:2)=Fy(:,this%cfg%jmax+1,:,1:2)
+      call this%cfg%sync(Fz(:,:,:,1)); call this%cfg%sync(Fz(:,:,:,2)); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) Fz(:,:,this%cfg%kmin-1,1:2)=Fz(:,:,this%cfg%kmin,1:2); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.this%cfg%npz) Fz(:,:,this%cfg%kmax+2,1:2)=Fz(:,:,this%cfg%kmax+1,1:2)
       
       ! Allocate mixture mass fluxes and populate from phasic fluxes
       allocate(FRX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FRX=Fx(:,:,:,1)+Fx(:,:,:,2)

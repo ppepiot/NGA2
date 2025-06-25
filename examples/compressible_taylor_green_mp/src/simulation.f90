@@ -348,7 +348,8 @@ contains
          real(WP), dimension(3),intent(in) :: xyz
          real(WP), intent(in) :: t
          real(WP) :: G
-         G=1.0_WP-abs(xyz(1)-Pi)
+         !G=1.0_WP-abs(xyz(1)-Pi)
+         G=1.0_WP
       end function levelset_slab
    end subroutine simulation_init
    
