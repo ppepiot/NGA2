@@ -224,9 +224,8 @@ contains
          ! Build PLIC interface
          call fs%build_interface()
          ! Build phasic total energies
-         fs%K=0.5_WP*(fs%U**2+fs%V**2+fs%W**2)
-         where (fs%VF.gt.0.0_WP) fs%EL=fs%IL+fs%K
-         where (fs%VF.lt.1.0_WP) fs%EG=fs%IG+fs%K
+         where (fs%VF.gt.0.0_WP) fs%EL=fs%IL+0.5_WP*(fs%U**2+fs%V**2+fs%W**2)
+         where (fs%VF.lt.1.0_WP) fs%EG=fs%IG+0.5_WP*(fs%U**2+fs%V**2+fs%W**2)
          ! Initialize conserved variables
          fs%Q(:,:,:,1)=        fs%VF *fs%RHOL
          fs%Q(:,:,:,2)=(1.0_WP-fs%VF)*fs%RHOG
