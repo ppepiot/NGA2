@@ -8,8 +8,8 @@ nz : 1
 
 # Fluid definition
 GammaL :    1.4
-PinfL :     100
-RHOL :      1000
+PinfL :     0!100
+RHOL :      1
 GammaG :    1.4
 PinfG :     0
 RHOG :      1
@@ -23,4 +23,4 @@ Max cfl number :    10.0
 Max time :          1000
 
 # Ensight output
-Ensight output period : 1e-1
+Ensight output period : 1e-10

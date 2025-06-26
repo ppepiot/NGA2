@@ -29,7 +29,7 @@ module simulation
    
    !> Private work arrays
    real(WP), dimension(:,:,:,:,:), allocatable :: dQdt
-   real(WP), dimension(:,:,:)    , allocatable :: Ui,Vi,Wi,Ma
+   real(WP), dimension(:,:,:)    , allocatable :: Ma
    
    !> Equation of state and flow conditions
    real(WP) :: Mach
@@ -184,9 +184,6 @@ contains
       ! Allocate work arrays
       allocate_work_arrays: block
          allocate(dQdt(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:fs%nQ,1:4))
-         allocate(Ui(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Vi(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Wi(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Ma(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
       end block allocate_work_arrays
       
@@ -196,6 +193,8 @@ contains
          use mpcomp_class, only: VFlo
          use random,       only: random_uniform
          integer :: i,j,k
+         ! Calculate domain center
+         center=[cfg%x(cfg%imin),cfg%y(cfg%jmin),cfg%z(cfg%kmin)]+0.5_WP*[cfg%x(cfg%imax+1)-cfg%x(cfg%imin),cfg%y(cfg%jmax+1)-cfg%y(cfg%jmin),cfg%z(cfg%kmax+1)-cfg%z(cfg%kmin)]
          ! Initialize primary variables
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
@@ -204,8 +203,8 @@ contains
                   call initialize_volume_moments(lo=[cfg%x(i  ),cfg%y(j  ),cfg%z(k  )],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
                   levelset=levelset_slab,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=+Mach*sin(cfg%x (i))*cos(cfg%ym(j))*cos(cfg%zm(k))
-                  fs%V(i,j,k)=-Mach*cos(cfg%xm(i))*sin(cfg%y (j))*cos(cfg%zm(k))
+                  fs%U(i,j,k)=+Mach*sin(cfg%xm(i))*cos(cfg%ym(j))*cos(cfg%zm(k))
+                  fs%V(i,j,k)=-Mach*cos(cfg%xm(i))*sin(cfg%ym(j))*cos(cfg%zm(k))
                   fs%W(i,j,k)=0.0_WP
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
@@ -225,7 +224,7 @@ contains
          ! Build PLIC interface
          call fs%build_interface()
          ! Build phasic total energies
-         call fs%get_ke()
+         fs%K=0.5_WP*(fs%U**2+fs%V**2+fs%W**2)
          where (fs%VF.gt.0.0_WP) fs%EL=fs%IL+fs%K
          where (fs%VF.lt.1.0_WP) fs%EG=fs%IG+fs%K
          ! Initialize conserved variables
@@ -233,13 +232,14 @@ contains
          fs%Q(:,:,:,2)=(1.0_WP-fs%VF)*fs%RHOG
          fs%Q(:,:,:,3)= fs%Q(:,:,:,1)*fs%EL
          fs%Q(:,:,:,4)= fs%Q(:,:,:,2)*fs%EG
-         call fs%get_momentum()
+         fs%RHO=fs%Q(:,:,:,1)+fs%Q(:,:,:,2)
+         fs%Q(:,:,:,5)=fs%RHO*fs%U
+         fs%Q(:,:,:,6)=fs%RHO*fs%V
+         fs%Q(:,:,:,7)=fs%RHO*fs%W
          ! Rebuild primitive variables
          call fs%get_primitive()
-         ! Interpolate velocity
-         call fs%interp_vel(Ui,Vi,Wi)
          ! Compute local Mach number
-         Ma=sqrt(Ui**2+Vi**2+Wi**2)/fs%C
+         Ma=sqrt(fs%U**2+fs%V**2+fs%W**2)/fs%C
       end block initial_conditions
       
       ! Add Ensight output
@@ -250,7 +250,7 @@ contains
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
          ! Add variables to output
-         call ens_out%add_vector('velocity',Ui,Vi,Wi)
+         call ens_out%add_vector('velocity',fs%U,fs%V,fs%W)
          call ens_out%add_scalar('VOF',fs%VF)
          call ens_out%add_scalar('RHO',fs%RHO)
          call ens_out%add_scalar('E',fs%E)
@@ -343,12 +343,11 @@ contains
       end function levelset_drop
       !> Function that defines a level set function for a slab
       function levelset_slab(xyz,t) result(G)
-         use mathtools, only: Pi
          implicit none
          real(WP), dimension(3),intent(in) :: xyz
          real(WP), intent(in) :: t
          real(WP) :: G
-         G=1.0_WP-abs(xyz(1)-Pi)
+         G=1.0_WP!-abs(xyz(1)-center(1))
       end function levelset_slab
    end subroutine simulation_init
    
@@ -431,11 +430,8 @@ contains
          ! Recompute primitive variables
          call fs%get_primitive()
          
-         ! Interpolate velocity
-         call fs%interp_vel(Ui,Vi,Wi)
-         
          ! Compute local Mach number
-         Ma=sqrt(Ui**2+Vi**2+Wi**2)/fs%C
+         Ma=sqrt(fs%U**2+fs%V**2+fs%W**2)/fs%C
          
          ! Output to ensight
          if (ens_evt%occurs()) then
@@ -459,7 +455,7 @@ contains
    subroutine simulation_final
       implicit none
       ! Deallocate work arrays
-      deallocate(dQdt,Ui,Vi,Wi,Ma)
+      deallocate(dQdt,Ma)
    end subroutine simulation_final
    
    
