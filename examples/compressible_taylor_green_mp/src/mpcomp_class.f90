@@ -50,8 +50,8 @@ module mpcomp_class
       integer :: nQ
       real(WP), dimension(:,:,:,:), allocatable :: Q,Qold
       
-      ! Flow velocity and kinetic energy per unit mass
-      real(WP), dimension(:,:,:), allocatable :: U,V,W,K
+      ! Flow velocity
+      real(WP), dimension(:,:,:), allocatable :: U,V,W
       
       ! Phasic densities
       real(WP), dimension(:,:,:), allocatable :: RHOL,RHOG,RHOLold,RHOGold
@@ -232,7 +232,6 @@ contains
       allocate(this%U(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%U=0.0_WP
       allocate(this%V(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%V=0.0_WP
       allocate(this%W(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%W=0.0_WP
-      allocate(this%K(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%K=0.0_WP
       
       ! Phasic densities
       allocate(this%RHOL   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%RHOL   =0.0_WP
@@ -1280,8 +1279,6 @@ contains
       this%U=this%Q(:,:,:,5)/this%RHO
       this%V=this%Q(:,:,:,6)/this%RHO
       this%W=this%Q(:,:,:,7)/this%RHO
-      ! Get mixture kinetic energy
-      this%K=0.5_WP*(this%U**2+this%V**2+this%W**2)
       ! Get mixture total energy
       this%E=(this%Q(:,:,:,3)+this%Q(:,:,:,4))/this%RHO
       ! Get clipped phasic density, total energy, internal energy, pressure, temperature, speed of sound
@@ -1290,7 +1287,7 @@ contains
          if (this%VF(i,j,k).ge.VFlo) then
             this%RHOL(i,j,k)=this%Q (i,j,k,1)/this%VF(i,j,k)
             this%EL  (i,j,k)=this%Q (i,j,k,3)/this%Q (i,j,k,1)
-            this%IL  (i,j,k)=this%EL(i,j,k)-this%K(i,j,k)
+            this%IL  (i,j,k)=this%EL(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PL  (i,j,k)=this%getPL(this%RHOL(i,j,k),this%IL(i,j,k))
             this%TL  (i,j,k)=this%getTL(this%RHOL(i,j,k),this%PL(i,j,k))
             CL              =this%getCL(this%RHOL(i,j,k),this%PL(i,j,k))
@@ -1300,7 +1297,7 @@ contains
             this%EL  (i,j,k)=0.0_WP
             this%IL  (i,j,k)=0.0_WP
             this%EG  (i,j,k)=this%E(i,j,k)
-            this%IG  (i,j,k)=this%E(i,j,k)-this%K(i,j,k)
+            this%IG  (i,j,k)=this%E(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PL  (i,j,k)=0.0_WP
             this%TL  (i,j,k)=0.0_WP
             CL              =0.0_WP
@@ -1309,7 +1306,7 @@ contains
          if (this%VF(i,j,k).le.VFhi) then
             this%RHOG(i,j,k)=this%Q(i,j,k,2)/(1.0_WP-this%VF(i,j,k))
             this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
-            this%IG  (i,j,k)=this%EG(i,j,k)-this%K(i,j,k)
+            this%IG  (i,j,k)=this%EG(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PG  (i,j,k)=this%getPG(this%RHOG(i,j,k),this%IG(i,j,k))
             this%TG  (i,j,k)=this%getTG(this%RHOG(i,j,k),this%PG(i,j,k))
             CG              =this%getCG(this%RHOG(i,j,k),this%PG(i,j,k))
@@ -1319,7 +1316,7 @@ contains
             this%EG  (i,j,k)=0.0_WP
             this%IG  (i,j,k)=0.0_WP
             this%EL  (i,j,k)=this%E(i,j,k)
-            this%IL  (i,j,k)=this%E(i,j,k)-this%K(i,j,k)
+            this%IL  (i,j,k)=this%E(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PG  (i,j,k)=0.0_WP
             this%TG  (i,j,k)=0.0_WP
             CG              =0.0_WP
