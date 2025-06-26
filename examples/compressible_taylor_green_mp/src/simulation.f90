@@ -200,22 +200,22 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Volume moments for a droplet
-                  call initialize_volume_moments(lo=[cfg%x(i  ),cfg%y(j  ),cfg%z(k  )],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
+                  call initialize_volume_moments(lo=[cfg%x(i),cfg%y(j),cfg%z(k)],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
                   levelset=levelset_slab,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Mixture velocity
-                  fs%U(i,j,k)=+Mach*sin(cfg%xm(i))*cos(cfg%ym(j))*cos(cfg%zm(k))
-                  fs%V(i,j,k)=-Mach*cos(cfg%xm(i))*sin(cfg%ym(j))*cos(cfg%zm(k))
+                  fs%U(i,j,k)=1.0_WP!+Mach*sin(cfg%xm(i))*cos(cfg%ym(j))*cos(cfg%zm(k))
+                  fs%V(i,j,k)=0.0_WP!-Mach*cos(cfg%xm(i))*sin(cfg%ym(j))*cos(cfg%zm(k))
                   fs%W(i,j,k)=0.0_WP
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
                      fs%RHOL(i,j,k)=RHOL
-                     fs%PL  (i,j,k)=1.0_WP/GammaL+fs%RHOL(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
+                     fs%PL  (i,j,k)=1.0_WP/GammaL!+fs%RHOL(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
                      fs%IL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PinfL)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                   ! Gas variables
                   if (fs%VF(i,j,k).lt.1.0_WP) then
                      fs%RHOG(i,j,k)=RHOG
-                     fs%PG  (i,j,k)=1.0_WP/GammaG+fs%RHOG(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
+                     fs%PG  (i,j,k)=1.0_WP/GammaG!+fs%RHOG(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
                      fs%IG  (i,j,k)=(fs%PG(i,j,k)+GammaG*PinfG)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
                   end if
                end do
@@ -347,7 +347,7 @@ contains
          real(WP), dimension(3),intent(in) :: xyz
          real(WP), intent(in) :: t
          real(WP) :: G
-         G=1.0_WP!-abs(xyz(1)-center(1))
+         G=1.0_WP-abs(xyz(1)-center(1))
       end function levelset_slab
    end subroutine simulation_init
    
