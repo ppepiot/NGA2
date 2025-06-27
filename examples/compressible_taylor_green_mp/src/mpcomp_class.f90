@@ -744,7 +744,7 @@ contains
       real(WP), dimension(:,:,:,:), allocatable :: Fx,Fy,Fz
       real(WP), dimension(:,:,:)  , allocatable :: FUX,FUY,FUZ,FVX,FVY,FVZ,FWX,FWY,FWZ
       integer :: i,j,k,n
-      real(WP) :: w,div
+      real(WP) :: w,div,YL,YG
       real(WP), parameter :: eps=1.0e-15_WP
       real(WP), dimension(-2: 0) :: wenop
       real(WP), dimension(-1:+1) :: wenom
@@ -848,6 +848,14 @@ contains
                dQdt(i,j,k,5)=this%dxi*(FUX(i+1,j,k  )-FUX(i,j,k  ))+this%dyi*(FUY(i,j+1,k  )-FUY(i,j,k  ))+this%dzi*(FUZ(i,j,k+1  )-FUZ(i,j,k  ))
                dQdt(i,j,k,6)=this%dxi*(FVX(i+1,j,k  )-FVX(i,j,k  ))+this%dyi*(FVY(i,j+1,k  )-FVY(i,j,k  ))+this%dzi*(FVZ(i,j,k+1  )-FVZ(i,j,k  ))
                dQdt(i,j,k,7)=this%dxi*(FWX(i+1,j,k  )-FWX(i,j,k  ))+this%dyi*(FWY(i,j+1,k  )-FWY(i,j,k  ))+this%dzi*(FWZ(i,j,k+1  )-FWZ(i,j,k  ))
+               ! Add dynamic relaxation source term to phasic total energy equation
+               YL=this%VF(i,j,k)*this%RHOL(i,j,k)/this%RHO(i,j,k); YG=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)/this%RHO(i,j,k)
+               dQdt(i,j,k,3)=dQdt(i,j,k,3)-0.5_WP*this%U(i,j,k)*(YL*this%dxi*((1.0_WP-this%VF(i+1,j,k))*this%PG(i+1,j,k)-(1.0_WP-this%VF(i-1,j,k))*this%PG(i-1,j,k))-YG*this%dxi*(this%VF(i+1,j,k)*this%PL(i+1,j,k)-this%VF(i-1,j,k)*this%PL(i-1,j,k)))&
+               &                          -0.5_WP*this%V(i,j,k)*(YL*this%dyi*((1.0_WP-this%VF(i,j+1,k))*this%PG(i,j+1,k)-(1.0_WP-this%VF(i,j-1,k))*this%PG(i,j-1,k))-YG*this%dyi*(this%VF(i,j+1,k)*this%PL(i,j+1,k)-this%VF(i,j-1,k)*this%PL(i,j-1,k)))&
+               &                          -0.5_WP*this%W(i,j,k)*(YL*this%dzi*((1.0_WP-this%VF(i,j,k+1))*this%PG(i,j,k+1)-(1.0_WP-this%VF(i,j,k-1))*this%PG(i,j,k-1))-YG*this%dzi*(this%VF(i,j,k+1)*this%PL(i,j,k+1)-this%VF(i,j,k+1)*this%PL(i,j,k+1)))
+               dQdt(i,j,k,4)=dQdt(i,j,k,4)+0.5_WP*this%U(i,j,k)*(YL*this%dxi*((1.0_WP-this%VF(i+1,j,k))*this%PG(i+1,j,k)-(1.0_WP-this%VF(i-1,j,k))*this%PG(i-1,j,k))-YG*this%dxi*(this%VF(i+1,j,k)*this%PL(i+1,j,k)-this%VF(i-1,j,k)*this%PL(i-1,j,k)))&
+               &                          +0.5_WP*this%V(i,j,k)*(YL*this%dyi*((1.0_WP-this%VF(i,j+1,k))*this%PG(i,j+1,k)-(1.0_WP-this%VF(i,j-1,k))*this%PG(i,j-1,k))-YG*this%dyi*(this%VF(i,j+1,k)*this%PL(i,j+1,k)-this%VF(i,j-1,k)*this%PL(i,j-1,k)))&
+               &                          +0.5_WP*this%W(i,j,k)*(YL*this%dzi*((1.0_WP-this%VF(i,j,k+1))*this%PG(i,j,k+1)-(1.0_WP-this%VF(i,j,k-1))*this%PG(i,j,k-1))-YG*this%dzi*(this%VF(i,j,k+1)*this%PL(i,j,k+1)-this%VF(i,j,k+1)*this%PL(i,j,k+1)))
             end do
          end do
       end do
