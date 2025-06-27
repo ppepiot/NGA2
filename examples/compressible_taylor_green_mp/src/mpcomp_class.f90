@@ -37,6 +37,9 @@ module mpcomp_class
       procedure(Tfunc_type), pointer, nopass :: getTG=>NULL()
       procedure(Cfunc_type), pointer, nopass :: getCG=>NULL()
       
+      ! Pointer to subroutine for mechanical relaxation in a cell
+      procedure(Prelax_type), pointer, nopass :: Prelax=>NULL()
+      
       ! Volume moments, interface, and semi-Lagrangian fluxes
       real(WP), dimension(:,:,:)  , allocatable :: VF,VFold
       real(WP), dimension(:,:,:,:), allocatable :: BL,BLold
@@ -133,6 +136,7 @@ module mpcomp_class
       procedure :: rhs                                    !< Compute rhs of our equations using standard fluxes
       procedure :: build_interface                        !< Build interface from volume moments
       procedure :: get_primitive                          !< Calculate phasic and mixture primitive variables from conserved variables
+      procedure :: relax_pressure                         !< Enforce mechanical equilibrium of phasic pressures in interfacial cells
       procedure :: get_cfl                                !< Calculate maximum CFL
       procedure :: get_info                               !< Calculate maximum field values
       procedure :: update_surfmesh                        !< Update a surfmesh object using current polygons
@@ -161,20 +165,28 @@ module mpcomp_class
          real(WP), intent(in) :: RHO
          real(WP), intent(in) :: P
       end function Cfunc_type
+      !> Pressure relaxation (acts only on the conserved quantities)
+      subroutine Prelax_type(VF,Q)
+         import :: WP
+         implicit none
+         real(WP),                intent(inout) :: VF
+         real(WP), dimension(1:), intent(inout) :: Q
+      end subroutine Prelax_type
    end interface
    
 contains
    
    
    !> Initialization for compressible flow solver
-   subroutine initialize(this,cfg,getPL,getTL,getCL,getPG,getTG,getCG,name)
+   subroutine initialize(this,cfg,getPL,getTL,getCL,getPG,getTG,getCG,Prelax,name)
       use messager, only: die
       implicit none
       class(mpcomp) :: this
       class(config), target, intent(in) :: cfg
-      procedure(Pfunc_type) :: getPL,getPG
-      procedure(Tfunc_type) :: getTL,getTG
-      procedure(Cfunc_type) :: getCL,getCG
+      procedure(Pfunc_type)  :: getPL,getPG
+      procedure(Tfunc_type)  :: getTL,getTG
+      procedure(Cfunc_type)  :: getCL,getCG
+      procedure(Prelax_type) :: Prelax
       character(len=*), optional :: name
       integer :: i,j,k
       
@@ -191,6 +203,9 @@ contains
       this%getPG=>getPG
       this%getTG=>getTG
       this%getCG=>getCG
+      
+      ! Point to pressure relaxation model
+      this%Prelax=>Prelax
       
       ! Check that config is uniform with at least 3 cells of overlap
       if (this%cfg%no.lt.3) call die('[mpcomp initialize] mpcomp solver requires at least 3 cells of overlap')
@@ -1341,6 +1356,44 @@ contains
       this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
       this%T=0.0_WP
    end subroutine get_primitive
+   
+   
+   !> Enforce mechanical equilibrium of phasic pressures in interfacial cells using user-provided model
+   subroutine relax_pressure(this)
+      implicit none
+      class(mpcomp), intent(inout) :: this
+      integer :: i,j,k
+      type(RectCub_type) :: cell
+      type(SepVM_type)   :: separated_volume_moments
+      ! Allocate IRL objects
+      call new(cell)
+      call new(separated_volume_moments)
+      ! Loop over the full domain
+      do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+         ! Ignore single-phase cells
+         if (this%VF(i,j,k).le.VFlo.or.this%VF(i,j,k).ge.VFhi) cycle
+         ! Apply user-provided relaxation model
+         call this%Prelax(this%VF(i,j,k),this%Q(i,j,k,:))
+         ! Adjust PLIC interface location
+         call construct_2pt(cell,[this%cfg%x(i),this%cfg%y(j),this%cfg%z(k)],[this%cfg%x(i+1),this%cfg%y(j+1),this%cfg%z(k+1)])
+         call matchVolumeFraction(cell,this%VF(i,j,k),this%PLIC(i,j,k))
+         ! Adjust volume moments to ensure consistency
+         call getNormMoments(cell,this%PLIC(i,j,k),separated_volume_moments)
+         this%VF  (i,j,k)=getVolumePtr(separated_volume_moments,0)/this%cfg%vol(i,j,k)
+         this%BL(:,i,j,k)= getCentroid(separated_volume_moments,0)
+         this%BG(:,i,j,k)= getCentroid(separated_volume_moments,1)
+         if (this%VF(i,j,k).lt.VFlo) then
+            this%VF  (i,j,k)=0.0_WP
+            this%BL(:,i,j,k)=[this%cfg%xm(i),this%cfg%ym(j),this%cfg%zm(k)]
+            this%BG(:,i,j,k)=[this%cfg%xm(i),this%cfg%ym(j),this%cfg%zm(k)]
+         end if
+         if (this%VF(i,j,k).gt.VFhi) then
+            this%VF  (i,j,k)=1.0_WP
+            this%BL(:,i,j,k)=[this%cfg%xm(i),this%cfg%ym(j),this%cfg%zm(k)]
+            this%BG(:,i,j,k)=[this%cfg%xm(i),this%cfg%ym(j),this%cfg%zm(k)]
+         end if
+      end do; end do; end do
+   end subroutine relax_pressure
    
    
    !> Calculate the CFL

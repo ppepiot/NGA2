@@ -52,11 +52,11 @@ contains
    !end subroutine get_visc
    
    
-   !> P=EOS(RHO,E) for liquid
-   pure real(WP) function get_PL(RHO,E)
+   !> P=EOS(RHO,I) for liquid
+   pure real(WP) function get_PL(RHO,I)
       implicit none
-      real(WP), intent(in) :: RHO,E
-      get_PL=RHO*E*(GammaL-1.0_WP)-GammaL*PinfL
+      real(WP), intent(in) :: RHO,I
+      get_PL=RHO*I*(GammaL-1.0_WP)-GammaL*PinfL
    end function get_PL
    !> T=f(RHO,P) for liquid
    pure real(WP) function get_TL(RHO,P)
@@ -72,11 +72,11 @@ contains
    end function get_CL
    
    
-   !> P=EOS(RHO,E) for gas
-   pure real(WP) function get_PG(RHO,E)
+   !> P=EOS(RHO,I) for gas
+   pure real(WP) function get_PG(RHO,I)
       implicit none
-      real(WP), intent(in) :: RHO,E
-      get_PG=RHO*E*(GammaG-1.0_WP)-GammaG*PinfG
+      real(WP), intent(in) :: RHO,I
+      get_PG=RHO*I*(GammaG-1.0_WP)-GammaG*PinfG
    end function get_PG
    !> T=f(RHO,P) for gas
    pure real(WP) function get_TG(RHO,P)
@@ -90,6 +90,38 @@ contains
       real(WP), intent(in) :: RHO,P
       get_CG=sqrt(GammaG*(P+PinfG)/RHO)
    end function get_CG
+   
+   
+   !> Mechanical relaxation model
+   subroutine P_relax(VF,Q)
+      implicit none
+      real(WP),                intent(inout) :: VF
+      real(WP), dimension(1:), intent(inout) :: Q
+      real(WP) :: PG,PL,ZG,ZL,Pint
+      real(WP) :: a,b,d,coeffL,coeffG,Peq,VFeq
+      ! Get phasic pressures
+      PL=get_PL(RHO=Q(1)/(       VF),I=Q(3)/Q(1)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
+      PG=get_PL(RHO=Q(2)/(1.0_WP-VF),I=Q(4)/Q(2)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
+      ! Get phasic impedances
+      ZL=Q(1)/(       VF)*get_CL(RHO=Q(1)/(       VF),P=PL)**2
+      ZG=Q(2)/(1.0_WP-VF)*get_CL(RHO=Q(2)/(1.0_WP-VF),P=PG)**2
+      ! Calculate model interface pressure
+      Pint=(ZG*PL+ZL*PG)/(ZG+ZL)
+      ! Setup quadratic problem
+      coeffL=2.0_WP*GammaL*PinfL+(GammaL-1.0_WP)*Pint
+      coeffG=2.0_WP*GammaG*PinfG+(GammaG-1.0_WP)*Pint
+      a=1.0_WP+GammaG*VF+GammaL*(1.0_WP-VF)
+      b=coeffL*(1.0_WP-VF)+coeffG*VF-(1.0_WP+GammaG)*VF*PL-(1.0_WP+GammaL)*(1.0_WP-VF)*PG
+      d=-(coeffG*VF*PL+coeffL*(1.0_WP-VF)*PG)
+      ! Equilibrium pressure
+      Peq=0.5_WP/a*(-b+sqrt(b**2-4.0_WP*a*d))
+      ! Equilibrium volume fraction
+      VFeq=((gammaL-1.0_WP)*Peq+2.0_WP*PL+coeffL)/((1.0_WP+gammaL)*Peq+coeffL)*VF
+      ! Adjust conserved quantities
+      Q(3)=Q(3)-0.5_WP*(Pint+Peq)*(VFeq-VF)
+      Q(4)=Q(4)+0.5_WP*(Pint+Peq)*(VFeq-VF)
+      VF=VFeq
+   end subroutine P_relax
    
    
    !> Post-process conservation properties
@@ -178,7 +210,7 @@ contains
       ! Create a fast compressible flow solver
       create_velocity_solver: block
          call fs%initialize(cfg=cfg,getPL=get_PL,getTL=get_TL,getCL=get_CL,&
-         &                          getPG=get_PG,getTG=get_TG,getCG=get_CG,name='Compressible NS')
+         &                          getPG=get_PG,getTG=get_TG,getCG=get_CG,Prelax=P_relax,name='Compressible NS')
       end block create_velocity_solver
       
       ! Allocate work arrays
@@ -426,6 +458,8 @@ contains
          fs%Q=fs%Qold+time%dt/6.0_WP*(dQdt(:,:,:,:,1)+2.0_WP*dQdt(:,:,:,:,2)+2.0_WP*dQdt(:,:,:,:,3)+dQdt(:,:,:,:,4))
          ! Increment Q with SL terms
          call fs%SLincrement()
+         ! Enforce mechanical equilibrium
+         call fs%relax_pressure()
          ! Recompute primitive variables
          call fs%get_primitive()
          
