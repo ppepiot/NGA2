@@ -1296,17 +1296,19 @@ contains
       class(mpcomp), intent(inout) :: this
       real(WP) :: CL,CG
       integer :: i,j,k
-      ! Get mixture density
-      this%RHO=this%Q(:,:,:,1)+this%Q(:,:,:,2)
-      ! Get mixture velocity
-      this%U=this%Q(:,:,:,5)/this%RHO
-      this%V=this%Q(:,:,:,6)/this%RHO
-      this%W=this%Q(:,:,:,7)/this%RHO
-      ! Get mixture total energy
-      this%E=(this%Q(:,:,:,3)+this%Q(:,:,:,4))/this%RHO
-      ! Get clipped phasic density, total energy, internal energy, pressure, temperature, speed of sound
       do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
-         ! Liquid primitive variables
+         ! Get mixture density
+         this%RHO(i,j,k)=this%Q(i,j,k,1)+this%Q(i,j,k,2)
+         ! Get mixture velocity
+         this%U(i,j,k)=this%Q(i,j,k,5)/this%RHO(i,j,k)
+         this%V(i,j,k)=this%Q(i,j,k,6)/this%RHO(i,j,k)
+         this%W(i,j,k)=this%Q(i,j,k,7)/this%RHO(i,j,k)
+         ! Get mixture total energy
+         this%E(i,j,k)=(this%Q(i,j,k,3)+this%Q(i,j,k,4))/this%RHO(i,j,k)
+         ! Ensure proper distribution of phasic mass and energy
+         if (this%VF(i,j,k).le.VFlo) then; this%Q(i,j,k,2)=sum(this%Q(i,j,k,1:2)); this%Q(i,j,k,1)=0.0_WP; this%Q(i,j,k,4)=sum(this%Q(i,j,k,3:4)); this%Q(i,j,k,3)=0.0_WP; end if
+         if (this%VF(i,j,k).ge.VFhi) then; this%Q(i,j,k,1)=sum(this%Q(i,j,k,1:2)); this%Q(i,j,k,2)=0.0_WP; this%Q(i,j,k,3)=sum(this%Q(i,j,k,3:4)); this%Q(i,j,k,4)=0.0_WP; end if
+         ! Get liquid primitive variables
          if (this%VF(i,j,k).ge.VFlo) then
             this%RHOL(i,j,k)=this%Q (i,j,k,1)/this%VF(i,j,k)
             this%EL  (i,j,k)=this%Q (i,j,k,3)/this%Q (i,j,k,1)
@@ -1316,16 +1318,13 @@ contains
             CL              =this%getCL(this%RHOL(i,j,k),this%PL(i,j,k))
          else
             this%RHOL(i,j,k)=0.0_WP
-            this%RHOG(i,j,k)=this%RHO(i,j,k)
             this%EL  (i,j,k)=0.0_WP
             this%IL  (i,j,k)=0.0_WP
-            this%EG  (i,j,k)=this%E(i,j,k)
-            this%IG  (i,j,k)=this%E(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PL  (i,j,k)=0.0_WP
             this%TL  (i,j,k)=0.0_WP
             CL              =0.0_WP
          end if
-         ! Gas primitive variables
+         ! Get gas primitive variables
          if (this%VF(i,j,k).le.VFhi) then
             this%RHOG(i,j,k)=this%Q(i,j,k,2)/(1.0_WP-this%VF(i,j,k))
             this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
@@ -1335,26 +1334,19 @@ contains
             CG              =this%getCG(this%RHOG(i,j,k),this%PG(i,j,k))
          else
             this%RHOG(i,j,k)=0.0_WP
-            this%RHOL(i,j,k)=this%RHO(i,j,k)
             this%EG  (i,j,k)=0.0_WP
             this%IG  (i,j,k)=0.0_WP
-            this%EL  (i,j,k)=this%E(i,j,k)
-            this%IL  (i,j,k)=this%E(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PG  (i,j,k)=0.0_WP
             this%TG  (i,j,k)=0.0_WP
             CG              =0.0_WP
          end if
-         ! Also reset conserved phasic variables for consistency
-         this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k)
-         this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)
-         this%Q(i,j,k,3)=(       this%VF(i,j,k))*this%RHOL(i,j,k)*this%EL(i,j,k)
-         this%Q(i,j,k,4)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)*this%EG(i,j,k)
          ! Mixture speed of sound
          this%C(i,j,k)=sqrt(this%Q(i,j,k,1)*CL/this%RHO(i,j,k)+this%Q(i,j,k,2)*CG/this%RHO(i,j,k))
+         ! Get mixture pressure
+         this%P(i,j,k)=this%VF(i,j,k)*this%PL(i,j,k)+(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)
+         ! Get mixture temperature
+         this%T(i,j,k)=0.0_WP
       end do; end do; end do
-      ! Get other mixture variables
-      this%P=this%VF*this%PL+(1.0_WP-this%VF)*this%PG
-      this%T=0.0_WP
    end subroutine get_primitive
    
    
