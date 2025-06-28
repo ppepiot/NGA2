@@ -172,7 +172,7 @@ contains
          ! Provide entropy calculation functions
          fs%getSL=>get_SL; fs%getSG=>get_SG
          ! Provide temperature calculation functions
-         fs%getTL=>get_TL; fs%getTG=>get_TG
+         !fs%getTL=>get_TL; fs%getTG=>get_TG
       end block create_velocity_solver
       
       ! Allocate work arrays
