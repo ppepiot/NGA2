@@ -21,11 +21,7 @@ module simulation
    type(event)    :: ens_evt
    
    !> Simulation monitor file
-   type(monitor) :: mfile,cflfile
-   
-   !> Monitoring of conservation
-   type(monitor) :: consfile
-   real(WP) :: RHOKint,RHOSLint,RHOSGint,DilDiss,SolDiss
+   type(monitor) :: mfile,cflfile,consfile
    
    !> Private work arrays
    real(WP), dimension(:,:,:,:,:), allocatable :: dQdt
@@ -70,6 +66,12 @@ contains
       real(WP), intent(in) :: RHO,P
       get_CL=sqrt(GammaL*(P+PinfL)/RHO)
    end function get_CL
+   !> S=f(RHO,P) for liquid
+   pure real(WP) function get_SL(RHO,P)
+      implicit none
+      real(WP), intent(in) :: RHO,P
+      get_SL=CvL*log((P+PinfL)/RHO**GammaL)
+   end function get_SL
    
    
    !> P=EOS(RHO,I) for gas
@@ -90,6 +92,12 @@ contains
       real(WP), intent(in) :: RHO,P
       get_CG=sqrt(GammaG*(P+PinfG)/RHO)
    end function get_CG
+   !> S=f(RHO,P) for gas
+   pure real(WP) function get_SG(RHO,P)
+      implicit none
+      real(WP), intent(in) :: RHO,P
+      get_SG=CvG*log((P+PinfG)/RHO**GammaG)
+   end function get_SG
    
    
    !> Mechanical relaxation model
@@ -128,62 +136,6 @@ contains
    end subroutine P_relax
    
    
-   !> Post-process conservation properties
-   subroutine analyze_conservation()
-      implicit none
-      integer :: i,j,k
-      real(WP), dimension(:,:,:), allocatable :: tmp,XY,YZ,ZX
-      ! Allocate temporary storage
-      allocate(tmp(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-      !allocate(XY (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-      !allocate(YZ (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-      !allocate(ZX (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-      ! Compute kinetic energy
-      do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-         tmp(i,j,k)=0.25_WP*(sum(fs%Q(i:i+1,j,k,5)*fs%U(i:i+1,j,k))+sum(fs%Q(i,j:j+1,k,6)*fs%V(i,j:j+1,k))+sum(fs%Q(i,j,k:k+1,7)*fs%W(i,j,k:k+1)))
-      end do; end do; end do
-      call cfg%integrate(tmp,integral=RHOKint)
-      ! Compute liquid entropy
-      do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-         if (fs%VF(i,j,k).gt.0.0_WP) then
-            tmp(i,j,k)=fs%VF(i,j,k)*fs%RHOL(i,j,k)*CvL*log((fs%PL(i,j,k)+PinfL)/fs%RHOL(i,j,k)**GammaL)
-         else
-            tmp(i,j,k)=0.0_WP
-         end if
-      end do; end do; end do
-      call cfg%integrate(tmp,integral=RHOSLint)
-      ! Compute gas entropy
-      do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-         if (fs%VF(i,j,k).lt.1.0_WP) then
-            tmp(i,j,k)=(1.0_WP-fs%VF(i,j,k))*fs%RHOG(i,j,k)*CvG*log((fs%PG(i,j,k)+PinfG)/fs%RHOG(i,j,k)**GammaG)
-         else
-            tmp(i,j,k)=0.0_WP
-         end if
-      end do; end do; end do
-      call cfg%integrate(tmp,integral=RHOSGint)
-      ! Calculate dilatational dissipation
-      !do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-      !   tmp(i,j,k)=(fs%beta(i,j,k)+4.0_WP/3.0_WP*fs%visc(i,j,k))*(fs%dxi*(fs%U(i+1,j,k)-fs%U(i,j,k))+fs%dyi*(fs%V(i,j+1,k)-fs%V(i,j,k))+fs%dzi*(fs%W(i,j,k+1)-fs%W(i,j,k)))**2
-      !end do; end do; end do
-      !call cfg%integrate(tmp,integral=DilDiss)
-      ! Calculate solenoidal dissipation
-      !do k=cfg%kmin_,cfg%kmax_+1; do j=cfg%jmin_,cfg%jmax_+1; do i=cfg%imin_,cfg%imax_+1
-         ! (dvdx-dudy)^2 at xy edge
-      !   XY(i,j,k)=0.25_WP*sum(fs%visc(i-1:i,j-1:j,k))*(fs%dxi*(fs%V(i,j,k)-fs%V(i-1,j,k))-fs%dyi*(fs%U(i,j,k)-fs%U(i,j-1,k)))**2
-         ! (dwdy-dvdz)^2 at yz edge
-      !   YZ(i,j,k)=0.25_WP*sum(fs%visc(i,j-1:j,k-1:k))*(fs%dyi*(fs%W(i,j,k)-fs%W(i,j-1,k))-fs%dzi*(fs%V(i,j,k)-fs%V(i,j,k-1)))**2
-      !   ! (dudz-dwdx)^2 at zx edge
-      !   ZX(i,j,k)=0.25_WP*sum(fs%visc(i-1:i,j,k-1:k))*(fs%dzi*(fs%U(i,j,k)-fs%U(i,j,k-1))-fs%dxi*(fs%W(i,j,k)-fs%W(i-1,j,k)))**2
-      !end do; end do; end do
-      !do k=cfg%kmin_,cfg%kmax_; do j=cfg%jmin_,cfg%jmax_; do i=cfg%imin_,cfg%imax_
-      !   tmp(i,j,k)=0.25_WP*sum(XY(i:i+1,j:j+1,k))+0.25_WP*sum(YZ(i,j:j+1,k:k+1))+0.25_WP*sum(ZX(i:i+1,j,k:k+1))
-      !end do; end do; end do
-      !call cfg%integrate(tmp,integral=SolDiss)
-      ! Deallocate storage
-      deallocate(tmp)!,XY,YZ,ZX)
-   end subroutine analyze_conservation
-   
-   
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -211,10 +163,16 @@ contains
          time%dt=time%dtmax
       end block initialize_timetracker
       
-      ! Create a fast compressible flow solver
+      ! Create multipgase compressible flow solver
       create_velocity_solver: block
-         call fs%initialize(cfg=cfg,getPL=get_PL,getTL=get_TL,getCL=get_CL,&
-         &                          getPG=get_PG,getTG=get_TG,getCG=get_CG,Prelax=P_relax,name='Compressible NS')
+         ! Initialize solver with required thermodynamic functions
+         call fs%initialize(cfg=cfg,getPL=get_PL,getCL=get_CL,getPG=get_PG,getCG=get_CG,name='Compressible NS')
+         ! Provide pressure relaxation model
+         fs%Prelax=>P_relax
+         ! Provide entropy calculation functions
+         fs%getSL=>get_SL; fs%getSG=>get_SG
+         ! Provide temperature calculation functions
+         fs%getTL=>get_TL; fs%getTG=>get_TG
       end block create_velocity_solver
       
       ! Allocate work arrays
@@ -306,7 +264,6 @@ contains
          ! Prepare some info about fields
          call fs%get_cfl(dt=time%dt,cfl=time%cfl)
          call fs%get_info()
-         call analyze_conservation()
          ! Create simulation monitor
          mfile=monitor(fs%cfg%amRoot,'simulation')
          call mfile%add_column(time%n,'Timestep number')
@@ -358,14 +315,13 @@ contains
          call consfile%add_column(fs%Qint(2),'Gas mass')
          call consfile%add_column(fs%Qint(3),'Liquid energy')
          call consfile%add_column(fs%Qint(4),'Gas energy')
-         call consfile%add_column(RHOSLint,'Liquid Entropy')
-         call consfile%add_column(RHOSGint,'Gas Entropy')
          call consfile%add_column(fs%Qint(5),'U Momentum')
          call consfile%add_column(fs%Qint(6),'V Momentum')
          call consfile%add_column(fs%Qint(7),'W Momentum')
-         call consfile%add_column(RHOKint,'Kinetic energy')
-         !call consfile%add_column(DilDiss,'Dilatation dissipation')
-         !call consfile%add_column(SolDiss,'Solenoidal dissipation')
+         call consfile%add_column(fs%RHOKLint,'Liquid KE')
+         call consfile%add_column(fs%RHOKGint,'Gas KE')
+         call consfile%add_column(fs%RHOSLint,'Liquid entropy')
+         call consfile%add_column(fs%RHOSGint,'Gas entropy')
          call consfile%write()
       end block create_monitor
       
@@ -480,7 +436,6 @@ contains
          
          ! Perform and output monitoring
          call fs%get_info()
-         call analyze_conservation()
          call mfile%write()
          call cflfile%write()
          call consfile%write()

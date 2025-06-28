@@ -33,9 +33,11 @@ module mpcomp_class
       procedure(Pfunc_type), pointer, nopass :: getPL=>NULL()
       procedure(Tfunc_type), pointer, nopass :: getTL=>NULL()
       procedure(Cfunc_type), pointer, nopass :: getCL=>NULL()
+      procedure(Sfunc_type), pointer, nopass :: getSL=>NULL()
       procedure(Pfunc_type), pointer, nopass :: getPG=>NULL()
       procedure(Tfunc_type), pointer, nopass :: getTG=>NULL()
       procedure(Cfunc_type), pointer, nopass :: getCG=>NULL()
+      procedure(Sfunc_type), pointer, nopass :: getSG=>NULL()
       
       ! Pointer to subroutine for mechanical relaxation in a cell
       procedure(Prelax_type), pointer, nopass :: Prelax=>NULL()
@@ -91,6 +93,8 @@ module mpcomp_class
       ! Monitoring quantities for conserved variables
       real(WP) :: VFmin,VFmax,VFint
       real(WP), dimension(:), allocatable :: Qmin,Qmax,Qint
+      real(WP) :: RHOKLint,RHOKGint
+      real(WP) :: RHOSLint,RHOSGint
       
       ! Monitoring quantities for primitive variables
       real(WP) :: Umax,Vmax,Wmax                          !< Velocity stats
@@ -165,6 +169,13 @@ module mpcomp_class
          real(WP), intent(in) :: RHO
          real(WP), intent(in) :: P
       end function Cfunc_type
+      !> S=S(RHO,P)
+      pure real(WP) function Sfunc_type(RHO,P)
+         import :: WP
+         implicit none
+         real(WP), intent(in) :: RHO
+         real(WP), intent(in) :: P
+      end function Sfunc_type
       !> Pressure relaxation (acts only on the conserved quantities)
       subroutine Prelax_type(VF,Q)
          import :: WP
@@ -178,13 +189,12 @@ contains
    
    
    !> Initialization for compressible flow solver
-   subroutine initialize(this,cfg,getPL,getTL,getCL,getPG,getTG,getCG,Prelax,name)
+   subroutine initialize(this,cfg,getPL,getCL,getPG,getCG,name)
       use messager, only: die
       implicit none
       class(mpcomp) :: this
       class(config), target, intent(in) :: cfg
       procedure(Pfunc_type)  :: getPL,getPG
-      procedure(Tfunc_type)  :: getTL,getTG
       procedure(Cfunc_type)  :: getCL,getCG
       procedure(Prelax_type) :: Prelax
       character(len=*), optional :: name
@@ -198,14 +208,9 @@ contains
       
       ! Point to thermodynamic functions
       this%getPL=>getPL
-      this%getTL=>getTL
       this%getCL=>getCL
       this%getPG=>getPG
-      this%getTG=>getTG
       this%getCG=>getCG
-      
-      ! Point to pressure relaxation model
-      this%Prelax=>Prelax
       
       ! Check that config is uniform with at least 3 cells of overlap
       if (this%cfg%no.lt.3) call die('[mpcomp initialize] mpcomp solver requires at least 3 cells of overlap')
@@ -1317,6 +1322,8 @@ contains
       class(mpcomp), intent(inout) :: this
       real(WP) :: CL,CG
       integer :: i,j,k
+      
+      ! Get mixture and phasic primitive variables
       do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
          ! Get mixture density
          this%RHO(i,j,k)=this%Q(i,j,k,1)+this%Q(i,j,k,2)
@@ -1332,14 +1339,12 @@ contains
             this%EL  (i,j,k)=this%Q (i,j,k,3)/this%Q (i,j,k,1)
             this%IL  (i,j,k)=this%EL(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PL  (i,j,k)=this%getPL(this%RHOL(i,j,k),this%IL(i,j,k))
-            this%TL  (i,j,k)=this%getTL(this%RHOL(i,j,k),this%PL(i,j,k))
             CL              =this%getCL(this%RHOL(i,j,k),this%PL(i,j,k))
          else
             this%RHOL(i,j,k)=0.0_WP
             this%EL  (i,j,k)=0.0_WP
             this%IL  (i,j,k)=0.0_WP
             this%PL  (i,j,k)=0.0_WP
-            this%TL  (i,j,k)=0.0_WP
             CL              =0.0_WP
          end if
          ! Get gas primitive variables
@@ -1348,30 +1353,48 @@ contains
             this%EG  (i,j,k)=this%Q(i,j,k,4)/        this%Q (i,j,k,2)
             this%IG  (i,j,k)=this%EG(i,j,k)-0.5_WP*(this%U(i,j,k)**2+this%V(i,j,k)**2+this%W(i,j,k)**2)
             this%PG  (i,j,k)=this%getPG(this%RHOG(i,j,k),this%IG(i,j,k))
-            this%TG  (i,j,k)=this%getTG(this%RHOG(i,j,k),this%PG(i,j,k))
             CG              =this%getCG(this%RHOG(i,j,k),this%PG(i,j,k))
          else
             this%RHOG(i,j,k)=0.0_WP
             this%EG  (i,j,k)=0.0_WP
             this%IG  (i,j,k)=0.0_WP
             this%PG  (i,j,k)=0.0_WP
-            this%TG  (i,j,k)=0.0_WP
             CG              =0.0_WP
          end if
          ! Rebuild conserved quantities to ensure consistency
-         !this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k); this%Q(i,j,k,3)=this%Q(i,j,k,1)*this%EL(i,j,k)
-         !this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k); this%Q(i,j,k,4)=this%Q(i,j,k,2)*this%EG(i,j,k)
-         !this%RHO(i,j,k)=this%Q(i,j,k,1)+this%Q(i,j,k,2)
-         !this%Q(i,j,k,5)=this%RHO(i,j,k)*this%U(i,j,k)
-         !this%Q(i,j,k,6)=this%RHO(i,j,k)*this%V(i,j,k)
-         !this%Q(i,j,k,7)=this%RHO(i,j,k)*this%W(i,j,k)
+         this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k); this%Q(i,j,k,3)=this%Q(i,j,k,1)*this%EL(i,j,k)
+         this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k); this%Q(i,j,k,4)=this%Q(i,j,k,2)*this%EG(i,j,k)
+         this%RHO(i,j,k)=this%Q(i,j,k,1)+this%Q(i,j,k,2)
+         this%Q(i,j,k,5)=this%RHO(i,j,k)*this%U(i,j,k)
+         this%Q(i,j,k,6)=this%RHO(i,j,k)*this%V(i,j,k)
+         this%Q(i,j,k,7)=this%RHO(i,j,k)*this%W(i,j,k)
          ! Get mixture speed of sound
          this%C(i,j,k)=sqrt(this%Q(i,j,k,1)*CL/this%RHO(i,j,k)+this%Q(i,j,k,2)*CG/this%RHO(i,j,k))
          ! Get mixture pressure
          this%P(i,j,k)=this%VF(i,j,k)*this%PL(i,j,k)+(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)
-         ! Get mixture temperature
-         this%T(i,j,k)=0.0_WP
       end do; end do; end do
+      
+      ! Get mixture and phasic temperatures
+      if (associated(this%getTL)) then
+         do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+            if (this%VF(i,j,k).ge.VFlo) then
+               this%TL(i,j,k)=this%getTL(this%RHOL(i,j,k),this%PL(i,j,k))
+            else
+               this%TL(i,j,k)=0.0_WP
+            end if
+         end do; end do; end do
+      end if
+      if (associated(this%getTG)) then
+         do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
+            if (this%VF(i,j,k).le.VFhi) then
+               this%TG(i,j,k)=this%getTG(this%RHOG(i,j,k),this%PG(i,j,k))   
+            else
+               this%TG(i,j,k)=0.0_WP
+            end if
+         end do; end do; end do
+      end if
+      this%T=0.0_WP
+      
    end subroutine get_primitive
    
    
@@ -1382,6 +1405,8 @@ contains
       integer :: i,j,k
       type(RectCub_type) :: cell
       type(SepVM_type)   :: separated_volume_moments
+      ! If no relaxation model was provided, return
+      if (.not.associated(this%Prelax)) return
       ! Allocate IRL objects
       call new(cell)
       call new(separated_volume_moments)
@@ -1451,6 +1476,7 @@ contains
       implicit none
       class(mpcomp), intent(inout) :: this
       integer :: n,i,j,k,ierr
+      real(WP), dimension(:,:,:), allocatable :: tmp
       
       ! Compute integrals and extrema of conserved variables
       call this%cfg%integrate(this%VF,integral=this%VFint)
@@ -1473,6 +1499,36 @@ contains
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Qmin,this%nQ,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,this%Qmax,this%nQ,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      
+      ! Also compute integral of phasic KE and phasic entropy
+      allocate(tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      tmp=0.5_WP*this%Q(:,:,:,1)*(this%U**2+this%V**2+this%W**2)
+      call this%cfg%integrate(tmp,integral=this%RHOKLint)
+      tmp=0.5_WP*this%Q(:,:,:,2)*(this%U**2+this%V**2+this%W**2)
+      call this%cfg%integrate(tmp,integral=this%RHOKGint)
+      this%RHOSLint=0.0_WP
+      if (associated(this%getSL)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
+            if (this%VF(i,j,k).ge.VFlo) then
+               tmp(i,j,k)=this%Q(i,j,k,1)*this%getSL(this%RHOL(i,j,k),this%PL(i,j,k))
+            else
+               tmp(i,j,k)=0.0_WP
+            end if
+         end do; end do; end do
+         call this%cfg%integrate(tmp,integral=this%RHOSLint)
+      end if
+      this%RHOSGint=0.0_WP
+      if (associated(this%getSG)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_; do j=this%cfg%jmin_,this%cfg%jmax_; do i=this%cfg%imin_,this%cfg%imax_
+            if (this%VF(i,j,k).le.VFhi) then
+               tmp(i,j,k)=this%Q(i,j,k,2)*this%getSG(this%RHOG(i,j,k),this%PG(i,j,k))
+            else
+               tmp(i,j,k)=0.0_WP
+            end if
+         end do; end do; end do
+         call this%cfg%integrate(tmp,integral=this%RHOSGint)
+      end if
+      deallocate(tmp)
       
       ! Calculate extrema of primitive fields
       this%RHOLmin=+huge(1.0_WP); this%RHOLmax=-huge(1.0_WP); this%RHOGmin=+huge(1.0_WP); this%RHOGmax=-huge(1.0_WP)
