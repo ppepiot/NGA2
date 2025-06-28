@@ -759,7 +759,7 @@ contains
       real(WP), dimension(:,:,:,:), allocatable :: Fx,Fy,Fz
       real(WP), dimension(:,:,:)  , allocatable :: FUX,FUY,FUZ,FVX,FVY,FVZ,FWX,FWY,FWZ
       integer :: i,j,k,n
-      real(WP) :: w,div,YL,YG
+      real(WP) :: w,vel,YL,YG
       real(WP), parameter :: eps=1.0e-15_WP
       real(WP), dimension(-2: 0) :: wenop
       real(WP), dimension(-1:+1) :: wenom
@@ -794,24 +794,45 @@ contains
             do i=this%cfg%imin_,this%cfg%imax_+1
                ! Phasic mass flux
                if (maxval(this%iSL(i-1:i,j,k)).eq.0) then
+                  vel=0.5_WP*sum(this%U(i-1:i,j,k))
                   if (this%VF(i,j,k).gt.0.5_WP) then ! In the liquid
-                     Fx(i,j,k,1)=-0.5_WP*sum(this%U(i-1:i,j,k))*0.5_WP*sum(this%RHOL(i-1:i,j,k))
+                     w=weno_weight((abs(this%RHOL(i-1,j,k)-this%RHOL(i-2,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOL(i+1,j,k)-this%RHOL(i  ,j,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i-1,j,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fx(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOL(i-2:i  ,j,k))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOL(i-1:i+1,j,k))
+                     !Fx(i,j,k,1)=-vel*0.5_WP*sum(this%RHOL(i-1:i,j,k))
                   else                               ! In the gas
-                     Fx(i,j,k,2)=-0.5_WP*sum(this%U(i-1:i,j,k))*0.5_WP*sum(this%RHOG(i-1:i,j,k))
+                     w=weno_weight((abs(this%RHOG(i-1,j,k)-this%RHOG(i-2,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOG(i+1,j,k)-this%RHOG(i  ,j,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i-1,j,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fx(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOG(i-2:i  ,j,k))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOG(i-1:i+1,j,k))
+                     !Fx(i,j,k,2)=-vel*0.5_WP*sum(this%RHOG(i-1:i,j,k))
                   end if
                end if
                if (maxval(this%iSL(i,j-1:j,k)).eq.0) then
+                  vel=0.5_WP*sum(this%V(i,j-1:j,k))
                   if (this%VF(i,j,k).gt.0.5_WP) then ! In the liquid
-                     Fy(i,j,k,1)=-0.5_WP*sum(this%V(i,j-1:j,k))*0.5_WP*sum(this%RHOL(i,j-1:j,k))
+                     w=weno_weight((abs(this%RHOL(i,j-1,k)-this%RHOL(i,j-2,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOL(i,j+1,k)-this%RHOL(i,j  ,k))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j-1,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fy(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOL(i,j-2:j  ,k))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOL(i,j-1:j+1,k))
+                     !Fy(i,j,k,1)=-vel*0.5_WP*sum(this%RHOL(i,j-1:j,k))
                   else                               ! In the gas
-                     Fy(i,j,k,2)=-0.5_WP*sum(this%V(i,j-1:j,k))*0.5_WP*sum(this%RHOG(i,j-1:j,k))
+                     w=weno_weight((abs(this%RHOG(i,j-1,k)-this%RHOG(i,j-2,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOG(i,j+1,k)-this%RHOG(i,j  ,k))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j-1,k))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fy(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOG(i,j-2:j  ,k))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOG(i,j-1:j+1,k))
+                     !Fy(i,j,k,2)=-vel*0.5_WP*sum(this%RHOG(i,j-1:j,k))
                   end if
                end if
                if (maxval(this%iSL(i,j,k-1:k)).eq.0) then
+                  vel=0.5_WP*sum(this%W(i,j,k-1:k))
                   if (this%VF(i,j,k).gt.0.5_WP) then ! In the liquid
-                     Fz(i,j,k,1)=-0.5_WP*sum(this%W(i,j,k-1:k))*0.5_WP*sum(this%RHOL(i,j,k-1:k))
+                     w=weno_weight((abs(this%RHOL(i,j,k-1)-this%RHOL(i,j,k-2))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOL(i,j,k+1)-this%RHOL(i,j,k  ))+eps)/(abs(this%RHOL(i,j,k)-this%RHOL(i,j,k-1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fz(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOL(i,j,k-2:k  ))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOL(i,j,k-1:k+1))
+                     !Fz(i,j,k,1)=-vel*0.5_WP*sum(this%RHOL(i,j,k-1:k))
                   else                               ! In the gas
-                     Fz(i,j,k,2)=-0.5_WP*sum(this%W(i,j,k-1:k))*0.5_WP*sum(this%RHOG(i,j,k-1:k))
+                     w=weno_weight((abs(this%RHOG(i,j,k-1)-this%RHOG(i,j,k-2))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wenop=0.5_WP*[      -w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                     w=weno_weight((abs(this%RHOG(i,j,k+1)-this%RHOG(i,j,k  ))+eps)/(abs(this%RHOG(i,j,k)-this%RHOG(i,j,k-1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,      -w]
+                     Fz(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*this%RHOG(i,j,k-2:k  ))-0.5_WP*(vel-abs(vel))*sum(wenom*this%RHOG(i,j,k-1:k+1))
+                     !Fz(i,j,k,2)=-vel*0.5_WP*sum(this%RHOG(i,j,k-1:k))
                   end if
                end if
                ! Phasic internal energy flux

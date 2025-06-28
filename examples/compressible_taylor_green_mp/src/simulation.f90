@@ -271,6 +271,8 @@ contains
          fs%Q(:,:,:,5)=fs%RHO*fs%U
          fs%Q(:,:,:,6)=fs%RHO*fs%V
          fs%Q(:,:,:,7)=fs%RHO*fs%W
+         ! Communicate conserved variables (not needed in general, but allows 2D runs without changing loop above...)
+         do i=1,fs%nQ; call fs%cfg%sync(fs%Q(:,:,:,i)); end do
          ! Rebuild primitive variables
          call fs%get_primitive()
          ! Compute local Mach number
