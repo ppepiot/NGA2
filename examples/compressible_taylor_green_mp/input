@@ -8,19 +8,19 @@ nz : 1
 
 # Fluid definition
 GammaL : 1.4
-PinfL :  0!100
-RHOL :   10
+PinfL :  0
+RHOL :   0.001
 GammaG : 1.4
 PinfG :  0
 RHOG :   1
 
 # Flow definition
-Mach :   0.2
+Mach :   0.8
 
 # Time integration
-Max timestep size : 0.02
+Max timestep size : 0.0025
 Max cfl number :    10.0
 Max time :          1000
 
 # Ensight output
-Ensight output period : 1e-10
+Ensight output period : 0.1

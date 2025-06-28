@@ -1326,9 +1326,6 @@ contains
          this%W(i,j,k)=this%Q(i,j,k,7)/this%RHO(i,j,k)
          ! Get mixture total energy
          this%E(i,j,k)=(this%Q(i,j,k,3)+this%Q(i,j,k,4))/this%RHO(i,j,k)
-         ! Ensure proper distribution of phasic mass and energy
-         if (this%VF(i,j,k).le.VFlo) then; this%Q(i,j,k,2)=sum(this%Q(i,j,k,1:2)); this%Q(i,j,k,1)=0.0_WP; this%Q(i,j,k,4)=sum(this%Q(i,j,k,3:4)); this%Q(i,j,k,3)=0.0_WP; end if
-         if (this%VF(i,j,k).ge.VFhi) then; this%Q(i,j,k,1)=sum(this%Q(i,j,k,1:2)); this%Q(i,j,k,2)=0.0_WP; this%Q(i,j,k,3)=sum(this%Q(i,j,k,3:4)); this%Q(i,j,k,4)=0.0_WP; end if
          ! Get liquid primitive variables
          if (this%VF(i,j,k).ge.VFlo) then
             this%RHOL(i,j,k)=this%Q (i,j,k,1)/this%VF(i,j,k)
@@ -1361,7 +1358,14 @@ contains
             this%TG  (i,j,k)=0.0_WP
             CG              =0.0_WP
          end if
-         ! Mixture speed of sound
+         ! Rebuild conserved quantities to ensure consistency
+         !this%Q(i,j,k,1)=(       this%VF(i,j,k))*this%RHOL(i,j,k); this%Q(i,j,k,3)=this%Q(i,j,k,1)*this%EL(i,j,k)
+         !this%Q(i,j,k,2)=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k); this%Q(i,j,k,4)=this%Q(i,j,k,2)*this%EG(i,j,k)
+         !this%RHO(i,j,k)=this%Q(i,j,k,1)+this%Q(i,j,k,2)
+         !this%Q(i,j,k,5)=this%RHO(i,j,k)*this%U(i,j,k)
+         !this%Q(i,j,k,6)=this%RHO(i,j,k)*this%V(i,j,k)
+         !this%Q(i,j,k,7)=this%RHO(i,j,k)*this%W(i,j,k)
+         ! Get mixture speed of sound
          this%C(i,j,k)=sqrt(this%Q(i,j,k,1)*CL/this%RHO(i,j,k)+this%Q(i,j,k,2)*CG/this%RHO(i,j,k))
          ! Get mixture pressure
          this%P(i,j,k)=this%VF(i,j,k)*this%PL(i,j,k)+(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)
