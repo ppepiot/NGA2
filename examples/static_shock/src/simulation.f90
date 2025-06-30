@@ -53,7 +53,43 @@ contains
       get_C=sqrt(Gamma*P/RHO)
    end function get_C
    
-
+   
+   !> Mechanical relaxation model
+   subroutine P_relax(VF,Q)
+      implicit none
+      real(WP),                intent(inout) :: VF
+      real(WP), dimension(1:), intent(inout) :: Q
+      real(WP) :: PG,PL,ZG,ZL,Pint
+      real(WP) :: a,b,d,coeffL,coeffG,Peq,VFeq
+      ! Get phasic pressures
+      PL=get_P(RHO=Q(1)/(       VF),I=Q(3)/Q(1)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
+      PG=get_P(RHO=Q(2)/(1.0_WP-VF),I=Q(4)/Q(2)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
+      ! Handle limit cases
+      if (PL.lt.0.0_WP) then; VF=0.0_WP; Q(4)=Q(3)+Q(4); Q(3)=0.0_WP; return; end if
+      if (PG.lt.0.0_WP) then; VF=1.0_WP; Q(3)=Q(3)+Q(4); Q(4)=0.0_WP; return; end if
+      ! Get phasic impedances
+      ZL=Q(1)/(       VF)*get_C(RHO=Q(1)/(       VF),P=PL)**2
+      ZG=Q(2)/(1.0_WP-VF)*get_C(RHO=Q(2)/(1.0_WP-VF),P=PG)**2
+      ! Calculate model interface pressure
+      Pint=(ZG*PL+ZL*PG)/(ZG+ZL)
+      ! Setup quadratic problem
+      coeffL=(Gamma-1.0_WP)*Pint
+      coeffG=(Gamma-1.0_WP)*Pint
+      a=1.0_WP+Gamma*VF+Gamma*(1.0_WP-VF)
+      b=coeffL*(1.0_WP-VF)+coeffG*VF-(1.0_WP+Gamma)*VF*PL-(1.0_WP+Gamma)*(1.0_WP-VF)*PG
+      d=-(coeffG*VF*PL+coeffL*(1.0_WP-VF)*PG)
+      ! Get equilibrium pressure
+      Peq=(-b+sqrt(b**2-4.0_WP*a*d))/(2.0_WP*a)
+      ! Get equilibrium volume fraction
+      VFeq=VF*((gamma-1.0_WP)*Peq+2.0_WP*PL+coeffL)/((1.0_WP+gamma)*Peq+coeffL)
+      !print*,Peq,PL,PG,VFeq,VF
+      ! Adjust conserved quantities
+      Q(3)=Q(3)-0.5_WP*(Pint+Peq)*(VFeq-VF)
+      Q(4)=Q(4)+0.5_WP*(Pint+Peq)*(VFeq-VF)
+      VF=VFeq
+   end subroutine P_relax
+   
+   
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -108,6 +144,8 @@ contains
       create_velocity_solver: block
          ! Initialize solver with required thermodynamic functions
          call fs%initialize(cfg=cfg,getPL=get_P,getCL=get_C,getPG=get_P,getCG=get_C,name='Compressible NS')
+         ! Provide pressure relaxation model
+         fs%Prelax=>P_relax
       end block create_velocity_solver
       
       ! Allocate work arrays
@@ -119,6 +157,8 @@ contains
       ! Initialize our initial conditions
       initial_conditions: block
          use irl_fortran_interface, only: setNumberOfPlanes,setPlane
+         use mms_geom,              only: initialize_volume_moments
+         use mpcomp_class,          only: VFlo
          integer :: i,j,k
          ! Initialize gas fields
          do k=cfg%kmino_,cfg%kmaxo_
@@ -130,6 +170,9 @@ contains
                   fs%BG(:,i,j,k)=[fs%cfg%xm(i),fs%cfg%ym(j),fs%cfg%zm(k)]
                   ! Set corresponding PLIC
                   call setNumberOfPlanes(fs%PLIC(i,j,k),1); call setPlane(fs%PLIC(i,j,k),0,[0.0_WP,0.0_WP,0.0_WP],sign(1.0_WP,fs%VF(i,j,k)-0.5_WP))
+                  ! Volume moments for a slab
+                  call initialize_volume_moments(lo=[cfg%x(i),cfg%y(j),cfg%z(k)],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
+                  levelset=levelset_slab,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
                   ! Setup normal shock
                   fs%RHOG(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),delta=0.5_WP)
                   fs%RHOL(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),delta=0.5_WP)
@@ -142,15 +185,15 @@ contains
             end do
          end do
          ! Uncomment this for moving shock
-         !fs%U=fs%U-u1
+         fs%U=fs%U-u1
          ! Build total energy
          fs%EL=fs%IL+0.5_WP*fs%U**2
          fs%EG=fs%IG+0.5_WP*fs%U**2
          ! Initialize conserved variables
-         fs%Q(:,:,:,1)=fs%RHOL
-         fs%Q(:,:,:,2)=fs%RHOG
-         fs%Q(:,:,:,3)=fs%RHOL*fs%EL
-         fs%Q(:,:,:,4)=fs%RHOG*fs%EG
+         fs%Q(:,:,:,1)=(       fs%VF)*fs%RHOL
+         fs%Q(:,:,:,2)=(1.0_WP-fs%VF)*fs%RHOG
+         fs%Q(:,:,:,3)=fs%Q(:,:,:,1)*fs%EL
+         fs%Q(:,:,:,4)=fs%Q(:,:,:,2)*fs%EG
          fs%RHO=fs%Q(:,:,:,1)+fs%Q(:,:,:,2)
          fs%Q(:,:,:,5)=fs%RHO*fs%U
          fs%Q(:,:,:,6)=fs%RHO*fs%V
@@ -169,11 +212,20 @@ contains
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
          ! Add variables to output
-         call ens_out%add_scalar('pressure',fs%P)
-         call ens_out%add_vector('velocity',fs%U,fs%V,fs%W)
-         call ens_out%add_scalar('density' ,fs%RHO)
-         call ens_out%add_scalar('energy'  ,fs%E)
+         call ens_out%add_scalar('VOF',fs%VF)
+         call ens_out%add_scalar('P',fs%P)
+         call ens_out%add_vector('U',fs%U,fs%V,fs%W)
+         call ens_out%add_scalar('RHO' ,fs%RHO)
+         call ens_out%add_scalar('E',fs%E)
          call ens_out%add_scalar('Mach',Ma)
+
+         call ens_out%add_scalar('PL',fs%PL)
+         call ens_out%add_scalar('PG',fs%PG)
+         call ens_out%add_scalar('RHOL' ,fs%RHOL)
+         call ens_out%add_scalar('RHOG' ,fs%RHOG)
+         call ens_out%add_scalar('EL',fs%EL)
+         call ens_out%add_scalar('EG',fs%EG)
+         
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -227,6 +279,17 @@ contains
          call consfile%add_column(fs%RHOKGint,'Kinetic energy')
          call consfile%write()
       end block create_monitor
+      
+   contains
+      
+      !> Function that defines a level set function for a slab
+      function levelset_slab(xyz,t) result(G)
+         implicit none
+         real(WP), dimension(3),intent(in) :: xyz
+         real(WP), intent(in) :: t
+         real(WP) :: G
+         G=20.0_WP-abs(xyz(1)+40.0_WP)
+      end function levelset_slab
       
    end subroutine simulation_init
    
