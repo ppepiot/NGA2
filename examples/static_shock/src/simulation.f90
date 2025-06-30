@@ -59,34 +59,12 @@ contains
       implicit none
       real(WP),                intent(inout) :: VF
       real(WP), dimension(1:), intent(inout) :: Q
-      real(WP) :: PG,PL,ZG,ZL,Pint
-      real(WP) :: a,b,d,coeffL,coeffG,Peq,VFeq
-      ! Get phasic pressures
-      PL=get_P(RHO=Q(1)/(       VF),I=Q(3)/Q(1)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
-      PG=get_P(RHO=Q(2)/(1.0_WP-VF),I=Q(4)/Q(2)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
-      ! Handle limit cases
-      if (PL.lt.0.0_WP) then; VF=0.0_WP; Q(4)=Q(3)+Q(4); Q(3)=0.0_WP; return; end if
-      if (PG.lt.0.0_WP) then; VF=1.0_WP; Q(3)=Q(3)+Q(4); Q(4)=0.0_WP; return; end if
-      ! Get phasic impedances
-      ZL=Q(1)/(       VF)*get_C(RHO=Q(1)/(       VF),P=PL)**2
-      ZG=Q(2)/(1.0_WP-VF)*get_C(RHO=Q(2)/(1.0_WP-VF),P=PG)**2
-      ! Calculate model interface pressure
-      Pint=(ZG*PL+ZL*PG)/(ZG+ZL)
-      ! Setup quadratic problem
-      coeffL=(Gamma-1.0_WP)*Pint
-      coeffG=(Gamma-1.0_WP)*Pint
-      a=1.0_WP+Gamma*VF+Gamma*(1.0_WP-VF)
-      b=coeffL*(1.0_WP-VF)+coeffG*VF-(1.0_WP+Gamma)*VF*PL-(1.0_WP+Gamma)*(1.0_WP-VF)*PG
-      d=-(coeffG*VF*PL+coeffL*(1.0_WP-VF)*PG)
-      ! Get equilibrium pressure
-      Peq=(-b+sqrt(b**2-4.0_WP*a*d))/(2.0_WP*a)
-      ! Get equilibrium volume fraction
-      VFeq=VF*((gamma-1.0_WP)*Peq+2.0_WP*PL+coeffL)/((1.0_WP+gamma)*Peq+coeffL)
-      !print*,Peq,PL,PG,VFeq,VF
-      ! Adjust conserved quantities
-      Q(3)=Q(3)-0.5_WP*(Pint+Peq)*(VFeq-VF)
-      Q(4)=Q(4)+0.5_WP*(Pint+Peq)*(VFeq-VF)
-      VF=VFeq
+      real(WP) :: E
+      ! Adjust conserved quantities to match single-phase model
+      VF=Q(1)/(Q(1)+Q(2))
+      E=Q(3)+Q(4)
+      Q(3)=E*VF
+      Q(4)=E*(1.0_WP-VF)
    end subroutine P_relax
    
    
@@ -338,6 +316,8 @@ contains
          fs%Q=fs%Qold+0.5_WP*time%dt*dQdt(:,:,:,:,1)
          ! Increment Q with SL terms
          call fs%SLincrement()
+         ! Enforce mechanical equilibrium
+         call fs%relax_pressure()
          ! Recompute primitive variables
          call fs%get_primitive()
          
@@ -347,6 +327,8 @@ contains
          fs%Q=fs%Qold+0.5_WP*time%dt*dQdt(:,:,:,:,2)
          ! Increment Q with SL terms
          call fs%SLincrement()
+         ! Enforce mechanical equilibrium
+         call fs%relax_pressure()
          ! Recompute primitive variables
          call fs%get_primitive()
          
@@ -360,6 +342,8 @@ contains
          fs%Q=fs%Qold+1.0_WP*time%dt*dQdt(:,:,:,:,3)
          ! Increment Q with SL terms
          call fs%SLincrement()
+         ! Enforce mechanical equilibrium
+         call fs%relax_pressure()
          ! Recompute primitive variables
          call fs%get_primitive()
          

@@ -9,7 +9,7 @@ nz : 1
 # Fluid definition
 GammaL : 1.4
 PinfL :  0
-RHOL :   0.001
+RHOL :   1
 GammaG : 1.4
 PinfG :  0
 RHOG :   1
@@ -18,7 +18,7 @@ RHOG :   1
 Mach :   0.8
 
 # Time integration
-Max timestep size : 0.0025
+Max timestep size : 0.005
 Max cfl number :    10.0
 Max time :          1000
 

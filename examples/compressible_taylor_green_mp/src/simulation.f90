@@ -128,12 +128,24 @@ contains
       Peq=(-b+sqrt(b**2-4.0_WP*a*d))/(2.0_WP*a)
       ! Get equilibrium volume fraction
       VFeq=VF*((gammaL-1.0_WP)*Peq+2.0_WP*PL+coeffL)/((1.0_WP+gammaL)*Peq+coeffL)
-      !print*,Peq,PL,PG,VFeq,VF
       ! Adjust conserved quantities
       Q(3)=Q(3)-0.5_WP*(Pint+Peq)*(VFeq-VF)
       Q(4)=Q(4)+0.5_WP*(Pint+Peq)*(VFeq-VF)
       VF=VFeq
    end subroutine P_relax
+
+
+   !> Pseudo single-phase mechanical relaxation
+   !subroutine P_relax(VF,Q)
+   !   implicit none
+   !   real(WP),                intent(inout) :: VF
+   !   real(WP), dimension(1:), intent(inout) :: Q
+   !   real(WP) :: E
+   !   VF=Q(1)/(Q(1)+Q(2))
+   !   E=Q(3)+Q(4)
+   !   Q(3)=E*VF
+   !   Q(4)=E*(1.0_WP-VF)
+   !end subroutine P_relax
    
    
    !> Initialization of problem solver
