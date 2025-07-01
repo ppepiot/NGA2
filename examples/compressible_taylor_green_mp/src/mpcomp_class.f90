@@ -1406,7 +1406,7 @@ contains
          this%Q(i,j,k,6)=this%RHO(i,j,k)*this%V(i,j,k)
          this%Q(i,j,k,7)=this%RHO(i,j,k)*this%W(i,j,k)
          ! Get mixture speed of sound
-         this%C(i,j,k)=this%Q(i,j,k,1)*CL/this%RHO(i,j,k)+this%Q(i,j,k,2)*CG/this%RHO(i,j,k)
+         this%C(i,j,k)=sqrt((this%Q(i,j,k,1)*CL**2+this%Q(i,j,k,2)*CG**2)/this%RHO(i,j,k))
          ! Get mixture pressure
          this%P(i,j,k)=this%VF(i,j,k)*this%PL(i,j,k)+(1.0_WP-this%VF(i,j,k))*this%PG(i,j,k)
       end do; end do; end do
