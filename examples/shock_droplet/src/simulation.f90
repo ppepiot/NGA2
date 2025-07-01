@@ -27,13 +27,14 @@ module simulation
    real(WP), dimension(:,:,:,:,:), allocatable :: dQdt
    real(WP), dimension(:,:,:)    , allocatable :: Ma
    
-   !> Equation of state and flow conditions
-   real(WP) :: Mach
-   real(WP) :: GammaL,PinfL,CvL,RHOL,GammaG,PinfG,CvG,RHOG
+   !> Equations of state
+   real(WP) :: PinfL,GammaL,CvL
+   real(WP) ::       GammaG,CvG
    
-   !> Drop radius and center
-   real(WP) :: radius=1.0_WP
-   real(WP), dimension(3) :: center=[0.0_WP,0.0_WP,0.0_WP]
+   !> Shock parameters
+   real(WP) :: Ms,Xs
+   real(WP) :: rho1,p1,u1,M1
+   real(WP) :: rho2,p2,u2,M2
    
 contains
    
@@ -46,6 +47,14 @@ contains
    !      fs%visc(i,j,k)=Reynolds**(-1.0_WP)*(1.4042_WP*fs%T(i,j,k)**1.5_WP)/(fs%T(i,j,k)+0.4042_WP)
    !   end do; end do; end do
    !end subroutine get_visc
+   
+   
+   !> Function that returns a smooth Heaviside of thickness delta
+   real(WP) function Hshock(x,delta)
+      real(WP), intent(in) :: x,delta
+      ! Goes from 1 to 0 as x goes from begative to positive
+      Hshock=1.0_WP/(1.0_WP+exp(-x/delta))
+   end function Hshock
    
    
    !> P=EOS(RHO,I) for liquid
@@ -78,25 +87,25 @@ contains
    pure real(WP) function get_PG(RHO,I)
       implicit none
       real(WP), intent(in) :: RHO,I
-      get_PG=RHO*I*(GammaG-1.0_WP)-GammaG*PinfG
+      get_PG=RHO*I*(GammaG-1.0_WP)
    end function get_PG
    !> T=f(RHO,P) for gas
    pure real(WP) function get_TG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_TG=(P+PinfG)/(CvG*RHO*(GammaG-1.0_WP))
+      get_TG=P/(CvG*RHO*(GammaG-1.0_WP))
    end function get_TG
    !> C=f(RHO,P) for gas
    pure real(WP) function get_CG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_CG=sqrt(GammaG*(P+PinfG)/RHO)
+      get_CG=sqrt(GammaG*P/RHO)
    end function get_CG
    !> S=f(RHO,P) for gas
    pure real(WP) function get_SG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_SG=CvG*log((P+PinfG)/RHO**GammaG)
+      get_SG=CvG*log(P/RHO**GammaG)
    end function get_SG
    
    
@@ -133,19 +142,6 @@ contains
       Q(4)=Q(4)+0.5_WP*(Pint+Peq)*(VFeq-VF)
       VF=VFeq
    end subroutine P_relax
-
-
-   !> Pseudo single-phase mechanical relaxation
-   !subroutine P_relax(VF,Q)
-   !   implicit none
-   !   real(WP),                intent(inout) :: VF
-   !   real(WP), dimension(1:), intent(inout) :: Q
-   !   real(WP) :: E
-   !   VF=Q(1)/(Q(1)+Q(2))
-   !   E=Q(3)+Q(4)
-   !   Q(3)=E*VF
-   !   Q(4)=E*(1.0_WP-VF)
-   !end subroutine P_relax
    
    
    !> Initialization of problem solver
@@ -153,18 +149,42 @@ contains
       use param, only: param_read
       implicit none
       
-      ! Prepare EoS and flow conditions
-      initialize_eos: block
-         call param_read('GammaL'  ,GammaL  )
-         call param_read('PinfL'   ,PinfL   )
-         call param_read('RHOL'    ,RHOL    )
-         call param_read('GammaG'  ,GammaG  )
-         call param_read('PinfG'   ,PinfG   )
-         call param_read('RHOG'    ,RHOG    )
-         call param_read('Mach'    ,Mach    )
-         CvL=1.0_WP/(GammaL*(GammaL-1.0_WP)*Mach**2)
-         CvG=1.0_WP/(GammaG*(GammaG-1.0_WP)*Mach**2)
-      end block initialize_eos
+      ! Initialize flow/fluid conditions
+      initialize_conditions: block
+         ! Read in fluid gammas
+         call param_read('Liquid gamma',GammaL)
+         call param_read('Gas gamma'   ,GammaG)
+         ! Read in shock Mach number
+         call param_read('Shock Mach number',Ms)
+         call param_read('Shock location',Xs)
+         ! Generate preshock conditions
+         rho1=1.0_WP
+         p1=0.25_WP*rho1/gamma*((gamma+1.0_WP)*M1/(M1**2-1.0_WP))**2 ! Ensures that |u2-u1|=1
+         a1=sqrt(gamma*p1/rho1)
+         ! Generate pre-shock velocity
+         u1=M1*a1
+         ! Also generate post-shock conditions
+         p2=p1*(2.0_WP*gamma/(gamma+1.0_WP)*(M1**2-1.0_WP)+1.0_WP)
+         rho2=rho1*(gamma+1.0_WP)*M1**2/((gamma-1.0_WP)*M1**2+2.0_WP)
+         u2=u1*rho1/rho2
+         a2=sqrt(gamma*p2/rho2)
+         M2=u2/a2
+         ! Output shock info
+         if (cfg%amRoot) then
+            write(message,'("[Pre -shock conditions] =>  rho1=",es12.5)')  rho1; call log(message)
+            write(message,'("[Pre -shock conditions] =>    p1=",es12.5)')    p1; call log(message)
+            write(message,'("[Pre -shock conditions] =>    u1=",es12.5)')    u1; call log(message)
+            write(message,'("[Pre -shock conditions] =>    a1=",es12.5)')    a1; call log(message)
+            write(message,'("[Pre -shock conditions] =>    M1=",es12.5)')    M1; call log(message)
+            write(message,'("[Post-shock conditions] =>  rho2=",es12.5)')  rho2; call log(message)
+            write(message,'("[Post-shock conditions] =>    p2=",es12.5)')    p2; call log(message)
+            write(message,'("[Post-shock conditions] =>    u2=",es12.5)')    u2; call log(message)
+            write(message,'("[Post-shock conditions] =>    a2=",es12.5)')    a2; call log(message)
+            write(message,'("[Post-shock conditions] =>    M2=",es12.5)')    M2; call log(message)
+         end if
+      end block initialize_conditions
+
+
       
       ! Initialize time tracker
       initialize_timetracker: block
