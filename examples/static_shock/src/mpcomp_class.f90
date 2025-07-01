@@ -757,7 +757,7 @@ contains
                YG=(1.0_WP-this%VF(i,j,k))*this%RHOG(i,j,k)/this%RHO(i,j,k)
                dE=0.5_WP*this%U(i,j,k)*(YL*this%dxi*((1.0_WP-this%VF(i+1,j,k))*this%PG(i+1,j,k)-(1.0_WP-this%VF(i-1,j,k))*this%PG(i-1,j,k))-YG*this%dxi*(this%VF(i+1,j,k)*this%PL(i+1,j,k)-this%VF(i-1,j,k)*this%PL(i-1,j,k)))&
                & +0.5_WP*this%V(i,j,k)*(YL*this%dyi*((1.0_WP-this%VF(i,j+1,k))*this%PG(i,j+1,k)-(1.0_WP-this%VF(i,j-1,k))*this%PG(i,j-1,k))-YG*this%dyi*(this%VF(i,j+1,k)*this%PL(i,j+1,k)-this%VF(i,j-1,k)*this%PL(i,j-1,k)))&
-               & +0.5_WP*this%W(i,j,k)*(YL*this%dzi*((1.0_WP-this%VF(i,j,k+1))*this%PG(i,j,k+1)-(1.0_WP-this%VF(i,j,k-1))*this%PG(i,j,k-1))-YG*this%dzi*(this%VF(i,j,k+1)*this%PL(i,j,k+1)-this%VF(i,j,k+1)*this%PL(i,j,k+1)))
+               & +0.5_WP*this%W(i,j,k)*(YL*this%dzi*((1.0_WP-this%VF(i,j,k+1))*this%PG(i,j,k+1)-(1.0_WP-this%VF(i,j,k-1))*this%PG(i,j,k-1))-YG*this%dzi*(this%VF(i,j,k+1)*this%PL(i,j,k+1)-this%VF(i,j,k-1)*this%PL(i,j,k-1)))
                this%Q(i,j,k,3)=this%Q(i,j,k,3)-this%SLdt*dE
                this%Q(i,j,k,4)=this%Q(i,j,k,4)+this%SLdt*dE
             end do
