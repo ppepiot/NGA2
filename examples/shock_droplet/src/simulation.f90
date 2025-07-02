@@ -29,7 +29,7 @@ module simulation
    
    !> Equations of state
    real(WP) :: PinfL,GammaL,CvL
-   real(WP) ::       GammaG,CvG
+   real(WP) :: PinfG,GammaG,CvG
    
    !> Flow parameters
    real(WP) :: Ms,Xs
@@ -89,25 +89,25 @@ contains
    pure real(WP) function get_PG(RHO,I)
       implicit none
       real(WP), intent(in) :: RHO,I
-      get_PG=RHO*I*(GammaG-1.0_WP)
+      get_PG=RHO*I*(GammaG-1.0_WP)-GammaG*PinfG
    end function get_PG
    !> T=f(RHO,P) for gas
    pure real(WP) function get_TG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_TG=P/(CvG*RHO*(GammaG-1.0_WP))
+      get_TG=(P+PinfG)/(CvG*RHO*(GammaG-1.0_WP))
    end function get_TG
    !> C=f(RHO,P) for gas
    pure real(WP) function get_CG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_CG=sqrt(GammaG*P/RHO)
+      get_CG=sqrt(GammaG*(P+PinfG)/RHO)
    end function get_CG
    !> S=f(RHO,P) for gas
    pure real(WP) function get_SG(RHO,P)
       implicit none
       real(WP), intent(in) :: RHO,P
-      get_SG=CvG*log(P/RHO**GammaG)
+      get_SG=CvG*log((P+PinfG)/RHO**GammaG)
    end function get_SG
    
    
@@ -122,8 +122,8 @@ contains
       PL=get_PL(RHO=Q(1)/(       VF),I=Q(3)/Q(1)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
       PG=get_PG(RHO=Q(2)/(1.0_WP-VF),I=Q(4)/Q(2)-0.5_WP*((Q(5)/(Q(1)+Q(2)))**2+(Q(6)/(Q(1)+Q(2)))**2+(Q(7)/(Q(1)+Q(2)))**2))
       ! Handle limit cases
-      if (PL.lt.0.0_WP) then; VF=0.0_WP; Q(4)=Q(3)+Q(4); Q(3)=0.0_WP; return; end if
-      if (PG.lt.0.0_WP) then; VF=1.0_WP; Q(3)=Q(3)+Q(4); Q(4)=0.0_WP; return; end if
+      if (PL.le.-PinfL) then; VF=0.0_WP; Q(4)=Q(3)+Q(4); Q(3)=0.0_WP; return; end if
+      if (PG.le.-PinfG) then; VF=1.0_WP; Q(3)=Q(3)+Q(4); Q(4)=0.0_WP; return; end if
       ! Get phasic impedances
       ZL=Q(1)/(       VF)*get_CL(RHO=Q(1)/(       VF),P=PL)**2
       ZG=Q(2)/(1.0_WP-VF)*get_CG(RHO=Q(2)/(1.0_WP-VF),P=PG)**2
@@ -131,7 +131,7 @@ contains
       Pint=(ZG*PL+ZL*PG)/(ZG+ZL)
       ! Setup quadratic problem
       coeffL=(GammaL-1.0_WP)*Pint+2.0_WP*GammaL*PinfL
-      coeffG=(GammaG-1.0_WP)*Pint!+2.0_WP*GammaG*PinfG
+      coeffG=(GammaG-1.0_WP)*Pint+2.0_WP*GammaG*PinfG
       a=1.0_WP+GammaG*VF+GammaL*(1.0_WP-VF)
       b=coeffL*(1.0_WP-VF)+coeffG*VF-(1.0_WP+GammaG)*VF*PL-(1.0_WP+GammaL)*(1.0_WP-VF)*PG
       d=-(coeffG*VF*PL+coeffL*(1.0_WP-VF)*PG)
@@ -156,6 +156,8 @@ contains
          use string,   only: str_long
          use messager, only: log
          character(str_long) :: message
+         ! Set PinfG to zero
+         PinfG=0.0_WP
          ! Read in Gammas
          call param_read('Liquid gamma',GammaL)
          call param_read('Gas gamma'   ,GammaG)
