@@ -31,10 +31,11 @@ module simulation
    real(WP) :: PinfL,GammaL,CvL
    real(WP) ::       GammaG,CvG
    
-   !> Shock parameters
+   !> Flow parameters
    real(WP) :: Ms,Xs
    real(WP) :: rho1,p1,u1,M1
    real(WP) :: rho2,p2,u2,M2
+   real(WP) :: rho_ratio,Ml
    
 contains
    
@@ -52,7 +53,7 @@ contains
    !> Function that returns a smooth Heaviside of thickness delta
    real(WP) function Hshock(x,delta)
       real(WP), intent(in) :: x,delta
-      ! Goes from 1 to 0 as x goes from begative to positive
+      ! Goes from 0 to 1 as x goes from begative to positive
       Hshock=1.0_WP/(1.0_WP+exp(-x/delta))
    end function Hshock
    
@@ -128,8 +129,8 @@ contains
       ! Calculate model interface pressure
       Pint=(ZG*PL+ZL*PG)/(ZG+ZL)
       ! Setup quadratic problem
-      coeffL=2.0_WP*GammaL*PinfL+(GammaL-1.0_WP)*Pint
-      coeffG=2.0_WP*GammaG*PinfG+(GammaG-1.0_WP)*Pint
+      coeffL=(GammaL-1.0_WP)*Pint+2.0_WP*GammaL*PinfL
+      coeffG=(GammaG-1.0_WP)*Pint!+2.0_WP*GammaG*PinfG
       a=1.0_WP+GammaG*VF+GammaL*(1.0_WP-VF)
       b=coeffL*(1.0_WP-VF)+coeffG*VF-(1.0_WP+GammaG)*VF*PL-(1.0_WP+GammaL)*(1.0_WP-VF)*PG
       d=-(coeffG*VF*PL+coeffL*(1.0_WP-VF)*PG)
@@ -149,42 +150,50 @@ contains
       use param, only: param_read
       implicit none
       
-      ! Initialize flow/fluid conditions
+      ! Initialize eos and flow conditions
       initialize_conditions: block
-         ! Read in fluid gammas
+         use string,   only: str_long
+         use messager, only: log
+         character(str_long) :: message
+         ! Read in Gammas
          call param_read('Liquid gamma',GammaL)
          call param_read('Gas gamma'   ,GammaG)
-         ! Read in shock Mach number
+         ! Read in shock Mach number and location
          call param_read('Shock Mach number',Ms)
          call param_read('Shock location',Xs)
-         ! Generate preshock conditions
+         ! First generate static shock with normalized pre-shock conditions
+         M1=Ms
          rho1=1.0_WP
-         p1=0.25_WP*rho1/gamma*((gamma+1.0_WP)*M1/(M1**2-1.0_WP))**2 ! Ensures that |u2-u1|=1
-         a1=sqrt(gamma*p1/rho1)
-         ! Generate pre-shock velocity
-         u1=M1*a1
-         ! Also generate post-shock conditions
-         p2=p1*(2.0_WP*gamma/(gamma+1.0_WP)*(M1**2-1.0_WP)+1.0_WP)
-         rho2=rho1*(gamma+1.0_WP)*M1**2/((gamma-1.0_WP)*M1**2+2.0_WP)
+         rho2=rho1*(GammaG+1.0_WP)*M1**2/((GammaG-1.0_WP)*M1**2+2.0_WP)
+         p1=0.25_WP*rho1/GammaG*((GammaG+1.0_WP)*M1/(M1**2-1.0_WP))**2 ! Ensures that |u2-u1|=1
+         p2=p1*(2.0_WP*GammaG/(GammaG+1.0_WP)*(M1**2-1.0_WP)+1.0_WP)
+         u1=M1*sqrt(GammaG*p1/rho1)
          u2=u1*rho1/rho2
-         a2=sqrt(gamma*p2/rho2)
-         M2=u2/a2
-         ! Output shock info
+         ! Now shift frame of reference to obtain moving shock
+         u2=abs(u2-u1); M2=u2/sqrt(GammaG*p2/rho2); u1=0.0_WP; M1=u1/sqrt(GammaG*p1/rho1)
+         ! Read in density ratio
+         call param_read('Density ratio',rho_ratio)
+         ! Read in liquid Mach number and use it to set PinfL
+         call param_read('Liquid Mach number',Ml)
+         PinfL=(u2/Ml)**2*(rho1*rho_ratio)/GammaL-p1
+         ! Output case info
          if (cfg%amRoot) then
-            write(message,'("[Pre -shock conditions] =>  rho1=",es12.5)')  rho1; call log(message)
-            write(message,'("[Pre -shock conditions] =>    p1=",es12.5)')    p1; call log(message)
-            write(message,'("[Pre -shock conditions] =>    u1=",es12.5)')    u1; call log(message)
-            write(message,'("[Pre -shock conditions] =>    a1=",es12.5)')    a1; call log(message)
-            write(message,'("[Pre -shock conditions] =>    M1=",es12.5)')    M1; call log(message)
-            write(message,'("[Post-shock conditions] =>  rho2=",es12.5)')  rho2; call log(message)
-            write(message,'("[Post-shock conditions] =>    p2=",es12.5)')    p2; call log(message)
-            write(message,'("[Post-shock conditions] =>    u2=",es12.5)')    u2; call log(message)
-            write(message,'("[Post-shock conditions] =>    a2=",es12.5)')    a2; call log(message)
-            write(message,'("[Post-shock conditions] =>    M2=",es12.5)')    M2; call log(message)
+            write(message,'("[Liquid EOS -- Gamma  ] => GammaL=",es12.5)') GammaL; call log(message)
+            write(message,'("[Liquid EOS -- Pinf   ] =>  PinfL=",es12.5)')  PinfL; call log(message)
+            write(message,'("[   Gas EOS -- Gamma  ] => GammaG=",es12.5)') GammaG; call log(message)
+            write(message,'("[Shock Mach number    ] =>     Ms=",es12.5)')     Ms; call log(message)
+            write(message,'("[Pre -shock conditions] =>   rho1=",es12.5)')   rho1; call log(message)
+            write(message,'("[Pre -shock conditions] =>     p1=",es12.5)')     p1; call log(message)
+            write(message,'("[Pre -shock conditions] =>     u1=",es12.5)')     u1; call log(message)
+            write(message,'("[Pre -shock conditions] =>     M1=",es12.5)')     M1; call log(message)
+            write(message,'("[Post-shock conditions] =>   rho2=",es12.5)')   rho2; call log(message)
+            write(message,'("[Post-shock conditions] =>     p2=",es12.5)')     p2; call log(message)
+            write(message,'("[Post-shock conditions] =>     u2=",es12.5)')     u2; call log(message)
+            write(message,'("[Post-shock conditions] =>     M2=",es12.5)')     M2; call log(message)
+            write(message,'("[Liquid Mach number] =>        Ml=",es12.5)')     Ml; call log(message)
+            write(message,'("[Density ratio     ] => rhol/rho1=",es12.5)') rho_ratio; call log(message)
          end if
       end block initialize_conditions
-
-
       
       ! Initialize time tracker
       initialize_timetracker: block
@@ -215,34 +224,35 @@ contains
       
       ! Prepare initial conditions
       initial_conditions: block
-         use mms_geom,     only: initialize_volume_moments
-         use mpcomp_class, only: VFlo
-         use random,       only: random_uniform
+         use irl_fortran_interface, only: setNumberOfPlanes,setPlane
+         use mms_geom,              only: initialize_volume_moments
+         use mpcomp_class,          only: VFlo
          integer :: i,j,k
-         ! Calculate domain center
-         center=[cfg%x(cfg%imin),cfg%y(cfg%jmin),cfg%z(cfg%kmin)]+0.5_WP*[cfg%x(cfg%imax+1)-cfg%x(cfg%imin),cfg%y(cfg%jmax+1)-cfg%y(cfg%jmin),cfg%z(cfg%kmax+1)-cfg%z(cfg%kmin)]
          ! Initialize primary variables
          do k=cfg%kmino_,cfg%kmaxo_
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
-                  ! Volume moments for a droplet
+                  ! Initialize liquid volume to zero and set corresponding PLIC
+                  fs%VF(i,j,k)=0.0_WP; fs%BL(:,i,j,k)=[fs%cfg%xm(i),fs%cfg%ym(j),fs%cfg%zm(k)]; fs%BG(:,i,j,k)=[fs%cfg%xm(i),fs%cfg%ym(j),fs%cfg%zm(k)]
+                  call setNumberOfPlanes(fs%PLIC(i,j,k),1); call setPlane(fs%PLIC(i,j,k),0,[0.0_WP,0.0_WP,0.0_WP],sign(1.0_WP,fs%VF(i,j,k)-0.5_WP))
+                  ! Not set volume moments for a droplet or a slab
                   call initialize_volume_moments(lo=[cfg%x(i),cfg%y(j),cfg%z(k)],hi=[cfg%x(i+1),cfg%y(j+1),cfg%z(k+1)],&
-                  levelset=levelset_slab,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
-                  ! Mixture velocity
-                  fs%U(i,j,k)=+Mach*sin(cfg%xm(i))*cos(cfg%ym(j))*cos(cfg%zm(k))
-                  fs%V(i,j,k)=-Mach*cos(cfg%xm(i))*sin(cfg%ym(j))*cos(cfg%zm(k))
+                  levelset=levelset_drop,time=0.0_WP,level=4,VFlo=VFlo,VF=fs%VF(i,j,k),BL=fs%BL(:,i,j,k),BG=fs%BG(:,i,j,k))
+                  ! Initialize mixture velocity to normal shock
+                  fs%U(i,j,k)=u2*Hshock(Xs-cfg%xm(i),delta=0.5_WP*fs%dx)
+                  fs%V(i,j,k)=0.0_WP
                   fs%W(i,j,k)=0.0_WP
-                  ! Liquid variables
-                  if (fs%VF(i,j,k).gt.0.0_WP) then
-                     fs%RHOL(i,j,k)=RHOL
-                     fs%PL  (i,j,k)=1.0_WP/GammaL+fs%RHOL(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
-                     fs%IL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PinfL)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
-                  end if
                   ! Gas variables
                   if (fs%VF(i,j,k).lt.1.0_WP) then
-                     fs%RHOG(i,j,k)=RHOG
-                     fs%PG  (i,j,k)=1.0_WP/GammaG+fs%RHOG(i,j,k)*Mach**2/16.0_WP*(cos(2.0_WP*cfg%xm(i))+cos(2.0_WP*cfg%ym(j)))*(cos(2.0_WP*cfg%zm(k))+2.0_WP)
-                     fs%IG  (i,j,k)=(fs%PG(i,j,k)+GammaG*PinfG)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
+                     fs%RHOG(i,j,k)=rho1+(rho2-rho1)*Hshock(Xs-cfg%xm(i),delta=0.5_WP*fs%dx)
+                     fs%PG  (i,j,k)=p1  +(p2  -p1  )*Hshock(Xs-cfg%xm(i),delta=0.5_WP*fs%dx)
+                     fs%IG  (i,j,k)=fs%PG(i,j,k)/(fs%RHOG(i,j,k)*(GammaG-1.0_WP))
+                  end if
+                  ! Liquid variables
+                  if (fs%VF(i,j,k).gt.0.0_WP) then
+                     fs%RHOL(i,j,k)=rho_ratio*rho1
+                     fs%PL  (i,j,k)=p1
+                     fs%IL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PinfL)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
                end do
             end do
@@ -272,7 +282,7 @@ contains
       ! Add Ensight output
       create_ensight: block
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='TaylorGreen')
+         ens_out=ensight(cfg=cfg,name='ShockDrop')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -358,21 +368,21 @@ contains
       end block create_monitor
       
    contains
-      !> Function that defines a level set function for a sphere
+      !> Level set function for a sphere of unity diameter centered at (0,0,0)
       function levelset_drop(xyz,t) result(G)
          implicit none
          real(WP), dimension(3),intent(in) :: xyz
          real(WP), intent(in) :: t
          real(WP) :: G
-         G=radius-sqrt(sum((xyz-center)**2))
+         G=0.5_WP-sqrt(sum(xyz**2))
       end function levelset_drop
-      !> Function that defines a level set function for a slab
+      !> Level set function for a slab of unity width centered at x=0
       function levelset_slab(xyz,t) result(G)
          implicit none
          real(WP), dimension(3),intent(in) :: xyz
          real(WP), intent(in) :: t
          real(WP) :: G
-         G=1.0_WP-abs(xyz(1)-center(1))
+         G=1.0_WP-abs(xyz(1))
       end function levelset_slab
    end subroutine simulation_init
    

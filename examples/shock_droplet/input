@@ -16,18 +16,10 @@ Gas gamma :    1.3
 Liquid gamma : 6.12
 !--- fluid definitions ----
 Density ratio :   1000
-Viscosity ratio : 50
 !------ inviscid ----------
 Shock Mach number :  5
 Shock location :    -2
 Liquid Mach number : 0.1
-!------ viscous -----------
-Gas Reynold number :    200
-Gas Prandtl number :    1.0
-Liquid Prandtl number : 7.0
-!--- surface tension ------
-Weber number : 1000
-
 
 # Time integration
 Max timestep size : 1e-3
