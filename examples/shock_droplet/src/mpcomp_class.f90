@@ -216,10 +216,10 @@ contains
       if (this%cfg%no.lt.3) call die('[mpcomp initialize] mpcomp solver requires at least 3 cells of overlap')
       if (.not.all([this%cfg%uniform_x,this%cfg%uniform_y,this%cfg%uniform_z])) call die('[mpcomp initialize] mpcomp solver requires a uniform mesh')
       
-      ! Store constant cell size and its inverse
-      this%dx=this%cfg%dx(this%cfg%imin_); this%dxi=1.0_WP/this%dx
-      this%dy=this%cfg%dy(this%cfg%jmin_); this%dyi=1.0_WP/this%dy
-      this%dz=this%cfg%dz(this%cfg%kmin_); this%dzi=1.0_WP/this%dz
+      ! Store constant cell size and its inverse, handle 2D conditions
+      this%dx=this%cfg%dx(this%cfg%imin_); this%dxi=1.0_WP/this%dx; if (this%cfg%nx.eq.1) this%dxi=0.0_WP
+      this%dy=this%cfg%dy(this%cfg%jmin_); this%dyi=1.0_WP/this%dy; if (this%cfg%ny.eq.1) this%dyi=0.0_WP
+      this%dz=this%cfg%dz(this%cfg%kmin_); this%dzi=1.0_WP/this%dz; if (this%cfg%nz.eq.1) this%dzi=0.0_WP
       
       ! Allocate and zero out conserved variables
       this%nQ=7

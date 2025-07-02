@@ -471,6 +471,15 @@ contains
          call fs%SLincrement()
          ! Enforce mechanical equilibrium
          call fs%relax_pressure()
+         ! Apply Neumann condition at the outflow
+         neumann_outflow: block
+            integer :: i
+            if (fs%cfg%iproc.eq.fs%cfg%npx) then
+               do i=fs%cfg%imax+1,fs%cfg%imaxo
+                  fs%Q(i,:,:,:)=fs%Q(fs%cfg%imax,:,:,:)
+               end do
+            end if
+         end block neumann_outflow
          ! Recompute primitive variables
          call fs%get_primitive()
          
