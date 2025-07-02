@@ -15,11 +15,11 @@ X0 : -3
 Gas gamma :    1.3
 Liquid gamma : 6.12
 !--- fluid definitions ----
-Density ratio :   1000
+Density ratio :     1000
+Sound speed ratio : 4.3
 !------ inviscid ----------
 Shock Mach number :  5
 Shock location :    -2
-Liquid Mach number : 0.1
 
 # Time integration
 Max timestep size : 1e-3

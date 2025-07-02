@@ -35,7 +35,8 @@ module simulation
    real(WP) :: Ms,Xs
    real(WP) :: rho1,p1,u1,M1
    real(WP) :: rho2,p2,u2,M2
-   real(WP) :: rho_ratio,Ml
+   real(WP) :: rho_ratio,c_ratio
+   real(WP) :: rhol,Ml
    
 contains
    
@@ -171,11 +172,16 @@ contains
          u2=u1*rho1/rho2
          ! Now shift frame of reference to obtain moving shock
          u2=abs(u2-u1); M2=u2/sqrt(GammaG*p2/rho2); u1=0.0_WP; M1=u1/sqrt(GammaG*p1/rho1)
-         ! Read in density ratio
-         call param_read('Density ratio',rho_ratio)
+         ! Read in density ratio and use it to set liquid density
+         call param_read('Density ratio',rho_ratio); rhol=rho_ratio*rho1
          ! Read in liquid Mach number and use it to set PinfL
-         call param_read('Liquid Mach number',Ml)
-         PinfL=(u2/Ml)**2*(rho1*rho_ratio)/GammaL-p1
+         !call param_read('Liquid Mach number',Ml)
+         !PinfL=(u2/Ml)**2*rhol/GammaL-p1
+         !c_ratio=sqrt(GammaL*(p1+PinfL)/rhol)/sqrt(GammaG*p1/rho1)
+         ! Read in sound speed ratio and use it to set PinfL
+         call param_read('Sound speed ratio',c_ratio)
+         PinfL=p1*(rho_ratio*c_ratio**2*GammaG/GammaL-1.0_WP)
+         Ml=u2/sqrt(GammaL*(p1+PinfL)/rhol)
          ! Output case info
          if (cfg%amRoot) then
             write(message,'("[Liquid EOS -- Gamma  ] => GammaL=",es12.5)') GammaL; call log(message)
@@ -192,6 +198,7 @@ contains
             write(message,'("[Post-shock conditions] =>     M2=",es12.5)')     M2; call log(message)
             write(message,'("[Liquid Mach number] =>        Ml=",es12.5)')     Ml; call log(message)
             write(message,'("[Density ratio     ] => rhol/rho1=",es12.5)') rho_ratio; call log(message)
+            write(message,'("[Sound speed ratio ] =>     cl/c1=",es12.5)')   c_ratio; call log(message)
          end if
       end block initialize_conditions
       
@@ -250,7 +257,7 @@ contains
                   end if
                   ! Liquid variables
                   if (fs%VF(i,j,k).gt.0.0_WP) then
-                     fs%RHOL(i,j,k)=rho_ratio*rho1
+                     fs%RHOL(i,j,k)=rhol
                      fs%PL  (i,j,k)=p1
                      fs%IL  (i,j,k)=(fs%PL(i,j,k)+GammaL*PinfL)/(fs%RHOL(i,j,k)*(GammaL-1.0_WP))
                   end if
