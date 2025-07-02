@@ -11,14 +11,14 @@ nz :  1
 X0 : -3
 
 # Adimensional flow parameters
-!---------- eos -----------
+!---------- eos ----------
 Gas gamma :    1.3
 Liquid gamma : 6.12
-!--- fluid definitions ----
+!--- fluid definitions ---
 Density ratio :     1000
 Sound speed ratio : 4.3
-!------ inviscid ----------
-Shock Mach number :  5
+!------ inviscid ---------
+Shock Mach number :  5.12
 Shock location :    -2
 
 # Time integration
