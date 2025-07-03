@@ -38,6 +38,7 @@ module ceq_types   !  define data types
 	real(k_wp), pointer :: BR(:,:)  ! the reduced constraint matrix (nsu x nrc)
 	real(k_wp), pointer :: A(:,:)   ! modified constraint transformation matrix (nb x nc)
 	real(k_wp), pointer :: thermo(:,:)  ! thermodynamic coefficients (re-ordered) (ns x 15)
+	real(k_wp), pointer :: P(:,:)   ! phase summation matrix (ns x 2)
 
 	logical :: initialized != .false. ! = .true. when sys has been initialized
 

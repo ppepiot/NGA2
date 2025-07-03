@@ -14,7 +14,7 @@ module ceq_system
 contains
 
    subroutine ceq_sys_init( ns, ne, ncs, ng, &
-        Ein, CS, Bg, thermo_in, lu_op, diag, sys, iret )
+        Ein, CS, Bg, thermo_in, P, lu_op, diag, sys, iret )
 
 !  Specify a constrained equilibrium system.
 !  This routine must be called (to generate the data structure  sys)
@@ -33,6 +33,7 @@ contains
 !   Bg    - general linear constraint matrix (ns x ng)
 !   thermo_in  - thermodynamic data for species (ns x 15)
 !              - see below for details
+!   P     - Phase summation matrix     
 !   lu_op - logical unit for output 
 !   diag  - level of diagnostic output (0=none, 1=severe errors, ...5=full)
 !   (The values of lu_op and diag are stored in sys, and used in calls to ceq_state.
@@ -72,7 +73,7 @@ contains
 !------------------------
   implicit none
   integer, intent(in)      :: ns, ne, ncs, ng, CS(ncs), lu_op, diag
-  real(k_dp), intent(in)   :: Ein(ns,ne), Bg(ns,ng), thermo_in(ns,15)
+  real(k_dp), intent(in)   :: Ein(ns,ne), Bg(ns,ng), thermo_in(ns,15), P(ns,2)
   integer, intent(out)     :: iret
   real(k_dp) :: BR(ns,ne+ncs+ng), A(ne+ncs+ng,ne+ncs+ng)
   type (sys_type), pointer :: sys
@@ -135,6 +136,7 @@ contains
    allocate( sys%E(ns,ne) )
    allocate( sys%B(ns,nc) )
    allocate( sys%thermo(ns,15) )
+   allocate( sys%P(ns,2) )
 
    sys%Ein = Ein(1:ns,1:ne)
 
@@ -154,6 +156,9 @@ contains
 
 !re-order thermo
    call ceq_reorder( ns, 15, thermo_in, sys%sp_order, sys%thermo )
+
+!re-order P
+   call ceq_reorder( ns, 2, P, sys%sp_order, sys%P )
 
    sys%lu   = lu_op
    sys%diag = diag

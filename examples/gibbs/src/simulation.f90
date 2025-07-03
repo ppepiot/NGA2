@@ -19,6 +19,12 @@ module simulation
    ! Elements matrix
    real(WP), dimension(:,:), allocatable :: elem_mat
 
+   ! Phase summation matrix
+   real(WP), dimension(:,:), allocatable :: phse_mat
+
+   ! Phase indices (need to get these from two_phase classes)
+   integer :: Lphase=0,Gphase=1
+
    ! Simulation subroutines
    public :: simulation_init,simulation_run,simulation_final
    
@@ -138,6 +144,16 @@ contains
             nasa_coef(isc,2:8 )=a(1,:)
             nasa_coef(isc,9:15)=a(2,:)
          end do
+         ! Form the phase summation matrix
+         allocate(phse_mat(ns,Lphase:Gphase)); phse_mat(:,Lphase)=0.0_WP; phse_mat(:,Gphase)=1.0_WP
+         do isc=1,ns
+            if (len_trim(sp_names(isc)).ge.3) then
+               if (sp_names(isc)(len_trim(sp_names(isc))-2:len_trim(sp_names(isc))).eq.'(L)') then
+                  phse_mat(isc,Lphase)=1.0_WP
+                  phse_mat(isc,Gphase)=0.0_WP
+               end if
+            end if
+         end do
          ! Close the mechanism file and clean up
          call yaml_close_file(domain)
          call sp_list%destroy()
@@ -164,8 +180,7 @@ contains
          allocate(CS(ncs))
          allocate(Bg(ns,ng))
          allocate(N(ns))
-         ! allocate(N_init(ns)); N_init=[2.0_WP,0.0_WP,1.0_WP,0.0_WP] ! This causes the constant p and h case to fail
-         allocate(N_init(ns)); N_init=[2.0_WP,2.0_WP,1.0_WP,1.0_WP]
+         allocate(N_init(ns)); N_init=[1.0_WP,0.0_WP,1.0_WP,3.71_WP]
          allocate(c(ng))
          allocate(stats(20))
          ! Print the initial conditions
@@ -174,7 +189,7 @@ contains
             print*,trim(sp_names(isc)),': ',N_init(isc)
          end do
          ! Inizialize the system
-         call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5,sys=sys,iret=iret)
+         call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
          if (iret.lt.0) call die('System initialization failed.')
          ! Get the equilibrium state
          ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,info=info)
