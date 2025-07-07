@@ -202,19 +202,18 @@ contains
       sys_init: block
          use ceq_system,  only: ceq_sys_init
          use ceq_state_m, only: ceq_state
-         integer :: ncs=0,ng=0
+         integer :: ncs=0,ng=1
          integer :: lu,iostat,iret,info
          real(WP), dimension(:,:), allocatable :: Bg
          integer,  dimension(:),   allocatable :: CS
-         real(WP), dimension(:),   allocatable :: N_init,c,stats
+         real(WP), dimension(:),   allocatable :: N_init,stats
          real(WP) :: HoR
          integer :: isc
          ! Allocate arrays
          allocate(CS(ncs))
-         allocate(Bg(ns,ng))
+         allocate(Bg(ns,ng));  Bg=reshape([1.0_WP,1.0_WP],shape(Bg))
          allocate(N(ns))
          allocate(N_init(ns)); N_init=[0.0_WP,1.0_WP]
-         allocate(c(ng))
          allocate(stats(20))
          ! Print the initial conditions
          print*,'Initial moles:'
@@ -288,7 +287,6 @@ contains
       real(WP) :: rcond
       integer  :: rank,lwork
 
-
       ! Allocate arrays
       allocate(Jac(nc+np,nc+np)); Jac=0.0_WP
       allocate(BTB(nc,nc));       BTB=0.0_WP
@@ -301,11 +299,10 @@ contains
       allocate(S(nc+np))
       lwork=10*(nc+np)
       allocate(work(lwork))
-
       rcond=-1.0_WP
       
       ! Newton-Raphson
-      iter_max=100
+      iter_max=50
       tol=1e-6
       y=get_y(x,gort)
       do iter=1,iter_max
@@ -365,13 +362,12 @@ contains
             print*, 'ERROR: dgelss failed, info =',info
             call die('Least-squares solve failed')
          end if
+         print*,'Rank = ',rank,'/',nc+np
+         print*,'Smallest singular value = ',minval(S)
          ! Update the solution
          x=x0+dx
          ! Get the species and phase moles
          y=get_y(x,gort)
-         if (any(y.le.0.0_WP)) then
-            print*,'Warning: y has zero or negative entries!'
-         end if
          N=y*y
          Nbar=exp(x(nc+1:nc+np))
          print*, 'Iter: ',iter,', norm(R) = ',err,', norm(dx) = ',norm2(dx)
@@ -379,7 +375,7 @@ contains
 
       ! Output
       print*,'Number of iterations = ', iter
-      print*,'Residal error = ', err
+      print*,'Residal error = ', R
       print*,'Equilibrium moles:'
       do isc=1,ns
          print*,trim(sp_names(isc)),': ',N(isc)
