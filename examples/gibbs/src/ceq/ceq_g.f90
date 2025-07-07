@@ -6,16 +6,17 @@
 !  source directory.)                                                 !
 !---------------------------------------------------------------------!
 
-subroutine ceq_g(ns,T,p,thermo,gort)
+subroutine ceq_g(ns,T,p,thermo,isGas,gort)
 !----------------
   implicit none
   integer, parameter :: ncof=7
   integer, intent(in) :: ns
-  real(kind(1.d0)), intent(in) :: T, p, thermo(ns,2*ncof+1)
+  real(kind(1.d0)), intent(in) :: T, p, thermo(ns,2*ncof+1), isGas(ns)
   real(kind(1.d0)), intent(out) :: gort(ns)
 !-------------
 !  return normalized Gibbs functions at temperature T
 ! input:
+!   isGas  - 1 if gas, 0 if liquid
 !   T      - temperature (K)
 !   p      - pressure (atm)
 !   thermo - thermo data for all species
@@ -52,22 +53,23 @@ do k=1,ns
     endif
 end do
 
-gort=gort+log(p)
+gort=gort+isGas*log(p)
 
 end subroutine ceq_g
 
 
 ! Extra to return just the entropy part of the gibbs free energy formula
-subroutine ceq_s(ns,T,p,thermo,s)
+subroutine ceq_s(ns,T,p,thermo,isGas,s)
 !----------------
   implicit none
   integer, parameter :: ncof=7
   integer, intent(in) :: ns
-  real(kind(1.d0)), intent(in) :: T, p, thermo(ns,2*ncof+1)
+  real(kind(1.d0)), intent(in) :: T, p, thermo(ns,2*ncof+1), isGas(ns)
   real(kind(1.d0)), intent(out) :: s(ns)
 !-------------
 !  return normalized Gibbs functions at temperature T
 ! input:
+!   isGas  - 1 if gas, 0 if liquid
 !   T      - temperature (K)
 !   p      - pressure (atm)
 !   thermo - thermo data for all species
@@ -104,7 +106,7 @@ do k=1,ns
     endif
 end do
 
-s=s+log(p)
+s=s+isGas*log(p)
 
 !print*,'T',T 
 !print*,'P',p 

@@ -11,6 +11,8 @@ module ceq_solve
 use ceq_types
 implicit none
 
+integer :: Lphase=0,Gphase=1
+
 contains
 
 subroutine ceq_fixed_T( sys, state, nsu, nrc, gu, gu0, lam0, res0, res_tol, lam, zu, err, fail )
@@ -187,7 +189,7 @@ subroutine ceq_fixed_h( sys, state, nsu, nrc, T0, h0, gu0, lam0, res_tol, &
 
 !  determine equilibrium composition at current T
       guold      = gu
-	  call ceq_g( nsu, T, state%p, sys%thermo(nsd+1:ns,:), gu)
+	  call ceq_g( nsu, T, state%p, sys%thermo(nsd+1:ns,:), sys%P(nsd+1:ns,Gphase), gu)
 
       call ceq_fixed_T( sys, state, nsu, nrc, gu, guold, lam, res0, res_tol, lam1, zu, err, fail )
 
@@ -574,7 +576,7 @@ subroutine ceq_cp_eff( sys, state, ns, nsd, nsu, nrc, zu, lam, T, cp_eff, fail )
 				 dXddT(nsd), dXdT(ns), w(nrc), dNdT
 
 !  determine d(lam)/dT from dg/dT
-   call ceq_g( nsu, T, state%p, sys%thermo(nsd+1:ns,:) ,gu )
+   call ceq_g( nsu, T, state%p, sys%thermo(nsd+1:ns,:), sys%P(nsd+1:ns,Gphase) ,gu )
    call ceq_dgdT( nsu, T,       sys%thermo(nsd+1:ns,:), dgudT )
 
    call ceq_rate( sys, state, nsu, nrc, lam, gu, dgudT, state%Q, dlamdT, fail )

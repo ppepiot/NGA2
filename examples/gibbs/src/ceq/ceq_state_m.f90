@@ -263,7 +263,7 @@ subroutine ceq_state( sys, c, N, p_atm, p_Pa, p_cgs, T, HoR, N_h, T_h, &
 	  T0 = max( T0, 0.1d0 * sys%T_high )
    endif
 
-   call ceq_g( nsu, T0, p, sys%thermo(nsd+1:ns,:), gu )
+   call ceq_g( nsu, T0, p, sys%thermo(nsd+1:ns,:), sys%P(nsd+1:ns,Gphase), gu )
 
 !  form the basic constraint vector  =========================
 
@@ -435,7 +435,7 @@ subroutine ceq_state( sys, c, N, p_atm, p_Pa, p_cgs, T, HoR, N_h, T_h, &
 		   return
 	   endif
 
-	   call ceq_g( nsu, T0, p, sys%thermo(nsd+1:ns,:), gu )  ! set gu based on T0
+	   call ceq_g( nsu, T0, p, sys%thermo(nsd+1:ns,:), sys%P(nsd+1:ns,Gphase), gu )  ! set gu based on T0
    endif
 
    state%gu = gu
@@ -452,37 +452,39 @@ subroutine ceq_state( sys, c, N, p_atm, p_Pa, p_cgs, T, HoR, N_h, T_h, &
 
 !===============  perform equilibrium calculation  ==================
    
-   if( fixed_T ) then         ! fixed (p,T)
+   ! DEBUG
+   state%zu=zu0
+   ! if( fixed_T ) then         ! fixed (p,T)
 
-      call ceq_fixed_T( sys, state, nsu, nrc, gu, gu0, lam0, 0.d0, sys%res_tol, &
-	                    state%lam, state%zu, err, fail )
+   !    call ceq_fixed_T( sys, state, nsu, nrc, gu, gu0, lam0, 0.d0, sys%res_tol, &
+	!                     state%lam, state%zu, err, fail )
 
-	  if( fail ) then
-	     info = -16
-		 if( diag ) write(lu,*) 'ceq_state: ceq_fixed_T failed'
-		 return
-	  endif
+	!   if( fail ) then
+	!      info = -16
+	! 	 if( diag ) write(lu,*) 'ceq_state: ceq_fixed_T failed'
+	! 	 return
+	!   endif
 
-   else                       ! fixed (p,h)
+   ! else                       ! fixed (p,h)
 
-      call ceq_fixed_h( sys, state, nsu, nrc, T0, state%h, gu0, lam0, sys%res_tol, &
-                           state%lam, state%zu, state%T, err, iret )
+   !    call ceq_fixed_h( sys, state, nsu, nrc, T0, state%h, gu0, lam0, sys%res_tol, &
+   !                         state%lam, state%zu, state%T, err, iret )
 
-	  if( iret == -1  .or.  iret == -2 ) then
-	     info = -17
-		 if( diag ) write(lu,*) 'ceq_state: ceq_fixed_h failed'
-		 return
-      elseif( iret == -3 ) then
-	     info = -18
-         if( diag ) write(lu,*) 'ceq_state: T_eq is greater than T_high'
-		 return
-      elseif( iret == -4 ) then
-	     info = -19
-         if( diag ) write(lu,*) 'ceq_state: T_eq is less than T_low'
-		 return
-	  endif
+	!   if( iret == -1  .or.  iret == -2 ) then
+	!      info = -17
+	! 	 if( diag ) write(lu,*) 'ceq_state: ceq_fixed_h failed'
+	! 	 return
+   !    elseif( iret == -3 ) then
+	!      info = -18
+   !       if( diag ) write(lu,*) 'ceq_state: T_eq is greater than T_high'
+	! 	 return
+   !    elseif( iret == -4 ) then
+	!      info = -19
+   !       if( diag ) write(lu,*) 'ceq_state: T_eq is less than T_low'
+	! 	 return
+	!   endif
 
-   endif
+   ! endif
 
 !  determine required output  =======================================
 
@@ -519,8 +521,6 @@ subroutine ceq_state( sys, c, N, p_atm, p_Pa, p_cgs, T, HoR, N_h, T_h, &
 
       info = state%nyeval
    endif
-   
-   call ceq_state_rm( state )
 
    return
 
