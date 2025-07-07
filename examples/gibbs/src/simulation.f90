@@ -48,7 +48,7 @@ module simulation
 contains
 
 
-   !> Get the residual vector
+   !> Get the square root of moles
    function get_y(xin,g) result(y)
       real(WP), dimension(nc+np), intent(in) :: xin
       real(WP), dimension(ns),    intent(in) :: g
@@ -62,7 +62,7 @@ contains
       real(WP), dimension(ns), intent(in) :: y
       real(WP), dimension(nc+np) :: res
       res(1:nc)=matmul(BtildeT,y)-constraints
-      res(1:np)=matmul(PtildeT,y)-Nbar
+      res(nc+1:nc+np)=matmul(PtildeT,y)-Nbar
    end function get_res
 
 
@@ -242,7 +242,6 @@ contains
          nc=sys%nc
          allocate(constraints(nc))
          constraints=matmul(N_init,sys%B)
-         N=[0.5_WP,0.5_WP]
       end block sys_init
 
       ! Initialize the chemical state solution vector
@@ -254,7 +253,7 @@ contains
          allocate(x0(nc+np)); x0=0.0_WP
          allocate(dx(nc+np)); dx=0.0_WP
          allocate(Nbar(np));  Nbar=0.0_WP
-         allocate(R (nc+np)); R=0.0_WP
+         allocate(R(nc+np));  R=0.0_WP
          allocate(gort(ns));  gort=0.0_WP
          allocate(rhs(nc))
          allocate(lam(nc))
@@ -285,6 +284,10 @@ contains
       real(WP), dimension(:,:), allocatable :: Jac,BTB,PTP,BTP
       real(WP), dimension(:,:), allocatable :: Btilde,Ptilde
       real(WP), dimension(:),   allocatable :: y
+      real(WP), dimension(:),   allocatable :: S,work
+      real(WP) :: rcond
+      integer  :: rank,lwork
+
 
       ! Allocate arrays
       allocate(Jac(nc+np,nc+np)); Jac=0.0_WP
@@ -295,6 +298,11 @@ contains
       allocate(BtildeT(nc,ns));   BtildeT=0.0_WP
       allocate(PtildeT(np,ns));   PtildeT=0.0_WP
       allocate(y(ns));            y=0.0_WP
+      allocate(S(nc+np))
+      lwork=10*(nc+np)
+      allocate(work(lwork))
+
+      rcond=-1.0_WP
       
       ! Newton-Raphson
       iter_max=100
@@ -304,14 +312,6 @@ contains
          ! Remember the old solution
          x0=x
          ! Build the Jacobian matrix
-         do j=1,nc
-            Btilde(:,j)=y*sys%B(:,j)
-         end do
-         do j=1,np
-            Ptilde(:,j)=y*sys%P(:,j)
-         end do
-         BtildeT=transpose(Btilde)
-         PtildeT=transpose(Ptilde)
          do j=1,nc
             Btilde(:,j)=y*sys%B(:,j)
          end do
@@ -360,16 +360,21 @@ contains
          if (err.lt.tol) exit
          ! Solve for dx
          dx=-R
-         call dpotrf('L',nc+np,Jac,nc+np,info)
-         if (info.ne.0) call die('Cholesky factorization failed')
-         call dpotrs('L',nc+np,1,Jac,nc+np,dx,nc+np,info)
-         if (info.ne.0) call die('Linear solver failed')
+         call dgelss(nc+np,nc+np,1,Jac,nc+np,dx,nc+np,S,rcond,rank,work,lwork,info)
+         if (info.ne.0) then
+            print*, 'ERROR: dgelss failed, info =',info
+            call die('Least-squares solve failed')
+         end if
          ! Update the solution
          x=x0+dx
          ! Get the species and phase moles
          y=get_y(x,gort)
+         if (any(y.le.0.0_WP)) then
+            print*,'Warning: y has zero or negative entries!'
+         end if
          N=y*y
          Nbar=exp(x(nc+1:nc+np))
+         print*, 'Iter: ',iter,', norm(R) = ',err,', norm(dx) = ',norm2(dx)
       end do
 
       ! Output
