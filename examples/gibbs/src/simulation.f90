@@ -242,6 +242,7 @@ contains
          nc=sys%nc
          allocate(constraints(nc))
          constraints=matmul(N_init,sys%B)
+         N=[0.5_WP,0.5_WP]
       end block sys_init
 
       ! Initialize the chemical state solution vector
@@ -276,6 +277,7 @@ contains
 
    !> Perform an NGA2 simulation - this mimicks NGA's old time integration for multiphase
    subroutine simulation_run
+      use messager, only: die
       implicit none
       integer  :: i,j,iJ,jJ,isc,info
       integer  :: iter,iter_max
@@ -357,9 +359,11 @@ contains
          err=norm2(R)
          if (err.lt.tol) exit
          ! Solve for dx
-         x=-R
+         dx=-R
          call dpotrf('L',nc+np,Jac,nc+np,info)
-         call dpotrs('L',nc+np,1,Jac,nc+np,x,nc+np,info)
+         if (info.ne.0) call die('Cholesky factorization failed')
+         call dpotrs('L',nc+np,1,Jac,nc+np,dx,nc+np,info)
+         if (info.ne.0) call die('Linear solver failed')
          ! Update the solution
          x=x0+dx
          ! Get the species and phase moles
