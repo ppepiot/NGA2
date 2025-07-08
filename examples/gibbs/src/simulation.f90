@@ -203,7 +203,7 @@ contains
       sys_init: block
          use ceq_system,  only: ceq_sys_init
          use ceq_state_m, only: ceq_state
-         integer :: ncs=0,ng=1
+         integer :: ncs=2,ng=1
          integer :: lu,iostat,iret,info
          real(WP), dimension(:,:), allocatable :: Bg
          integer,  dimension(:),   allocatable :: CS
@@ -211,10 +211,10 @@ contains
          real(WP) :: HoR
          integer :: isc
          ! Allocate arrays
-         allocate(CS(ncs))
-         allocate(Bg(ns,ng));  Bg=reshape([1.0_WP,1.0_WP,1.0_WP],shape(Bg))
+         allocate(CS(ncs));    CS=[1,4]
+         allocate(Bg(ns,ng));  Bg=reshape([0.0_WP,1.0_WP,1.0_WP,0.0_WP],shape(Bg))
          allocate(N(ns))
-         allocate(N_init(ns)); N_init=[0.0_WP,1.0_WP,1.0_WP]
+         allocate(N_init(ns)); N_init=[1.0_WP,0.0_WP,1.0_WP,3.71_WP]
          allocate(stats(20))
          ! Print the initial conditions
          print*,'Initial moles:'
@@ -226,9 +226,14 @@ contains
          ! Inizialize the system
          call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
          if (iret.lt.0) call die('System initialization failed.')
+         nsd=sys%nsd
+         nsu=sys%nsu
+         ned=sys%ned
+         neu=sys%neu
+         nc =sys%nc
+         nrc=sys%nrc
          ! Get the equilibrium state (I commented out the equilibrium calculcations in ceq_state and made it output the initial mole numbers found by maxmin and ming. See parts with comment "DEBUG")
          call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=373.15_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,state=state,info=info)
-         ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,N_h=N_init,T_h=380.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,info=info)
          ! Close CEQ file
          close(lu)
          ! Error check
@@ -239,12 +244,6 @@ contains
             print*,trim(sp_names(isc)),': ',N(isc)
          end do
          print*,'Equilibrium temperature = ',T, '(k)'
-         nsd=sys%nsd
-         nsu=sys%nsu
-         ned=sys%ned
-         neu=sys%neu
-         nc =sys%nc
-         nrc=sys%nrc
       end block sys_init
 
       ! Initialize the chemical state solution vector
@@ -256,10 +255,10 @@ contains
          allocate(x0(nrc+np)); x0=0.0_WP
          allocate(dx(nrc+np)); dx=0.0_WP
          allocate(Nbar(np));   Nbar=0.0_WP
-         allocate(Nu(nsu));    Nu=0.0_WP
-         allocate(Nd(nsd));    Nd=0.0_WP
-         allocate(Neq(ns));    Neq=0.0_WP
-         allocate(R(nrc+np));  R=0.0_WP
+         allocate(Nu  (nsu));  Nu=0.0_WP
+         allocate(Nd  (nsd));  Nd=0.0_WP
+         allocate(Neq (ns));   Neq=0.0_WP
+         allocate(R (nrc+np)); R=0.0_WP
          allocate(Rd(np));     Rd=0.0_WP
          allocate(gort(nsu));  gort=0.0_WP
          allocate(rhs(nrc))
@@ -271,17 +270,13 @@ contains
          ! Calculate the contribution of Nd in the residual
          Rd=matmul(transpose(sys%P(1:nsd,:)),Nd)
          ! Calculate the Lagrange multipliers
-         call ceq_g(nsu,T,PoPref,sys%thermo,sys%P(nsd+1:ns,Gphase),gort)
-         print*,'gort = ',gort
+         call ceq_g(nsu,T,PoPref,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gort)
          rhs=log(Nu)-matmul(sys%P(nsd+1:ns,:),log(Nbar))+gort
-         print*,'rhs = ',rhs
          call ceq_lss(nsu,nrc,sys%BR,rhs,lam,info)
          if (info.ne.0) call die('Least squares for lambda initialization failed.')
          ! Set the initial solution vector
          x(1:nrc)=lam
          x(nrc+1:nrc+np)=log(Nbar)
-         print*,'Nbar = ',Nbar
-         print*,'x = ',x
       end block x_init
 
    end subroutine simulation_init
@@ -301,16 +296,6 @@ contains
       real(WP) :: rcond
       integer  :: rank,lwork
 
-      print*,'BR = '
-      do isc=1,nsu
-         print*,sys%BR(isc,:)
-      end do
-
-      print*,'PR = '
-      do isc=1,nsu
-         print*,sys%P(isc+nsd,:)
-      end do
-
       ! Allocate arrays
       allocate(Jac(nrc+np,nrc+np)); Jac=0.0_WP
       allocate(BTB(nrc,nrc));       BTB=0.0_WP
@@ -329,7 +314,7 @@ contains
       iter_max=50
       tol=1e-6
       y=get_y(x,gort)
-      print*,'y',y
+      ! y=sqrt(Nu)
       do iter=1,iter_max
          ! Remember the old solution
          x0=x
@@ -376,7 +361,7 @@ contains
             jJ=nrc+i
             Jac(iJ,jJ)=Jac(iJ,jJ)-Nbar(i)
          end do
-         print*,'Jac = '
+         print*,'jac = '
          do i=1,nrc+np
             print*,Jac(i,:)
          end do
@@ -387,19 +372,15 @@ contains
          ! Solve for dx
          dx=-R
          call dgelss(nrc+np,nrc+np,1,Jac,nrc+np,dx,nrc+np,S,rcond,rank,work,lwork,info)
-         print*,'Rank = ',rank,'/',nrc+np
-         print*,'Smallest singular value = ',minval(S)
-         if (info.ne.0) then
-            print*, 'ERROR: dgelss failed, info =',info
-            call die('Least-squares solve failed')
-         end if
+         if (rank.ne.nrc+np) call die('Jacobian is not full rank')
+         if (info.ne.0) call die('Least-squares solver failed')
          ! Update the solution
          x=x0+dx
          ! Get the species and phase moles
          y=get_y(x,gort)
          Nu=y*y
          Nbar=exp(x(nrc+1:nrc+np))
-         print*, 'Iter: ',iter,', norm(R) = ',err,', norm(dx) = ',norm2(dx)
+         print*,'Iter: ',iter,', norm(R) = ',err,', norm(dx) = ',norm2(dx)
       end do
 
       ! Output
