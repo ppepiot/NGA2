@@ -17,7 +17,7 @@ module ceq_state_m
 contains
 
 subroutine ceq_state( sys, c, N, p_atm, p_Pa, p_cgs, T, HoR, N_h, T_h, &
-                      N_g, T_g, N_eq, T_eq, HoR_eq, stats, info )
+                      N_g, T_g, N_eq, T_eq, HoR_eq, stats, state, info )
 
 !  Subroutine ceq_state determines the constrained equilibrium state of 
 !  an ideal gas mixture consisting of ns species, either at fixed pressure and
