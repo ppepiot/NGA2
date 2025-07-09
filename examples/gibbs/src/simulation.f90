@@ -37,7 +37,6 @@ module simulation
    ! Working arrays
    real(WP), dimension(:),   allocatable :: N,Nbar,Nu,Nd,Neq ! Mole numbers
    real(WP), dimension(:),   allocatable :: R,Rd             ! Residuals
-   real(WP), dimension(:),   allocatable :: constraints      ! Residuals
    real(WP), dimension(:),   allocatable :: x,x0,dx          ! Chemical state unknowns
    real(WP), dimension(:),   allocatable :: gort             ! Normalized Gibbs free energy (Molar G over RT)
    real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT
@@ -221,7 +220,7 @@ contains
          do isc=1,ns
             print*,trim(sp_names(isc)),': ',N_init(isc)
          end do
-         ! Open CEQ output file
+         ! Open CEQ file
          open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
          ! Inizialize the system
          call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
@@ -233,8 +232,8 @@ contains
          nc =sys%nc
          nrc=sys%nrc
          ! Get the equilibrium state (I commented out the equilibrium calculcations in ceq_state and made it output the initial mole numbers found by maxmin and ming. See parts with comment "DEBUG")
-         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=373.15_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,state=state,info=info)
-         ! Close CEQ output file
+         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,state=state,info=info)
+         ! Close CEQ file
          close(lu)
          ! Error check
          if (info.lt.0) call die('ceq_state failed.')
@@ -244,6 +243,8 @@ contains
             print*,trim(sp_names(isc)),': ',N(isc)
          end do
          print*,'Equilibrium temperature = ',T, '(k)'
+         ! Deallocate arrays
+         deallocate(CS,Bg,N_init,stats)
       end block sys_init
 
       ! Initialize the chemical state solution vector
@@ -277,6 +278,8 @@ contains
          ! Set the initial solution vector
          x(1:nrc)=lam
          x(nrc+1:nrc+np)=log(Nbar)
+         ! Deallocate arrays
+         deallocate(lam)
       end block x_init
 
    end subroutine simulation_init
@@ -286,8 +289,9 @@ contains
    subroutine simulation_run
       use messager, only: die
       implicit none
-      integer  :: i,j,iJ,jJ,isc,info
-      integer  :: iter,iter_max
+      integer :: i,j,iJ,jJ,isc,info
+      integer :: iter,iter_max
+      integer :: ifile,iostat
       real(WP) :: err,tol
       real(WP), dimension(:,:), allocatable :: Jac,BTB,PTP,BTP
       real(WP), dimension(:,:), allocatable :: Btilde,Ptilde
@@ -311,108 +315,84 @@ contains
       allocate(work(lwork))
       rcond=-1.0_WP
       
-      s=0.0_WP
-      send=1.0_WP
-      gu=gort
-      dguds=gu-gu0
-      do while (s.lt.1.0_WP)
-         ! Get the pseudo time step size
-         ds=send-s
-         ! Get the Gibbs function at s
-         gus=gu-(1.0_WP-s)*dguds
-         ! Get the rate of change of x
-         call get_dxds()
-         ! Decrease the time step size and repeat if needed
-         if (failed) then
-            send=s+*ds
-            cycle
+      ! Open Newton file
+      open(unit=ifile,file='newton',status='replace',action='write',iostat=iostat)
+      write(ifile,*) 'iter','   ','err'
+
+      ! Newton-Raphson
+      iter=0
+      iter_max=25
+      tol=1e-7
+      y=get_y(x,gort)
+      err=10*tol
+      do while(err.ge.tol)
+         ! Increment iteration number
+         iter=iter+1
+         if (iter.gt.iter_max) then
+            iter=iter-1
+            exit
          end if
-         ! Explicit Euler
-         x=x+ds*dxds
-         Nbar=exp(x(nrc+1:nrc+np))
-         ! Get the Gibbs function at send=s+ds
-         gus=gu-(1.0_WP-send)*dguds
-         ! Newton-Raphson
-         iter_max=50
-         tol=1e-6
-         y=get_y(x,gus)
-         do iter=1,iter_max
-            ! Remember the old solution
-            x0=x
-            ! Build the Jacobian matrix
-            do j=1,nrc
-               Btilde(:,j)=y*sys%BR(:,j)
-            end do
-            do j=1,np
-               Ptilde(:,j)=y*sys%P(nsd+1:ns,j)
-            end do
-            BtildeT=transpose(Btilde)
-            PtildeT=transpose(Ptilde)
-            BTB=matmul(BtildeT,Btilde)
-            PTP=matmul(PtildeT,Ptilde)
-            BTP=matmul(BtildeT,Ptilde)
-            do j=1,nrc
-               jJ=j
-               do i=1,j
-                  iJ=i
-                  Jac(iJ,jJ)=BTB(iJ,jJ)
-               end do
-            end do
-            do j=1,np
-               jJ=nrc+j
-               do i=1,nrc
-                  iJ=i
-                  Jac(iJ,jJ)=BTP(iJ,jJ)
-               end do
-            end do
-            do j=1,np
-               jJ=nrc+j
-               do i=1,j
-                  iJ=nrc+i
-                  Jac(iJ,jJ)=PTP(iJ,jJ)
-               end do
-            end do
-            do j=1,nrc+np-1
-               do i=j+1,nrc+np
-                  Jac(i,j)=Jac(j,i)
-               end do
-            end do
-            do i=1,np
-               iJ=nrc+i
-               jJ=nrc+i
-               Jac(iJ,jJ)=Jac(iJ,jJ)-Nbar(i)
-            end do
-            print*,'jac = '
-            do i=1,nrc+np
-               print*,Jac(i,:)
-            end do
-            print*,'Smallest singular value = ', minval(S)
-            print*,'y = ', y
-            ! Evaluate the residual error
-            R=get_res(y)
-            err=norm2(R)
-            if (err.lt.tol) exit
-            ! Solve for dx
-            dx=-R
-            call dgelss(nrc+np,nrc+np,1,Jac,nrc+np,dx,nrc+np,S,rcond,rank,work,lwork,info)
-            if (rank.ne.nrc+np) call die('Jacobian is not full rank')
-            if (info.ne.0) call die('Least-squares solver failed')
-            ! Update the solution
-            x=x0+dx
-            ! Get the species and phase moles
-            y=get_y(x,gus)
-            Nu=y*y
-            Nbar=exp(x(nrc+1:nrc+np))
-            print*,'Iter: ',iter,', norm(R) = ',err,', norm(dx) = ',norm2(dx)
+         ! Remember the old solution
+         x0=x
+         ! Build the Jacobian matrix
+         do j=1,nrc
+            Btilde(:,j)=y*sys%BR(:,j)
          end do
-         ! Decrease the time step size and repeat if needed
-         if (failed.or.) then
-            send=s+*ds
-         end if
-         ! Increament pseuso time
-         err_tol=
-         s=send
-         send=min()
+         do j=1,np
+            Ptilde(:,j)=y*sys%P(nsd+1:ns,j)
+         end do
+         BtildeT=transpose(Btilde)
+         PtildeT=transpose(Ptilde)
+         BTB=matmul(BtildeT,Btilde)
+         PTP=matmul(PtildeT,Ptilde)
+         BTP=matmul(BtildeT,Ptilde)
+         do j=1,nrc
+            jJ=j
+            do i=1,j
+               iJ=i
+               Jac(iJ,jJ)=BTB(i,j)
+            end do
+         end do
+         do j=1,np
+            jJ=nrc+j
+            do i=1,nrc
+               iJ=i
+               Jac(iJ,jJ)=BTP(i,j)
+            end do
+         end do
+         do j=1,np
+            jJ=nrc+j
+            do i=1,j
+               iJ=nrc+i
+               Jac(iJ,jJ)=PTP(i,j)
+            end do
+         end do
+         do j=1,nrc+np-1
+            do i=j+1,nrc+np
+               Jac(i,j)=Jac(j,i)
+            end do
+         end do
+         do i=1,np
+            iJ=nrc+i
+            jJ=nrc+i
+            Jac(iJ,jJ)=Jac(iJ,jJ)-Nbar(i)
+         end do
+         ! Get the residual error
+         R=get_res(y)
+         err=norm2(R)
+         ! Solve for dx
+         dx=-R
+         call dgelss(nrc+np,nrc+np,1,Jac,nrc+np,dx,nrc+np,S,rcond,rank,work,lwork,info)
+         if (rank.ne.nrc+np) call die('Jacobian is not full rank')
+         if (info.ne.0) call die('Least-squares solver failed')
+         ! Update the solution
+         x=x0+dx
+         ! Get the species and phase moles
+         y=get_y(x,gort)
+         Nu=y*y
+         Nbar=exp(x(nrc+1:nrc+np))
+         ! Write to file
+         write(ifile,*) iter,'   ',err
       end do
 
       ! Output
@@ -427,8 +407,11 @@ contains
          print*,trim(sp_names(isc)),': ',N(isc)
       end do
 
+      ! Close newton file
+      close(ifile)
+
       ! Deallocate arrays
-      deallocate(Jac,BTB,PTP,Btilde,Ptilde,y)
+      deallocate(Jac,BTB,BTP,PTP,Btilde,Ptilde,y,S,work)
 
    end subroutine simulation_run
    
@@ -439,7 +422,8 @@ contains
       
       ! Get rid of all objects-need destructors
       deallocate(species,sp_names,e_names,elem_mat,phse_mat)
-      deallocate(N,Nbar,Nu,Nd,R,x,x0,dx,gort,BtildeT,PtildeT)
+      deallocate(N,Nbar,Nu,Nd,Neq,R,Rd,x,x0,dx,gort,BtildeT,PtildeT)
+      nullify(sys,state)
 
    end subroutine simulation_final
 
