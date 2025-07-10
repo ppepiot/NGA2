@@ -12,6 +12,8 @@ module mathtools
    public :: qrotate
    public :: arctan
    public :: eigensolve3
+   public :: reorder_rows
+   public :: ind_col
    
    ! Trigonometric parameters
    real(WP), parameter :: Pi   =3.1415926535897932385_WP
@@ -301,6 +303,84 @@ contains
       end subroutine householder
    
    end subroutine eigensolve3
+
+
+   !> re-order rows of input matrix
+   !> input:
+   !>	   nr     - number of rows in x
+   !>	   nc     - number of columns in x
+   !>    x      - matrix to be re-ordered
+   !>    order  - pointer: j-th row of reordered matrix is row order(j) of x
+   !> output:
+   !>    y      - reordered matrix
+   subroutine reorder_rows(nr,nc,x,order,y)
+      implicit none
+      integer,  intent(in)  :: nr,nc,order(nr)
+      real(WP), intent(in)  :: x(nr,nc)
+      real(WP), intent(out) :: y(nr,nc)
+      !  S. B. Pope 5/25/02
+      integer :: j
+      do j=1,nr
+         y(j,:)=x(order(j),:)
+      end do
+   end subroutine reorder_rows
+
+
+   !>  Determine independent columns of the matrix B, given that columns 1:nci are independent.
+   subroutine ind_col(nr,nc,nci,B,thresh,indcol,info)
+      implicit none
+      integer, intent(in) :: nr, nc, nci
+      real(WP), intent(in) :: B(nr,nc), thresh
+      integer, intent(out) :: indcol(nc), info
+      
+      ! Input:
+      !	nr	- number of rows of B
+      !	nc	- number of columns of B
+      !   nci - index, such that B(:,1:nci) has full column rank
+      !   B   - matrix
+      !   thresh  - threshold for determining rank
+
+      ! Output:
+      !   indcol(k)=0 if k-th column is dependent of columns 1:k-1
+      !   indcol(k)=1 if k-th column is independent of columns 1:k-1
+      !   info < 0 indicates failure
+
+      integer :: lwork, k, jpvt(nc)
+      ! real(WP) :: R(nr,nc), tau(nr+nc), work(3*(nr+nc))
+      real(WP) :: R(nr,nc), tau(min(nr,nc)), work(3*(nr+nc))
+
+      indcol=0
+      lwork=size( work )
+      R=B
+      jpvt=0
+      !  perform QR with column pivoting:  B P = Q R
+
+      ! call dgeqpf(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:nr+nc), work(1:lwork), info)
+      call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)), work(1:lwork), lwork, info)
+
+      if( info /=0 ) then
+         !write(0,*)'ceq_ind_col2: QR failed, info= ', info
+         return
+      end if
+
+      do k=1,min(nc,nr)   !  loop over possibly dependent columns
+         if( abs(R(k,k)) >= thresh ) then
+            indcol( jpvt(k) ) = 1	   
+         else
+            exit
+         endif
+      end do
+
+      !  check that the first nci columns are dependent
+
+      do k=1,nci
+         if( indcol(k) /=1 ) then
+            info = -2
+            return
+         endif
+      end do
+
+   end subroutine ind_col
    
 
 end module mathtools

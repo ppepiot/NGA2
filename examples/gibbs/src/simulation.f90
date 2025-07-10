@@ -1,10 +1,12 @@
 !> Example to read in YAML thermodynamic file
 module simulation
-   use precision,     only: WP
-   use string,        only: str_short,str_medium
-   use monitor_class, only: monitor
-   use YAMLRead,      only: YAMLElement
-   use ceq_types,     only: sys_type,state_type
+   use precision,        only: WP
+   use string,           only: str_short,str_medium
+   use monitor_class,    only: monitor
+   use YAMLRead,         only: YAMLElement
+   ! use ceq_types,        only: sys_type,state_type
+   use chem_sys_class,   only: chem_sys
+   use chem_state_class, only: chem_state
    implicit none
    private
    
@@ -32,8 +34,8 @@ module simulation
    integer :: Lphase=0,Gphase=1
 
    !> Chemical system and state
-   type(sys_type),   pointer :: sys
-   type(state_type), pointer :: state
+   type(chem_sys),   pointer :: sys
+   type(chem_state), pointer :: state
 
    !> Newton solver
    integer  :: iter_max
@@ -237,7 +239,7 @@ contains
       end block parse_mech
 
       ! Initialize the chemical system
-      sys_init: block
+      ceq_init: block
          use ceq_system,  only: ceq_sys_init
          use ceq_state_m, only: ceq_state
          integer :: ng=1
@@ -266,7 +268,8 @@ contains
          ! Open CEQ file
          open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
          ! Inizialize the system
-         call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
+         call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5)
+         ! call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
          if (iret.lt.0) call die('System initialization failed.')
          nsd=sys%nsd
          nsu=sys%nsu
@@ -275,7 +278,8 @@ contains
          nc =sys%nc
          nrc=sys%nrc
          ! Get the equilibrium state (I commented out the equilibrium calculcations in ceq_state and made it output the initial mole numbers found by maxmin and ming. See parts with comment "DEBUG")
-         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,state=state,info=info)
+         call state%initialize(sys=sys)
+         ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,state=state,info=info)
          ! Close CEQ file
          close(lu)
          ! Error check
@@ -288,7 +292,7 @@ contains
          print*,'Equilibrium temperature = ',T_eq, '(k)'
          ! Deallocate arrays
          deallocate(Bg,stats)
-      end block sys_init
+      end block ceq_init
 
       ! Initialize the chemical state solution vector
       x_init: block
