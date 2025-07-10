@@ -1,47 +1,57 @@
 !> Example to read in YAML thermodynamic file
 module simulation
-   use precision, only: WP
-   use YAMLRead,  only: YAMLElement
-   use string,    only: str_short,str_medium
-   use ceq_types, only: sys_type,state_type
+   use precision,     only: WP
+   use string,        only: str_short,str_medium
+   use monitor_class, only: monitor
+   use YAMLRead,      only: YAMLElement
+   use ceq_types,     only: sys_type,state_type
    implicit none
    private
    
-   ! The array of the species. Eeach stored as a YAMLElement object
+   !> The array of the species. Eeach stored as a YAMLElement object
    type(YAMLElement), dimension(:), allocatable :: species
 
-   ! Number of species, elements, constraints, and phases
-   integer :: ns,ne,nsd,nsu,ned,neu,nc,nrc,np=2
+   !> Number of species, elements, constraints, and phases
+   integer :: ns,ne,nsd,nsu,ned,neu,nc,nrc,np=2,ncs
 
-   ! Species and elements names
+   !> Species and elements names
    character(len=str_medium), dimension(:), allocatable :: sp_names
    character(len=str_short),  dimension(:), allocatable :: e_names
 
-   ! Elements matrix
+   !> Elements matrix
    real(WP), dimension(:,:), allocatable :: elem_mat
 
-   ! Phase summation matrix
+   !> Phase summation matrix
    real(WP), dimension(:,:), allocatable :: phse_mat
 
-   ! Thermodynamic quantities
+   !> Thermodynamic quantities
    real(WP) :: T
-   real(WP) :: PoPref=1.0_WP
+   real(WP) :: PoPref
 
-   ! Phase indices (need to get these from two_phase classes)
+   !> Phase indices (need to get these from two_phase classes)
    integer :: Lphase=0,Gphase=1
 
-   ! Chemical system and state
+   !> Chemical system and state
    type(sys_type),   pointer :: sys
    type(state_type), pointer :: state
 
-   ! Working arrays
+   !> Newton solver
+   integer  :: iter_max
+   real(WP) :: tol
+   integer  :: iter
+   real(WP) :: Rnorm,dxnorm
+
+   !> Private work arrays
    real(WP), dimension(:),   allocatable :: N,Nbar,Nu,Nd,Neq ! Mole numbers
    real(WP), dimension(:),   allocatable :: R,Rd             ! Residuals
    real(WP), dimension(:),   allocatable :: x,x0,dx          ! Chemical state unknowns
    real(WP), dimension(:),   allocatable :: gort             ! Normalized Gibbs free energy (Molar G over RT)
-   real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT
+   real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT  ! Coefficient matrices
 
-   ! Simulation subroutines
+   !> Simulation monitor file
+   type(monitor) :: nfile
+
+   !> Simulation subroutines
    public :: simulation_init,simulation_run,simulation_final
    
 
@@ -72,17 +82,21 @@ contains
       use messager, only: die
       implicit none
       real(WP), allocatable :: nasa_coef(:,:)
+      character(len=str_medium), dimension(:), allocatable :: const_sp
+      integer,  dimension(:), allocatable :: CS
+      real(WP), dimension(:), allocatable :: N_init
 
       ! Parse the mechanism file
       parse_mech: block
          use YAMLRead, only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
-         character(len=str_medium) :: yaml_file
-         character(len=str_short), dimension(:), allocatable :: sp_names_copy
+         character(len=str_medium) :: mch_file
+         character(len=str_short), dimension(:), allocatable :: sp_names_copy,const_sp_copy
+         real(WP), dimension(:), allocatable :: N_init_copy
          type(YAMLHandler)  :: domain
          type(YAMLSequence) :: sp_list,phases,elements
          type(YAMLElement)  :: sp,gas
          type(YAMLMap)      :: thermo,comp
-         integer :: isc,nn,i,e,code
+         integer :: isc,nn,i,j,k,e,code
          character(len=:), allocatable :: name_arr(:)
          character(len=:), allocatable :: name
          real(WP), allocatable :: T_range(:)
@@ -90,19 +104,32 @@ contains
          logical :: new_elem
          ! Get the target species from input
          ns=param_getsize('Species')
+         nn=param_getsize('Initial moles')
+         ncs=param_getsize('Constrained species')
+         if (ns.ne.nn) call die('Unequal number of species and moles in the input file.')
          allocate(sp_names(1:ns))
          allocate(sp_names_copy(1:ns))
+         allocate(N_init(1:ns))
+         allocate(N_init_copy(1:ns))
+         allocate(const_sp(1:ncs))
+         allocate(const_sp_copy(1:ncs))
+         allocate(CS(ncs));    CS=[1,4]
          call param_read('Species',sp_names)
+         call param_read('Initial moles',N_init)
+         call param_read('Constrained species',const_sp)
          sp_names_copy=sp_names
+         N_init_copy=N_init
+         const_sp_copy=const_sp
          ! Read the mechanism file path
-         call param_read('YAML file',yaml_file)
+         call param_read('Mechanism file',mch_file)
          ! Open the mechanism
-         domain=yaml_open_file(trim(yaml_file))
+         domain=yaml_open_file(trim(mch_file))
          ! Get the list of all species
          sp_list=yaml_start_from_sequence(domain,'species')
          ! Extract the target species from the mechanism
          allocate(species(1:ns))
          nn=0
+         k=0
          do isc=0,sp_list%size-1 ! Index in YAMLSequence starts from 0
             sp=sp_list%element(isc)
             name_arr=sp%value_str('name',code)
@@ -110,11 +137,21 @@ contains
             do i=1,size(name_arr)
                name=trim(name//name_arr(i))
             end do
-            if (any(sp_names_copy.eq.name)) then
-               nn=nn+1
-               species(nn)=sp
-               sp_names(nn)=name
-            end if
+            do i=1,ns
+               if (sp_names_copy(i).eq.name) then
+                  nn=nn+1
+                  species(nn)=sp
+                  sp_names(nn)=name
+                  N_init(nn)=N_init_copy(i)
+                  do j=1,ncs
+                     if (const_sp_copy(j).eq.name) then
+                        k=k+1
+                        const_sp(k)=name
+                        CS(k)=nn
+                     end if
+                  end do
+               end if
+            end do
             call sp%destroy()
          end do
          if(nn.ne.ns) call die('Some species are missing in the mechanism file.')
@@ -196,25 +233,31 @@ contains
          call sp%destroy()
          call comp%destroy()
          call thermo%destroy()
+         deallocate(sp_names_copy,N_init_copy,const_sp_copy)
       end block parse_mech
 
       ! Initialize the chemical system
       sys_init: block
          use ceq_system,  only: ceq_sys_init
          use ceq_state_m, only: ceq_state
-         integer :: ncs=2,ng=1
+         integer :: ng=1
          integer :: lu,iostat,iret,info
          real(WP), dimension(:,:), allocatable :: Bg
-         integer,  dimension(:),   allocatable :: CS
-         real(WP), dimension(:),   allocatable :: N_init,stats
-         real(WP) :: HoR
+         real(WP), dimension(:),   allocatable :: stats
+         real(WP) :: HoR,T_eq
          integer :: isc
          ! Allocate arrays
-         allocate(CS(ncs));    CS=[1,4]
-         allocate(Bg(ns,ng));  Bg=reshape([0.0_WP,1.0_WP,1.0_WP,0.0_WP],shape(Bg))
+         allocate(Bg(ns,ng));  Bg=0.0_WP
          allocate(N(ns))
-         allocate(N_init(ns)); N_init=[1.0_WP,0.0_WP,1.0_WP,3.71_WP]
          allocate(stats(20))
+         ! Create the general constraints
+         do isc=1,ns
+            if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
+            if (sp_names(isc).eq.'H2O(L)') Bg(isc,1)=1.0_WP
+         end do
+         ! Read inputs
+         call param_read('Temperature',T)
+         call param_read('Pressure over reference pressure',PoPref)
          ! Print the initial conditions
          print*,'Initial moles:'
          do isc=1,ns
@@ -232,7 +275,7 @@ contains
          nc =sys%nc
          nrc=sys%nrc
          ! Get the equilibrium state (I commented out the equilibrium calculcations in ceq_state and made it output the initial mole numbers found by maxmin and ming. See parts with comment "DEBUG")
-         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=300.0_WP,N_eq=N,T_eq=T,HoR_eq=HoR,stats=stats,state=state,info=info)
+         call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,state=state,info=info)
          ! Close CEQ file
          close(lu)
          ! Error check
@@ -242,9 +285,9 @@ contains
          do isc=1,ns
             print*,trim(sp_names(isc)),': ',N(isc)
          end do
-         print*,'Equilibrium temperature = ',T, '(k)'
+         print*,'Equilibrium temperature = ',T_eq, '(k)'
          ! Deallocate arrays
-         deallocate(CS,Bg,N_init,stats)
+         deallocate(Bg,stats)
       end block sys_init
 
       ! Initialize the chemical state solution vector
@@ -279,8 +322,24 @@ contains
          x(1:nrc)=lam
          x(nrc+1:nrc+np)=log(Nbar)
          ! Deallocate arrays
-         deallocate(lam)
+         deallocate(rhs,lam)
       end block x_init
+
+      ! Read in newton iterations inputs
+      call param_read('Tolerance',tol)
+      call param_read('Max number of iterations',iter_max)
+
+      ! Create a monitor file
+      create_monitor: block
+         nfile=monitor(.true.,'newton')
+         call nfile%add_column(iter,'Iter number')
+         call nfile%add_column(Rnorm,'R norm')
+         call nfile%add_column(dxnorm,'dx norm')
+         ! call nfile%write()
+      end block create_monitor
+
+      ! Deallocate arrays
+      deallocate(nasa_coef,const_sp,CS,N_init)
 
    end subroutine simulation_init
 
@@ -290,9 +349,6 @@ contains
       use messager, only: die
       implicit none
       integer :: i,j,iJ,jJ,isc,info
-      integer :: iter,iter_max
-      integer :: ifile,iostat
-      real(WP) :: err,tol
       real(WP), dimension(:,:), allocatable :: Jac,BTB,PTP,BTP
       real(WP), dimension(:,:), allocatable :: Btilde,Ptilde
       real(WP), dimension(:),   allocatable :: y
@@ -314,18 +370,12 @@ contains
       lwork=10*(nrc+np)
       allocate(work(lwork))
       rcond=-1.0_WP
-      
-      ! Open Newton file
-      open(unit=ifile,file='newton',status='replace',action='write',iostat=iostat)
-      write(ifile,*) 'iter','   ','err'
 
       ! Newton-Raphson
       iter=0
-      iter_max=25
-      tol=1e-7
       y=get_y(x,gort)
-      err=10*tol
-      do while(err.ge.tol)
+      Rnorm=10*tol
+      do while(Rnorm.ge.tol)
          ! Increment iteration number
          iter=iter+1
          if (iter.gt.iter_max) then
@@ -379,20 +429,21 @@ contains
          end do
          ! Get the residual error
          R=get_res(y)
-         err=norm2(R)
+         Rnorm=norm2(R)
          ! Solve for dx
          dx=-R
          call dgelss(nrc+np,nrc+np,1,Jac,nrc+np,dx,nrc+np,S,rcond,rank,work,lwork,info)
          if (rank.ne.nrc+np) call die('Jacobian is not full rank')
          if (info.ne.0) call die('Least-squares solver failed')
+         dxnorm=norm2(dx)
          ! Update the solution
          x=x0+dx
          ! Get the species and phase moles
          y=get_y(x,gort)
          Nu=y*y
          Nbar=exp(x(nrc+1:nrc+np))
-         ! Write to file
-         write(ifile,*) iter,'   ',err
+         ! Perform and output monitoring
+         call nfile%write()
       end do
 
       ! Output
@@ -406,9 +457,6 @@ contains
       do isc=1,ns
          print*,trim(sp_names(isc)),': ',N(isc)
       end do
-
-      ! Close newton file
-      close(ifile)
 
       ! Deallocate arrays
       deallocate(Jac,BTB,BTP,PTP,Btilde,Ptilde,y,S,work)
