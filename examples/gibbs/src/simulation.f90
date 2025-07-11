@@ -34,8 +34,8 @@ module simulation
    integer :: Lphase=0,Gphase=1
 
    !> Chemical system and state
-   type(chem_sys),   pointer :: sys
-   type(chem_state), pointer :: state
+   type(chem_sys)   :: sys
+   type(chem_state) :: state
 
    !> Newton solver
    integer  :: iter_max
@@ -80,8 +80,9 @@ contains
 
    !> Initialization of problem solver
    subroutine simulation_init
-      use param,    only: param_read,param_getsize
-      use messager, only: die
+      use param,     only: param_read,param_getsize
+      use messager,  only: die
+      use mathtools, only: lss
       implicit none
       real(WP), allocatable :: nasa_coef(:,:)
       character(len=str_medium), dimension(:), allocatable :: const_sp
@@ -240,8 +241,6 @@ contains
 
       ! Initialize the chemical system
       ceq_init: block
-         use ceq_system,  only: ceq_sys_init
-         use ceq_state_m, only: ceq_state
          integer :: ng=1
          integer :: lu,iostat,iret,info
          real(WP), dimension(:,:), allocatable :: Bg
@@ -267,7 +266,7 @@ contains
          end do
          ! Open CEQ file
          open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
-         ! Inizialize the system
+         ! Inizialize the chemical system
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5)
          ! call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
          if (iret.lt.0) call die('System initialization failed.')
@@ -277,8 +276,8 @@ contains
          neu=sys%neu
          nc =sys%nc
          nrc=sys%nrc
-         ! Get the equilibrium state (I commented out the equilibrium calculcations in ceq_state and made it output the initial mole numbers found by maxmin and ming. See parts with comment "DEBUG")
-         call state%initialize(sys=sys)
+         ! Initialize the chemical state
+         call state%initialize(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,info=info)
          ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,state=state,info=info)
          ! Close CEQ file
          close(lu)
@@ -318,9 +317,9 @@ contains
          ! Calculate the contribution of Nd in the residual
          Rd=matmul(transpose(sys%P(1:nsd,:)),Nd)
          ! Calculate the Lagrange multipliers
-         call ceq_g(nsu,T,PoPref,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gort)
+         call state%get_gort(nsu,T,PoPref,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gort)
          rhs=log(Nu)-matmul(sys%P(nsd+1:ns,:),log(Nbar))+gort
-         call ceq_lss(nsu,nrc,sys%BR,rhs,lam,info)
+         call lss(nsu,nrc,sys%BR,rhs,lam,info)
          if (info.ne.0) call die('Least squares for lambda initialization failed.')
          ! Set the initial solution vector
          x(1:nrc)=lam
@@ -475,7 +474,6 @@ contains
       ! Get rid of all objects-need destructors
       deallocate(species,sp_names,e_names,elem_mat,phse_mat)
       deallocate(N,Nbar,Nu,Nd,Neq,R,Rd,x,x0,dx,gort,BtildeT,PtildeT)
-      nullify(sys,state)
 
    end subroutine simulation_final
 

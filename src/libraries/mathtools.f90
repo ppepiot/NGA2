@@ -14,6 +14,7 @@ module mathtools
    public :: eigensolve3
    public :: reorder_rows
    public :: ind_col
+   public :: lss
    
    ! Trigonometric parameters
    real(WP), parameter :: Pi   =3.1415926535897932385_WP
@@ -159,14 +160,14 @@ contains
       real(WP), intent(in) :: dx,dy
       real(WP) :: arctan
       if (abs(dx)+abs(dy).lt.1.0e-9_WP) then
-         arctan = 0.0_WP
+         arctan=0.0_WP
       else
-         arctan = atan(dy/dx)
+         arctan=atan(dy/dx)
       end if
       if (dx.le.0.0_WP) then
-         arctan = Pi+arctan
+         arctan=Pi+arctan
       else if (dy.le.0.0_WP .and. dx.gt.0.0_WP) then
-         arctan = twoPi+arctan
+         arctan=twoPi+arctan
       end if
    end function arctan
    
@@ -233,7 +234,7 @@ contains
                G=C*R-B
                ! Form eigenvectors
                do k=1,3
-                  T       =  Q(k,j+1)
+                  T      = Q(k,j+1)
                   Q(k,j+1)=S*Q(k,j)+C*T
                   Q(k,j)  =C*Q(k,j)-S*T
                end do
@@ -248,7 +249,7 @@ contains
       
       !> Reduces a symmetric 3x3 matrix to real tridiagonal form by applying (unitary) Householder transformations:
       !>           [ D[1]  E[1]       ]
-      !>   A = Q . [ E[1]  D[2]  E[2] ] . Q^T
+      !>   A=Q . [ E[1]  D[2]  E[2] ] . Q^T
       !>           [       E[2]  D[3] ]
       !> The function accesses only the diagonal and upper triangular parts of A
       subroutine householder(A,Q,D,E)
@@ -318,7 +319,7 @@ contains
       integer,  intent(in)  :: nr,nc,order(nr)
       real(WP), intent(in)  :: x(nr,nc)
       real(WP), intent(out) :: y(nr,nc)
-      !  S. B. Pope 5/25/02
+      ! S. B. Pope 5/25/02
       integer :: j
       do j=1,nr
          y(j,:)=x(order(j),:)
@@ -329,58 +330,73 @@ contains
    !>  Determine independent columns of the matrix B, given that columns 1:nci are independent.
    subroutine ind_col(nr,nc,nci,B,thresh,indcol,info)
       implicit none
-      integer, intent(in) :: nr, nc, nci
-      real(WP), intent(in) :: B(nr,nc), thresh
-      integer, intent(out) :: indcol(nc), info
-      
+      integer, intent(in) :: nr,nc,nci
+      real(WP), intent(in) :: B(nr,nc),thresh
+      integer, intent(out) :: indcol(nc),info
       ! Input:
       !	nr	- number of rows of B
       !	nc	- number of columns of B
       !   nci - index, such that B(:,1:nci) has full column rank
       !   B   - matrix
       !   thresh  - threshold for determining rank
-
       ! Output:
       !   indcol(k)=0 if k-th column is dependent of columns 1:k-1
       !   indcol(k)=1 if k-th column is independent of columns 1:k-1
       !   info < 0 indicates failure
-
-      integer :: lwork, k, jpvt(nc)
-      ! real(WP) :: R(nr,nc), tau(nr+nc), work(3*(nr+nc))
-      real(WP) :: R(nr,nc), tau(min(nr,nc)), work(3*(nr+nc))
-
+      integer :: lwork,k,jpvt(nc)
+      real(WP) :: R(nr,nc),tau(min(nr,nc)),work(3*(nr+nc))
       indcol=0
-      lwork=size( work )
+      lwork=size(work)
       R=B
       jpvt=0
-      !  perform QR with column pivoting:  B P = Q R
-
-      ! call dgeqpf(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:nr+nc), work(1:lwork), info)
-      call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)), work(1:lwork), lwork, info)
-
-      if( info /=0 ) then
-         !write(0,*)'ceq_ind_col2: QR failed, info= ', info
+      ! Perform QR with column pivoting:  B P=Q R
+      call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)),work(1:lwork),lwork,info)
+      if(info.ne.0) then
+         !write(0,*)'ceq_ind_col2: QR failed,info= ',info
          return
       end if
-
       do k=1,min(nc,nr)   !  loop over possibly dependent columns
-         if( abs(R(k,k)) >= thresh ) then
-            indcol( jpvt(k) ) = 1	   
+         if(abs(R(k,k)).ge.thresh) then
+            indcol(jpvt(k))=1	   
          else
             exit
          endif
       end do
-
-      !  check that the first nci columns are dependent
-
+      ! Check that the first nci columns are dependent
       do k=1,nci
-         if( indcol(k) /=1 ) then
-            info = -2
+         if(indcol(k).ne.1) then
+            info=-2
             return
          endif
       end do
-
    end subroutine ind_col
    
+
+   !> Determine the least-squares/minimum-norm solution x to the linear equation A x=b.
+   subroutine lss(nb,nx,A,b,x,info)
+      implicit none
+      integer,  intent(in)  :: nb,nx
+      real(WP), intent(in)  :: A(nb,nx),b(nb)
+      real(WP), intent(out) :: x(nx)
+      integer,  intent(out) :: info
+      !  Input:
+      !	nb	- number of rows in b
+      !	nx	- number of rows in A and x
+      !	A	- the nb x nx matrix A
+      !	b	- the nb-vector b
+      !  Output:
+      !	x	- the solution nx-vector
+      !	info=0 for successful solution
+      !	S.B. Pope 10/2/02
+      integer :: lwork,rank
+      real(WP) :: tol=1.d-9,aa(nb,nx),bb(nb+nx),sv(nb+nx),work(4*(nb+nx+1)*(nb+nx+1))
+      lwork= size(work)
+      aa=A
+      bb=0.d0
+      bb(1:nb)=b
+      call dgelss(nb,nx,1,aa(1:nb,1:nx),nb,bb(1:nb+nx),nb+nx,sv(1:nb+nx),tol,rank,work(1:lwork),lwork,info)
+      x=bb(1:nx)
+   end subroutine lss
+
 
 end module mathtools

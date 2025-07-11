@@ -10,58 +10,66 @@ module chem_sys_class
    !> Chemical system object definition
    type :: chem_sys
 
-      ! Scalars
-      integer :: np                       !< Number of phases
-      integer :: ne                       !< Number of elements
-      integer :: ned                      !< Number of determined elements
-      integer :: neu                      !< Number of undetermined elements
-      integer :: ns                       !< Number of species
-      integer :: nsd                      !< Number of determined species    
-      integer :: nsu                      !< Number of undetermined species
-      integer :: ncs                      !< Number of constrained species
-      integer :: ng                       !< Number of general linear constraints
-      integer :: nc                       !< Number of basic constraints =ne+ncs+ng
-      integer :: nrc                      !< Number of reduced constraints
-      integer :: nb                       !< Number of independent constraints =nsd+nrc
+      ! Indices
+      integer :: np                                   !< Number of phases
+      integer :: ne                                   !< Number of elements
+      integer :: ned                                  !< Number of determined elements
+      integer :: neu                                  !< Number of undetermined elements
+      integer :: ns                                   !< Number of species
+      integer :: nsd                                  !< Number of determined species    
+      integer :: nsu                                  !< Number of undetermined species
+      integer :: ncs                                  !< Number of constrained species
+      integer :: ng                                   !< Number of general linear constraints
+      integer :: nc                                   !< Number of basic constraints =ne+ncs+ng
+      integer :: nrc                                  !< Number of reduced constraints
+      integer :: nb                                   !< Number of independent constraints =nsd+nrc
 
-      ! 1D arrays
-      integer, pointer :: CS(:)           !< Indexes of constrained species (n_cs x 1)
-      integer, pointer :: sp_order(:)     !< The k-th ordered species is sp_order(k) (ns x 1)
-      integer, pointer :: el_order(:)     !< The j-th ordered element is el_order(j) (ne x 1)
+      ! Constrained species
+      integer, dimension(:), allocatable :: CS        !< Indexes of constrained species (ncs x 1)
 
-      ! 2D arrays
-      real(WP), pointer :: Ein(:,:)       !< Element matrix (ns x ne).  A molecule of species k contains Ein(k,j) atoms of element j.
-      real(WP), pointer :: E(:,:)         !< The re-ordered element matrix (ns x ne)
-      real(WP), pointer :: Bg(:,:)        !< General linear constraint matrix (ns x ng)
-      real(WP), pointer :: B(:,:)         !< Basic constraint matrix (ns x nc)
-      real(WP), pointer :: BR(:,:)        !< The reduced constraint matrix (nsu x nrc)
-      real(WP), pointer :: A(:,:)         !< Modified constraint transformation matrix (nb x nc)
-      real(WP), pointer :: thermo(:,:)    !< Thermodynamic coefficients (re-ordered) (ns x 15)
-      real(WP), pointer :: P(:,:)         !< Phase summation matrix (ns x np)
+      ! Ordering arrays
+      integer, dimension(:), allocatable :: sp_order  !< The k-th ordered species is sp_order(k) (ns x 1)
+      integer, dimension(:), allocatable :: el_order  !< The j-th ordered element is el_order(j) (ne x 1)
+
+      ! Phase matrix
+      real(WP), dimension(:,:), allocatable :: P      !< Phase summation matrix (ns x np)
+
+      ! Element matrices
+      real(WP), dimension(:,:), allocatable :: Ein    !< Element matrix (ns x ne).  A molecule of species k contains Ein(k,j) atoms of element j.
+      real(WP), dimension(:,:), allocatable :: E      !< The re-ordered element matrix (ns x ne)
+
+      ! Constraint matrices
+      real(WP), dimension(:,:), allocatable :: Bg     !< General linear constraint matrix (ns x ng)
+      real(WP), dimension(:,:), allocatable :: B      !< Basic constraint matrix (ns x nc)
+      real(WP), dimension(:,:), allocatable :: BR     !< The reduced constraint matrix (nsu x nrc)
+      real(WP), dimension(:,:), allocatable :: A      !< Modified constraint transformation matrix (nb x nc)
+      
+      ! Thermodynamic coefficients
+      real(WP), dimension(:,:), allocatable :: thermo !< Thermodynamic coefficients (re-ordered) (ns x 15)
 
       ! Is the system initialized
-      logical :: initialized              !<=.false. !=.true. when chem_sys has been initialized
+      logical :: initialized                          !<=.false. !=.true. when chem_sys has been initialized
 
       ! Numerical parameters (when parameters are altered,chem_sys_param_set and ceq_param_def must be updated.)
-      integer  :: diag                    !< Greater than 0 for diagnostics
-      integer  :: lu                      !< Logical unit number for diagnostics
-      real(WP) :: T_low                   !< Lowest allowed temperature
-      real(WP) :: T_high                  !< Highest allowed temperature
-      real(WP) :: frac_zm                 !< Fraction of zm used in initial guess
-      real(WP) :: T_tol                   !< Convergence tolerance on log(T)
-      real(WP) :: ds_inc                  !< Factor by which ds is increased after success (ceq_fixed_T)
-      real(WP) :: ds_dec                  !< Factor by which ds is decreased after failure (ceq_fixed_T)
-      real(WP) :: ds_min                  !< Smallest allowed time step
-      real(WP) :: res_tol                 !< Convergence tolerance for residual (ceq_fixed_T)
-      real(WP) :: ires_fac                !< Factor by which the irreducible residual can exceed res_tol
-      real(WP) :: logy_lim                !< Upper limit on log(y)  (to prevent overflow in ceq_y)
-      real(WP) :: srat_lim                !< Lower limit on singular-value ratio (ceq_Sinv)
-      real(WP) :: err_huge                !< Upper limit on error (ceq_newt)
-      real(WP) :: dec_min                 !< Minimum acceptable decrease in residual (ceq_newt)
-      real(WP) :: eps_el                  !< Relative lower bound on element moles (ceq_perturb)
-      real(WP) :: eps_sp                  !< Relative lower bound on species moles (ceq_perturb)
-      real(WP) :: pert_tol                !< Largest allowed normalized perturbation
-      integer  :: pert_skip               !< Set =1 to skip perturbing undetermined species
+      integer  :: diag                                !< Greater than 0 for diagnostics
+      integer  :: lu                                  !< Logical unit number for diagnostics
+      real(WP) :: T_low                               !< Lowest allowed temperature
+      real(WP) :: T_high                              !< Highest allowed temperature
+      real(WP) :: frac_zm                             !< Fraction of zm used in initial guess
+      real(WP) :: T_tol                               !< Convergence tolerance on log(T)
+      real(WP) :: ds_inc                              !< Factor by which ds is increased after success (ceq_fixed_T)
+      real(WP) :: ds_dec                              !< Factor by which ds is decreased after failure (ceq_fixed_T)
+      real(WP) :: ds_min                              !< Smallest allowed time step
+      real(WP) :: res_tol                             !< Convergence tolerance for residual (ceq_fixed_T)
+      real(WP) :: ires_fac                            !< Factor by which the irreducible residual can exceed res_tol
+      real(WP) :: logy_lim                            !< Upper limit on log(y)  (to prevent overflow in ceq_y)
+      real(WP) :: srat_lim                            !< Lower limit on singular-value ratio (ceq_Sinv)
+      real(WP) :: err_huge                            !< Upper limit on error (ceq_newt)
+      real(WP) :: dec_min                             !< Minimum acceptable decrease in residual (ceq_newt)
+      real(WP) :: eps_el                              !< Relative lower bound on element moles (ceq_perturb)
+      real(WP) :: eps_sp                              !< Relative lower bound on species moles (ceq_perturb)
+      real(WP) :: pert_tol                            !< Largest allowed normalized perturbation
+      integer  :: pert_skip                           !< Set =1 to skip perturbing undetermined species
 
    contains
       procedure :: initialize
@@ -89,7 +97,7 @@ module chem_sys_class
          !   ng    - number of general linear constraints
          !   Ein   - element matrix (ns x ne).  A molecule of species k contains
          !           Ein(k,j) atoms of element j.
-         !   CS    - array containing indexes of constrained species (n_cs x 1)
+         !   CS    - array containing indexes of constrained species (ncs x 1)
          !   Bg    - general linear constraint matrix (ns x ng)
          !   thermo_in  - thermodynamic data for species (ns x 15)
          !              - see below for details
@@ -125,7 +133,8 @@ module chem_sys_class
          !    The values of lu_op and diag are stored in chem_sys,and used in subsequent calls to ceq_state.
          !    These values can be changed by,for example,call chem_sys_param_set(lu_op=3,diag=4).
 
-         use messager, only: die
+         use messager,  only: die
+         use mathtools, only: reorder_rows
          implicit none
          class(chem_sys), intent(inout) :: this
          integer, intent(in)  :: np,ns,ne,ncs,ng,CS(ncs),lu_op,diag
@@ -203,10 +212,10 @@ module chem_sys_class
          allocate(this%P(ns,np))
       
          this%Ein=Ein(1:ns,1:ne)
-      
+         
          ! Form basic and reduced constraint equations
          call this%red_con(BR,A,diag,lu_op)
-      
+         
          allocate(this%BR(this%nsu,this%nrc))
          allocate(this%A(this%nb,nc))
       
@@ -231,7 +240,7 @@ module chem_sys_class
          ! If this%diag=5,the values of the parameters are output.
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer, intent(in), optional :: diag,lu,pert_skip
+         integer,  intent(in), optional :: diag,lu,pert_skip
          real(WP), intent(in), optional :: T_low,T_high,frac_zm,T_tol,ds_inc,ds_dec,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
          integer :: luu
          if(present(diag))     this%diag    =diag
@@ -289,8 +298,8 @@ module chem_sys_class
          this%T_high  =5000.0_WP  ! highest allowed temperature
          this%frac_zm =1e-1       ! fraction of zm used in initial guess
          this%T_tol   =1e-6       ! convergence tolerance on log(T)
-         this%ds_inc  =1.4d0      ! factor by which ds is increased after success (ceq_fixed_T)
-         this%ds_dec  =0.25d0     ! factor by which ds is decreased after failure (ceq_fixed_T)
+         this%ds_inc  =1.4_WP     ! factor by which ds is increased after success (ceq_fixed_T)
+         this%ds_dec  =0.25_WP    ! factor by which ds is decreased after failure (ceq_fixed_T)
          this%ds_min  =1e-15      ! smallest allowed time step
          this%res_tol =1e-9       ! convergence tolerance for residual (ceq_fixed_T)
          this%ires_fac=1e2        ! factor by which the irreducible residual can exceed res_tol
@@ -301,21 +310,22 @@ module chem_sys_class
          this%eps_el  =1e-9       ! relative lower bound on element moles (ceq_perturb)
          this%eps_sp  =1e-9       ! relative lower bound on species moles (ceq_perturb)
          this%pert_tol=1e-4       ! largest allowed normalized perturbation
-         this%pert_skip= 0          ! set =1 to skip perturbing undetermined species
+         this%pert_skip= 0        ! set =1 to skip perturbing undetermined species
       end subroutine chem_sys_param_def
 
 
       !> Set the reduced constraint matrix BR,and determine the ordering of the elements and species
       subroutine red_con(this,BR,A,ifop,lud)
-         use messager, only: die
+         use messager,  only: die
+         use mathtools, only: ind_col,reorder_rows
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer, intent(in) :: ifop,lud
+         integer,  intent(in)  :: ifop,lud
          real(WP), intent(out) :: BR(this%ns,this%nc),A(this%nc,this%nc)
-         integer :: k,info,lwork,rank_def,sp_det(this%ns),kk,ndebg,el_det(this%ne),ngi,is,js,ie,je,j,indcol(this%ns+this%ne+this%ng)
+         integer  :: k,info,lwork,rank_def,sp_det(this%ns),kk,ndebg,el_det(this%ne),ngi,is,js,ie,je,j,indcol(this%ns+this%ne+this%ng)
          real(WP) :: Sc(this%ns,this%ncs),S(this%ns+this%nc),U(this%ns,this%ns),VT(this%nc,this%nc),work(4*(this%ns+this%nc)*(this%ns+this%nc))
          real(WP) :: DEBg(this%ns,this%ns+this%ne+this%ng),EU(this%ns,this%ne),BS(this%ns,this%nc),PU(this%ns,this%nc),BTTPU(this%nc,this%nc),BB(this%ns,this%nc)
-         real(WP), parameter ::  thresh=1e-10 ! threshold for singular values and vectors
+         real(WP), parameter :: thresh=1e-10 ! threshold for singular values and vectors
 
          ! print out dimensions and input
          if(ifop.ge.5) then
@@ -329,7 +339,7 @@ module chem_sys_class
             write(lud,*)'Constrained species'
             write(lud,'((20i4))')this%CS
          endif
-            
+         
          ! Check input
          call check_input()
 
@@ -337,7 +347,7 @@ module chem_sys_class
 
             do j=1,this%ncs-1
                do k=j+1,this%ncs
-                  if(this%CS(j) == this%CS(k)) then
+                  if(this%CS(j).eq.this%CS(k)) then
                      write(0,*)'red_con: CS not distinct'
                      call die('red_con: CS not distinct')
                   endif
@@ -364,18 +374,18 @@ module chem_sys_class
             end do 
             this%B(:,1:this%ncs)=Sc              ! first ncs columns - constrained species
          endif
-
+         
          this%B(1:this%ns,this%ncs+1:this%ncs+this%ne)=this%Ein(1:this%ns,1:this%ne)      ! next ne columns - element vectors
 
          if(this%ng.gt.0) &
          this%B(1:this%ns,this%ne+this%ncs+1:this%nc)=this%Bg(1:this%ns,1:this%ng)        ! last ng columns - general constraints
 
          BB(1:this%ns,1:this%nc)=this%B(1:this%ns,1:this%nc)
-
+         
          lwork=size(work)
          call dgesvd('A','A',this%ns,this%nc,BB(1:this%ns,1:this%nc),this%ns,S(1:this%ns+this%nc),U(1:this%ns,1:this%ns),this%ns,&
                      VT(1:this%nc,1:this%nc),this%nc,work(1:lwork),lwork,info)
-
+         
          if(info.ne.0) then
             if(ifop.ge.1) then
                write(lud,*)'red_con: svd failed,info= ',info
@@ -415,7 +425,7 @@ module chem_sys_class
          this%nsu=this%ns-this%nsd
 
          do k=1,this%ns
-            if(sp_det(k)==0) then
+            if(sp_det(k).eq.0) then
                kk=kk+1
                this%sp_order(kk)=k	! undetermined species are last in ordering
             endif
@@ -430,7 +440,7 @@ module chem_sys_class
                write(lud,'((20i4))')this%sp_order
             endif
          endif
-
+         
          !  form DEBg=[D E Bg]
          ndebg=this%nsd+this%ne+this%ng
          DEBg=0.0_WP
@@ -458,7 +468,7 @@ module chem_sys_class
          this%ned=0
 
          do k=1,this%ne
-            if(indcol(this%nsd+k)==0) then	!	element k is determined
+            if(indcol(this%nsd+k).eq.0) then	!	element k is determined
                this%ned=this%ned+1
                el_det(k)=1
                this%el_order(this%ned)=k	! determined elements are first in ordering
@@ -470,7 +480,7 @@ module chem_sys_class
          kk=0
          EU=0.0_WP
          do k=1,this%ne
-            if(el_det(k)==0) then
+            if(el_det(k).eq.0) then
                kk=kk+1
                this%el_order(kk+this%ned)=k		! undetermined elements are last in ordering
                EU(:,kk)=this%Ein(:,k)
@@ -499,26 +509,26 @@ module chem_sys_class
          BS=0.0_WP
          kk=0
          do k=1,this%ne
-            if(el_det(k)==0) then
+            if(el_det(k).eq.0) then
                kk=kk+1
                BS(:,kk)=this%Ein(:,k)
             endif
          end do
 
          do k=1,this%ng
-            if(indcol(this%nsd+this%ne+k)==1) then
+            if(indcol(this%nsd+this%ne+k).eq.1) then
                kk=kk+1
                BS(:,kk)=this%Bg(:,k)
             endif
          end do
-
+         
          ! Assemble BR
-         this%BR=0.0_WP
+         BR=0.0_WP
          do kk=1,this%nsu
             k=this%sp_order(this%nsd+kk)
-            this%BR(kk,1:this%nrc)=BS(k,1:this%nrc)
+            BR(kk,1:this%nrc)=BS(k,1:this%nrc)
          end do
-
+         
          ! Assemble E
          this%E=0.0_WP
          do is=1,this%ns
@@ -530,7 +540,7 @@ module chem_sys_class
          end do
 
          ! Determine modified constraint transformation matrix
-
+         
          call reorder_rows(this%ns,this%nb,U(1:this%ns,1:this%nb),this%sp_order,PU(1:this%ns,1:this%nb))
 
          BTTPU=0.0_WP
@@ -541,7 +551,6 @@ module chem_sys_class
          end do
          A=0.0_WP
          A(1:this%nb,1:this%nc)=matmul(BTTPU(1:this%nb,1:this%nc),VT)
-
 
          ! Set to zero near-zero components of A
          do j=1,this%nb
@@ -574,7 +583,7 @@ module chem_sys_class
             if(this%ncs.lt.0.or.this%ncs.gt.this%ns) myerr(3)=1
             if(this%ng.lt.0) myerr(4)=1
             if(this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
-            if(maxval(myerr) == 0) return
+            if(maxval(myerr).eq.0) return
             if(ifop.ge.1) then
                write(lud,*)'red_con: error in input'
                do i=1,5
