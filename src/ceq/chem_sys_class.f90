@@ -56,12 +56,12 @@ module chem_sys_class
       ! Is the system initialized
       logical :: initialized                          !<=.false. !=.true. when chem_sys has been initialized
 
-      ! Numerical parameters (when parameters are altered,chem_sys_param_set and ceq_param_def must be updated.)
+      ! Numerical parameters (when parameters are altered,chem_sys_param_set and chem_param_def must be updated.)
       integer  :: diag                                !< Greater than 0 for diagnostics
       integer  :: lu                                  !< Logical unit number for diagnostics
       real(WP) :: T_low                               !< Lowest allowed temperature
       real(WP) :: T_high                              !< Highest allowed temperature
-      real(WP) :: frac_zm                             !< Fraction of zm used in initial guess
+      real(WP) :: frac_Nm                             !< Fraction of zm used in initial guess
       real(WP) :: T_tol                               !< Convergence tolerance on log(T)
       real(WP) :: ds_inc                              !< Factor by which ds is increased after success (ceq_fixed_T)
       real(WP) :: res_tol                             !< Convergence tolerance for residual (ceq_fixed_T)
@@ -76,10 +76,10 @@ module chem_sys_class
       integer  :: pert_skip                           !< Set =1 to skip perturbing undetermined species
 
    contains
-      procedure :: initialize
-      procedure :: param_def=>chem_sys_param_def
-      procedure :: param_set=>chem_sys_param_set
-      procedure :: red_con
+      procedure :: initialize                         !< Object initializer
+      procedure :: param_def=>chem_sys_param_def      !< Define parameters
+      procedure :: param_set=>chem_sys_param_set      !< Reset parameters
+      procedure :: red_con                            !< Reduce the constraints
    end type chem_sys
 
 
@@ -240,18 +240,18 @@ module chem_sys_class
 
 
       !> Reset values of parameters in chem_sys: apart from chem_sys,all arguments are optional.
-      subroutine chem_sys_param_set(this,diag,lu,T_low,T_high,frac_zm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
+      subroutine chem_sys_param_set(this,diag,lu,T_low,T_high,frac_Nm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
          ! If this%diag=5,the values of the parameters are output.
          implicit none
          class(chem_sys), intent(inout) :: this
          integer,  intent(in), optional :: diag,lu,pert_skip
-         real(WP), intent(in), optional :: T_low,T_high,frac_zm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
+         real(WP), intent(in), optional :: T_low,T_high,frac_Nm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
          integer :: luu
          if(present(diag))     this%diag    =diag
          if(present(lu))       this%lu      =lu
          if(present(T_low))    this%T_low   =T_low
          if(present(T_high))   this%T_high  =T_high
-         if(present(frac_zm))  this%frac_zm =frac_zm
+         if(present(frac_Nm))  this%frac_Nm =frac_Nm
          if(present(T_tol))    this%T_tol   =T_tol
          if(present(res_tol))  this%res_tol =res_tol
          if(present(ires_fac)) this%ires_fac=ires_fac
@@ -273,7 +273,7 @@ module chem_sys_class
          write(luu,'(a,i4)') 'pert_skip=',this%pert_skip 
          write(luu,'(a,1p,e13.4)') 'T_low   =',this%T_low
          write(luu,'(a,1p,e13.4)') 'T_high  =',this%T_high
-         write(luu,'(a,1p,e13.4)') 'frac_zm =',this%frac_zm
+         write(luu,'(a,1p,e13.4)') 'frac_Nm =',this%frac_Nm
          write(luu,'(a,1p,e13.4)') 'T_tol   =',this%T_tol
          write(luu,'(a,1p,e13.4)') 'res_tol =',this%res_tol
          write(luu,'(a,1p,e13.4)') 'ires_fac=',this%ires_fac
@@ -296,7 +296,7 @@ module chem_sys_class
          this%lu      =0          ! logical unit number for diagnostics
          this%T_low   =250.0_WP   ! lowest allowed temperature
          this%T_high  =5000.0_WP  ! highest allowed temperature
-         this%frac_zm =1e-1       ! fraction of zm used in initial guess
+         this%frac_Nm =1e-1       ! fraction of zm used in initial guess
          this%T_tol   =1e-6       ! convergence tolerance on log(T)
          this%res_tol =1e-9       ! convergence tolerance for residual (ceq_fixed_T)
          this%ires_fac=1e2        ! factor by which the irreducible residual can exceed res_tol
