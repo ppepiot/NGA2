@@ -53,18 +53,12 @@ module chem_sys_class
       ! Thermodynamic coefficients
       real(WP), dimension(:,:), allocatable :: thermo !< Thermodynamic coefficients (re-ordered) (ns x 2*ncof+1)
 
-      ! Is the system initialized
-      logical :: initialized                          !<=.false. !=.true. when chem_sys has been initialized
-
       ! Numerical parameters (when parameters are altered,chem_sys_param_set and chem_param_def must be updated.)
       integer  :: diag                                !< Greater than 0 for diagnostics
-      integer  :: lu                                  !< Logical unit number for diagnostics
       real(WP) :: T_low                               !< Lowest allowed temperature
       real(WP) :: T_high                              !< Highest allowed temperature
       real(WP) :: frac_Nm                             !< Fraction of zm used in initial guess
       real(WP) :: T_tol                               !< Convergence tolerance on log(T)
-      real(WP) :: ds_inc                              !< Factor by which ds is increased after success (ceq_fixed_T)
-      real(WP) :: res_tol                             !< Convergence tolerance for residual (ceq_fixed_T)
       real(WP) :: ires_fac                            !< Factor by which the irreducible residual can exceed res_tol
       real(WP) :: logy_lim                            !< Upper limit on log(y)  (to prevent overflow in ceq_y)
       real(WP) :: srat_lim                            !< Lower limit on singular-value ratio (ceq_Sinv)
@@ -87,7 +81,7 @@ module chem_sys_class
       
 
       !> Chemical system initializer
-      subroutine initialize(this,np,ns,ne,ncs,ng,P,Ein,CS,Bg,thermo_in,lu_op,diag)
+      subroutine initialize(this,np,ns,ne,ncs,ng,P,Ein,CS,Bg,thermo_in,diag)
 
          !  Specify a constrained equilibrium system.
       
@@ -105,11 +99,7 @@ module chem_sys_class
          !   Bg    - general linear constraint matrix (ns x ng)
          !   thermo_in  - thermodynamic data for species (ns x 2*ncof+1)
          !              - see below for details
-         !   P     - Phase summation matrix     
-         !   lu_op - logical unit for output 
-         !   diag  - level of diagnostic output (0=none,1=severe errors,...5=full)
-         !   (The values of lu_op and diag are stored in chem_sys,and used in calls to ceq_state.
-         !    These values can be changed by,for example,call chem_sys_param_set(lu_op=3,diag=4).)
+         !   P     - Phase summation matrix
       
          ! Unconstrained equilibrium:
          !   For unconstrained equilibrium calculations (i.e.,in which the only 
@@ -132,16 +122,12 @@ module chem_sys_class
          !   Then for each species,H and S are given by:
          !   H/(RT)=a(6)/T+sum_{n=1}^{n=5} a(n) T^{n-1}/n
          !   S/R=a(1)log(T)+a(7)+sum_{n=2}^{n=5} a(n) T^{n-1}/(n-1)
-      
-         !  Notes:
-         !    The values of lu_op and diag are stored in chem_sys,and used in subsequent calls to ceq_state.
-         !    These values can be changed by,for example,call chem_sys_param_set(lu_op=3,diag=4).
 
          use messager,  only: die
          use mathtools, only: reorder_rows
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer,  intent(in) :: np,ns,ne,ncs,ng,CS(ncs),lu_op,diag
+         integer,  intent(in) :: np,ns,ne,ncs,ng,CS(ncs),diag
          real(WP), intent(in) :: Ein(ns,ne),Bg(ns,ng),thermo_in(ns,2*ncof+1),P(ns,Lphase:Gphase)
          real(WP) :: BR(ns,ne+ncs+ng),A(ne+ncs+ng,ne+ncs+ng)
          integer  :: nc,j,k
@@ -154,28 +140,19 @@ module chem_sys_class
          if(np.ge.1) then
             this%np=np
          else
-            if(diag.ge.1) then
-               write(lu_op,*)'chem_sys initialize: bad input,np= ',np
-               call die('np needs to be greater than zero')
-            end if
+            call die('[chem_sys initialize] np needs to be greater than zero')
          endif
 
          if(ns.ge.1) then
             this%ns=ns
          else
-            if(diag.ge.1) then
-               write(lu_op,*)'chem_sys initialize: bad input,ns= ',ns
-               call die('ns needs to be greater than zero')
-            end if
+            call die('[chem_sys initialize] ns needs to be greater than zero')
          endif
 
          if(ne.ge.1) then
             this%ne=ne
          else
-            if(diag.ge.1) then
-               write(lu_op,*)'chem_sys initialize: bad input,ne= ',ne
-               call die('ne needs to be greater than zero')
-            end if
+            call die('[chem_sys initialize] ne needs to be greater than zero')
          endif
       
          if(ncs.ge.0) then
@@ -185,10 +162,7 @@ module chem_sys_class
                this%CS=CS(1:ncs)
             endif
          else
-            if(diag.ge.1) then
-               write(lu_op,*)'chem_sys initialize: bad input,ncs= ',ncs
-               call die('ncs cannot be negative')
-            end if
+            call die('[chem_sys initialize] ncs cannot be negative')
          endif
       
          if(ng.ge.0) then
@@ -198,10 +172,7 @@ module chem_sys_class
                this%Bg=Bg(1:ns,1:ng)
             endif
          else
-            if(diag.ge.1) then
-               write(lu_op,*)'chem_sys initialize: bad input,ng= ',ng
-               call die('ng cannot be negative') 
-            end if
+            call die('[chem_sys initialize] ng cannot be negative') 
          endif
       
          ! Allocate arrays
@@ -218,13 +189,13 @@ module chem_sys_class
          this%Ein=Ein(1:ns,1:ne)
          
          ! Form basic and reduced constraint equations
-         call this%red_con(BR,A,diag,lu_op)
+         call this%red_con(BR,A,diag)
          
          allocate(this%BR(this%nsu,this%nrc))
          allocate(this%A(this%nb,nc))
       
          this%BR=BR(1:this%nsu,1:this%nrc)
-         this%A =A(1:this%nb,1:nc)
+         this%A =A (1:this%nb,1:nc)
       
          ! Re-order thermo
          call reorder_rows(thermo_in,this%sp_order,this%thermo)
@@ -232,28 +203,23 @@ module chem_sys_class
          ! Re-order P
          call reorder_rows(P,this%sp_order,this%P)
       
-         this%lu  =lu_op
          this%diag=diag
-         this%initialized=.true.  ! indicate successful initialization
 
       end subroutine initialize
 
 
       !> Reset values of parameters in chem_sys: apart from chem_sys,all arguments are optional.
-      subroutine chem_sys_param_set(this,diag,lu,T_low,T_high,frac_Nm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
+      subroutine chem_sys_param_set(this,diag,T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
          ! If this%diag=5,the values of the parameters are output.
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer,  intent(in), optional :: diag,lu,pert_skip
-         real(WP), intent(in), optional :: T_low,T_high,frac_Nm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
-         integer :: luu
+         integer,  intent(in), optional :: diag,pert_skip
+         real(WP), intent(in), optional :: T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
          if(present(diag))     this%diag    =diag
-         if(present(lu))       this%lu      =lu
          if(present(T_low))    this%T_low   =T_low
          if(present(T_high))   this%T_high  =T_high
          if(present(frac_Nm))  this%frac_Nm =frac_Nm
          if(present(T_tol))    this%T_tol   =T_tol
-         if(present(res_tol))  this%res_tol =res_tol
          if(present(ires_fac)) this%ires_fac=ires_fac
          if(present(logy_lim)) this%logy_lim=logy_lim
          if(present(srat_lim)) this%srat_lim=srat_lim
@@ -263,27 +229,6 @@ module chem_sys_class
          if(present(eps_sp))   this%eps_sp  =eps_sp
          if(present(pert_tol)) this%pert_tol=pert_tol
          if(present(pert_skip)) this%pert_skip=pert_skip
-         if(this%diag.lt.5) return
-         luu=this%lu
-         write(luu,*)' '
-         write(luu,*)' Parameters output from chem_sys_param_set '
-         write(luu,*)' '
-         write(luu,'(a,i4)') 'diag     =',this%diag
-         write(luu,'(a,i4)') 'lu       =',this%lu  
-         write(luu,'(a,i4)') 'pert_skip=',this%pert_skip 
-         write(luu,'(a,1p,e13.4)') 'T_low   =',this%T_low
-         write(luu,'(a,1p,e13.4)') 'T_high  =',this%T_high
-         write(luu,'(a,1p,e13.4)') 'frac_Nm =',this%frac_Nm
-         write(luu,'(a,1p,e13.4)') 'T_tol   =',this%T_tol
-         write(luu,'(a,1p,e13.4)') 'res_tol =',this%res_tol
-         write(luu,'(a,1p,e13.4)') 'ires_fac=',this%ires_fac
-         write(luu,'(a,1p,e13.4)') 'logy_lim=',this%logy_lim
-         write(luu,'(a,1p,e13.4)') 'srat_lim=',this%srat_lim
-         write(luu,'(a,1p,e13.4)') 'err_huge=',this%err_huge
-         write(luu,'(a,1p,e13.4)') 'dec_min =',this%dec_min
-         write(luu,'(a,1p,e13.4)') 'eps_el  =',this%eps_el
-         write(luu,'(a,1p,e13.4)') 'eps_sp  =',this%eps_sp
-         write(luu,'(a,1p,e13.4)') 'pert_tol=',this%pert_tol
       end subroutine chem_sys_param_set
 
 
@@ -291,14 +236,11 @@ module chem_sys_class
       subroutine chem_sys_param_def(this)
          implicit none
          class(chem_sys), intent(inout) :: this
-         this%initialized=.false. !=.true. when chem_sys has been initialized
          this%diag    =1          ! >0 for diagnostics
-         this%lu      =0          ! logical unit number for diagnostics
          this%T_low   =250.0_WP   ! lowest allowed temperature
          this%T_high  =5000.0_WP  ! highest allowed temperature
          this%frac_Nm =1e-1       ! fraction of zm used in initial guess
          this%T_tol   =1e-6       ! convergence tolerance on log(T)
-         this%res_tol =1e-9       ! convergence tolerance for residual (ceq_fixed_T)
          this%ires_fac=1e2        ! factor by which the irreducible residual can exceed res_tol
          this%logy_lim=120.0_WP   ! upper limit on log(y)  (to prevent overflow in ceq_y)
          this%srat_lim=1e-9       ! lower limit on singular-value ratio (ceq_Sinv)
@@ -312,30 +254,17 @@ module chem_sys_class
 
 
       !> Set the reduced constraint matrix BR,and determine the ordering of the elements and species
-      subroutine red_con(this,BR,A,ifop,lud)
+      subroutine red_con(this,BR,A,ifop)
          use messager,  only: die
          use mathtools, only: ind_col,reorder_rows
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer,  intent(in)  :: ifop,lud
+         integer,  intent(in)  :: ifop
          real(WP), intent(out) :: BR(this%ns,this%nc),A(this%nc,this%nc)
          integer  :: k,info,lwork,rank_def,sp_det(this%ns),kk,ndebg,el_det(this%ne),ngi,is,js,ie,je,j,indcol(this%ns+this%ne+this%ng)
          real(WP) :: Sc(this%ns,this%ncs),S(this%ns+this%nc),U(this%ns,this%ns),VT(this%nc,this%nc),work(4*(this%ns+this%nc)*(this%ns+this%nc))
          real(WP) :: DEBg(this%ns,this%ns+this%ne+this%ng),EU(this%ns,this%ne),BS(this%ns,this%nc),PU(this%ns,this%nc),BTTPU(this%nc,this%nc),BB(this%ns,this%nc)
          real(WP), parameter :: thresh=1e-10 ! threshold for singular values and vectors
-
-         ! print out dimensions and input
-         if(ifop.ge.5) then
-            write(lud,*)' '
-            write(lud,*)'Input to red_con'
-            write(lud,*)'ne=',this%ne
-            write(lud,*)'ns=',this%ns
-            write(lud,*)'ncs= ',this%ncs
-            write(lud,*)'ng=  ',this%ng
-            write(lud,*)'nc=',this%nc
-            write(lud,*)'Constrained species'
-            write(lud,'((20i4))')this%CS
-         endif
          
          ! Check input
          call check_input()
@@ -385,7 +314,6 @@ module chem_sys_class
          
          if(info.ne.0) then
             if(ifop.ge.1) then
-               write(lud,*)'red_con: svd failed,info= ',info
                call die('red_con: svd failed')
             endif
          end if
@@ -397,12 +325,6 @@ module chem_sys_class
                exit
             endif
          end do
-
-         if(rank_def.gt.0.and.ifop.ge.3) then
-            write(lud,*)' '
-            write(lud,*)'red_con: basic constraint matrix is singular'
-            write(lud,*)'rank deficiency= ',rank_def
-         endif
 
          this%nb=this%nc-rank_def
 
@@ -427,16 +349,6 @@ module chem_sys_class
                this%sp_order(kk)=k	! undetermined species are last in ordering
             endif
          end do
-
-         if(ifop.ge.3) then
-            write(lud,*)' '
-            write(lud,'(a,i5)')'nsd=',this%nsd
-            write(lud,'(a,i5)')'nsu=',this%nsu
-            if(ifop.ge.4) then
-               write(lud,*)'sp_order='
-               write(lud,'((20i4))')this%sp_order
-            endif
-         endif
          
          !  form DEBg=[D E Bg]
          ndebg=this%nsd+this%ne+this%ng
@@ -453,7 +365,6 @@ module chem_sys_class
 
          if(info.lt.0) then
             if(ifop.ge.1) then
-               write(lud,*) 'red_con: ind_col failed; info=',info
                call die('red_con: ind_col failed')
             end if
          endif
@@ -483,16 +394,6 @@ module chem_sys_class
                EU(:,kk)=this%Ein(:,k)
             endif
          end do
-
-         if(ifop.ge.3) then
-            write(lud,*)' '
-            write(lud,*)'ned=',this%ned
-            write(lud,*)'neu=',this%neu
-            if(ifop.ge.4) then
-               write(lud,*)'el_order='
-               write(lud,'((20i4))')this%el_order
-            endif
-         endif
 
          !  identify any linearly dependent columns of Bg
          if(this%ng.gt.0) then
@@ -557,21 +458,9 @@ module chem_sys_class
 
          if(ifop<3) return
 
-         write(lud,*)'number of elements,             ne= ' ,this%ne
-         write(lud,*)'number of species ,             ns= ' ,this%ns
-         write(lud,*)'number of constrained species ,ncs= ' ,this%ncs
-         write(lud,*)'number of general constraints ,ng=  ' ,this%ng
-         write(lud,*)'number of determined elements ,ned= ' ,this%ned
-         write(lud,*)'number of determined species , nsd= ' ,this%nsd
-         write(lud,*)'  '
-         write(lud,*)'number of undetermined species , nsu= ' ,this%nsu
-         write(lud,*)'number of undetermined elements ,neu= ' ,this%neu
-         write(lud,*)'number of indep. gen. constr.,   ngi =' ,ngi
-         write(lud,*)'number of reduced constraints,   nrc= ' ,this%nrc
-         write(lud,*)' '
-
       contains
          subroutine check_input()
+            use, intrinsic :: iso_fortran_env, only: output_unit
             integer :: myerr(5),i
             myerr=0
             if(this%ns.lt.1) myerr(1)=1
@@ -581,10 +470,9 @@ module chem_sys_class
             if(this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
             if(maxval(myerr).eq.0) return
             if(ifop.ge.1) then
-               write(lud,*)'red_con: error in input'
+               write(output_unit,'(" >   chem_sys red_con: error in input")')
                do i=1,5
-                  if(myerr(i).gt.0) write(lud,'(a,i3)') '   error in argument ',i
-                  call die('')
+                  if(myerr(i).gt.0) write(output_unit,'(" >   chem_sys red_con: error in argument,i5")') i
                end do
             endif
          end subroutine check_input

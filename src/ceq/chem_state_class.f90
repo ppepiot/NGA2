@@ -8,11 +8,21 @@ module chem_state_class
    !> Expose type/constructor/methods
    public :: chem_state
 
+   !> List of available equilibrium conditions
+   integer, parameter, public :: fixed_T=1                     !< Fixed temperature
+   integer, parameter, public :: fixed_H=2                     !< Fixed enthalpy
+
+   !> Reference pressure (Pa)
+   real(WP), parameter :: p0=1.01325e5
+
    !> Chemical statete object definition
    type :: chem_state
 
       ! This is our chemical system
       class(chem_sys), pointer :: sys                          !< This is the chemical system the solver is build for
+
+      ! Equilibrium condition
+      integer :: cond
 
       ! Thermochemical quantities
       real(WP) :: p                                            !< Pressure
@@ -24,7 +34,6 @@ module chem_state_class
       real(WP), dimension(:),   allocatable :: Nu              !< Moles of undetermined species (nsu)
       real(WP), dimension(:),   allocatable :: lam             !< Lagrange multipliers (nrc)
       real(WP), dimension(:),   allocatable :: cr              !< Reduced constraint vector
-      real(WP), dimension(:),   allocatable :: Q               !< Consistency vector Q'*Xu=1 (nsu)
       real(WP), dimension(:),   allocatable :: gu              !< Gibbs functions of undetermined species (nsu)
       real(WP), dimension(:),   allocatable :: R,Rd            !< Residual arrays
       real(WP), dimension(:),   allocatable :: x               !< Chemical state unknowns
@@ -34,11 +43,6 @@ module chem_state_class
       real(WP) :: tol                                           !< Tolerance for the residual norm
       integer  :: iter                                          !< Number of iterations
       integer  :: iter_max                                      !< Maximum number of iterations
-      integer  :: temp_its                                      !< Number of temperature iterations performed
-      integer  :: time_steps                                    !< Number of pseudo time steps
-      integer  :: newt_calls                                    !< Number of Newton solves attempted
-      integer  :: newt_its                                      !< Number of Newton iterations performed
-      integer  :: nyeval                                        !< Number of y evaluations
 
    contains
       procedure :: initialize                                   !< Object initializer
@@ -62,7 +66,7 @@ module chem_state_class
 
 
       !> Chemical state initializer
-      subroutine initialize(this,sys,c,N,p_atm,p_Pa,p_cgs,T,HoR,N_h,T_h,N_g,T_g,stats,info)
+      subroutine initialize(this,sys,cond,p,T,c,N,HoR,N_h,T_h,N_g,T_g)
 
          !  Initializes the constrained equilibrium state of 
          !  an ideal liquid-gas mixture consisting of ns species,either at fixed pressure and
@@ -72,20 +76,17 @@ module chem_state_class
          !  ns x nc basic constraint matrix,N is the ns-vector of species moles,
          !  and c is the nc-vector of constraint values.
 
-         !  On return,info should be checked. (info.ge.0 for success)
-
          !  Input:
          !    sys -object type chem_sys created by subroutine.
          !           Required first argument
+
+         !    cond -Equilibrium condition: Either T_fixed or H_fixed
 
          !    (Either c or N must be specified.)
          !    c   -values of the nc basic constraints (real(nc))
          !    N   -moles of species used to calculate c as : c=B'*N (real(ns))
 
-         !    (Either p_atm or p_Pa or p_cgs must be specified.)
-         !    p_atm-pressure in standard atmospheres (real)
-         !    p_Pa -pressure in Pascals (SI units) (real)
-         !    p_cgs-pressure in cgs units (dynes/cm^2) (real)
+         !    p   -pressure
 
          !    (For a fixed (p,T) equilibrium calculation,specify T: do not specify HoR,N_h or T_h.)
          !    T-temperature (K) for fixed-temperature problem
@@ -97,97 +98,71 @@ module chem_state_class
          !    T_h temperature used to calculate H as:  H/R=sum(N_h h(T_h)/R),where
          !        h(T_h)/R [which has dimensions K] is the molar specific species enthalpy.
 
-         !    (Initial guesses are not needed,and should not be specified unless they
+         !    (Initial guesses are not needed, and should not be specified unless they
          !     are good guesses.)
          !    N_g  -initial guess for species moles
          !    T_g  -initial guess for temperature (for fixed (p,H) only)
 
-         !  Output:
-         !    N_eq    -moles of species in equilibrium mixture (real(ns))
-         !    T_eq    -temperature of the equilibrium mixture (real)
-         !    HoR_eq  -value of H/R [moles K] for the equilibrium mixture (real)
-         !    stats   -numerical information about the solution-details below (real(20))
-         !    info    -information about the solution:
-         !             > 0,info=the number of Newton iterations performed
-         !             < 0,an error occurred-see details below
-
-         !  Error conditions:  
-         !    info=-1  sys is not associated (ceq_sys_init must be called first)
-         !    info=-2  sys has not been initialized (ceq_sys_init must be called first)
-         !    info=-3  the pressure has been specified more than once
-         !    info=-4  the pressure has not been specified
-         !    info=-5  the pressure is non-positive
-         !    info=-6  the specified temperature is outside the range (T_low,T_high)
-         !    info=-7  neither T nor enthalpy specified
-         !    info=-8  the guess for temperature T_g is outside the range (T_low,T_high)
-         !    info=-9  neither c nor N has not been specified
-         !    info=-10 the constraints (and determined species) are zero
-         !    info=-11 the constraints are not realizable
-         !    info=-12 (maxmin_comp failed)
-         !    info=-13 (get_Nming failed)
-         !    info=-14 (get_hort2T failed)
-         !    info=-15 (ceq_lamg_init failed)
-         !    info=-16 (ceq_fixed_T failed)
-         !    info=-17 (ceq_fixed_h failed)
-         !    info=-18 T_eq is greater than T_high
-         !    info=-19 T_eq is less than T_low
-
-         !  Values of info between -12 and -17 are internal failures (which could be caused by erroneous
-         !  input).  Other values are caused by erroneous input.  A temperature outside the range
-         !  (T_low,T_high) may be caused by erroneous input (e.g.,of T or HoR).  If the correct
-         !  temperature is outside this range,the values of T_low and T_high can be changed prior to
-         !  calling ceq_state by calling ceq_param_set,e.g.,call ceq_param_set(sys,T_low=200.0_WP).
          !  To diagnose an error condition,the case can be repeated with diagnostics turned on,
-         !  by: call ceq_param_set(sys,diag=5).
+         !  by: call param_set(sys,diag=5).
 
-         ! stats:
-         !    stats(1)=temp_its  -number of temperature iterations
-         !    stats(2)=time_steps-number of psuedo-time steps
-         !    stats(3)=newt_calls-number of Newton calls (iteration not performed if initial residual small)
-         !    stats(4)=newt_its  -number of Newton iterations
-         !    stats(5)=nyeval    -number of temperature iterations
-         !    stats(6)=err       -last residual error
-         !    stats(7)=npert     -number of quantities perturbed
-         !    stats(8)=max_pert  -maximum value of perturbation
-         !    stats(9)=zmm       -minimum maxmin composition
-
+         use, intrinsic :: iso_fortran_env, only: output_unit
          use messager,  only: die
          use mathtools, only: reorder_rows
          implicit none
          class(chem_state), intent(inout) :: this
          class(chem_sys), target, intent(in) :: sys
-         real(WP), intent(in),  optional :: c(sys%nc),N(sys%ns),p_atm,p_Pa,p_cgs,T,HoR,N_h(sys%ns),T_h,N_g(sys%ns),T_g
-         integer,  intent(out), optional :: info
-         real(WP), intent(out), optional :: stats(20)
-         real(WP) :: N_eq(sys%ns),T_eq,HoR_eq
-         integer  :: np,nb,nc,ns,nsd,nsu,nrc,npert,iret,i,lu
-         real(WP) :: p,T0,errc,max_pert,Ndbar,Nu_atoms,zumin,zumax,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),cr_norm,cb_norm,res,N_low,res_tol,err2
+         integer,  intent(in) :: cond
+         real(WP), intent(in) :: p
+         real(WP), intent(in), optional :: c(sys%nc),N(sys%ns),T,HoR,N_h(sys%ns),T_h,N_g(sys%ns),T_g
+         integer  :: np,nb,nc,ns,nsd,nsu,nrc,npert,iret,i
+         real(WP) :: T0,max_pert,Numin,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),cr_norm,cb_norm,res,N_low,res_tol=1e-9
          real(WP), dimension(sys%ns)  :: N0,N1,h,Neq
-         real(WP), dimension(sys%nsu) :: Nu,Nu0,Nm,Nupper,atoms,Ng,gu,xu,rhs,gu0,Nu00
-         real(WP), dimension(sys%nrc) :: cr,lam0
-         real(WP), parameter :: p0_Pa=1.01325e5 ! standard atmosphere [Pa]
-         logical :: fixed_T,fail,diag
+         real(WP), dimension(sys%nsu) :: Nu,Nu0,Nm,Nupper,Ng,gu
+         real(WP), dimension(sys%nrc) :: cr
+         logical :: fail,diag
 
-         ! Point to chem_sys object
+         ! Point to chemical system
          this%sys=>sys
 
-         if(.not.present(info)) then
-            write(0,*)'chem_state initializer: argument INFO must be present; stopping'
-            call die('chem_state initializer: argument INFO must be present')
-         endif
+         ! Set the eqiuilibrium condition
+         select case (cond)
+            case (fixed_T)
+               if(present(T)) then
+                  if(T.lt.sys%T_low.or.T.gt.sys%T_high) call die('[chem_sys initialize] Temperature out of range')
+                  this%T=T
+                  T0=T
+               else
+                  call die('[chem_sys initialize] Temperature is required for the fixed temperature condition')
+               end if
+            case (fixed_H)
+               if(present(HoR)) then
+                  this%HoR=HoR
+               elseif(present(N_h).and.present(T_h)) then
+                  call reorder_rows(N_h,sys%sp_order,N0)
+                  call this%get_hort(sys%ns,T_h,sys%thermo,h)
+                  this%HoR=sum(N0*h)*T_h
+               else
+                  call die('[chem_sys initialize] both N_h and T_h are required for the fixed enthalpy case')
+               end if
+               if(present(T_g)) then
+                  ! Guess provided
+                  T0=T_g
+                  if(T_g.lt.sys%T_low.or.T_g.gt.sys%T_high) call die('[chem_sys initialize] Guessed temperature out of range')
+               else
+                  T0=sqrt(sys%T_low*sys%T_high)
+                  T0=max(T0,0.1_WP*sys%T_high)
+               endif
+            case default
+               call die('[chem_sys initialize] The chemical state must be at either constant temperature or constant enthalpy')
+         end select
+         this%cond=cond
 
-         ! Anticipate success
-         info =0
-         if(present(stats)) stats=0.0_WP
+         ! Determine pressure in standard atmospheres
+         if(p.le.0.0_WP) call die('[chem_sys initialize] Pressure must be strictly positive')
+         this%p=p/p0
 
-         ! Check that sys has been initialized  =====================================
-
-         if(.not.sys%initialized) then
-            info=-2
-            call die('')
-         endif
-
-         ! Obtain indexes and allocate state
+         ! Obtain indexes
          np =sys%np
          nb =sys%nb
          nc =sys%nc
@@ -196,167 +171,46 @@ module chem_state_class
          nsd=sys%nsd
          nsu=sys%nsu
 
+         ! Allocate arrays
          allocate(this%N   (ns));           this%N      =0.0_WP
          allocate(this%Nbar(np));           this%Nbar   =0.0_WP
          allocate(this%Nd  (nsd));          this%Nd     =0.0_WP
          allocate(this%Nu  (nsu));          this%Nu     =0.0_WP
          allocate(this%lam (nrc));          this%lam    =0.0_WP
          allocate(this%cr  (nrc));          this%cr     =0.0_WP
-         allocate(this%Q   (nsu));          this%Q      =0.0_WP
          allocate(this%gu  (nsu));          this%gu     =0.0_WP
          allocate(this%R   (nrc+np));       this%R      =0.0_WP
          allocate(this%Rd  (np));           this%Rd     =0.0_WP
          allocate(this%x   (nrc+np));       this%x      =0.0_WP
          allocate(this%BtildeT(nrc,nsu));   this%BtildeT=0.0_WP
          allocate(this%PtildeT(np,nsu));    this%PtildeT=0.0_WP
-         
-         this%temp_its  =0 ! number of temperature iterations performed
-         this%time_steps=0 ! number of pseudo time steps
-         this%newt_calls=0 ! number of Newton solves attempted
-         this%newt_its  =0 ! number of Newton iterations performed
-         this%nyeval    =0 ! number of y evaluations
 
-         ! Determine if errors are to be reported
-         if(sys%diag.ge.1) then
-            diag=.true.
-         else
-            diag=.false.
-         endif
-         lu=sys%lu
-
-         ! Determine pressure  p  in standard atmospheres  !=================
-         if(present(p_atm)) then
-            p=p_atm
-            if(present(p_Pa).or.present(p_cgs)) then
-               if(diag) then
-                  write(lu,*) 'ceq_state: multiple input pressures'
-               end if
-               info=-3
-               call die('chem_sys initialize: Multiple input pressures')
-            endif
-
-         elseif(present(p_Pa)) then
-            p=p_Pa/p0_Pa 
-            if(present(p_atm).or.present(p_cgs)) then
-               if(diag) then
-                  write(lu,*) 'ceq_state: multiple input pressures'
-               end if
-               info=-3
-               call die('chem_sys initialize: Multiple input pressures')
-            endif
-
-         elseif(present(p_cgs)) then
-            p=p_cgs*0.1_WP/p0_Pa  
-            if(present(p_atm).or.present(p_Pa)) then
-               if(diag) then
-                  write(lu,*) 'ceq_state: multiple input pressures'
-               end if
-               info=-3
-               call die('chem_sys initialize: Multiple input pressures')
-            endif
-         else
-            if(diag) then
-               write(lu,*) 'ceq_state: no pressure specified'
-            end if
-            info=-4
-            call die('chem_sys initialize: No pressure specified')
-         endif
-
-         if(p.le.0.0_WP) then
-            if(diag) then
-               write(lu,'(a,1p,9e13.4)') 'ceq_state: pressure must be strictly positive: p=',p
-            end if
-            info=-5
-            call die('')
-         endif
-
-         this%p=p
-
-         ! Determine T or HoR  =============================================
-
-         fixed_T=.false.
-         if(present(T)) then
-            this%T=T
-            fixed_T=.true.
-
-            if(T.lt.sys%T_low.or.T.gt.sys%T_high) then
-               if(diag) write(lu,'(a,1p,9e13.4)') &
-                     'ceq_state: temperature out of range: T,T_low,T_high=',T,sys%T_low,sys%T_high
-               info=-6
-               call die('chem_sys initialize: ')
-            endif
-
-         elseif(present(HoR)) then
-            this%HoR=HoR
-
-         elseif(present(N_h).and.present(T_h)) then
-            call reorder_rows(N_h,sys%sp_order,N0)
-            call this%get_hort(sys%ns,T_h,sys%thermo,h)
-            this%HoR=sum(N0*h)*T_h  ! HoR
-
-         else
-            if(diag) write(lu,*) 'ceq_state: neither T nor HoR nor (N_h and T_h) specified'
-            info=-7
-            call die('chem_sys initialize: ')
-         endif
-
-         ! Determine T0 for initial guess,and evaluate gu0=gu(T0) ===============
-
-         if(fixed_T) then
-            T0=this%T  ! specified fixed T
-
-         elseif(present(T_g)) then
-            T0=T_g  ! guess provided
-
-            if(T_g.lt.sys%T_low.or.T_g.gt.sys%T_high) then
-               if(diag) write(lu,'(a,1p,9e13.4)') 'ceq_state: T_g out of range: T_g,T_low,T_high=',T_g,sys%T_low,sys%T_high
-               info=-8
-               call die('chem_sys initialize: ')
-            endif
-
-         else
-            T0=sqrt(sys%T_low*sys%T_high)
-            T0=max(T0,0.1_WP*sys%T_high)
-         endif
-
+         ! Initialize the Gibbs function
          call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
 
-         ! Form the basic constraint vector  =========================
-
+         ! Form the basic constraint vector
          if(present(c)) then
             cb(1:nc)=c
-
          elseif(present(N)) then
             cb(1:nc)=matmul(N,sys%B)
-
          else
-            if(diag) write(lu,*) 'ceq_state: neither c nor N specified'
-            info=-9
-            call die('chem_sys initialize: ')
+            call die('[chem_sys initialize] Neither c nor N specified')
          endif
 
-         ! Form modified and reduced constraints  !===================
-
-         cmod(1:nb)=matmul(sys%A(1:nb,1:nc),cb)   ! form modified constraint vector
-         Nd(1:nsd) =cmod(1:nsd)                   ! determined species
+         ! Form modified and reduced constraints
+         cmod(1:nb)=matmul(sys%A(1:nb,1:nc),cb)
+         Nd(1:nsd) =cmod(1:nsd)
 
          ! Treat the special case of no undetermined species
-
          if(nsu.eq.0) then
             Neq=Nd
-            if(.not.fixed_T) then
-               call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
-               if(iret.lt.0) then
-                  info=-17+iret
-                  call die('chem_sys initialize: ')
-               endif
-            endif
-            
+            if(cond.eq.fixed_H) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
             go to 500
          endif
          
-         cr(1:nrc) =cmod(nsd+1:nb)   ! reduced constraint vector
-         cr_norm   =norm2(cr)        ! |cr|
+         ! Reduced constraint vector
+         cr(1:nrc) =cmod(nsd+1:nb)
+         cr_norm   =norm2(cr)
 
          if(cr_norm.le.0.0_WP) then
          ! SBP added 4/9/2009
@@ -364,58 +218,33 @@ module chem_state_class
                !  only determined species
                Neq=0.0_WP
                Neq(1:nsd)=Nd(1:nsd)
-               if(.not.fixed_T) then
-                  call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
-                  if(iret.lt.0) then
-                     info=-17+iret
-                     call die('chem_sys initialize: ')
-                  endif
-               endif
+               if(cond.eq.fixed_H) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
                go to 500
             endif
             ! SBP end of added
-         
-            if(diag) write(lu,*) 'ceq_state: constraints are zero'
-            info=-10  ! SBP bug fix 4/8/2009
-            call die('chem_sys initialize: ')
+            call die('[chem_sys initialize] All zero composition')
          endif
 
-         ! Use initial guess N_g if provided  !====================
-
+         ! Use initial guess N_g if provided
          if(present(N_g)) then
             call reorder_rows(N_g,sys%sp_order,N0)
-            Nu0(1:nsu)=N0(nsd+1:ns)  ! guessed undetermined species
-
-            cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR) ! reduced c.v. based on N_g
+            ! Guessed undetermined species
+            Nu0(1:nsu)=N0(nsd+1:ns)
+            ! Reduced c.v. based on N_g
+            cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR)
             cb_norm  =norm2(cb)
-
-            if(cb_norm.eq.0.0_WP) then
-               if(sys%diag .ge.2) write(lu,*)'ceq_state: N_g yields zero constraint'
-               go to 50
-            endif  
-
-            res=norm2((cb(1:nrc)/cb_norm-cr/cr_norm))  !  residual 
-
-            if(sys%diag.ge.2) write(lu,'(a,1p,2e13.4)')'ceq_state: initial guess residual=',res
-
-            if(res.gt.sys%res_tol) then  !  adjust initial guess Nu0,store in Nm
-
+            if(cb_norm.eq.0.0_WP) go to 50
+            res=norm2((cb(1:nrc)/cb_norm-cr/cr_norm))
+            ! Adjust initial guess Nu0,store in Nm
+            if(res.gt.res_tol) then
                N_low=sum(cr(1:sys%neu))*1e-15
-
-               call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,info)
-               if(info.ne.0) then  !  min_pert failed
-                     if(sys%diag.ge.2) write(lu,*)'ceq_state: min_pert failed,info=',info
+               call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,iret)
+               ! min_pert failed
+               if(iret.ne.0) then
+                  call die('[ceq_state] min_pert failed')
                   go to 50
                endif
-
                Nu0=Nm
-
-               if(sys%diag.ge.2) then
-                  cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR) ! reduced c.v. based on N_g
-                  cb_norm  =norm2(cb)
-                  res      =norm2((cb(1:nrc)/cb_norm-cr/cr_norm))
-                  write(0,'(a,1p,9e13.4)') 'ceq_state: after min_pert: res,min(Nu0)=',res,minval(Nu0)
-               endif
             endif
 
             ! Accept initial guess (Nu0); skip max-min and min_g
@@ -427,100 +256,55 @@ module chem_state_class
 
          50    continue  !  proceed without using initial guess N_g
 
-         ! Perturb if necessary  =====================================
-
-         call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,&
-                           Nd,cr,sys%BR,sys%E,sys%diag,sys%lu, &
-                           sys%eps_el,sys%eps_sp,sys%pert_tol,sys%pert_skip,&
-                           this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
+         ! Perturb if necessary
+         call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,Nd,cr,sys%BR,sys%E,sys%diag,sys%eps_el,sys%eps_sp, &
+         &                 sys%pert_tol,sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
 
          if(iret.eq.-1) then 
-            if(diag) write(lu,*) 'ceq_state: non-realizable constraint'
-            info=-11
-            call die('chem_sys initialize: ')
-
+            write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
          elseif(iret.eq.-2) then 
-            if(diag) write(lu,*) 'ceq_state: ceq_max-min failed'
-            info=-12
-            call die('chem_sys initialize: ')
+            call die('[chem_state initialize] Perturb failed')
          endif
 
-         if(present(stats)) then
-            stats(7)=npert
-            stats(8)=max_pert
-            stats(9)=minval(Nm)
-         endif
-
-
-         ! Determine min_g composition based on T0  !===========
-
+         ! Determine min_g composition based on T0
          call this%get_Nming(nsu,nrc,sys%BR,this%cr,gu,Ng,iret)
-         
-         if(iret.lt.0) then
-            if(diag) write(lu,*) 'ceq_state: get_Nming failed'
-            info=-13
-            call die('chem_sys initialize: ')
-         endif
+         if(iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
 
-         ! Form initial guess Nu0   !============================
-
+         ! Form initial guess Nu0
          Nu0=Ng+sys%frac_Nm*(Nm-Ng)
 
-         100 continue  !  skip to here if Nu0 based on N_g accepted
+         ! Skip to here if Nu0 based on N_g accepted
+         100 continue
 
-         ! Determine normalization-condition vector Q !=========
-         !     q=Q'*Xu -1=0
-         Ndbar      =sum(this%Nd)               ! total moles of determined species
-         atoms   =sum(sys%E(nsd+1:ns,:),2)      ! atoms in undetermined species
-         Nu_atoms=sum(this%cr(1:sys%neu))       ! total moles of atoms in undetermined species
-         this%Q  =1.0_WP+atoms*Ndbar/Nu_atoms   ! consistency condition vector
-
-         ! Re-estimate T0 and re-evaluate gu if required !======
-
-         if(.not.fixed_T.and..not.present(T_g)) then
+         ! Re-estimate T0 and re-evaluate gu if required
+         if((cond.eq.fixed_H).and.(.not.present(T_g))) then
             N1(1:nsd)   =this%Nd
             N1(nsd+1:ns)=Nu0
-            call this%hor2T(ns,N1,this%HoR,sys%T_low,sys%T_high,sys%thermo,T0,iret)
-
-            if(iret.eq.-3) then
-                  if(diag) write(lu,*) 'ceq_state: hor2T failed'
-               info=-14
-               call die('chem_sys initialize: ')
-            endif
-
-            call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)  ! set gu based on T0
+            call this%hor2T(ns,N1,this%HoR,sys%T_low,sys%T_high,sys%thermo,T0)
+            ! Set gu based on T0
+            call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
          endif
 
+         ! Set the Gibbs functin and the undetermined species moles
          this%gu=gu
          this%Nu=Nu0
-         
 
-         ! Determine required output  =======================================
+         ! Determine required output
+         Neq=[this%Nd,this%Nu]
 
-         Neq=(/ this%Nd ,this%Nu /)  !  equilibrium moles (re-ordered)
+         ! Jump to here if there are no undetermined species
+         500	   continue
 
-         500	   continue  !  jump to here if there are no undetermined species
-
-         if(fixed_T) then
+         ! Update the enthalpy
+         if(cond.eq.fixed_T) then
             call this%get_hort(ns,this%T,sys%thermo,h)
             this%HoR=sum(Neq*h)*this%T
          endif
 
-         do i=1,ns          ! re-order species
+         ! Re-order species
+         do i=1,ns
             this%N(sys%sp_order(i))=Neq(i)
          end do
-
-         if(nsu.gt.0) then
-            if(present(stats)) then
-               stats(1)=this%temp_its
-               stats(2)=this%time_steps
-               stats(3)=this%newt_calls
-               stats(4)=this%newt_its
-               stats(5)=this%nyeval
-            endif
-
-            info=this%nyeval
-         endif
          
       end subroutine initialize
 
@@ -530,8 +314,8 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
-         real(kind(1.0_WP)), intent(in) :: T,thermo(ns,2*ncof+1)
-         real(kind(1.0_WP)), intent(out) :: hort(ns)
+         real(WP), intent(in) :: T,thermo(ns,2*ncof+1)
+         real(WP), intent(out) :: hort(ns)
          ! input:
          !	ns	  -number of species
          !   T     -temperature (K)
@@ -539,7 +323,7 @@ module chem_state_class
          ! output:
          !   hort  -h_j/(RT) -normalized enthalpies
          ! S. B. Pope 9/26/02
-         real(kind(1.0_WP)) :: th(6),Tpnm1
+         real(WP) :: th(6),Tpnm1
          integer :: k,n
          th(1)=1.0_WP  ! coefficient multipliers for enthalpy
          th(6)=1./T
@@ -563,8 +347,8 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
-         real(kind(1.0_WP)), intent(in) :: T,p,thermo(ns,2*ncof+1),isGas(ns)
-         real(kind(1.0_WP)), intent(out) :: gort(ns)
+         real(WP), intent(in) :: T,p,thermo(ns,2*ncof+1),isGas(ns)
+         real(WP), intent(out) :: gort(ns)
          ! input:
          !   isGas -1 if gas,0 if liquid
          !   T     -temperature (K)
@@ -573,7 +357,7 @@ module chem_state_class
          ! output:
          !   gort  -g_j/(RT) -normalized Gibbs functions
          ! S. B. Pope 9/26/02
-         real(kind(1.0_WP)) :: tc(ncof),th(ncof),ts(ncof),tg(ncof)
+         real(WP) :: tc(ncof),th(ncof),ts(ncof),tg(ncof)
          integer :: k,n
          if(ns.le.0) return
          tc=0.0_WP  ! coefficient multipliers for specific heats
@@ -602,13 +386,13 @@ module chem_state_class
 
 
       !> Determine temperature given enthalpy
-      subroutine hor2T(this,ns,z,hin,T_low,T_high,thermo,T,iret)
+      subroutine hor2T(this,ns,z,hin,T_low,T_high,thermo,T)
+         use messager, only: die
          implicit none
          class(chem_state),  intent(in)  :: this
          integer,            intent(in)  :: ns
-         real(kind(1.0_WP)), intent(in)  :: z(ns),hin,T_low,T_high,thermo(ns,2*ncof+1)
-         real(kind(1.0_WP)), intent(out) :: T
-         integer,            intent(out) :: iret
+         real(WP), intent(in)  :: z(ns),hin,T_low,T_high,thermo(ns,2*ncof+1)
+         real(WP), intent(out) :: T
          ! input:
          !	ns		- number of species
          !   z      -moles of species
@@ -618,10 +402,6 @@ module chem_state_class
          !   thermo -thermo data
          ! output:
          !   T   -temperature (K)
-         !   iret= 0  for success
-         !       =-1  for T > T_high
-         !       =-2  for T < T_low
-         !       =-3  for failure
 
          ! Notes:  if the temperature is outside the range [T_low T_high]
          !   then T is returned as the closest of these bounds.
@@ -630,13 +410,12 @@ module chem_state_class
          ! S. B. Pope 9/26/02
 
          integer :: itmax,it
-         real(kind(1.0_WP)) :: T_tol,T0,hort(ns),hor,h_a,T_a,h_b,T_b,dT,&
+         real(WP) :: T_tol,T0,hort(ns),hor,h_a,T_a,h_b,T_b,dT,&
             cpor(ns),hh,cpp
 
          itmax=100     ! maximum number of Newton iterations (usually only 3 required)
          T_tol=1e-6    ! error tolerance
          T0=1500.0_WP  ! initial guess
-         iret=0        ! anticipate success
 
          !  determine if T>T0 and bracket T in [T_a T_b]
          call this%get_hort(ns,T0,thermo,hort)
@@ -649,7 +428,6 @@ module chem_state_class
             h_b=dot_product(z,hort)*T_high
             if(hin.ge.h_b) then
                T=T_high   ! T > T_high (return T=T_high)
-               iret=-1
                return
             endif
             T_b=T_high
@@ -660,7 +438,6 @@ module chem_state_class
             h_a=dot_product(z,hort)*T_low
             if(hin.le.h_a) then
                T=T_low    ! T < T_low (return T=T_low)
-               iret=-2
                return
             endif
             T_a=T_low
@@ -680,21 +457,21 @@ module chem_state_class
             if(abs(dT).lt.T_tol) return  ! success
          end do
 
-         ! failure
-         iret=-3
-         T=-1.0_WP
+         ! Failure
+         call die('[chem_state hor2T] Iterations failed')
 
       end subroutine hor2T
 
 
       !> Generate (possibly) perturbed CE problem
-      subroutine perturb(this,ns,nsd,nsu,ne,ned,neu,nrc,Nd,cr,BR,E,ifop,lud,eps_el,eps_sp,pert_tol,pert_skip,zdp,zup,Nupper,crp,npert,max_pert,iret)
+      subroutine perturb(this,ns,nsd,nsu,ne,ned,neu,nrc,Nd,cr,BR,E,ifop,eps_el,eps_sp,pert_tol,pert_skip,zdp,zup,Nupper,crp,npert,max_pert,iret)
+         use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(in) :: this
-         integer, intent(in) :: ns,nsd,nsu,ne,ned,neu,nrc,ifop,lud,pert_skip
-         real(kind(1.0_WP)), intent(in) :: Nd(nsd),cr(nrc),BR(nsu,nrc),E(ns,ne),eps_el,eps_sp,pert_tol
+         integer, intent(in) :: ns,nsd,nsu,ne,ned,neu,nrc,ifop,pert_skip
+         real(WP), intent(in) :: Nd(nsd),cr(nrc),BR(nsu,nrc),E(ns,ne),eps_el,eps_sp,pert_tol
          integer, intent(out) :: npert,iret
-         real(kind(1.0_WP)), intent(out) :: zdp(nsd),zup(nsu),Nupper(nsu),crp(nrc),max_pert
+         real(WP), intent(out) :: zdp(nsd),zup(nsu),Nupper(nsu),crp(nrc),max_pert
 
          !  Input:
          !	ns		- number of species
@@ -709,7 +486,6 @@ module chem_state_class
          !   BR     -reduced constraint matrix
          !   E      -element matrix
          !   ifop    >0 for output
-         !   lud    -logical unit for diagnostic output
          !   eps_el -relative lower bound on element moles
          !   eps_sp -relative lower bound on species moles
          !   pert_tol- largest allowed perturbation (moles/moles of atoms)
@@ -728,18 +504,13 @@ module chem_state_class
          !          =-3,zero atoms
 
          integer :: j,k
-         real(kind(1.0_WP)) :: zdlim,zatoms,&
+         real(WP) :: zdlim,zatoms,&
          cre(neu),sumcre,cref,zed(ned),zeu(neu),ze(ne),zeu_in(neu),zau,zelow,&
-         zemax,zumm(nsu),zumin,zulow,zeumax
+         zemax,zumm(nsu),Numin,zulow,zeumax
 
          iret=0         ! anticipate success
          npert=0        ! number of perturbations
          max_pert=0.0_WP  ! largest normalized perturbation
-
-         if(ifop.ge.5) then
-            write(lud,*)'perturb'
-            write(lud,'(a,9i4)')'ne ned neu ns nsd nsu nrc= ',ne,ned,neu,ns,nsd,nsu,nrc
-         endif
 
          zdp=Nd       ! check that determined species are non-negative
          zatoms=0.0_WP  ! estimate of moles of atoms
@@ -754,7 +525,7 @@ module chem_state_class
          end do
 
          if(zatoms.le.0.0_WP) then
-            if(ifop .ge.1) write(lud,*) 'perturb: no atoms'
+            write(output_unit,'(" >   chem_state perturb: no atoms")')
             iret=-3
             return
          endif
@@ -765,7 +536,7 @@ module chem_state_class
                if(abs(zdp(k))>zdlim  ) then ! significantly negative
                      max_pert=max(max_pert,abs(zdp(k))/zatoms)
                      npert=npert+1
-                     if(ifop.ge.1) write(lud,*)'perturb: negative determined species '
+                     if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative determined species")')
                endif
                zdp(k)=0.0_WP
             endif
@@ -784,7 +555,7 @@ module chem_state_class
                if(abs(cre(k))>cref ) then ! significantly negative
                      max_pert=max(max_pert,abs(cre(k))/zatoms)
                      npert=npert+1
-                     if(ifop.ge.1) write(lud,*)'perturb: negative undetermined element '
+                     if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative undetermined element")')
                endif
                cre(k)=0.0_WP
             endif
@@ -810,31 +581,17 @@ module chem_state_class
             endif
          end do
 
-         if(ifop.ge.5.and.npert>0) then
-            write(lud,*) 'zeu_in'
-            write(lud,'(1p,5e13.4)') zeu_in
-            write(lud,*) 'zeu'
-            write(lud,'(1p,5e13.4)') zeu
-            write(lud,*) 'zeu-zeu_in'
-            write(lud,'(1p,5e13.4)') zeu-zeu_in
-         endif
-
          Nupper=0.0_WP    ! determine upper bound on undetermined species
          do j=1,nsu
             Nupper(j)=1/maxval(E(nsd+j,ned+1:ne)/zeu)
          end do
 
-         if(ifop.ge.5) then
-            write(lud,*) 'log10(Nupper)= '
-            write(lud,'(1p,5e13.4)') log10(Nupper)
-         endif
-
          !  determine max-min moles of undetermined species
 
-         call this%maxmin_comp(nsu,nrc,BR,crp,zumm,zumin,iret)
+         call this%maxmin_comp(nsu,nrc,BR,crp,zumm,Numin,iret)
 
          if(iret<0) then
-            if(ifop.ge.1) write(lud,*)'perturb: maxmin_comp failed,iret=',iret
+            if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: maxmin_comp failed")')
             iret=-2 
             return 
          endif
@@ -855,10 +612,7 @@ module chem_state_class
          crp=crp+matmul(zup-zumm,BR)
 
          if(max_pert.gt.pert_tol) then
-            if(ifop.ge.1) then
-               write(lud,*)'perturb: large perturbation made'
-               write(lud,'(a,i5,1p,e13.4)') 'npert,maxpert=',npert,max_pert
-            endif
+            if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: large perturbation made")')
             iret=-1 
          endif
 
@@ -870,25 +624,18 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: nz,nc
-         real(kind(1.0_WP)), intent(in) :: B(nz,nc),c(nc),g(nz)
+         real(WP), intent(in) :: B(nz,nc),c(nc),g(nz)
          integer, intent(out) :: iret
-         real(kind(1.0_WP)), intent(out) :: Ng(nz)
-         !  Exit flag from linprog: iret<=0 for failure.
+         real(WP), intent(out) :: Ng(nz)
+         !  Exit flag from linprog: iret<0 for failure.
          !  S.B. Pope 10/1/02
          integer :: i,iftest  
-         real(kind(1.0_WP)) :: BT(nc,nz),errc(nc),errmax,gmin
+         real(WP) :: BT(nc,nz)
          BT=transpose(B)
          call this%solve_linprog(nz,nc,g,BT,c,Ng,iret)
          do i=1,nz  ! guard against small negative values due to round-off
          Ng(i)=max(Ng(i),0.0_WP)
          end do
-         iftest=0	! for testing only
-         if(iftest.eq.0 ) return
-         ! Test satisfaction of constraints and value of g'z
-         errc=matmul(Ng,B)-c
-         errmax=max(maxval(errc),-minval(errc))
-         gmin=dot_product(Ng,g)
-         write(0,*)'get_Nming: iret,errmax,gmin=',iret,errmax,gmin
       end subroutine get_Nming
 
 
@@ -910,10 +657,10 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in)           :: nz,nc
-         real(kind(1.0_WP)), intent(in)  :: B(nz,nc),c(nc),N0(nz),eps
-         real(kind(1.0_WP)), intent(out) :: z(nz)
+         real(WP), intent(in)  :: B(nz,nc),c(nc),N0(nz),eps
+         real(WP), intent(out) :: z(nz)
          integer, intent(out)          :: iret
-         real(kind(1.0_WP)) :: A(nc+nz,3*nz),x(3*nz),f(3*nz),r(nc+nz),d(nz),tp,tm,res,Bsc,csc,zsc
+         real(WP) :: A(nc+nz,3*nz),x(3*nz),f(3*nz),r(nc+nz),d(nz),tp,tm,res,Bsc,csc,zsc
          integer :: i,nx,nr
          logical :: linear=.false.
          ! x=[ u v w ]=[ z-eps (t+d)/2   (t-d)/2  ]
@@ -955,17 +702,6 @@ module chem_state_class
             end do
          endif
          if(.false.) return
-         !  diagnostics
-         write(0,*)' '
-         write(0,*)'min_pert: iret=',iret
-         write(0,*)'min_pert: N0,z,N0-z'
-         do i=1,nz
-            write(0,'(1p,10e11.2)') N0(i),z(i),N0(i)-z(i),x(nz+i),x(2*nz+i),x(nz+i)+x(2*nz+i),x(nz+i)-x(2*nz+i)
-         end do
-         write(0,*) 'min_pert: min(x)=',minval(x)
-         r(1:nc)=matmul(z(1:nz),B(1:nz,1:nc))-c(1:nc)
-         write(0,*) 'min_pert: residual=',norm2(r(1:nc))
-         write(0,*) 'min_pert: sum of perts.=',sum(x(nz+1:3*nz))
       end subroutine min_pert
 
 
@@ -974,8 +710,8 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
-         real(kind(1.0_WP)), intent(in) :: T,thermo(ns,2*ncof+1)
-         real(kind(1.0_WP)), intent(out) :: cpor(ns)
+         real(WP), intent(in) :: T,thermo(ns,2*ncof+1)
+         real(WP), intent(out) :: cpor(ns)
          ! input:
          !	ns	  -number of species
          !   T     -temperature (K)
@@ -983,7 +719,7 @@ module chem_state_class
          ! output:
          !   cpor  -Cp_j/R   -normalized constant-pressure specific heats
          ! S. B. Pope 9/26/02
-         real(kind(1.0_WP)) :: tc(5)
+         real(WP) :: tc(5)
          integer :: k,n
          cpor=0.0_WP
          tc(1)=1.0_WP  ! coefficient multipliers for specific heats
@@ -1005,9 +741,9 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: nz,nc
-         real(kind(1.0_WP)), intent(in) :: B(nz,nc),c(nc)
+         real(WP), intent(in) :: B(nz,nc),c(nc)
          integer, intent(out) :: iret
-         real(kind(1.0_WP)), intent(out) :: Nm(nz),zmin
+         real(WP), intent(out) :: Nm(nz),zmin
          !  Find Nm which maximizes zmin=min_i(z(i)) subject to B'*z=c.
          !  iret<0 indicates failure
          !  Method: 
@@ -1023,7 +759,7 @@ module chem_state_class
          !       where A=[ B' sum(B)'].
          !   S.B. Pope 10/1/02
          integer :: nx,tries, j,jj
-         real(kind(1.0_WP)) :: A(nc,nz+1),bsum(nc),f(nz+1),x(nz+1)
+         real(WP) :: A(nc,nz+1),bsum(nc),f(nz+1),x(nz+1)
          nx=nz+1
          bsum=sum(B,dim=1)
          f=0
@@ -1055,8 +791,8 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: nx,nb
-         real(kind(1.0_WP)), intent(in)  :: f(nx),A(nb,nx),b(nb)
-         real(kind(1.0_WP)), intent(out) :: xm(nx)
+         real(WP), intent(in)  :: f(nx),A(nb,nx),b(nb)
+         real(WP), intent(out) :: xm(nx)
          integer, intent(out) :: iret
          ! Input:
          !	nx	- number of components of x
@@ -1070,7 +806,7 @@ module chem_state_class
          !	iret=-2 if there is no feasible solution
          !	iret=-3 if A is rank deficient
          !  S.B. Pope 10/1/06
-         real(kind(1.0_WP)) :: eps=1e-9,ale(1,1),age(1,1),ble(1),bge(1)
+         real(WP) :: eps=1e-9,ale(1,1),age(1,1),ble(1),bge(1)
          call lp(nx,0,0,nb,ale,age,A,ble,bge,b,f,xm,iret,toler=eps)
          if(iret<0) then
             !XXX write(0,*)'solve_linprog,iret=',iret  ! SBP XXX

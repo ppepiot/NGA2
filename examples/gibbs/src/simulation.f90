@@ -4,7 +4,7 @@ module simulation
    use string,           only: str_short,str_medium
    use YAMLRead,         only: YAMLElement
    use chem_sys_class,   only: chem_sys,Lphase,Gphase
-   use chem_state_class, only: chem_state
+   use chem_state_class, only: chem_state,fixed_T
    implicit none
    private
    
@@ -200,6 +200,9 @@ contains
          real(WP), dimension(:,:), allocatable :: Bg
          real(WP), dimension(:),   allocatable :: stats
          integer :: isc
+         ! Read inputs
+         call param_read('Temperature',T)
+         call param_read('Pressure',p)
          ! Allocate arrays
          allocate(Bg(ns,ng));  Bg=0.0_WP
          allocate(stats(20))
@@ -208,25 +211,20 @@ contains
             if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
             if (sp_names(isc).eq.'H2O(L)') Bg(isc,1)=1.0_WP
          end do
-         ! Read inputs
-         call param_read('Temperature',T)
-         call param_read('Pressure',p)
          ! Print the initial conditions
          print*,'Initial moles:'
          do isc=1,ns
             print*,trim(sp_names(isc)),': ',N_init(isc)
          end do
-         ! Open CEQ file
+         ! Open CEQ output file
          open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
          ! Inizialize the chemical system
-         call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5)
+         call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
          if (iret.lt.0) call die('chem_sys initialization failed.')
          ! Initialize the chemical state
-         call state%initialize(sys=sys,N=N_init,p_Pa=p,T=T,stats=stats,info=info)
-         ! Close CEQ file
+         call state%initialize(sys=sys,cond=fixed_T,p=p,T=T,N=N_init)
+         ! Close CEQ output file
          close(lu)
-         ! Error check
-         if (info.lt.0) call die('chem_state failed.')
          ! CEQ initialization of moles
          print*,'CEQ initialization of moles:'
          do isc=1,sys%ns
