@@ -18,8 +18,8 @@ module chem_state_class
       real(WP) :: p                              !< Pressure
       real(WP) :: T                              !< Temperature
       real(WP) :: h                              !< Enthalpy
-      real(WP), dimension(:),allocatable :: zd   !< Moles of determined species (nsd)
-      real(WP), dimension(:),allocatable :: zu   !< Moles of undetermined species (nsu)
+      real(WP), dimension(:),allocatable :: Nd   !< Moles of determined species (nsd)
+      real(WP), dimension(:),allocatable :: Nu   !< Moles of undetermined species (nsu)
       real(WP), dimension(:),allocatable :: lam  !< Lagrange multipliers (nrc)
       real(WP), dimension(:),allocatable :: cr   !< Reduced constraint vector
       real(WP), dimension(:),allocatable :: Q    !< Consistency vector Q'*Xu=1 (nsu)
@@ -149,9 +149,9 @@ module chem_state_class
          real(WP), intent(out),  optional :: N_eq(sys%ns),T_eq,HoR_eq,stats(20)
          integer,   intent(out), optional :: info
          integer  :: nb,nc,ns,nsd,nsu,nrc,npert,iret,i,lu
-         real(WP) :: p,T0,errc,max_pert,Nd,Nu_atoms,zumin,zumax,cb(sys%nc),cmod(sys%nb),zd(sys%nsd),err,cr_norm,cb_norm,res,z_low,res_tol,err2
-         real(WP), dimension(sys%ns)  :: z0,z1,h,zeq
-         real(WP), dimension(sys%nsu) :: zu,zu0,zm,zupper,atoms,zg,gu,xu,rhs,gu0,zu00
+         real(WP) :: p,T0,errc,max_pert,Ndbar,Nu_atoms,zumin,zumax,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),err,cr_norm,cb_norm,res,z_low,res_tol,err2
+         real(WP), dimension(sys%ns)  :: N0,N1,h,Neq
+         real(WP), dimension(sys%nsu) :: Nu,zu0,zm,zupper,atoms,zg,gu,xu,rhs,gu0,zu00
          real(WP), dimension(sys%nrc) :: cr,lam0
          real(WP), parameter :: p0_Pa=1.01325d5 ! standard atmosphere [Pa]
          logical :: fixed_T,fail,diag
@@ -184,8 +184,8 @@ module chem_state_class
          nsd=sys%nsd
          nsu=sys%nsu
 
-         allocate(this%zd(sys%nsd))
-         allocate(this%zu(sys%nsu))
+         allocate(this%Nd(sys%nsd))
+         allocate(this%Nu(sys%nsu))
          allocate(this%lam(sys%nrc))
          allocate(this%cr(sys%nrc))
          allocate(this%Q(sys%nsu))
@@ -271,9 +271,9 @@ module chem_state_class
             this%h=HoR
 
          elseif(present(N_h).and.present(T_h)) then
-            call reorder_rows(N_h,sys%sp_order,z0)
+            call reorder_rows(N_h,sys%sp_order,N0)
             call this%get_hort(sys%ns,T_h,sys%thermo,h)
-            this%h=sum(z0*h)*T_h  ! HoR
+            this%h=sum(N0*h)*T_h  ! HoR
 
          else
             if(diag) write(lu,*) 'ceq_state: neither T nor HoR nor (N_h and T_h) specified'
@@ -320,14 +320,14 @@ module chem_state_class
          ! Form modified and reduced constraints  !===================
 
          cmod(1:nb)=matmul(sys%A(1:nb,1:nc) ,cb)   ! form modified constraint vector
-         zd(1:nsd) =cmod(1:nsd)                    ! determined species
+         Nd(1:nsd) =cmod(1:nsd)                    ! determined species
 
          ! Treat the special case of no undetermined species
 
          if(nsu.eq.0) then
-            zeq=zd
+            Neq=Nd
             if(.not.fixed_T) then
-               call this%hor2T(ns,zeq,this%h,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
+               call this%hor2T(ns,Neq,this%h,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
                if(iret.lt.0) then
                   info=-17+iret
                   call die('chem_sys initialize: ')
@@ -342,12 +342,12 @@ module chem_state_class
 
          if(cr_norm.le.0.0_WP) then
          ! SBP added 4/9/2009
-            if(cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(zd(1:nsd)).gt.0.0_WP) then
+            if(cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(Nd(1:nsd)).gt.0.0_WP) then
                !  only determined species
-               zeq=0.0_WP
-               zeq(1:nsd)=zd(1:nsd)
+               Neq=0.0_WP
+               Neq(1:nsd)=Nd(1:nsd)
                if(.not.fixed_T) then
-                  call this%hor2T(ns,zeq,this%h,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
+                  call this%hor2T(ns,Neq,this%h,sys%T_low,sys%T_high,sys%thermo,this%T,iret)
                   if(iret.lt.0) then
                      info=-17+iret
                      call die('chem_sys initialize: ')
@@ -366,8 +366,8 @@ module chem_state_class
          ! Use initial guess N_g if provided  !====================
 
          if(present(N_g)) then
-            call reorder_rows(N_g,sys%sp_order,z0)
-            zu0(1:nsu)=z0(nsd+1:ns)  ! guessed undetermined species
+            call reorder_rows(N_g,sys%sp_order,N0)
+            zu0(1:nsu)=N0(nsd+1:ns)  ! guessed undetermined species
 
             cb(1:nrc)=matmul(zu0(1:nsu),sys%BR) ! reduced c.v. based on N_g
             cb_norm  =norm2(cb)
@@ -404,7 +404,7 @@ module chem_state_class
 
             ! Accept initial guess (zu0); skip max-min and min_g
 
-            this%zd=zd
+            this%Nd=Nd
             this%cr=cr
 
             go to 100
@@ -415,9 +415,9 @@ module chem_state_class
          ! Perturb if necessary  =====================================
 
          call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,&
-                           zd,cr,sys%BR,sys%E,sys%diag,sys%lu, &
+                           Nd,cr,sys%BR,sys%E,sys%diag,sys%lu, &
                      sys%eps_el,sys%eps_sp,sys%pert_tol,sys%pert_skip,&
-                           this%zd,zm,zupper,this%cr,npert,max_pert,iret)
+                           this%Nd,zm,zupper,this%cr,npert,max_pert,iret)
 
          if(iret.eq.-1) then 
             if(diag) write(lu,*) 'ceq_state: non-realizable constraint'
@@ -455,17 +455,17 @@ module chem_state_class
 
          ! Determine normalization-condition vector Q !=========
          !     q=Q'*Xu -1=0
-         Nd      =sum(this%zd)               ! total moles of determined species
+         Ndbar      =sum(this%Nd)               ! total moles of determined species
          atoms   =sum(sys%E(nsd+1:ns,:),2)   ! atoms in undetermined species
          Nu_atoms=sum(this%cr(1:sys%neu))    ! total moles of atoms in undetermined species
-         this%Q  =1.0_WP+atoms*Nd/Nu_atoms   ! consistency condition vector
+         this%Q  =1.0_WP+atoms*Ndbar/Nu_atoms   ! consistency condition vector
 
          ! Re-estimate T0 and re-evaluate gu if required !======
 
          if(.not.fixed_T.and..not.present(T_g)) then
-            z1(1:nsd)   =this%zd
-            z1(nsd+1:ns)=zu0
-            call this%hor2T(ns,z1,this%h,sys%T_low,sys%T_high,sys%thermo,T0,iret)
+            N1(1:nsd)   =this%Nd
+            N1(nsd+1:ns)=zu0
+            call this%hor2T(ns,N1,this%h,sys%T_low,sys%T_high,sys%thermo,T0,iret)
 
             if(iret.eq.-3) then
                   if(diag) write(lu,*) 'ceq_state: hor2T failed'
@@ -477,12 +477,12 @@ module chem_state_class
          endif
 
          this%gu=gu
-         this%zu=zu0
+         this%Nu=zu0
          
 
          ! Determine required output  =======================================
 
-         zeq=(/ this%zd ,this%zu /)  !  equilibrium moles (re-ordered)
+         Neq=(/ this%Nd ,this%Nu /)  !  equilibrium moles (re-ordered)
 
          500	   continue  !  jump to here if there are no undetermined species
 
@@ -491,7 +491,7 @@ module chem_state_class
          if(present(HoR_eq)) then
             if(fixed_T) then
                call this%get_hort(ns,this%T,sys%thermo,h)
-               this%h=sum(zeq*h)*this%T
+               this%h=sum(Neq*h)*this%T
          endif
 
          HoR_eq=this%h
@@ -499,7 +499,7 @@ module chem_state_class
 
          if(present(N_eq)) then
             do i=1,ns          ! re-order species
-               N_eq(sys%sp_order(i))=zeq(i)
+               N_eq(sys%sp_order(i))=Neq(i)
             end do
          endif
 
@@ -682,11 +682,11 @@ module chem_state_class
 
 
       !> Generate (possibly) perturbed CE problem
-      subroutine perturb(this,ns,nsd,nsu,ne,ned,neu,nrc,zd,cr,BR,E,ifop,lud,eps_el,eps_sp,pert_tol,pert_skip,zdp,zup,zupper,crp,npert,max_pert,iret)
+      subroutine perturb(this,ns,nsd,nsu,ne,ned,neu,nrc,Nd,cr,BR,E,ifop,lud,eps_el,eps_sp,pert_tol,pert_skip,zdp,zup,zupper,crp,npert,max_pert,iret)
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns,nsd,nsu,ne,ned,neu,nrc,ifop,lud,pert_skip
-         real(kind(1.0_WP)), intent(in) :: zd(nsd),cr(nrc),BR(nsu,nrc),E(ns,ne),eps_el,eps_sp,pert_tol
+         real(kind(1.0_WP)), intent(in) :: Nd(nsd),cr(nrc),BR(nsu,nrc),E(ns,ne),eps_el,eps_sp,pert_tol
          integer, intent(out) :: npert,iret
          real(kind(1.0_WP)), intent(out) :: zdp(nsd),zup(nsu),zupper(nsu),crp(nrc),max_pert
 
@@ -698,7 +698,7 @@ module chem_state_class
          !	ned		- number of determined elements
          !	neu		- number of undetermined elements
          !	nrc		- number of reduced constraints
-         !   zd     -moles of determined species
+         !   Nd     -moles of determined species
          !   cr     -reduced constraint vector
          !   BR     -reduced constraint matrix
          !   E      -element matrix
@@ -735,11 +735,11 @@ module chem_state_class
             write(lud,'(a,9i4)')'ne ned neu ns nsd nsu nrc= ',ne,ned,neu,ns,nsd,nsu,nrc
          endif
 
-         zdp=zd       ! check that determined species are non-negative
+         zdp=Nd       ! check that determined species are non-negative
          zatoms=0.0_WP  ! estimate of moles of atoms
          if(nsd.gt.0) then
          do j=1,ne
-            zatoms=zatoms+abs(dot_product(zd,E(1:nsd,j)))
+            zatoms=zatoms+abs(dot_product(Nd,E(1:nsd,j)))
          end do
          endif
 
@@ -886,17 +886,17 @@ module chem_state_class
       end subroutine get_Nming
 
 
-      !> Determine z=z0+d which satisfies:
+      !> Determine z=N0+d which satisfies:
       !>    1) z(i).ge.eps
       !>    2) B'*z=c
       !>    3) t=max_i(|d(i)|) is minimized.
-      subroutine min_pert(this,nz,nc,B,c,z0,eps,z,iret)
+      subroutine min_pert(this,nz,nc,B,c,N0,eps,z,iret)
          ! Input:
          !  nz -length of z
          !  nc -length of c
          !  B  -nz x nc equality constraint matrix
          !  c  -constraint vector
-         !  z0 -nz-vector,z0
+         !  N0 -nz-vector,N0
          !  eps-positive threshold
          ! Output:
          !  z   -solution
@@ -904,7 +904,7 @@ module chem_state_class
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in)           :: nz,nc
-         real(kind(1.0_WP)), intent(in)  :: B(nz,nc),c(nc),z0(nz),eps
+         real(kind(1.0_WP)), intent(in)  :: B(nz,nc),c(nc),N0(nz),eps
          real(kind(1.0_WP)), intent(out) :: z(nz)
          integer, intent(out)          :: iret
          real(kind(1.0_WP)) :: A(nc+nz,3*nz),x(3*nz),f(3*nz),r(nc+nz),d(nz),tp,tm,res,Bsc,csc,zsc
@@ -925,21 +925,21 @@ module chem_state_class
                A(i,nz+i)  =-1.0_WP
                A(i,2*nz+i)= 1.0_WP
             end do
-         else  !  min. sum of dz/z0
+         else  !  min. sum of dz/N0
             do i=1,nz
                A(i,i)     = 1.0_WP
-               A(i,nz+i)  =-(max(z0(i),eps)/zsc)**0.0_WP
-               A(i,2*nz+i)= (max(z0(i),eps)/zsc)**0.0_WP
+               A(i,nz+i)  =-(max(N0(i),eps)/zsc)**0.0_WP
+               A(i,2*nz+i)= (max(N0(i),eps)/zsc)**0.0_WP
             end do
          endif
          A(nz+1:nz+nc,1:nz)  =transpose(B)/Bsc
-         r(1:nz)      =(z0(1:nz) -eps) /zsc
+         r(1:nz)      =(N0(1:nz) -eps) /zsc
          do i=1,nc
             r(nz+i)=(c(i)-eps*sum(B(:,i)))/csc
          end do
          f(1:nz)     =0.0_WP
          do i=1,nz
-            f(nz+i)  =(eps/(eps+z0(i)))**0.0_WP
+            f(nz+i)  =(eps/(eps+N0(i)))**0.0_WP
             f(2*nz+i)=f(nz+i)
          end do
          call this%solve_linprog(nx,nr,f,A,r,x,iret)
@@ -952,9 +952,9 @@ module chem_state_class
          !  diagnostics
          write(0,*)' '
          write(0,*)'min_pert: iret=',iret
-         write(0,*)'min_pert: z0,z,z0-z'
+         write(0,*)'min_pert: N0,z,N0-z'
          do i=1,nz
-            write(0,'(1p,10e11.2)') z0(i),z(i),z0(i)-z(i),x(nz+i),x(2*nz+i),x(nz+i)+x(2*nz+i),x(nz+i)-x(2*nz+i)
+            write(0,'(1p,10e11.2)') N0(i),z(i),N0(i)-z(i),x(nz+i),x(2*nz+i),x(nz+i)+x(2*nz+i),x(nz+i)-x(2*nz+i)
          end do
          write(0,*) 'min_pert: min(x)=',minval(x)
          r(1:nc)=matmul(z(1:nz),B(1:nz,1:nc))-c(1:nc)

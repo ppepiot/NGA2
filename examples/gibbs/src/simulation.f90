@@ -4,7 +4,7 @@ module simulation
    use string,           only: str_short,str_medium
    use monitor_class,    only: monitor
    use YAMLRead,         only: YAMLElement
-   use chem_sys_class,   only: chem_sys
+   use chem_sys_class,   only: chem_sys,Lphase,Gphase
    use chem_state_class, only: chem_state
    implicit none
    private
@@ -28,9 +28,6 @@ module simulation
    !> Thermodynamic quantities
    real(WP) :: T
    real(WP) :: PoPref
-
-   !> Phase indices (need to get these from two_phase classes) *** HAS TO START FROM 1 ***
-   integer :: Lphase=1,Gphase=2
 
    !> Chemical system and state
    type(chem_sys)   :: sys
@@ -308,8 +305,8 @@ contains
          allocate(rhs (nrc))
          allocate(lam (nrc))
          ! Get the species and phase moles
-         Nd=state%zd
-         Nu=state%zu
+         Nd=state%Nd
+         Nu=state%Nu
          Nbar=matmul(transpose(sys%P),[Nd,Nu])
          ! Calculate the contribution of Nd in the residual
          Rd=matmul(transpose(sys%P(1:nsd,:)),Nd)
