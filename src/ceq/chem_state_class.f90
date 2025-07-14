@@ -1,13 +1,10 @@
 !> Chemical state
 module chem_state_class
    use precision,      only: WP
-   use chem_sys_class, only: chem_sys
+   use chem_sys_class, only: chem_sys,Lphase,Gphase,ncof
    implicit none
    private
    
-   ! Take these from the two_phase classes
-   integer, parameter :: Lphase=0,Gphase=1 
-
    !> Expose type/constructor/methods
    public :: chem_state
 
@@ -15,18 +12,18 @@ module chem_state_class
    type :: chem_state
 
       ! This is our chemical system
-      class(chem_sys),pointer :: sys            !< This is the chemical system the solver is build for
+      class(chem_sys), pointer :: sys            !< This is the chemical system the solver is build for
 
       ! Thermochemical quantities
       real(WP) :: p                              !< Pressure
       real(WP) :: T                              !< Temperature
       real(WP) :: h                              !< Enthalpy
-      real(WP), dimension(:),allocatable :: zd  !< Moles of determined species (nsd)
-      real(WP), dimension(:),allocatable :: zu  !< Moles of undetermined species (nsu)
-      real(WP), dimension(:),allocatable :: lam !< Lagrange multipliers (nrc)
-      real(WP), dimension(:),allocatable :: cr  !< Reduced constraint vector
-      real(WP), dimension(:),allocatable :: Q   !< Consistency vector Q'*Xu=1 (nsu)
-      real(WP), dimension(:),allocatable :: gu  !< Gibbs functions of undetermined species (nsu)
+      real(WP), dimension(:),allocatable :: zd   !< Moles of determined species (nsd)
+      real(WP), dimension(:),allocatable :: zu   !< Moles of undetermined species (nsu)
+      real(WP), dimension(:),allocatable :: lam  !< Lagrange multipliers (nrc)
+      real(WP), dimension(:),allocatable :: cr   !< Reduced constraint vector
+      real(WP), dimension(:),allocatable :: Q    !< Consistency vector Q'*Xu=1 (nsu)
+      real(WP), dimension(:),allocatable :: gu   !< Gibbs functions of undetermined species (nsu)
 
       ! Numerical parameters
       integer :: temp_its                        !< Number of temperature iterations performed
@@ -46,7 +43,9 @@ module chem_state_class
       procedure :: get_cpor
       procedure :: maxmin_comp
       procedure :: solve_linprog
+      procedure :: eqiulibrate
    end type chem_state
+
 
    contains
 
@@ -228,7 +227,7 @@ module chem_state_class
             endif
 
          elseif(present(p_cgs)) then
-            p=p_cgs*0.1d0/p0_Pa  
+            p=p_cgs*0.1_WP/p0_Pa  
             if(present(p_atm).or.present(p_Pa)) then
                if(diag) then
                   write(lu,*) 'ceq_state: multiple input pressures'
@@ -272,7 +271,7 @@ module chem_state_class
             this%h=HoR
 
          elseif(present(N_h).and.present(T_h)) then
-            call reorder_rows(sys%ns,1,N_h,sys%sp_order,z0)
+            call reorder_rows(N_h,sys%sp_order,z0)
             call this%get_hort(sys%ns,T_h,sys%thermo,h)
             this%h=sum(z0*h)*T_h  ! HoR
 
@@ -299,7 +298,7 @@ module chem_state_class
 
          else
             T0=sqrt(sys%T_low*sys%T_high)
-            T0=max(T0,0.1d0*sys%T_high)
+            T0=max(T0,0.1_WP*sys%T_high)
          endif
 
          call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
@@ -367,7 +366,7 @@ module chem_state_class
          ! Use initial guess N_g if provided  !====================
 
          if(present(N_g)) then
-            call reorder_rows(sys%ns,1,N_g,sys%sp_order,z0)
+            call reorder_rows(N_g,sys%sp_order,z0)
             zu0(1:nsu)=z0(nsd+1:ns)  ! guessed undetermined species
 
             cb(1:nrc)=matmul(zu0(1:nsu),sys%BR) ! reduced c.v. based on N_g
@@ -392,7 +391,7 @@ module chem_state_class
                   go to 50
                endif
 
-               zu0      =zm
+               zu0=zm
 
                if(sys%diag.ge.2) then
                   cb(1:nrc)=matmul(zu0(1:nsu),sys%BR) ! reduced c.v. based on N_g
@@ -481,7 +480,7 @@ module chem_state_class
          this%zu=zu0
          
 
-         !  determine required output  =======================================
+         ! Determine required output  =======================================
 
          zeq=(/ this%zd ,this%zu /)  !  equilibrium moles (re-ordered)
 
@@ -523,7 +522,6 @@ module chem_state_class
       !> Get normalized enthalpies at temperature T
       subroutine get_hort(this,ns,T,thermo,hort)
          implicit none
-         integer, parameter :: ncof=7
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
          real(kind(1.0_WP)), intent(in) :: T,thermo(ns,2*ncof+1)
@@ -557,7 +555,6 @@ module chem_state_class
       !> Get normalized Gibbs functions at temperature T
       subroutine get_gort(this,ns,T,p,thermo,isGas,gort)
          implicit none
-         integer, parameter :: ncof=7
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
          real(kind(1.0_WP)), intent(in) :: T,p,thermo(ns,2*ncof+1),isGas(ns)
@@ -601,10 +598,9 @@ module chem_state_class
       !> Determine temperature given enthalpy
       subroutine hor2T(this,ns,z,hin,T_low,T_high,thermo,T,iret)
          implicit none
-         integer, parameter :: nth=15
          class(chem_state),  intent(in)  :: this
          integer,            intent(in)  :: ns
-         real(kind(1.0_WP)), intent(in)  :: z(ns),hin,T_low,T_high,thermo(ns,nth)
+         real(kind(1.0_WP)), intent(in)  :: z(ns),hin,T_low,T_high,thermo(ns,2*ncof+1)
          real(kind(1.0_WP)), intent(out) :: T
          integer,            intent(out) :: iret
          ! input:
@@ -932,8 +928,8 @@ module chem_state_class
          else  !  min. sum of dz/z0
             do i=1,nz
                A(i,i)     = 1.0_WP
-               A(i,nz+i)  =-(max(z0(i),eps)/zsc)**0.0d0
-               A(i,2*nz+i)= (max(z0(i),eps)/zsc)**0.0d0
+               A(i,nz+i)  =-(max(z0(i),eps)/zsc)**0.0_WP
+               A(i,2*nz+i)= (max(z0(i),eps)/zsc)**0.0_WP
             end do
          endif
          A(nz+1:nz+nc,1:nz)  =transpose(B)/Bsc
@@ -943,7 +939,7 @@ module chem_state_class
          end do
          f(1:nz)     =0.0_WP
          do i=1,nz
-            f(nz+i)  =(eps/(eps+z0(i)))**0.0d0
+            f(nz+i)  =(eps/(eps+z0(i)))**0.0_WP
             f(2*nz+i)=f(nz+i)
          end do
          call this%solve_linprog(nx,nr,f,A,r,x,iret)
@@ -970,7 +966,6 @@ module chem_state_class
       !> Get the normalized Cp's at temperature T
       subroutine get_cpor(this,ns,T,thermo,cpor)
          implicit none
-         integer, parameter :: ncof=7
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
          real(kind(1.0_WP)), intent(in) :: T,thermo(ns,2*ncof+1)
@@ -1075,6 +1070,13 @@ module chem_state_class
             !XXX write(0,*)'solve_linprog,iret=',iret  ! SBP XXX
          endif
       end subroutine solve_linprog
+
+
+      !> Find the chemical equilibium state
+      subroutine eqiulibrate(this)
+         implicit none
+         class(chem_state), intent(inout) :: this
+      end subroutine eqiulibrate
 
 
 end module chem_state_class

@@ -28,6 +28,18 @@ module mathtools
    !real(WP), dimension(0:9) :: by1=[0.000000000000000_WP,0.329780063306651_WP,0.629765721178679_WP,0.84604458266019_WP,0.95551827831671_WP,0.99154183259084_WP,0.99897290050990_WP,0.9999216098795_WP,0.99999627301467_WP,0.99999989265063_WP]
    !real(WP), dimension(0:9) :: by2=[0.332057384255589_WP,0.323007152241930_WP,0.266751564401387_WP,0.161360240845588_WP,0.06423404047594_WP,0.01590689966410_WP,0.00240199722109_WP,0.00022016340923_WP,0.00001224984692_WP,0.00000041090325_WP]
    
+   !> Re-order rows of input array
+   !> input:
+   !>    x      - array to be re-ordered
+   !>    order  - i-th row of reordered array is row order(i) of x
+   !> output:
+   !>    y      - reordered array
+   interface reorder_rows
+      module procedure reorder_rows_rank1
+      module procedure reorder_rows_rank2
+   end interface
+
+
 contains
    
    
@@ -306,33 +318,47 @@ contains
    end subroutine eigensolve3
 
 
-   !> re-order rows of input matrix
-   !> input:
-   !>	   nr     - number of rows in x
-   !>	   nc     - number of columns in x
-   !>    x      - matrix to be re-ordered
-   !>    order  - pointer: j-th row of reordered matrix is row order(j) of x
-   !> output:
-   !>    y      - reordered matrix
-   subroutine reorder_rows(nr,nc,x,order,y)
+   !> Re-order rows of a rank 1 array
+   subroutine reorder_rows_rank1(x,order,y)
+      use messager, only: die
       implicit none
-      integer,  intent(in)  :: nr,nc,order(nr)
-      real(WP), intent(in)  :: x(nr,nc)
-      real(WP), intent(out) :: y(nr,nc)
-      ! S. B. Pope 5/25/02
-      integer :: j
-      do j=1,nr
-         y(j,:)=x(order(j),:)
+      integer,  intent(in)  :: order(:)
+      real(WP), intent(in)  :: x(:)
+      real(WP), intent(out) :: y(:)
+      integer :: lb1,ub1
+      integer :: i
+      lb1=lbound(x,1); ub1=ubound(x,1)
+      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1))) call die('Array bounds do not match')
+      do i=lb1,ub1
+         y(i)=x(order(i))
       end do
-   end subroutine reorder_rows
+   end subroutine reorder_rows_rank1
+
+
+   !> Re-order rows of a rank 2 array
+   subroutine reorder_rows_rank2(x,order,y)
+      use messager, only: die
+      implicit none
+      integer,  intent(in)  :: order(:)
+      real(WP), intent(in)  :: x(:,:)
+      real(WP), intent(inout) :: y(:,:)
+      integer :: lb1,lb2,ub1,ub2
+      integer :: i
+      lb1=lbound(x,1); ub1=ubound(x,1)
+      lb2=lbound(x,2); ub2=ubound(x,2)
+      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1)) .or.(lb2.ne.lbound(y,2)).or.(ub2.ne.ubound(y,2))) call die('Matrix bounds do not match')
+      do i=lb1,ub1
+         y(i,:)=x(order(i),:)
+      end do
+   end subroutine reorder_rows_rank2
 
 
    !>  Determine independent columns of the matrix B, given that columns 1:nci are independent.
    subroutine ind_col(nr,nc,nci,B,thresh,indcol,info)
       implicit none
-      integer, intent(in) :: nr,nc,nci
-      real(WP), intent(in) :: B(nr,nc),thresh
-      integer, intent(out) :: indcol(nc),info
+      integer,  intent(in)  :: nr,nc,nci
+      real(WP), intent(in)  :: B(nr,nc),thresh
+      integer,  intent(out) :: indcol(nc),info
       ! Input:
       !	nr	- number of rows of B
       !	nc	- number of columns of B

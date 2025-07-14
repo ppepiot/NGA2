@@ -1,11 +1,17 @@
 !> Chemical system
 module chem_sys_class
-    use precision, only: WP
-    implicit none
-    private
+   use precision, only: WP
+   implicit none
+   private
    
-   ! Expose type/constructor/methods
+   !> Expose type/constructor/methods
    public :: chem_sys
+
+   !> Take these from the two_phase classes *** HAS TO START FROM 1 ***
+   integer, parameter, public :: Lphase=1,Gphase=2
+
+   !> NASA-7 polynomial coefficient number
+   integer, parameter, public :: ncof=7
 
    !> Chemical system object definition
    type :: chem_sys
@@ -45,7 +51,7 @@ module chem_sys_class
       real(WP), dimension(:,:), allocatable :: A      !< Modified constraint transformation matrix (nb x nc)
       
       ! Thermodynamic coefficients
-      real(WP), dimension(:,:), allocatable :: thermo !< Thermodynamic coefficients (re-ordered) (ns x 15)
+      real(WP), dimension(:,:), allocatable :: thermo !< Thermodynamic coefficients (re-ordered) (ns x 2*ncof+1)
 
       ! Is the system initialized
       logical :: initialized                          !<=.false. !=.true. when chem_sys has been initialized
@@ -58,8 +64,6 @@ module chem_sys_class
       real(WP) :: frac_zm                             !< Fraction of zm used in initial guess
       real(WP) :: T_tol                               !< Convergence tolerance on log(T)
       real(WP) :: ds_inc                              !< Factor by which ds is increased after success (ceq_fixed_T)
-      real(WP) :: ds_dec                              !< Factor by which ds is decreased after failure (ceq_fixed_T)
-      real(WP) :: ds_min                              !< Smallest allowed time step
       real(WP) :: res_tol                             !< Convergence tolerance for residual (ceq_fixed_T)
       real(WP) :: ires_fac                            !< Factor by which the irreducible residual can exceed res_tol
       real(WP) :: logy_lim                            !< Upper limit on log(y)  (to prevent overflow in ceq_y)
@@ -99,7 +103,7 @@ module chem_sys_class
          !           Ein(k,j) atoms of element j.
          !   CS    - array containing indexes of constrained species (ncs x 1)
          !   Bg    - general linear constraint matrix (ns x ng)
-         !   thermo_in  - thermodynamic data for species (ns x 15)
+         !   thermo_in  - thermodynamic data for species (ns x 2*ncof+1)
          !              - see below for details
          !   P     - Phase summation matrix     
          !   lu_op - logical unit for output 
@@ -137,8 +141,8 @@ module chem_sys_class
          use mathtools, only: reorder_rows
          implicit none
          class(chem_sys), intent(inout) :: this
-         integer, intent(in)  :: np,ns,ne,ncs,ng,CS(ncs),lu_op,diag
-         real(WP), intent(in) :: Ein(ns,ne),Bg(ns,ng),thermo_in(ns,15),P(ns,np)
+         integer,  intent(in) :: np,ns,ne,ncs,ng,CS(ncs),lu_op,diag
+         real(WP), intent(in) :: Ein(ns,ne),Bg(ns,ng),thermo_in(ns,2*ncof+1),P(ns,Lphase:Gphase)
          real(WP) :: BR(ns,ne+ncs+ng),A(ne+ncs+ng,ne+ncs+ng)
          integer  :: nc,j,k
          real(WP) :: cpu_redcon0,cpu_redcon
@@ -208,8 +212,8 @@ module chem_sys_class
          allocate(this%Ein(ns,ne))
          allocate(this%E(ns,ne))
          allocate(this%B(ns,nc))
-         allocate(this%thermo(ns,15))
-         allocate(this%P(ns,np))
+         allocate(this%thermo(ns,2*ncof+1))
+         allocate(this%P(ns,Lphase:Gphase))
       
          this%Ein=Ein(1:ns,1:ne)
          
@@ -223,10 +227,10 @@ module chem_sys_class
          this%A =A(1:this%nb,1:nc)
       
          ! Re-order thermo
-         call reorder_rows(ns,15,thermo_in,this%sp_order,this%thermo)
+         call reorder_rows(thermo_in,this%sp_order,this%thermo)
       
          ! Re-order P
-         call reorder_rows(ns,np,P,this%sp_order,this%P)
+         call reorder_rows(P,this%sp_order,this%P)
       
          this%lu  =lu_op
          this%diag=diag
@@ -236,12 +240,12 @@ module chem_sys_class
 
 
       !> Reset values of parameters in chem_sys: apart from chem_sys,all arguments are optional.
-      subroutine chem_sys_param_set(this,diag,lu,T_low,T_high,frac_zm,T_tol,ds_inc,ds_dec,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
+      subroutine chem_sys_param_set(this,diag,lu,T_low,T_high,frac_zm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
          ! If this%diag=5,the values of the parameters are output.
          implicit none
          class(chem_sys), intent(inout) :: this
          integer,  intent(in), optional :: diag,lu,pert_skip
-         real(WP), intent(in), optional :: T_low,T_high,frac_zm,T_tol,ds_inc,ds_dec,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
+         real(WP), intent(in), optional :: T_low,T_high,frac_zm,T_tol,res_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
          integer :: luu
          if(present(diag))     this%diag    =diag
          if(present(lu))       this%lu      =lu
@@ -249,8 +253,6 @@ module chem_sys_class
          if(present(T_high))   this%T_high  =T_high
          if(present(frac_zm))  this%frac_zm =frac_zm
          if(present(T_tol))    this%T_tol   =T_tol
-         if(present(ds_inc))   this%ds_inc  =ds_inc
-         if(present(ds_dec))   this%ds_dec  =ds_dec
          if(present(res_tol))  this%res_tol =res_tol
          if(present(ires_fac)) this%ires_fac=ires_fac
          if(present(logy_lim)) this%logy_lim=logy_lim
@@ -273,8 +275,6 @@ module chem_sys_class
          write(luu,'(a,1p,e13.4)') 'T_high  =',this%T_high
          write(luu,'(a,1p,e13.4)') 'frac_zm =',this%frac_zm
          write(luu,'(a,1p,e13.4)') 'T_tol   =',this%T_tol
-         write(luu,'(a,1p,e13.4)') 'ds_inc  =',this%ds_inc 
-         write(luu,'(a,1p,e13.4)') 'ds_dec  =',this%ds_dec 
          write(luu,'(a,1p,e13.4)') 'res_tol =',this%res_tol
          write(luu,'(a,1p,e13.4)') 'ires_fac=',this%ires_fac
          write(luu,'(a,1p,e13.4)') 'logy_lim=',this%logy_lim
@@ -298,9 +298,6 @@ module chem_sys_class
          this%T_high  =5000.0_WP  ! highest allowed temperature
          this%frac_zm =1e-1       ! fraction of zm used in initial guess
          this%T_tol   =1e-6       ! convergence tolerance on log(T)
-         this%ds_inc  =1.4_WP     ! factor by which ds is increased after success (ceq_fixed_T)
-         this%ds_dec  =0.25_WP    ! factor by which ds is decreased after failure (ceq_fixed_T)
-         this%ds_min  =1e-15      ! smallest allowed time step
          this%res_tol =1e-9       ! convergence tolerance for residual (ceq_fixed_T)
          this%ires_fac=1e2        ! factor by which the irreducible residual can exceed res_tol
          this%logy_lim=120.0_WP   ! upper limit on log(y)  (to prevent overflow in ceq_y)
@@ -540,8 +537,7 @@ module chem_sys_class
          end do
 
          ! Determine modified constraint transformation matrix
-         
-         call reorder_rows(this%ns,this%nb,U(1:this%ns,1:this%nb),this%sp_order,PU(1:this%ns,1:this%nb))
+         call reorder_rows(U(1:this%ns,1:this%nb),this%sp_order,PU(1:this%ns,1:this%nb))
 
          BTTPU=0.0_WP
          if(this%nsd.gt.0) BTTPU(1:this%nsd,1:this%nb)=PU(1:this%nsd,1:this%nb)

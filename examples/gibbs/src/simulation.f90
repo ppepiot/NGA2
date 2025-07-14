@@ -4,7 +4,6 @@ module simulation
    use string,           only: str_short,str_medium
    use monitor_class,    only: monitor
    use YAMLRead,         only: YAMLElement
-   ! use ceq_types,        only: sys_type,state_type
    use chem_sys_class,   only: chem_sys
    use chem_state_class, only: chem_state
    implicit none
@@ -30,8 +29,8 @@ module simulation
    real(WP) :: T
    real(WP) :: PoPref
 
-   !> Phase indices (need to get these from two_phase classes)
-   integer :: Lphase=0,Gphase=1
+   !> Phase indices (need to get these from two_phase classes) *** HAS TO START FROM 1 ***
+   integer :: Lphase=1,Gphase=2
 
    !> Chemical system and state
    type(chem_sys)   :: sys
@@ -268,8 +267,7 @@ contains
          open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
          ! Inizialize the chemical system
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,lu_op=lu,diag=5)
-         ! call ceq_sys_init(ns=ns,ne=ne,ncs=ncs,ng=ng,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,P=phse_mat,lu_op=lu,diag=5,sys=sys,iret=iret)
-         if (iret.lt.0) call die('System initialization failed.')
+         if (iret.lt.0) call die('chem_sys initialization failed.')
          nsd=sys%nsd
          nsu=sys%nsu
          ned=sys%ned
@@ -278,11 +276,10 @@ contains
          nrc=sys%nrc
          ! Initialize the chemical state
          call state%initialize(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,info=info)
-         ! call ceq_state(sys=sys,N=N_init,p_Pa=101325.0_WP,T=T,N_eq=N,T_eq=T_eq,HoR_eq=HoR,stats=stats,state=state,info=info)
          ! Close CEQ file
          close(lu)
          ! Error check
-         if (info.lt.0) call die('ceq_state failed.')
+         if (info.lt.0) call die('chem_state failed.')
          ! CEQ initialization of moles
          print*,'CEQ initialization of moles:'
          do isc=1,ns
@@ -298,18 +295,18 @@ contains
          integer :: info
          real(WP), dimension(:), allocatable :: rhs,lam
          ! Allocate arrays
-         allocate(x (nrc+np)); x=0.0_WP
-         allocate(x0(nrc+np)); x0=0.0_WP
-         allocate(dx(nrc+np)); dx=0.0_WP
-         allocate(Nbar(np));   Nbar=0.0_WP
-         allocate(Nu  (nsu));  Nu=0.0_WP
-         allocate(Nd  (nsd));  Nd=0.0_WP
-         allocate(Neq (ns));   Neq=0.0_WP
-         allocate(R (nrc+np)); R=0.0_WP
-         allocate(Rd(np));     Rd=0.0_WP
-         allocate(gort(nsu));  gort=0.0_WP
-         allocate(rhs(nrc))
-         allocate(lam(nrc))
+         allocate(x   (nrc+np)); x=0.0_WP
+         allocate(x0  (nrc+np)); x0=0.0_WP
+         allocate(dx  (nrc+np)); dx=0.0_WP
+         allocate(Nbar(np));     Nbar=0.0_WP
+         allocate(Nu  (nsu));    Nu=0.0_WP
+         allocate(Nd  (nsd));    Nd=0.0_WP
+         allocate(Neq (ns));     Neq=0.0_WP
+         allocate(R   (nrc+np)); R=0.0_WP
+         allocate(Rd  (np));     Rd=0.0_WP
+         allocate(gort(nsu));    gort=0.0_WP
+         allocate(rhs (nrc))
+         allocate(lam (nrc))
          ! Get the species and phase moles
          Nd=state%zd
          Nu=state%zu
@@ -430,6 +427,11 @@ contains
             jJ=nrc+i
             Jac(iJ,jJ)=Jac(iJ,jJ)-Nbar(i)
          end do
+         ! print*,'J = '
+         ! do i=1,np+nrc
+         !    print*,Jac(i,:)
+         ! end do
+         ! call die('')
          ! Get the residual error
          R=get_res(y)
          Rnorm=norm2(R)
