@@ -228,6 +228,7 @@ contains
                call die('Equilibrium condition must be either PT or PH')
          end select
          print*,'Equilibrium condition: Constant ',eq_cond
+         print*,'Initial temperature = ',state%T
          ! Re-initialization of moles
          print*,'Re-initialization of moles:'
          do isc=1,sys%ns
@@ -264,10 +265,10 @@ contains
 
       ! Output
       if (state%cond.eq.fixed_PH) then
-         print*,'Number of T iterations = ', state%iter_T
-         print*,'Residual error of T = ', state%dT
+         print*,'Number of T iterations = ',state%iter_T
+         print*,'Relative residual error of T = ',state%dT/state%T
       else
-         print*,'Number of Nerton iterations = ', state%iter_N
+         print*,'Number of Newton iterations = ',state%iter_N
          print*,'Residal error = ', norm2(state%R)
       end if
       print*,'Equilibrium temperature = ',state%T,' (K)'

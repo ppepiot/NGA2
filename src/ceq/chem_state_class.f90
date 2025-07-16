@@ -1,4 +1,4 @@
-!> Chemical state
+!> Chemical state class
 module chem_state_class
    use precision,      only: WP
    use chem_sys_class, only: chem_sys,Lphase,Gphase,ncof
@@ -96,40 +96,43 @@ module chem_state_class
       !> Chemical state initializer
       subroutine initialize(this,sys,cond,p,T,c,N,HoR,N_h,T_h,N_g,T_g)
 
-         !  Initializes the constrained equilibrium state of 
-         !  an ideal liquid-gas mixture consisting of ns species,either at fixed pressure and
-         !  temperature (p,T),or at fixed pressure and enthalpy (p,H).
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation. 
 
-         !  The nc equality constraints are written:  B'*N=c,where B is the
-         !  ns x nc basic constraint matrix,N is the ns-vector of species moles,
-         !  and c is the nc-vector of constraint values.
+         ! Initializes the constrained equilibrium state of 
+         ! an ideal liquid-gas mixture consisting of ns species,either at fixed pressure and
+         ! temperature (p,T),or at fixed pressure and enthalpy (p,H).
 
-         !  Input:
-         !    sys -object type chem_sys created by subroutine.
-         !           Required first argument
+         ! The nc equality constraints are written:  B'*N=c,where B is the
+         ! ns x nc basic constraint matrix,N is the ns-vector of species moles,
+         ! and c is the nc-vector of constraint values.
 
-         !    cond -Equilibrium condition: Either T_fixed or H_fixed
+         ! Input:
+         !  sys -object type chem_sys created by subroutine.
+         !         Required first argument
 
-         !    (Either c or N must be specified.)
-         !    c   -values of the nc basic constraints (real(nc))
-         !    N   -moles of species used to calculate c as : c=B'*N (real(ns))
+         !  cond -Equilibrium condition: Either T_fixed or H_fixed
 
-         !    p   -pressure
+         !  (Either c or N must be specified.)
+         !  c   -values of the nc basic constraints (real(nc))
+         !  N   -moles of species used to calculate c as : c=B'*N (real(ns))
 
-         !    (For a fixed (p,T) equilibrium calculation,specify T: do not specify HoR,N_h or T_h.)
-         !    T-temperature (K) for fixed-temperature problem
+         !  p   -pressure
 
-         !    (For a fixed (p,H) equilibrium calculation,specify either HoR or N_h and T_h: 
-         !     do not specify T.)
-         !    HoR the fixed value of H/R [moles K],where H=enthalpy,R=universal gas constant.
-         !    N_h species moles used to calculate H  (real(ns))
-         !    T_h temperature used to calculate H as:  H/R=sum(N_h h(T_h)/R),where
-         !        h(T_h)/R [which has dimensions K] is the molar specific species enthalpy.
+         ! (For a fixed (p,T) equilibrium calculation,specify T: do not specify HoR,N_h or T_h.)
+         ! T-temperature (K) for fixed-temperature problem
 
-         !    (Initial guesses are not needed, and should not be specified unless they
-         !     are good guesses.)
-         !    N_g  -initial guess for species moles
-         !    T_g  -initial guess for temperature (for fixed (p,H) only)
+         ! (For a fixed (p,H) equilibrium calculation,specify either HoR or N_h and T_h: 
+         !  do not specify T.)
+         ! HoR the fixed value of H/R [moles K],where H=enthalpy,R=universal gas constant.
+         ! N_h species moles used to calculate H  (real(ns))
+         ! T_h temperature used to calculate H as:  H/R=sum(N_h h(T_h)/R),where
+         !     h(T_h)/R [which has dimensions K] is the molar specific species enthalpy.
+
+         ! (Initial guesses are not needed, and should not be specified unless they
+         !  are good guesses.)
+         ! N_g  -initial guess for species moles
+         ! T_g  -initial guess for temperature (for fixed (p,H) only)
 
          !  To diagnose an error condition,the case can be repeated with diagnostics turned on,
          !  by: call param_set(sys,diag=5).
@@ -171,7 +174,7 @@ module chem_state_class
                   call this%get_hort(sys%ns,T_h,sys%thermo,h)
                   this%HoR=sum(N0*h)*T_h
                else
-                  call die('[chem_sys initialize] both N_h and T_h are required for the fixed enthalpy case')
+                  call die('[chem_sys initialize] Both N_h and T_h are required for the fixed enthalpy case')
                end if
                if (present(T_g)) then
                   ! Guess provided
@@ -272,7 +275,7 @@ module chem_state_class
                call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,iret)
                ! min_pert failed
                if (iret.ne.0) then
-                  call die('[ceq_state] min_pert failed')
+                  call die('[chem_state initialize] min_pert failed')
                   go to 50
                endif
                Nu0=Nm
@@ -342,6 +345,8 @@ module chem_state_class
 
       !> Get normalized enthalpies at temperature T
       subroutine get_hort(this,ns,T,thermo,hort)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
@@ -375,6 +380,8 @@ module chem_state_class
 
       !> Get normalized Gibbs functions at temperature T
       subroutine get_gort(this,ns,T,p,thermo,isGas,gort)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
@@ -418,18 +425,18 @@ module chem_state_class
 
       !> Determine temperature given enthalpy
       subroutine hor2T(this,ns,z,hin,T_low,T_high,thermo,T)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use messager, only: die
          implicit none
          class(chem_state),  intent(in)  :: this
          integer,            intent(in)  :: ns
-         real(WP), intent(in)  :: z(ns),hin,T_low,T_high,thermo(ns,2*ncof+1)
+         real(WP), intent(in)  :: z(ns),hin,thermo(ns,2*ncof+1)
          real(WP), intent(out) :: T
          ! input:
          !	ns		- number of species
          !   z      -moles of species
          !   hin    -enthalpy/R (K)=z'*h
-         !   T_low  -lower bound on temperature range
-         !   T_high  _ upper bound on temperature range
          !   thermo -thermo data
          ! output:
          !   T   -temperature (K)
@@ -496,6 +503,8 @@ module chem_state_class
 
       !> Return d/dT of the normalized Gibbs functions at temperature T
       subroutine get_dgdT(this,ns,T,thermo,dgdT)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer,  intent(in)  :: ns
@@ -535,6 +544,8 @@ module chem_state_class
 
       !> Generate (possibly) perturbed CE problem
       subroutine perturb(this,ns,nsd,nsu,ne,ned,neu,nrc,Nd,cr,BR,E,ifop,eps_el,eps_sp,pert_tol,pert_skip,zdp,zup,Nupper,crp,npert,max_pert,iret)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(in) :: this
@@ -691,6 +702,8 @@ module chem_state_class
 
       !> Get Ng,the value of N which minimizes g'N,subject to B'*N=c,N(i)>=0.
       subroutine get_Nming(this,nz,nc,B,c,g,Ng,iret)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: nz,nc
@@ -714,6 +727,8 @@ module chem_state_class
       !>    2) B'*N=c
       !>    3) t=max_i(|d(i)|) is minimized.
       subroutine min_pert(this,nz,nc,B,c,N0,eps,z,iret)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          ! Input:
          !  nz -length of N
          !  nc -length of c
@@ -777,6 +792,8 @@ module chem_state_class
 
       !> Get the normalized Cp's at temperature T
       subroutine get_cpor(this,ns,T,thermo,cpor)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: ns
@@ -808,6 +825,8 @@ module chem_state_class
 
       !> Determine the max-min composition.
       subroutine maxmin_comp(this,nz,nc,B,c,Nm,zmin,iret)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_state), intent(in) :: this
          integer, intent(in) :: nz,nc
@@ -857,6 +876,8 @@ module chem_state_class
 
       !> Determine x=xm which minimizes g=f'*x subject to x(i)>=0 and A*x=b,where A has full rank.
       subroutine solve_linprog(this,nx,nb,f,A,b,xm,iret)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use linprog, only: lp
          implicit none
          class(chem_state), intent(in) :: this
@@ -920,7 +941,7 @@ module chem_state_class
          call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
          rhs=log(this%Nu)-matmul(this%sys%P(this%sys%nsd+1:this%sys%ns,:),log(this%Nbar))+this%gu
          call lss(this%sys%nsu,this%sys%nrc,this%sys%BR,rhs,lam,info)
-         if (info.ne.0) call die('chem_state x_init: Least squares for lambda initialization failed.')
+         if (info.ne.0) call die('[chem_state x_init] Least squares solver for lambda initialization failed.')
          ! Set the initial solution vector
          this%x(1:this%sys%nrc)=lam
          this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np)=log(this%Nbar)
@@ -1045,6 +1066,8 @@ module chem_state_class
 
       !> Find the chemical equilibium state at constant pressure and enthalpy
       subroutine get_ceq_PH(this,Neq)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use messager, only: die
          implicit none
          class(chem_state), intent(inout) :: this
@@ -1056,17 +1079,17 @@ module chem_state_class
          allocate(hort(this%sys%ns))
          ! Initialize
          HoR0=this%HoR
-         this%dT=10.0_WP*this%tol_T
+         this%dT=1e5*this%tol_T
          this%iter_T=0
          Tlo=-1e30 ! Lowest temperature at which h has been evaluated
          Thi= 1e30 ! Highest temperature at which h has been evaluated
          ! Iterate over temperature
-         do while(abs(this%dT).ge.this%tol_T)
+         do while(abs(this%dT/this%T).ge.this%tol_T)
             ! Increment the iterations
             this%iter_T=this%iter_T+1
             if (this%iter_T.gt.this%iter_T_max) then
                this%iter_T=this%iter_T-1
-               print*,'Warning: Temperature iterations did not converge after ',this%iter_T,' attempts. Residual error = ',this%dT
+               print*,'Warning: Temperature iterations did not converge after ',this%iter_T,' attempts. Relative error = ',this%dT/this%T
                exit
             end if
             ! Determine equilibrium composition at current temperature
@@ -1198,7 +1221,7 @@ module chem_state_class
          M  =matmul(this%PtildeT,matmul(this%Btilde,lamdoty))
          rhs=matmul(this%PtildeT,matmul(this%Btilde,lamdotg)-Ygdot)
          call lss(this%sys%np,this%sys%np,M,rhs,dlnNbardT,info)
-         if (info.ne.0) call die('[chem_state get_dxdT] Least square solver failed')
+         if (info.ne.0) call die('[chem_state get_dxdT] Least squares solver failed')
          dxdT(1:this%sys%nrc)=lamdotg-matmul(lamdoty,dlnNbardT)
          dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np)=dlnNbardT
          ! Deallocate arrays

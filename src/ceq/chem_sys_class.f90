@@ -1,4 +1,4 @@
-!> Chemical system
+!> Chemical system class
 module chem_sys_class
    use precision, only: WP
    implicit none
@@ -83,45 +83,46 @@ module chem_sys_class
       !> Chemical system initializer
       subroutine initialize(this,np,ns,ne,ncs,ng,P,Ein,CS,Bg,thermo_in,diag)
 
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
+
          !  Specify a constrained equilibrium system.
       
-         !   S.B. Pope 6/30/03
-
          ! Input:
-         !   np    - number of phases
-         !   ns    - number of species
-         !   ne    - number of elements
-         !   ncs   - number of constrained species
-         !   ng    - number of general linear constraints
-         !   Ein   - element matrix (ns x ne).  A molecule of species k contains
-         !           Ein(k,j) atoms of element j.
-         !   CS    - array containing indexes of constrained species (ncs x 1)
-         !   Bg    - general linear constraint matrix (ns x ng)
-         !   thermo_in  - thermodynamic data for species (ns x 2*ncof+1)
-         !              - see below for details
-         !   P     - Phase summation matrix
+         !  np    - number of phases
+         !  ns    - number of species
+         !  ne    - number of elements
+         !  ncs   - number of constrained species
+         !  ng    - number of general linear constraints
+         !  Ein   - element matrix (ns x ne).  A molecule of species k contains
+         !          Ein(k,j) atoms of element j.
+         !  CS    - array containing indexes of constrained species (ncs x 1)
+         !  Bg    - general linear constraint matrix (ns x ng)
+         !  thermo_in  - thermodynamic data for species (ns x 2*ncof+1)
+         !             - see below for details
+         !  P     - Phase summation matrix
       
          ! Unconstrained equilibrium:
-         !   For unconstrained equilibrium calculations (i.e.,in which the only 
-         !   constraint is on the elements),set ncs=0,ng=0,CS=[] and Bg=[].
+         !  For unconstrained equilibrium calculations (i.e.,in which the only 
+         !  constraint is on the elements),set ncs=0,ng=0,CS=[] and Bg=[].
       
          ! Details of thermo_in:
-         !   As in Chemkin,the thermodynamic properties of each species are given
-         !   in terms of 7 non-dimensional coefficients,a(1:7).  Different values 
-         !   of a(1:7) are given for two temperature ranges.  T* [K] denotes the
-         !   upper limit of the lower temperature range,and the lower limit of the 
-         !   upper temperature range.  The contents of the array thermo_in are: 
-         !   thermo_in(k,1)   =T* for species k
-         !   thermo_in(k,2:8) =a(1:7) for species k in the lower temperature range
-         !   thermo_in(k,9:15)=a(1:7) for species k in the upper temperature range
-         !   The relevant thermodynamic variables are:
-         !   T   - temperature [K]
-         !   H   - molar specific enthalpy [J/kmol]
-         !   S   - molar specific entropy [J/(kmol K)]
-         !   R   - universal gas constant [J/(kmol K)]
-         !   Then for each species,H and S are given by:
-         !   H/(RT)=a(6)/T+sum_{n=1}^{n=5} a(n) T^{n-1}/n
-         !   S/R=a(1)log(T)+a(7)+sum_{n=2}^{n=5} a(n) T^{n-1}/(n-1)
+         !  As in Chemkin,the thermodynamic properties of each species are given
+         !  in terms of 7 non-dimensional coefficients,a(1:7).  Different values 
+         !  of a(1:7) are given for two temperature ranges.  T* [K] denotes the
+         !  upper limit of the lower temperature range,and the lower limit of the 
+         !  upper temperature range.  The contents of the array thermo_in are: 
+         !  thermo_in(k,1)   =T* for species k
+         !  thermo_in(k,2:8) =a(1:7) for species k in the lower temperature range
+         !  thermo_in(k,9:15)=a(1:7) for species k in the upper temperature range
+         !  The relevant thermodynamic variables are:
+         !  T   - temperature [K]
+         !  H   - molar specific enthalpy [J/kmol]
+         !  S   - molar specific entropy [J/(kmol K)]
+         !  R   - universal gas constant [J/(kmol K)]
+         !  Then for each species,H and S are given by:
+         !  H/(RT)=a(6)/T+sum_{n=1}^{n=5} a(n) T^{n-1}/n
+         !  S/R=a(1)log(T)+a(7)+sum_{n=2}^{n=5} a(n) T^{n-1}/(n-1)
 
          use messager,  only: die
          use mathtools, only: reorder_rows
@@ -210,7 +211,8 @@ module chem_sys_class
 
       !> Reset values of parameters in chem_sys: apart from chem_sys,all arguments are optional.
       subroutine chem_sys_param_set(this,diag,T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
-         ! If this%diag=5,the values of the parameters are output.
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_sys), intent(inout) :: this
          integer,  intent(in), optional :: diag,pert_skip
@@ -234,6 +236,8 @@ module chem_sys_class
 
       !> Reset parameters in chem_sys to their default settings.
       subroutine chem_sys_param_def(this)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_sys), intent(inout) :: this
          this%diag    =1          ! >0 for diagnostics
@@ -255,6 +259,8 @@ module chem_sys_class
 
       !> Set the reduced constraint matrix BR,and determine the ordering of the elements and species
       subroutine red_con(this,BR,A,ifop)
+         ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+         ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use messager,  only: die
          use mathtools, only: ind_col,reorder_rows
          implicit none
@@ -273,20 +279,14 @@ module chem_sys_class
 
             do j=1,this%ncs-1
                do k=j+1,this%ncs
-                  if (this%CS(j).eq.this%CS(k)) then
-                     write(0,*)'red_con: CS not distinct'
-                     call die('red_con: CS not distinct')
-                  endif
+                  if (this%CS(j).eq.this%CS(k)) call die('[chem_sys red_con] CS not distinct')
                end do
             end do
 
             else  ! original test which inappropriately assumes ordeering
 
                if (this%ncs.gt.1) then
-                  if (minval(this%CS(2:this%ncs)-this%CS(1:this%ncs-1)).lt.1) then
-                     write(0,*)'red_con: CS not distinct'
-                     call die('red_con: CS not distinct')
-                  endif
+                  if (minval(this%CS(2:this%ncs)-this%CS(1:this%ncs-1)).lt.1) call die('[chem_sys red_con] CS not distinct')
                endif
 
          endif  !  end of distinct test
@@ -312,11 +312,7 @@ module chem_sys_class
          call dgesvd('A','A',this%ns,this%nc,BB(1:this%ns,1:this%nc),this%ns,S(1:this%ns+this%nc),U(1:this%ns,1:this%ns),this%ns,&
                      VT(1:this%nc,1:this%nc),this%nc,work(1:lwork),lwork,info)
          
-         if (info.ne.0) then
-            if (ifop.ge.1) then
-               call die('red_con: svd failed')
-            endif
-         end if
+         if (info.ne.0) call die('[chem_sys red_con] SVD of the constraint matrix failed')
 
          rank_def=0     !  determine rank deficiency of B
          do j=1,this%nc
@@ -363,11 +359,7 @@ module chem_sys_class
          ! determine independent columns of DEBg
          call ind_col(this%ns,ndebg,this%nsd,DEBg(1:this%ns,1:ndebg),thresh,indcol(1:ndebg),info)
 
-         if (info.lt.0) then
-            if (ifop.ge.1) then
-               call die('red_con: ind_col failed')
-            end if
-         endif
+         if (info.lt.0) call die('[chem_sys red_con] ind_col failed')
 
          !  identify all determined elements
          el_det=0

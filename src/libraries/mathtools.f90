@@ -355,6 +355,9 @@ contains
 
    !>  Determine independent columns of the matrix B, given that columns 1:nci are independent.
    subroutine ind_col(nr,nc,nci,B,thresh,indcol,info)
+      ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+      ! Ideal Gas Mixtures using Gibbs Function Continuation. 
+      use messager, only: die
       implicit none
       integer,  intent(in)  :: nr,nc,nci
       real(WP), intent(in)  :: B(nr,nc),thresh
@@ -377,11 +380,9 @@ contains
       jpvt=0
       ! Perform QR with column pivoting:  B P=Q R
       call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)),work(1:lwork),lwork,info)
-      if (info.ne.0) then
-         !write(0,*)'ceq_ind_col2: QR failed,info= ',info
-         return
-      end if
-      do k=1,min(nc,nr)   !  loop over possibly dependent columns
+      if (info.ne.0) call die('[ind_col] QR decomposition failed')
+      ! Loop over possibly dependent columns
+      do k=1,min(nc,nr)
          if (abs(R(k,k)).ge.thresh) then
             indcol(jpvt(k))=1	   
          else
@@ -400,6 +401,7 @@ contains
 
    !> Determine the least-squares/minimum-norm solution x to the linear equation Ax = b.
    subroutine lss(nb,nx,A,b,x,info)
+      !	S.B. Pope 10/2/02
       implicit none
       integer,  intent(in)  :: nb,nx
       real(WP), intent(in)  :: A(nb,nx),b(nb)
@@ -413,7 +415,6 @@ contains
       !  Output:
       !	x	- the solution nx-vector
       !	info=0 for successful solution
-      !	S.B. Pope 10/2/02
       integer :: lwork,rank
       real(WP) :: tol=1.d-9,aa(nb,nx),bb(nb+nx),sv(nb+nx),work(4*(nb+nx+1)*(nb+nx+1))
       lwork= size(work)
