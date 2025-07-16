@@ -73,10 +73,10 @@ module chem_state_class
       procedure :: x_init                                      !< Initialize the chemical state solution vector
       procedure :: equilibrate                                 !< Obtain the chemical equilibrium state of the system
       procedure :: get_Cp_eff                                  !< Get the effective Cp
-      procedure :: get_dxdT                                    !< 
-      procedure :: get_BP                                      !< 
-      procedure, private :: get_ceq_PT                         !< 
-      procedure, private :: get_ceq_PH                         !< 
+      procedure :: get_dxdT                                    !< Get the temperature derivative of the solution vector
+      procedure :: get_BP                                      !< Get the coefficient matrices for constraints and phase summation
+      procedure, private :: get_ceq_PT                         !< Get the chemical equilibrium state at constant pressure and temperature
+      procedure, private :: get_ceq_PH                         !< Get the chemical equilibrium state at constant pressure and emthalpy
    end type chem_state
 
    !> Interface for get_ceq
@@ -238,7 +238,7 @@ module chem_state_class
          ! Treat the special case of no undetermined species
          if (nsu.eq.0) then
             Neq=Nd
-            if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
+            if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%thermo,this%T)
             go to 500
          endif
          
@@ -252,7 +252,7 @@ module chem_state_class
                !  only determined species
                Neq=0.0_WP
                Neq(1:nsd)=Nd(1:nsd)
-               if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
+               if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%thermo,this%T)
                go to 500
             endif
             ! SBP end of added
@@ -314,7 +314,7 @@ module chem_state_class
          if ((cond.eq.fixed_PH).and.(.not.present(T_g))) then
             N1(1:nsd)   =this%Nd
             N1(nsd+1:ns)=Nu0
-            call this%hor2T(ns,N1,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
+            call this%hor2T(ns,N1,this%HoR,sys%thermo,this%T)
             ! Set gu based on T0
             call this%get_gort(nsu,this%T,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
          endif
@@ -424,7 +424,7 @@ module chem_state_class
 
 
       !> Determine temperature given enthalpy
-      subroutine hor2T(this,ns,z,hin,T_low,T_high,thermo,T)
+      subroutine hor2T(this,ns,z,hin,thermo,T)
          ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
          ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use messager, only: die
