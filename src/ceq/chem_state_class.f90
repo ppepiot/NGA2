@@ -146,6 +146,7 @@ module chem_state_class
          integer,  intent(in) :: cond
          real(WP), intent(in) :: p
          real(WP), intent(in), optional :: c(sys%nc),N(sys%ns),T,HoR,N_h(sys%ns),T_h,N_g(sys%ns),T_g
+         real(WP), parameter :: frac_Nm =0.1_WP! fraction of zm used in initial guess
          integer  :: np,nb,nc,ns,nsd,nsu,nrc,npert,iret,i
          real(WP) :: max_pert,Numin,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),cr_norm,cb_norm,res,N_low,res_tol=1e-9
          real(WP), dimension(sys%ns)  :: N0,N1,h,Neq
@@ -160,7 +161,7 @@ module chem_state_class
          select case (cond)
             case (fixed_PT)
                if (present(T)) then
-                  if (T.lt.sys%T_low.or.T.gt.sys%T_high) call die('[chem_sys initialize] Temperature out of range')
+                  if (T.lt.T_low.or.T.gt.T_high) call die('[chem_sys initialize] Temperature out of range')
                   this%T=T
                else
                   call die('[chem_sys initialize] Temperature is required for the fixed temperature condition')
@@ -179,10 +180,10 @@ module chem_state_class
                if (present(T_g)) then
                   ! Guess provided
                   this%T=T_g
-                  if (T_g.lt.sys%T_low.or.T_g.gt.sys%T_high) call die('[chem_sys initialize] Guessed temperature out of range')
+                  if (T_g.lt.T_low.or.T_g.gt.T_high) call die('[chem_sys initialize] Guessed temperature out of range')
                else
-                  this%T=sqrt(sys%T_low*sys%T_high)
-                  this%T=max(this%T,0.1_WP*sys%T_high)
+                  this%T=sqrt(T_low*T_high)
+                  this%T=max(this%T,0.1_WP*T_high)
                endif
                this%get_ceq=>get_ceq_PH
             case default
@@ -305,7 +306,7 @@ module chem_state_class
          if (iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
 
          ! Form initial guess Nu0
-         Nu0=Ng+sys%frac_Nm*(Nm-Ng)
+         Nu0=Ng+frac_Nm*(Nm-Ng)
 
          ! Skip to here if Nu0 based on N_g accepted
          100 continue

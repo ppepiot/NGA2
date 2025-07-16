@@ -55,15 +55,6 @@ module chem_sys_class
 
       ! Numerical parameters (when parameters are altered,chem_sys_param_set and chem_param_def must be updated.)
       integer  :: diag                                !< Greater than 0 for diagnostics
-      real(WP) :: T_low                               !< Lowest allowed temperature
-      real(WP) :: T_high                              !< Highest allowed temperature
-      real(WP) :: frac_Nm                             !< Fraction of zm used in initial guess
-      real(WP) :: T_tol                               !< Convergence tolerance on log(T)
-      real(WP) :: ires_fac                            !< Factor by which the irreducible residual can exceed res_tol
-      real(WP) :: logy_lim                            !< Upper limit on log(y)  (to prevent overflow in ceq_y)
-      real(WP) :: srat_lim                            !< Lower limit on singular-value ratio (ceq_Sinv)
-      real(WP) :: err_huge                            !< Upper limit on error (ceq_newt)
-      real(WP) :: dec_min                             !< Minimum acceptable decrease in residual (ceq_newt)
       real(WP) :: eps_el                              !< Relative lower bound on element moles (ceq_perturb)
       real(WP) :: eps_sp                              !< Relative lower bound on species moles (ceq_perturb)
       real(WP) :: pert_tol                            !< Largest allowed normalized perturbation
@@ -210,23 +201,14 @@ module chem_sys_class
 
 
       !> Reset values of parameters in chem_sys: apart from chem_sys,all arguments are optional.
-      subroutine chem_sys_param_set(this,diag,T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol,pert_skip)
+      subroutine chem_sys_param_set(this,diag,eps_el,eps_sp,pert_tol,pert_skip)
          ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
          ! Ideal Gas Mixtures using Gibbs Function Continuation.
          implicit none
          class(chem_sys), intent(inout) :: this
          integer,  intent(in), optional :: diag,pert_skip
-         real(WP), intent(in), optional :: T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
+         real(WP), intent(in), optional :: eps_el,eps_sp,pert_tol
          if (present(diag))     this%diag    =diag
-         if (present(T_low))    this%T_low   =T_low
-         if (present(T_high))   this%T_high  =T_high
-         if (present(frac_Nm))  this%frac_Nm =frac_Nm
-         if (present(T_tol))    this%T_tol   =T_tol
-         if (present(ires_fac)) this%ires_fac=ires_fac
-         if (present(logy_lim)) this%logy_lim=logy_lim
-         if (present(srat_lim)) this%srat_lim=srat_lim
-         if (present(err_huge)) this%err_huge=err_huge
-         if (present(dec_min))  this%dec_min =dec_min
          if (present(eps_el))   this%eps_el  =eps_el
          if (present(eps_sp))   this%eps_sp  =eps_sp
          if (present(pert_tol)) this%pert_tol=pert_tol
@@ -241,19 +223,10 @@ module chem_sys_class
          implicit none
          class(chem_sys), intent(inout) :: this
          this%diag    =1          ! >0 for diagnostics
-         this%T_low   =250.0_WP   ! lowest allowed temperature
-         this%T_high  =5000.0_WP  ! highest allowed temperature
-         this%frac_Nm =1e-1       ! fraction of zm used in initial guess
-         this%T_tol   =1e-6       ! convergence tolerance on log(T)
-         this%ires_fac=1e2        ! factor by which the irreducible residual can exceed res_tol
-         this%logy_lim=120.0_WP   ! upper limit on log(y)  (to prevent overflow in ceq_y)
-         this%srat_lim=1e-9       ! lower limit on singular-value ratio (ceq_Sinv)
-         this%err_huge=1e6        ! upper limit on error (ceq_newt)
-         this%dec_min =0.5_WP     ! minimum acceptable decrease in residual (ceq_newt)
-         this%eps_el  =1e-9       ! relative lower bound on element moles (ceq_perturb)
-         this%eps_sp  =1e-9       ! relative lower bound on species moles (ceq_perturb)
-         this%pert_tol=1e-4       ! largest allowed normalized perturbation
-         this%pert_skip= 0        ! set =1 to skip perturbing undetermined species
+         this%eps_el  =1e-9       ! Selative lower bound on element moles (ceq_perturb)
+         this%eps_sp  =1e-9       ! Selative lower bound on species moles (ceq_perturb)
+         this%pert_tol=1e-4       ! Largest allowed normalized perturbation
+         this%pert_skip= 0        ! Set =1 to skip perturbing undetermined species
       end subroutine chem_sys_param_def
 
 
@@ -291,8 +264,10 @@ module chem_sys_class
 
          endif  !  end of distinct test
 
-         this%B=0.0_WP     ! set basic constraint matrix
-         ! set constrained species matrix
+         ! Set basic constraint matrix
+         this%B=0.0_WP
+
+         ! Set constrained species matrix
          if (this%ncs.gt.0) then
             Sc=0.0_WP
             do k=1,this%ncs 
@@ -314,7 +289,8 @@ module chem_sys_class
          
          if (info.ne.0) call die('[chem_sys red_con] SVD of the constraint matrix failed')
 
-         rank_def=0     !  determine rank deficiency of B
+         ! Determine rank deficiency of B
+         rank_def=0
          do j=1,this%nc
             if (S(j)<S(1)*thresh) then
                rank_def=this%nc-j+1
@@ -324,7 +300,7 @@ module chem_sys_class
 
          this%nb=this%nc-rank_def
 
-         ! Sdentify all determined species
+         ! Identify all determined species
          ! Species k is determined if U(k,nb+1:ns)=0
          sp_det=0
          this%sp_order=0
@@ -346,7 +322,7 @@ module chem_sys_class
             endif
          end do
          
-         !  form DEBg=[D E Bg]
+         ! Form DEBg=[D E Bg]
          ndebg=this%nsd+this%ne+this%ng
          DEBg=0.0_WP
          DEBg(1:this%ns,this%nsd+1:ndebg)=this%B(1:this%ns,this%ncs+1:this%nc)  ! set [E Bg]
@@ -356,12 +332,12 @@ module chem_sys_class
             DEBg(k,this%nsd+1:ndebg)=0.0_WP  ! set rows of [E Bg] to zero for determined species
          end do
 
-         ! determine independent columns of DEBg
+         ! Determine independent columns of DEBg
          call ind_col(this%ns,ndebg,this%nsd,DEBg(1:this%ns,1:ndebg),thresh,indcol(1:ndebg),info)
 
          if (info.lt.0) call die('[chem_sys red_con] ind_col failed')
 
-         !  identify all determined elements
+         ! Identify all determined elements
          el_det=0
          this%el_order=0
          this%neu=0
@@ -387,14 +363,14 @@ module chem_sys_class
             endif
          end do
 
-         !  identify any linearly dependent columns of Bg
+         ! Identify any linearly dependent columns of Bg
          if (this%ng.gt.0) then
             ngi=sum(indcol(this%nsd+this%ne+1:ndebg))
          else
             ngi=0
          endif
 
-         !  assemble BS (BR prior to species re-ordering)
+         ! Assemble BS (BR prior to species re-ordering)
          this%nrc=this%neu+ngi		! number of reduced constraints
          BS=0.0_WP
          kk=0
