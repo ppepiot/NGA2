@@ -137,27 +137,27 @@ module chem_sys_class
          call this%param_def()
 
          ! Check input
-         if(np.ge.1) then
+         if (np.ge.1) then
             this%np=np
          else
             call die('[chem_sys initialize] np needs to be greater than zero')
          endif
 
-         if(ns.ge.1) then
+         if (ns.ge.1) then
             this%ns=ns
          else
             call die('[chem_sys initialize] ns needs to be greater than zero')
          endif
 
-         if(ne.ge.1) then
+         if (ne.ge.1) then
             this%ne=ne
          else
             call die('[chem_sys initialize] ne needs to be greater than zero')
          endif
       
-         if(ncs.ge.0) then
+         if (ncs.ge.0) then
             this%ncs=ncs
-            if(ncs.ge.1) then
+            if (ncs.ge.1) then
                allocate(this%CS(ncs))
                this%CS=CS(1:ncs)
             endif
@@ -165,9 +165,9 @@ module chem_sys_class
             call die('[chem_sys initialize] ncs cannot be negative')
          endif
       
-         if(ng.ge.0) then
+         if (ng.ge.0) then
             this%ng=ng
-            if(ng.ge.1) then
+            if (ng.ge.1) then
                allocate(this%Bg(ns,ng))
                this%Bg=Bg(1:ns,1:ng)
             endif
@@ -215,20 +215,20 @@ module chem_sys_class
          class(chem_sys), intent(inout) :: this
          integer,  intent(in), optional :: diag,pert_skip
          real(WP), intent(in), optional :: T_low,T_high,frac_Nm,T_tol,ires_fac,logy_lim,srat_lim,err_huge,dec_min,eps_el,eps_sp,pert_tol
-         if(present(diag))     this%diag    =diag
-         if(present(T_low))    this%T_low   =T_low
-         if(present(T_high))   this%T_high  =T_high
-         if(present(frac_Nm))  this%frac_Nm =frac_Nm
-         if(present(T_tol))    this%T_tol   =T_tol
-         if(present(ires_fac)) this%ires_fac=ires_fac
-         if(present(logy_lim)) this%logy_lim=logy_lim
-         if(present(srat_lim)) this%srat_lim=srat_lim
-         if(present(err_huge)) this%err_huge=err_huge
-         if(present(dec_min))  this%dec_min =dec_min
-         if(present(eps_el))   this%eps_el  =eps_el
-         if(present(eps_sp))   this%eps_sp  =eps_sp
-         if(present(pert_tol)) this%pert_tol=pert_tol
-         if(present(pert_skip)) this%pert_skip=pert_skip
+         if (present(diag))     this%diag    =diag
+         if (present(T_low))    this%T_low   =T_low
+         if (present(T_high))   this%T_high  =T_high
+         if (present(frac_Nm))  this%frac_Nm =frac_Nm
+         if (present(T_tol))    this%T_tol   =T_tol
+         if (present(ires_fac)) this%ires_fac=ires_fac
+         if (present(logy_lim)) this%logy_lim=logy_lim
+         if (present(srat_lim)) this%srat_lim=srat_lim
+         if (present(err_huge)) this%err_huge=err_huge
+         if (present(dec_min))  this%dec_min =dec_min
+         if (present(eps_el))   this%eps_el  =eps_el
+         if (present(eps_sp))   this%eps_sp  =eps_sp
+         if (present(pert_tol)) this%pert_tol=pert_tol
+         if (present(pert_skip)) this%pert_skip=pert_skip
       end subroutine chem_sys_param_set
 
 
@@ -269,11 +269,11 @@ module chem_sys_class
          ! Check input
          call check_input()
 
-         if(.true.) then !  new test for constrained species being distinct SBP 2/6/09 
+         if (.true.) then !  new test for constrained species being distinct SBP 2/6/09 
 
             do j=1,this%ncs-1
                do k=j+1,this%ncs
-                  if(this%CS(j).eq.this%CS(k)) then
+                  if (this%CS(j).eq.this%CS(k)) then
                      write(0,*)'red_con: CS not distinct'
                      call die('red_con: CS not distinct')
                   endif
@@ -282,8 +282,8 @@ module chem_sys_class
 
             else  ! original test which inappropriately assumes ordeering
 
-               if(this%ncs.gt.1) then
-                  if(minval(this%CS(2:this%ncs)-this%CS(1:this%ncs-1)).lt.1) then
+               if (this%ncs.gt.1) then
+                  if (minval(this%CS(2:this%ncs)-this%CS(1:this%ncs-1)).lt.1) then
                      write(0,*)'red_con: CS not distinct'
                      call die('red_con: CS not distinct')
                   endif
@@ -293,7 +293,7 @@ module chem_sys_class
 
          this%B=0.0_WP     ! set basic constraint matrix
          ! set constrained species matrix
-         if(this%ncs.gt.0) then
+         if (this%ncs.gt.0) then
             Sc=0.0_WP
             do k=1,this%ncs 
                Sc(this%CS(k),k)=1.0_WP
@@ -303,7 +303,7 @@ module chem_sys_class
          
          this%B(1:this%ns,this%ncs+1:this%ncs+this%ne)=this%Ein(1:this%ns,1:this%ne)      ! next ne columns - element vectors
 
-         if(this%ng.gt.0) &
+         if (this%ng.gt.0) &
          this%B(1:this%ns,this%ne+this%ncs+1:this%nc)=this%Bg(1:this%ns,1:this%ng)        ! last ng columns - general constraints
 
          BB(1:this%ns,1:this%nc)=this%B(1:this%ns,1:this%nc)
@@ -312,15 +312,15 @@ module chem_sys_class
          call dgesvd('A','A',this%ns,this%nc,BB(1:this%ns,1:this%nc),this%ns,S(1:this%ns+this%nc),U(1:this%ns,1:this%ns),this%ns,&
                      VT(1:this%nc,1:this%nc),this%nc,work(1:lwork),lwork,info)
          
-         if(info.ne.0) then
-            if(ifop.ge.1) then
+         if (info.ne.0) then
+            if (ifop.ge.1) then
                call die('red_con: svd failed')
             endif
          end if
 
          rank_def=0     !  determine rank deficiency of B
          do j=1,this%nc
-            if(S(j)<S(1)*thresh) then
+            if (S(j)<S(1)*thresh) then
                rank_def=this%nc-j+1
                exit
             endif
@@ -334,7 +334,7 @@ module chem_sys_class
          this%sp_order=0
          kk=0
          do k=1,this%ns
-            if(norm2(U(k,this%nb+1:this%ns)).lt.thresh) then
+            if (norm2(U(k,this%nb+1:this%ns)).lt.thresh) then
                sp_det(k)=1	! species k is determined
                kk=kk+1
                this%sp_order(kk)=k	! determined species are first in ordering
@@ -344,7 +344,7 @@ module chem_sys_class
          this%nsu=this%ns-this%nsd
 
          do k=1,this%ns
-            if(sp_det(k).eq.0) then
+            if (sp_det(k).eq.0) then
                kk=kk+1
                this%sp_order(kk)=k	! undetermined species are last in ordering
             endif
@@ -363,8 +363,8 @@ module chem_sys_class
          ! determine independent columns of DEBg
          call ind_col(this%ns,ndebg,this%nsd,DEBg(1:this%ns,1:ndebg),thresh,indcol(1:ndebg),info)
 
-         if(info.lt.0) then
-            if(ifop.ge.1) then
+         if (info.lt.0) then
+            if (ifop.ge.1) then
                call die('red_con: ind_col failed')
             end if
          endif
@@ -376,7 +376,7 @@ module chem_sys_class
          this%ned=0
 
          do k=1,this%ne
-            if(indcol(this%nsd+k).eq.0) then	!	element k is determined
+            if (indcol(this%nsd+k).eq.0) then	!	element k is determined
                this%ned=this%ned+1
                el_det(k)=1
                this%el_order(this%ned)=k	! determined elements are first in ordering
@@ -388,7 +388,7 @@ module chem_sys_class
          kk=0
          EU=0.0_WP
          do k=1,this%ne
-            if(el_det(k).eq.0) then
+            if (el_det(k).eq.0) then
                kk=kk+1
                this%el_order(kk+this%ned)=k		! undetermined elements are last in ordering
                EU(:,kk)=this%Ein(:,k)
@@ -396,7 +396,7 @@ module chem_sys_class
          end do
 
          !  identify any linearly dependent columns of Bg
-         if(this%ng.gt.0) then
+         if (this%ng.gt.0) then
             ngi=sum(indcol(this%nsd+this%ne+1:ndebg))
          else
             ngi=0
@@ -407,14 +407,14 @@ module chem_sys_class
          BS=0.0_WP
          kk=0
          do k=1,this%ne
-            if(el_det(k).eq.0) then
+            if (el_det(k).eq.0) then
                kk=kk+1
                BS(:,kk)=this%Ein(:,k)
             endif
          end do
 
          do k=1,this%ng
-            if(indcol(this%nsd+this%ne+k).eq.1) then
+            if (indcol(this%nsd+this%ne+k).eq.1) then
                kk=kk+1
                BS(:,kk)=this%Bg(:,k)
             endif
@@ -441,8 +441,8 @@ module chem_sys_class
          call reorder_rows(U(1:this%ns,1:this%nb),this%sp_order,PU(1:this%ns,1:this%nb))
 
          BTTPU=0.0_WP
-         if(this%nsd.gt.0) BTTPU(1:this%nsd,1:this%nb)=PU(1:this%nsd,1:this%nb)
-         if(this%nsu.gt.0) BTTPU(this%nsd+1:this%nb,1:this%nb)=matmul(transpose(BR(1:this%nsu,1:this%nrc)),PU(this%nsd+1:this%ns,1:this%nb))
+         if (this%nsd.gt.0) BTTPU(1:this%nsd,1:this%nb)=PU(1:this%nsd,1:this%nb)
+         if (this%nsu.gt.0) BTTPU(this%nsd+1:this%nb,1:this%nb)=matmul(transpose(BR(1:this%nsu,1:this%nrc)),PU(this%nsd+1:this%ns,1:this%nb))
          do j=1,this%nb
             BTTPU(1:this%nb,j)=BTTPU(1:this%nb,j)/S(j)
          end do
@@ -452,27 +452,27 @@ module chem_sys_class
          ! Set to zero near-zero components of A
          do j=1,this%nb
             do k=1,this%nc
-               if(abs(A(j,k))<thresh) A(j,k)=0.0_WP
+               if (abs(A(j,k))<thresh) A(j,k)=0.0_WP
             end do
          end do
 
-         if(ifop<3) return
+         if (ifop<3) return
 
       contains
          subroutine check_input()
             use, intrinsic :: iso_fortran_env, only: output_unit
             integer :: myerr(5),i
             myerr=0
-            if(this%ns.lt.1) myerr(1)=1
-            if(this%ne.lt.1) myerr(2)=1
-            if(this%ncs.lt.0.or.this%ncs.gt.this%ns) myerr(3)=1
-            if(this%ng.lt.0) myerr(4)=1
-            if(this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
-            if(maxval(myerr).eq.0) return
-            if(ifop.ge.1) then
+            if (this%ns.lt.1) myerr(1)=1
+            if (this%ne.lt.1) myerr(2)=1
+            if (this%ncs.lt.0.or.this%ncs.gt.this%ns) myerr(3)=1
+            if (this%ng.lt.0) myerr(4)=1
+            if (this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
+            if (maxval(myerr).eq.0) return
+            if (ifop.ge.1) then
                write(output_unit,'(" >   chem_sys red_con: error in input")')
                do i=1,5
-                  if(myerr(i).gt.0) write(output_unit,'(" >   chem_sys red_con: error in argument,i5")') i
+                  if (myerr(i).gt.0) write(output_unit,'(" >   chem_sys red_con: error in argument,i5")') i
                end do
             endif
          end subroutine check_input

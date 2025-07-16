@@ -4,7 +4,7 @@ module simulation
    use string,           only: str_short,str_medium
    use YAMLRead,         only: YAMLElement
    use chem_sys_class,   only: chem_sys,Lphase,Gphase
-   use chem_state_class, only: chem_state,fixed_T
+   use chem_state_class, only: chem_state,fixed_PT,fixed_PH
    implicit none
    private
    
@@ -195,17 +195,17 @@ contains
 
       ! Initialize the chemical equilibrium framework
       ceq_init: block
-         integer :: lu,iostat,iret,info
+         use messager, only: die
          integer :: ng=1
          real(WP), dimension(:,:), allocatable :: Bg
-         real(WP), dimension(:),   allocatable :: stats
+         character(len=2) :: eq_cond
          integer :: isc
          ! Read inputs
          call param_read('Temperature',T)
          call param_read('Pressure',p)
+         call param_read('Equilibrium condition',eq_cond)
          ! Allocate arrays
          allocate(Bg(ns,ng));  Bg=0.0_WP
-         allocate(stats(20))
          ! Create the general constraints
          do isc=1,ns
             if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
@@ -216,30 +216,36 @@ contains
          do isc=1,ns
             print*,trim(sp_names(isc)),': ',N_init(isc)
          end do
-         ! Open CEQ output file
-         open(unit=lu,file='ceq_out',status='replace',action='write',iostat=iostat)
          ! Inizialize the chemical system
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
-         if (iret.lt.0) call die('chem_sys initialization failed.')
          ! Initialize the chemical state
-         call state%initialize(sys=sys,cond=fixed_T,p=p,T=T,N=N_init)
-         ! Close CEQ output file
-         close(lu)
-         ! CEQ initialization of moles
-         print*,'CEQ initialization of moles:'
+         select case (eq_cond)
+            case ('PT')
+               call state%initialize(sys=sys,cond=fixed_PT,p=p,T=T,N=N_init)
+            case ('PH')
+               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=N_init,T_h=T)
+            case default
+               call die('Equilibrium condition must be either PT or PH')
+         end select
+         print*,'Equilibrium condition: Constant ',eq_cond
+         ! Re-initialization of moles
+         print*,'Re-initialization of moles:'
          do isc=1,sys%ns
             print*,trim(sp_names(isc)),': ',state%N(isc)
          end do
-         print*,'Equilibrium temperature = ',state%T, '(k)'
          ! Initialize the chemical state solution vector
          call state%x_init()
          ! Deallocate arrays
-         deallocate(Bg,stats)
+         deallocate(Bg)
       end block ceq_init
 
-      ! Read in newton iterations inputs
-      call param_read('Tolerance',state%tol)
-      call param_read('Max number of iterations',state%iter_max)
+      ! Read in Newton and temperature iterations inputs
+      call param_read('Newton tolerance',state%tol_N)
+      call param_read('Newton max iterations',state%iter_N_max)
+      if (state%cond.eq.fixed_PH) then
+         call param_read('T tolerance',state%tol_T)
+         call param_read('T max iterations',state%iter_T_max)
+      end if
 
       ! Deallocate arrays
       deallocate(nasa_coef,const_sp,CS,N_init,e_names,elem_mat,phse_mat)
@@ -254,11 +260,17 @@ contains
       integer :: isc
 
       ! Obtain the chemical equilibrium state
-      call state%eqiulibrate()
+      call state%equilibrate()
 
       ! Output
-      print*,'Number of iterations = ', state%iter
-      print*,'Residal error = ', state%R
+      if (state%cond.eq.fixed_PH) then
+         print*,'Number of T iterations = ', state%iter_T
+         print*,'Residual error of T = ', state%dT
+      else
+         print*,'Number of Nerton iterations = ', state%iter_N
+         print*,'Residal error = ', norm2(state%R)
+      end if
+      print*,'Equilibrium temperature = ',state%T,' (K)'
       print*,'Equilibrium moles:'
       do isc=1,sys%ns
          print*,trim(sp_names(isc)),': ',state%N(isc)

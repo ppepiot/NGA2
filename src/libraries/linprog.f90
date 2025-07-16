@@ -110,14 +110,14 @@ contains
 
       calls=calls+1.0_WP
       
-      if(call_diag.gt.0) then
+      if (call_diag.gt.0) then
          lp_diag=0
-         if(nint(calls).eq.call_diag) lp_diag=3
+         if (nint(calls).eq.call_diag) lp_diag=3
       endif
       
-      if(present(lp_d)) lp_diag=lp_d
+      if (present(lp_d)) lp_diag=lp_d
       
-      if(present(lu_d).and..not.lu_set) then
+      if (present(lu_d).and..not.lu_set) then
          lu    =lu_d
          lu_set=.true.
       endif
@@ -127,21 +127,21 @@ contains
       info =0
       x    =0.0_WP
 
-      if(present(stats))     stats    =0.0_WP
-      if(present(indic_pos)) indic_pos=0
+      if (present(stats))     stats    =0.0_WP
+      if (present(indic_pos)) indic_pos=0
 
       nc=nle+nge+neq  !  total number of constraints
 
       ! Check the input
-      if(nx.le.0.or.nle.lt.0.or.nge.lt.0.or.neq.lt.0) then
+      if (nx.le.0.or.nle.lt.0.or.nge.lt.0.or.neq.lt.0) then
          info=1
          return
       endif
 
       !--------  set tol,iter_max and feas_only
-      if(present(toler)) then  !  error tolerance
+      if (present(toler)) then  !  error tolerance
 
-         if(toler.le.0.0_WP) then
+         if (toler.le.0.0_WP) then
             info=2
             return
          endif
@@ -160,15 +160,15 @@ contains
       
       ! Over-ride if user-specified
    
-      if(present(t_z_stop))   tol_z_stop  =t_z_stop
-      if(present(t_z_accept)) tol_z_accept=t_z_accept
-      if(present(t_pivot))    tol_pivot   =t_pivot
-      if(present(t_neg))      tol_neg     =t_neg
-      if(present(t_aof))      tol_aof     =t_aof
+      if (present(t_z_stop))   tol_z_stop  =t_z_stop
+      if (present(t_z_accept)) tol_z_accept=t_z_accept
+      if (present(t_pivot))    tol_pivot   =t_pivot
+      if (present(t_neg))      tol_neg     =t_neg
+      if (present(t_aof))      tol_aof     =t_aof
 
-      if(present(iter_lim)) then  !  limit on iterations
+      if (present(iter_lim)) then  !  limit on iterations
 
-         if(iter_lim.lt.0) then
+         if (iter_lim.lt.0) then
             info=3
             return
          endif
@@ -178,7 +178,7 @@ contains
          iter_max=iter_def*(nx+nc)
       endif
 
-      if(present(feasible_only)) then  !  only feasible solution required?
+      if (present(feasible_only)) then  !  only feasible solution required?
          feas_only=feasible_only
       else
          feas_only=.false.  !  by default,perform optimization
@@ -199,7 +199,7 @@ contains
 
       do ii=1,nle  !  original LE constraints
 
-      if(ble(ii).ge.0.0_WP) then  ! LE with no sign change
+      if (ble(ii).ge.0.0_WP) then  ! LE with no sign change
          n_le       = n_le+1
          i          = n_le
          tab(i,0)   = ble(ii)
@@ -215,7 +215,7 @@ contains
 
       do ii=1,nge  !  original GE constraints
 
-      if(bge(ii).le.0.0_WP) then  ! LE with sign change
+      if (bge(ii).le.0.0_WP) then  ! LE with sign change
          n_le       = n_le+1
          i          = n_le
          tab(i,0)   =-bge(ii)
@@ -232,7 +232,7 @@ contains
       do ii=1,neq  !  equality EQ constraints
          i =nle+nge+ii
 
-         if(beq(ii).ge.0.0_WP) then  !  EQ with no sign change
+         if (beq(ii).ge.0.0_WP) then  !  EQ with no sign change
             tab(i,0)   = beq(ii)
             tab(i,1:nx)=-aeq(ii,1:nx)   
          else                        !  EQ with sign change
@@ -244,7 +244,7 @@ contains
       !---------  attempt to solve LP   
 
       
-      if(lp_diag.gt.0) then
+      if (lp_diag.gt.0) then
          rhv=(/ (i,i=1,nx) /)
          lhv=(/ (i,i=1,nc) /)
          call tab_op(calls,-3,0,tab,nc,nx,rhv,lhv)
@@ -253,34 +253,34 @@ contains
       call lp_simplex(tab,nc,nx,n_le,n_ge,neq,info,rhv,lhv, &
                      feas_only,iter_max,iter_feas,iter_opt)
                      
-      if(info.ne.0.and.lp_diag.gt.0) then
+      if (info.ne.0.and.lp_diag.gt.0) then
          write(0,*)'linprog failed: info,calls=',info,nint(calls)
          call tab_op(calls,-7,info,tab,nc,nx,rhv,lhv)
       endif
                      
-      if(lp_diag.gt.0) call tab_op(calls,-1,info,tab,nc,nx,rhv,lhv)
+      if (lp_diag.gt.0) call tab_op(calls,-1,info,tab,nc,nx,rhv,lhv)
 
       !---------  obtain solution from LH variables     
 
       do j=1,nc  
          i=lhv(j)
-         if(i.le.nx) x(i)=tab(j,0)
+         if (i.le.nx) x(i)=tab(j,0)
       end do
       
-      if(present(lhvars)) lhvars=lhv
+      if (present(lhvars)) lhvars=lhv
       
       !  determine components of x which are essentially positive  
-      if(info.eq.0.and.present(indic_pos)) &
+      if (info.eq.0.and.present(indic_pos)) &
          call lp_pos(tab,nc,nx,rhv,lhv,indic_pos)
          
-      if(present(check))  then  !  check constraint equations
+      if (present(check))  then  !  check constraint equations
          call lp_check(nx,nle,nge,neq,ale,age,aeq,ble,bge,beq,x,err)
-         if(info.eq.0.and.err(5).gt.check) info=-5
+         if (info.eq.0.and.err(5).gt.check) info=-5
       else
          err=0.0_WP
       endif
                                  
-      if(present(stats)) then  ! set stats
+      if (present(stats)) then  ! set stats
          stats(1:7)  =(/ nx,nle,nge,neq,nc,n_le,n_ge /)*1.0_WP
          stats(8:11) =(/ info,iter_max,iter_feas,iter_opt /)*1.0_WP
          stats(12:17)=(/ tol,err /) 
@@ -313,7 +313,7 @@ contains
       
       rhs_pos=0
       do j=1,nx
-         if(tab(0,j).eq.0.0_WP) rhs_pos(j)=1
+         if (tab(0,j).eq.0.0_WP) rhs_pos(j)=1
       end do
       
       ! provisionally,set lhs_pos(i)=1, This is correct if the i-th LHS variable
@@ -334,34 +334,34 @@ contains
          changes=0
          
          do i=1,nc  !  loop over LHS variable
-            if(tab(i,0).ne.0.0_WP) cycle  ! positive LHS var
-            if(lhs_pos(i).eq.0) cycle  ! already determined to be essentially zero
+            if (tab(i,0).ne.0.0_WP) cycle  ! positive LHS var
+            if (lhs_pos(i).eq.0) cycle  ! already determined to be essentially zero
             !  zero LHS set potentially positive
             !  is there a positive coeff of a pos RHS var?
             n_pos=0
             do j=1,nx       ! loop over pos RHS
-               if(rhs_pos(j).eq.0) cycle
-               if(tab(i,j).gt.0.0_WP) then
+               if (rhs_pos(j).eq.0) cycle
+               if (tab(i,j).gt.0.0_WP) then
                   n_pos=1
                   exit
                endif
             end do
                
-            if(n_pos.eq.0) then ! no positive coeffs
+            if (n_pos.eq.0) then ! no positive coeffs
                lhs_pos(i)=0 ! LHS var is essentially zero
                changes   =1
                   
                do j=1,nx  ! rhs_pos(j)=1 only if tab(i,j)=0.0_WP
-                  if(rhs_pos(j).eq.1.and.tab(i,j).lt.0.0_WP) rhs_pos(j)=0
+                  if (rhs_pos(j).eq.1.and.tab(i,j).lt.0.0_WP) rhs_pos(j)=0
                end do
             end if
             
          end do  !  end of loop over LHS vars
-         if(changes.eq.0) exit ! all done
+         if (changes.eq.0) exit ! all done
       end do
       
-      if(changes.gt.0) then  !  failed
-         if( lp_diag.gt.0) then 
+      if (changes.gt.0) then  !  failed
+         if ( lp_diag.gt.0) then 
             write(0,*)'lp_pos failed:,changes=',changes
             write(0,*)lhs_pos
             write(0,*)rhs_pos
@@ -375,16 +375,16 @@ contains
       rhs_eqn=0 ! number of times an RHS var enters an lhs_pos=0 
                   ! equation with a non-zero coefficient 
       do i=1,nc
-         if(lhs_pos(i).eq.0) then
+         if (lhs_pos(i).eq.0) then
             do j=1,nx
-               if(rhs_pos(j).eq.1.and.tab(i,j).ne.0.0_WP)  &
+               if (rhs_pos(j).eq.1.and.tab(i,j).ne.0.0_WP)  &
                      rhs_eqn(j)=rhs_eqn(j)+1
             end do
          endif
       end do
       
-      if(maxval(rhs_eqn).gt.1) then
-         if( lp_diag.gt.0) write(0,*)'*** lp_pos ***,ambiguous: ',maxval(rhs_eqn)
+      if (maxval(rhs_eqn).gt.1) then
+         if ( lp_diag.gt.0) write(0,*)'*** lp_pos ***,ambiguous: ',maxval(rhs_eqn)
          indic_pos(1)=-1
          return
       endif
@@ -393,12 +393,12 @@ contains
       
       do j=1,nc  ! left-hand variables
          i=lhv(j)
-         if(i.le.nx.and.lhs_pos(j).eq.1) indic_pos(i)=1
+         if (i.le.nx.and.lhs_pos(j).eq.1) indic_pos(i)=1
       end do
       
       do j=1,nx  ! right-hand variables
          i=rhv(j)
-         if(i.le.nx.and.rhs_pos(j).eq.1) indic_pos(i)=1
+         if (i.le.nx.and.rhs_pos(j).eq.1) indic_pos(i)=1
       end do
       
    end subroutine lp_pos
@@ -412,7 +412,7 @@ contains
       
       integer :: i,j
 
-      if(.not.lu_set) then
+      if (.not.lu_set) then
          open(lu,file='lp_diag.op')
          lu_set=.true.
       endif
@@ -468,20 +468,20 @@ contains
          lhv(i)=nx+i  ! set indexes of LH variables
       end do
       
-      if(nge+neq.ne.0) &
+      if (nge+neq.ne.0) &
          call lp_feasible(tab,nc,nx,nle,nge,neq,rhv,lhv,col,ncol,info, &
                            iter_max,iter_feas)
                            
-      if(lp_diag.gt.0) call tab_op(0.0_WP,-2,info,tab,nc,nx,rhv,lhv)
+      if (lp_diag.gt.0) call tab_op(0.0_WP,-2,info,tab,nc,nx,rhv,lhv)
                   
-      if(feas_only.or.info.ne.0) return
+      if (feas_only.or.info.ne.0) return
          
       do !----  loop over exchanges to optimize
             
          !  find the largest element in the z-row (i=1)
          call lp_max(tab,nc,nx,0,col,ncol,jp,tmax)
             
-         if(tmax.le.tol_z_stop) then  !  largest element is essentially zero
+         if (tmax.le.tol_z_stop) then  !  largest element is essentially zero
             info=0                !  objective function cannot be increased
             return                !  success
          endif
@@ -489,10 +489,10 @@ contains
          !  find pivot:  given RH variable jp,pivot is LH variable ip  
          call lp_pivot(tab,nc,nx,ip,jp)
             
-         if(ip.eq.0) then
+         if (ip.eq.0) then
             info=-1  ! unbounded.  No limit on increase in RH variable
-            if(tmax.lt.tol_z_accept) info=0 ! accept solution
-            if(lp_diag.ge.2.and.info.ne.0) call tab_op(-8.0_WP,iter_opt,info,tab,nc,nx,rhv,lhv)
+            if (tmax.lt.tol_z_accept) info=0 ! accept solution
+            if (lp_diag.ge.2.and.info.ne.0) call tab_op(-8.0_WP,iter_opt,info,tab,nc,nx,rhv,lhv)
             return
          endif
 
@@ -503,9 +503,9 @@ contains
          lhv(ip)=j
          
          iter_opt=iter_opt+1
-         if(lp_diag.ge.2) call tab_op(-4.0_WP,iter_opt,info,tab,nc,nx,rhv,lhv)
+         if (lp_diag.ge.2) call tab_op(-4.0_WP,iter_opt,info,tab,nc,nx,rhv,lhv)
 
-         if(iter_opt.gt.iter_max) then
+         if (iter_opt.gt.iter_max) then
             info=-4
             return
          endif
@@ -540,25 +540,25 @@ contains
       iter_feas=0  !  number of iterations
 
       do  !--------- loop over exchanges
-         if(iter_feas.gt.iter_max) then
+         if (iter_feas.gt.iter_max) then
             info=-3
             return
          else
             iter_feas=iter_feas+1
          endif
          
-         if(lp_diag.ge.3) call tab_op(-5.0_WP,iter_feas,0,tab,nc,nx,rhv,lhv)
+         if (lp_diag.ge.3) call tab_op(-5.0_WP,iter_feas,0,tab,nc,nx,rhv,lhv)
 
          aof=tab(nc+1,0)  ! current value of AOF
          !  find largest element in the AOF (bottom) row
          !  Note: when feasible solution is obtained,bottom row consists of 0 and negative integers.
          call lp_max(tab,nc,nx,nc+1,col,ncol,jp,tmax)  
 
-         if(tmax.le.tol_aof.and.aof.le.tol_aof) then 
+         if (tmax.le.tol_aof.and.aof.le.tol_aof) then 
             !  The auxilliary objective function (AOF) is around zero or less
             !  and cannot be increased. 
       
-            if(aof.lt.-tol_aof)then
+            if (aof.lt.-tol_aof)then
             ! AOF is strictly negative -- no feasible solution
             info=-2  
             return
@@ -571,17 +571,17 @@ contains
             exist_aux=.false.  !  assume no auxilliary variables
             
             do ip=nle+nge+1,nc      ! loop over EQ auxilliary variables
-            if(lhv(ip).ne.ip+nx) cycle ! aux var has already been exchanged
+            if (lhv(ip).ne.ip+nx) cycle ! aux var has already been exchanged
                call lp_max_abs(tab,nc,nx,ip,col,ncol,jp,tmax)
-               if(tmax.gt.tol_aof) then
+               if (tmax.gt.tol_aof) then
                   exist_aux=.true.       ! exchange required
                   exit
                endif                         
             end do
 
-            if(.not.exist_aux) then
+            if (.not.exist_aux) then
             do  i=nle+1,nle+nge              !  loop over GE aux vars 
-               if(.not.ge_swapped(i-nle)) then !  if not exchanged...
+               if (.not.ge_swapped(i-nle)) then !  if not exchanged...
                   tab(i,0:nx)=-tab(i,0:nx)      !  ...change sign of row
                endif
             end do
@@ -591,12 +591,12 @@ contains
          else      
             ! tmax is greater than tol  (assuming AOF < tol)
 
-            if(aof.gt.tol_aof.and.lp_diag.gt.0) then
+            if (aof.gt.tol_aof.and.lp_diag.gt.0) then
                write(0,*)'linprog: positive aof=',aof
             endif
             
             call lp_pivot(tab,nc,nx,ip,jp)  !  find pivot (jp)
-            if(ip.eq.0) then
+            if (ip.eq.0) then
             info=-1  ! no pivot-AOF is unbounded
             return     ! no feasible solution
             endif
@@ -606,13 +606,13 @@ contains
          !  exchange LH variable ip with RH variable jp
          call lp_exchange(tab,nc,nx,1,ip,jp)  
 
-         if(lhv(ip).ge.nx+nle+nge+1) then
+         if (lhv(ip).ge.nx+nle+nge+1) then
             ! ip corresponds to an EQ auxilliary variable. 
             ! It has become a RH variable and does not need to be considered further.
             ! It has been exchanged to jp,so remove the jp column from consideration. 
             ! Find j such that col(j)=jp   
             do  j=1,ncol
-            if(col(j).eq.jp) exit  ! j found
+            if (col(j).eq.jp) exit  ! j found
             end do
             ncol=ncol-1  !  reduce length of list
             ! Remove col(j) by moving rest of list up
@@ -623,9 +623,9 @@ contains
          else
             
             ii=lhv(ip)-nle-nx
-            if(ii.ge.1) then 
+            if (ii.ge.1) then 
             ! ip corresponds to a GE slack variable
-            if(.not.ge_swapped(ii))then
+            if (.not.ge_swapped(ii))then
                ge_swapped(ii)=.true.  !  indicate that it has been exchanged
             ! Account for implicit artificial variable
                tab(nc+1,jp)  =  tab(nc+1,jp)+1.0_WP 
@@ -661,7 +661,7 @@ contains
 
       integer :: j
       
-      if(ncol.le.0) then
+      if (ncol.le.0) then
          tmax=0.0_WP  ! return if no right-hand variables
          jp  =0
          return
@@ -669,7 +669,7 @@ contains
             
       tmax=-huge(1.0_WP)
       do j=1,ncol
-         if(tab(i,col(j)).le.tmax) cycle
+         if (tab(i,col(j)).le.tmax) cycle
          tmax=tab(i,col(j))
          jp  =col(j)       
       end do
@@ -694,7 +694,7 @@ contains
 
       integer :: j
       
-      if(ncol.le.0) then
+      if (ncol.le.0) then
          tmax=0.0_WP  ! return if no right-hand variables
          jp  =0
          return
@@ -702,7 +702,7 @@ contains
             
       tmax=-huge(1.0_WP)
       do j=1,ncol
-         if(abs(tab(i,col(j))).le.tmax) cycle
+         if (abs(tab(i,col(j))).le.tmax) cycle
          tmax=abs(tab(i,col(j)))
          jp  =col(j)       
       end do
@@ -727,12 +727,12 @@ contains
       dxmin=huge(1.0_WP)
             
       do i=1,nc 
-         if(tab(i,jp).ge.-tol_pivot) cycle !  skip non-negative components
+         if (tab(i,jp).ge.-tol_pivot) cycle !  skip non-negative components
             
          dxi=-tab(i,0)/tab(i,jp) ! limiting value of RH variable jp,
                                     !  imposed by LH variable i 
                
-         if(dxi.lt.dxmin) then
+         if (dxi.lt.dxmin) then
                   ip   =i  ! i is limiting and therefore pivot
                   dxmin=dxi
                   
@@ -740,7 +740,7 @@ contains
             do j=1,nx  
             disc=tab(ip,j)/tab(ip,jp)-tab(i,j)/tab(i,jp)
             
-            if(disc.gt.0.0_WP) then
+            if (disc.gt.0.0_WP) then
                exit
             elseif(disc.lt.0.0_WP) then
                ip=i
@@ -778,9 +778,9 @@ contains
       !  To suppress,set tol_neg=huge(0.0_WP).  SBP 3/5/09
 
       do i=1,nc
-         if(i.eq.ip) cycle
+         if (i.eq.ip) cycle
          tab0=tab(i,0)-tab(ip,0)*piv_col(i) 
-         if(tab0.lt.-tol_neg) then
+         if (tab0.lt.-tol_neg) then
             tab(i,jp) =0.0_WP  !  deemed to be zero within roud-off
             piv_col(i)=0.0_WP
             tab(i,0)  =0.0_WP  !  set potentially negative LHS variable to zero
@@ -788,7 +788,7 @@ contains
       end do
             
       do i=0,nc+if_aux   !  loop over all rows (except pivot row)  
-         if(i.ne.ip) tab(i,0:nx)=tab(i,0:nx)-tab(ip,0:nx)*piv_col(i)             
+         if (i.ne.ip) tab(i,0:nx)=tab(i,0:nx)-tab(ip,0:nx)*piv_col(i)             
       end do
 
       tab(0:nc+1,jp)= piv_col(0:nc+1)       ! set pivot column
@@ -819,17 +819,17 @@ contains
       err   =0.0_WP
       err(1)=max(-minval(x),0.0_WP)  !  max error in x(i) >= 0
       
-      if(nle.gt.0) then  !  error in LE constraint
+      if (nle.gt.0) then  !  error in LE constraint
          zle(1:nle)=ble(1:nle)-matmul(ale(1:nle,1:nx) ,x(1:nx))
          err(2)=max(0.0_WP, -minval(zle(1:nle)))
       endif
       
-      if(nge.gt.0) then  !  error in GE constraint
+      if (nge.gt.0) then  !  error in GE constraint
          zge(1:nge)=bge(1:nge)-matmul(age(1:nge,1:nx) ,x(1:nx))
          err(3)=max(0.0_WP, maxval(zge(1:nge)))
       endif
       
-      if(neq.gt.0) then  !  error in EQ constraint
+      if (neq.gt.0) then  !  error in EQ constraint
          zeq(1:neq)=beq(1:neq)-matmul(aeq(1:neq,1:nx) ,x(1:nx))
          err(4)=max(maxval(zeq),-minval(zeq(1:neq)))
       endif

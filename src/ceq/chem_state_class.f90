@@ -9,8 +9,12 @@ module chem_state_class
    public :: chem_state
 
    !> List of available equilibrium conditions
-   integer, parameter, public :: fixed_T=1                     !< Fixed temperature
-   integer, parameter, public :: fixed_H=2                     !< Fixed enthalpy
+   integer, parameter, public :: fixed_PT=1                     !< Fixed temperature
+   integer, parameter, public :: fixed_PH=2                     !< Fixed enthalpy
+
+   !> Temperature bounds
+   real(WP), parameter :: T_high=5000.0_WP
+   real(WP), parameter :: T_low =250.0_WP
 
    !> Reference pressure (Pa)
    real(WP), parameter :: p0=1.01325e5
@@ -37,29 +41,53 @@ module chem_state_class
       real(WP), dimension(:),   allocatable :: gu              !< Gibbs functions of undetermined species (nsu)
       real(WP), dimension(:),   allocatable :: R,Rd            !< Residual arrays
       real(WP), dimension(:),   allocatable :: x               !< Chemical state unknowns
-      real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT !< Coefficient matrices
+      real(WP), dimension(:,:), allocatable :: Btilde,Ptilde   !< Coefficient matrices
+      real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT !< Coefficient matrices transposed
+
+      ! Pointer to the avaiable chemical equilibrium procedures
+      procedure(get_ceq_interface), pointer :: get_ceq=>NULL() !< Map the input to the latent variables
 
       ! Numerical parameters
-      real(WP) :: tol                                           !< Tolerance for the residual norm
-      integer  :: iter                                          !< Number of iterations
-      integer  :: iter_max                                      !< Maximum number of iterations
+      real(WP) :: tol_N                                        !< Tolerance for the residual norm
+      real(WP) :: tol_T                                        !< Tolerance for the temperature
+      real(WP) :: dT                                           !< Residual error for the temperature
+      integer  :: iter_N                                       !< Number of Newton-Raphson iterations
+      integer  :: iter_T                                       !< Number of temperature iterations
+      integer  :: iter_N_max                                   !< Maximum number of Newton-Raphson iterations
+      integer  :: iter_T_max                                   !< Maximum number of temperature iterations
 
    contains
-      procedure :: initialize                                   !< Object initializer
-      procedure :: get_hort                                     !< Get the normalized enthalpy
-      procedure :: get_gort                                     !< Get the normalized Gibbs free energy
-      procedure :: hor2T                                        !< Convert enthalpy to temperature
-      procedure :: perturb                                      !< Perturb the chemical equilibrium problem
-      procedure :: get_Nming                                    !< Get the composition that minimized G and satisfies the constraints
-      procedure :: min_pert                                     !< Get the purturbed maxmin composition
-      procedure :: get_cpor                                     !< Get the normalized Cp
-      procedure :: maxmin_comp                                  !< Get the minmax composition
-      procedure :: solve_linprog                                !< Solve the linear programming problem
-      procedure :: get_y                                        !< Get the square root of the mole numbers
-      procedure :: get_res                                      !< Get the residual vector
-      procedure :: x_init                                       !< Initialize the chemical state solution vector
-      procedure :: eqiulibrate
+      procedure :: initialize                                  !< Object initializer
+      procedure :: get_hort                                    !< Get the normalized enthalpy
+      procedure :: get_gort                                    !< Get the normalized Gibbs free energy
+      procedure :: hor2T                                       !< Convert enthalpy to temperature
+      procedure :: get_dgdT                                    !< 
+      procedure :: perturb                                     !< Perturb the chemical equilibrium problem
+      procedure :: get_Nming                                   !< Get the composition that minimized G and satisfies the constraints
+      procedure :: min_pert                                    !< Get the purturbed maxmin composition
+      procedure :: get_cpor                                    !< Get the normalized Cp
+      procedure :: maxmin_comp                                 !< Get the minmax composition
+      procedure :: solve_linprog                               !< Solve the linear programming problem
+      procedure :: get_y                                       !< Get the square root of the mole numbers
+      procedure :: get_res                                     !< Get the residual vector
+      procedure :: x_init                                      !< Initialize the chemical state solution vector
+      procedure :: equilibrate                                 !< Obtain the chemical equilibrium state of the system
+      procedure :: get_Cp_eff                                  !< Get the effective Cp
+      procedure :: get_dxdT                                    !< 
+      procedure :: get_BP                                      !< 
+      procedure, private :: get_ceq_PT                         !< 
+      procedure, private :: get_ceq_PH                         !< 
    end type chem_state
+
+   !> Interface for get_ceq
+   interface
+      subroutine get_ceq_interface(this,Neq)
+         use precision, only: WP
+         import chem_state
+         class(chem_state), intent(inout) :: this
+         real(WP), dimension(this%sys%ns), intent(inout) :: Neq
+      end subroutine get_ceq_interface
+   end interface
 
 
    contains
@@ -116,7 +144,7 @@ module chem_state_class
          real(WP), intent(in) :: p
          real(WP), intent(in), optional :: c(sys%nc),N(sys%ns),T,HoR,N_h(sys%ns),T_h,N_g(sys%ns),T_g
          integer  :: np,nb,nc,ns,nsd,nsu,nrc,npert,iret,i
-         real(WP) :: T0,max_pert,Numin,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),cr_norm,cb_norm,res,N_low,res_tol=1e-9
+         real(WP) :: max_pert,Numin,cb(sys%nc),cmod(sys%nb),Nd(sys%nsd),cr_norm,cb_norm,res,N_low,res_tol=1e-9
          real(WP), dimension(sys%ns)  :: N0,N1,h,Neq
          real(WP), dimension(sys%nsu) :: Nu,Nu0,Nm,Nupper,Ng,gu
          real(WP), dimension(sys%nrc) :: cr
@@ -127,16 +155,16 @@ module chem_state_class
 
          ! Set the eqiuilibrium condition
          select case (cond)
-            case (fixed_T)
-               if(present(T)) then
-                  if(T.lt.sys%T_low.or.T.gt.sys%T_high) call die('[chem_sys initialize] Temperature out of range')
+            case (fixed_PT)
+               if (present(T)) then
+                  if (T.lt.sys%T_low.or.T.gt.sys%T_high) call die('[chem_sys initialize] Temperature out of range')
                   this%T=T
-                  T0=T
                else
                   call die('[chem_sys initialize] Temperature is required for the fixed temperature condition')
                end if
-            case (fixed_H)
-               if(present(HoR)) then
+               this%get_ceq=>get_ceq_PT
+            case (fixed_PH)
+               if (present(HoR)) then
                   this%HoR=HoR
                elseif(present(N_h).and.present(T_h)) then
                   call reorder_rows(N_h,sys%sp_order,N0)
@@ -145,21 +173,22 @@ module chem_state_class
                else
                   call die('[chem_sys initialize] both N_h and T_h are required for the fixed enthalpy case')
                end if
-               if(present(T_g)) then
+               if (present(T_g)) then
                   ! Guess provided
-                  T0=T_g
-                  if(T_g.lt.sys%T_low.or.T_g.gt.sys%T_high) call die('[chem_sys initialize] Guessed temperature out of range')
+                  this%T=T_g
+                  if (T_g.lt.sys%T_low.or.T_g.gt.sys%T_high) call die('[chem_sys initialize] Guessed temperature out of range')
                else
-                  T0=sqrt(sys%T_low*sys%T_high)
-                  T0=max(T0,0.1_WP*sys%T_high)
+                  this%T=sqrt(sys%T_low*sys%T_high)
+                  this%T=max(this%T,0.1_WP*sys%T_high)
                endif
+               this%get_ceq=>get_ceq_PH
             case default
                call die('[chem_sys initialize] The chemical state must be at either constant temperature or constant enthalpy')
          end select
          this%cond=cond
 
          ! Determine pressure in standard atmospheres
-         if(p.le.0.0_WP) call die('[chem_sys initialize] Pressure must be strictly positive')
+         if (p.le.0.0_WP) call die('[chem_sys initialize] Pressure must be strictly positive')
          this%p=p/p0
 
          ! Obtain indexes
@@ -182,14 +211,16 @@ module chem_state_class
          allocate(this%R   (nrc+np));       this%R      =0.0_WP
          allocate(this%Rd  (np));           this%Rd     =0.0_WP
          allocate(this%x   (nrc+np));       this%x      =0.0_WP
+         allocate(this%Btilde(nsu,nrc));    this%Btilde =0.0_WP
+         allocate(this%Ptilde(nsu,np));     this%Ptilde =0.0_WP
          allocate(this%BtildeT(nrc,nsu));   this%BtildeT=0.0_WP
          allocate(this%PtildeT(np,nsu));    this%PtildeT=0.0_WP
 
          ! Initialize the Gibbs function
-         call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
+         call this%get_gort(nsu,this%T,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
 
          ! Form the basic constraint vector
-         if(present(c)) then
+         if (present(c)) then
             cb(1:nc)=c
          elseif(present(N)) then
             cb(1:nc)=matmul(N,sys%B)
@@ -202,9 +233,9 @@ module chem_state_class
          Nd(1:nsd) =cmod(1:nsd)
 
          ! Treat the special case of no undetermined species
-         if(nsu.eq.0) then
+         if (nsu.eq.0) then
             Neq=Nd
-            if(cond.eq.fixed_H) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
+            if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
             go to 500
          endif
          
@@ -212,13 +243,13 @@ module chem_state_class
          cr(1:nrc) =cmod(nsd+1:nb)
          cr_norm   =norm2(cr)
 
-         if(cr_norm.le.0.0_WP) then
+         if (cr_norm.le.0.0_WP) then
          ! SBP added 4/9/2009
-            if(cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(Nd(1:nsd)).gt.0.0_WP) then
+            if (cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(Nd(1:nsd)).gt.0.0_WP) then
                !  only determined species
                Neq=0.0_WP
                Neq(1:nsd)=Nd(1:nsd)
-               if(cond.eq.fixed_H) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
+               if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
                go to 500
             endif
             ! SBP end of added
@@ -226,21 +257,21 @@ module chem_state_class
          endif
 
          ! Use initial guess N_g if provided
-         if(present(N_g)) then
+         if (present(N_g)) then
             call reorder_rows(N_g,sys%sp_order,N0)
             ! Guessed undetermined species
             Nu0(1:nsu)=N0(nsd+1:ns)
             ! Reduced c.v. based on N_g
             cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR)
             cb_norm  =norm2(cb)
-            if(cb_norm.eq.0.0_WP) go to 50
+            if (cb_norm.eq.0.0_WP) go to 50
             res=norm2((cb(1:nrc)/cb_norm-cr/cr_norm))
             ! Adjust initial guess Nu0,store in Nm
-            if(res.gt.res_tol) then
+            if (res.gt.res_tol) then
                N_low=sum(cr(1:sys%neu))*1e-15
                call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,iret)
                ! min_pert failed
-               if(iret.ne.0) then
+               if (iret.ne.0) then
                   call die('[ceq_state] min_pert failed')
                   go to 50
                endif
@@ -260,15 +291,15 @@ module chem_state_class
          call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,Nd,cr,sys%BR,sys%E,sys%diag,sys%eps_el,sys%eps_sp, &
          &                 sys%pert_tol,sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
 
-         if(iret.eq.-1) then 
+         if (iret.eq.-1) then 
             write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
          elseif(iret.eq.-2) then 
             call die('[chem_state initialize] Perturb failed')
          endif
 
-         ! Determine min_g composition based on T0
+         ! Determine min_g composition
          call this%get_Nming(nsu,nrc,sys%BR,this%cr,gu,Ng,iret)
-         if(iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
+         if (iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
 
          ! Form initial guess Nu0
          Nu0=Ng+sys%frac_Nm*(Nm-Ng)
@@ -277,12 +308,12 @@ module chem_state_class
          100 continue
 
          ! Re-estimate T0 and re-evaluate gu if required
-         if((cond.eq.fixed_H).and.(.not.present(T_g))) then
+         if ((cond.eq.fixed_PH).and.(.not.present(T_g))) then
             N1(1:nsd)   =this%Nd
             N1(nsd+1:ns)=Nu0
-            call this%hor2T(ns,N1,this%HoR,sys%T_low,sys%T_high,sys%thermo,T0)
+            call this%hor2T(ns,N1,this%HoR,sys%T_low,sys%T_high,sys%thermo,this%T)
             ! Set gu based on T0
-            call this%get_gort(nsu,T0,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
+            call this%get_gort(nsu,this%T,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
          endif
 
          ! Set the Gibbs functin and the undetermined species moles
@@ -296,7 +327,7 @@ module chem_state_class
          500	   continue
 
          ! Update the enthalpy
-         if(cond.eq.fixed_T) then
+         if (cond.eq.fixed_PT) then
             call this%get_hort(ns,this%T,sys%thermo,h)
             this%HoR=sum(Neq*h)*this%T
          endif
@@ -333,7 +364,7 @@ module chem_state_class
             th(n)=Tpnm1/float(n)     ! =T.^(n-1) ./ n
          end do
          do k=1,ns
-            if(T<thermo(k,1)) then
+            if (T<thermo(k,1)) then
                hort(k)=dot_product(thermo(k,2:7),th)  ! coefficients in lower temperature range
             else
                hort(k)=dot_product(thermo(k,9:14),th) ! coefficients in upper temperature range
@@ -359,7 +390,7 @@ module chem_state_class
          ! S. B. Pope 9/26/02
          real(WP) :: tc(ncof),th(ncof),ts(ncof),tg(ncof)
          integer :: k,n
-         if(ns.le.0) return
+         if (ns.le.0) return
          tc=0.0_WP  ! coefficient multipliers for specific heats
          th=0.0_WP  ! coefficient multipliers for enthalpy
          ts=0.0_WP  ! coefficient multipliers for entropy
@@ -375,7 +406,7 @@ module chem_state_class
          end do
          tg=th-ts
          do k=1,ns
-            if(T<thermo(k,1)) then
+            if (T<thermo(k,1)) then
                gort(k)=dot_product(thermo(k,2:8),tg)  ! coefficients in lower temperature range
             else
                gort(k)=dot_product(thermo(k,9:15),tg) ! coefficients in upper temperature range
@@ -421,12 +452,12 @@ module chem_state_class
          call this%get_hort(ns,T0,thermo,hort)
          hor=dot_product(z,hort)*T0
 
-         if(hin>hor) then	! T > T0=T_a
+         if (hin>hor) then	! T > T0=T_a
             h_a=hor
             T_a=T0
             call this%get_hort(ns,T_high,thermo,hort)
             h_b=dot_product(z,hort)*T_high
-            if(hin.ge.h_b) then
+            if (hin.ge.h_b) then
                T=T_high   ! T > T_high (return T=T_high)
                return
             endif
@@ -436,7 +467,7 @@ module chem_state_class
             T_b=T0
             call this%get_hort(ns,T_low,thermo,hort)
             h_a=dot_product(z,hort)*T_low
-            if(hin.le.h_a) then
+            if (hin.le.h_a) then
                T=T_low    ! T < T_low (return T=T_low)
                return
             endif
@@ -454,13 +485,52 @@ module chem_state_class
             cpp=dot_product(z,cpor)
             dT=(hin-hh)/cpp
             T=T+dT
-            if(abs(dT).lt.T_tol) return  ! success
+            if (abs(dT).lt.T_tol) return  ! success
          end do
 
          ! Failure
          call die('[chem_state hor2T] Iterations failed')
 
       end subroutine hor2T
+
+
+      !> Return d/dT of the normalized Gibbs functions at temperature T
+      subroutine get_dgdT(this,ns,T,thermo,dgdT)
+         implicit none
+         class(chem_state), intent(in) :: this
+         integer,  intent(in)  :: ns
+         real(WP), intent(in)  :: T,thermo(ns,2*ncof+1)
+         real(WP), intent(out) :: dgdT(ns)
+         ! input:
+         !   T      - temperature (K)
+         !   thermo - thermo data for all species
+         ! output:
+         !   dgdT   - d/dT (g_j/(RT))
+         ! S. B. Pope 7/1/03
+         real(WP) :: tc(ncof),th(ncof),ts(ncof),tg(ncof)
+         integer  :: k,n
+         tc=0.d0  ! coefficient multipliers for specific heats
+         th=0.d0  ! coefficient multipliers for enthalpy
+         ts=0.d0  ! coefficient multipliers for entropy
+         tc(1)=1.d0/T
+         th(1)=0.d0
+         th(6)=-1.d0/T**2
+         ts(1)=1.d0/T
+         ts(7)=0.d0
+         do n=2,5
+            tc(n)=T*tc(n-1)                  ! =T.^(n-2)
+            th(n)=tc(n)*float(n-1)/float(n)  ! =T.^(n-2) * (n-1) / n
+            ts(n)=tc(n)                      ! =T.^(n-2) 
+         end do
+         tg=th-ts
+         do k=1,ns
+            if (T<thermo(k,1)) then
+               dgdT(k)=dot_product(thermo(k,2:8),tg)  ! coefficients in lower temperature range
+            else
+               dgdT(k)=dot_product(thermo(k,9:15),tg) ! coefficients in upper temperature range
+            endif
+         end do
+      end subroutine get_dgdT
 
 
       !> Generate (possibly) perturbed CE problem
@@ -514,7 +584,7 @@ module chem_state_class
 
          zdp=Nd       ! check that determined species are non-negative
          zatoms=0.0_WP  ! estimate of moles of atoms
-         if(nsd.gt.0) then
+         if (nsd.gt.0) then
          do j=1,ne
             zatoms=zatoms+abs(dot_product(Nd,E(1:nsd,j)))
          end do
@@ -524,7 +594,7 @@ module chem_state_class
          zatoms=zatoms+abs(cr(j))
          end do
 
-         if(zatoms.le.0.0_WP) then
+         if (zatoms.le.0.0_WP) then
             write(output_unit,'(" >   chem_state perturb: no atoms")')
             iret=-3
             return
@@ -532,11 +602,11 @@ module chem_state_class
 
          zdlim=zatoms*pert_tol
          do k=1,nsd
-            if(zdp(k)<0.0_WP) then
-               if(abs(zdp(k))>zdlim  ) then ! significantly negative
+            if (zdp(k)<0.0_WP) then
+               if (abs(zdp(k))>zdlim ) then ! significantly negative
                      max_pert=max(max_pert,abs(zdp(k))/zatoms)
                      npert=npert+1
-                     if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative determined species")')
+                     if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative determined species")')
                endif
                zdp(k)=0.0_WP
             endif
@@ -551,11 +621,11 @@ module chem_state_class
          cref=sumcre*pert_tol
 
          do k=1,neu
-            if(cre(k)<0.0_WP) then
-               if(abs(cre(k))>cref ) then ! significantly negative
+            if (cre(k)<0.0_WP) then
+               if (abs(cre(k))>cref) then ! significantly negative
                      max_pert=max(max_pert,abs(cre(k))/zatoms)
                      npert=npert+1
-                     if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative undetermined element")')
+                     if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative undetermined element")')
                endif
                cre(k)=0.0_WP
             endif
@@ -574,7 +644,7 @@ module chem_state_class
          !  impose lower bound on moles of undetermined elements
          zelow=max(eps_el*zeumax,eps_el**2*zemax)
          do j=1,neu      
-            if(zeu(j)<zelow) then
+            if (zeu(j)<zelow) then
                npert=npert+1
                max_pert=max(max_pert,(zelow-zeu(j))/zatoms)
                zeu(j)=zelow
@@ -590,8 +660,8 @@ module chem_state_class
 
          call this%maxmin_comp(nsu,nrc,BR,crp,zumm,Numin,iret)
 
-         if(iret<0) then
-            if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: maxmin_comp failed")')
+         if (iret<0) then
+            if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: maxmin_comp failed")')
             iret=-2 
             return 
          endif
@@ -599,20 +669,20 @@ module chem_state_class
          zup=zumm
          do j=1,nsu     ! impose lower limit on undetermined species
             zulow=eps_sp*Nupper(j)
-            if(zumm(j)<zulow) then
+            if (zumm(j)<zulow) then
                zup(j)=zulow
                npert=npert+1
                max_pert=max(max_pert,(zup(j)-zumm(j))/zatoms)
             endif
          end do
 
-         if(pert_skip.gt.0) return  ! do not modify constraints
+         if (pert_skip.gt.0) return  ! do not modify constraints
 
          !  modify constraints according to the perturbation in undetermined species
          crp=crp+matmul(zup-zumm,BR)
 
-         if(max_pert.gt.pert_tol) then
-            if(ifop.ge.1) write(output_unit,'(" >   chem_state perturb: large perturbation made")')
+         if (max_pert.gt.pert_tol) then
+            if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: large perturbation made")')
             iret=-1 
          endif
 
@@ -672,7 +742,7 @@ module chem_state_class
          csc=max(maxval(c),-minval(c))
          zsc=csc/Bsc
          A(1:nz+nc,1:3*nz)=0.0_WP
-         if(linear) then  !  min. sum of dz
+         if (linear) then  !  min. sum of dz
             do i=1,nz
                A(i,i)     = 1.0_WP
                A(i,nz+i)  =-1.0_WP
@@ -696,12 +766,12 @@ module chem_state_class
             f(2*nz+i)=f(nz+i)
          end do
          call this%solve_linprog(nx,nr,f,A,r,x,iret)
-         if(iret.eq.0) then
+         if (iret.eq.0) then
             do i=1,nz
                z(i)=max(x(i),0.0_WP)*zsc+eps
             end do
          endif
-         if(.false.) return
+         if (.false.) return
       end subroutine min_pert
 
 
@@ -727,7 +797,7 @@ module chem_state_class
             tc(n)=T*tc(n-1)   ! =T.^(n-1) 
          end do
          do k=1,ns
-            if(T.lt.thermo(k,1)) then
+            if (T.lt.thermo(k,1)) then
                cpor(k)=dot_product(thermo(k,2:6),tc)  ! coefficients in lower temperature range
             else
                cpor(k)=dot_product(thermo(k,9:13),tc) ! coefficients in upper temperature range
@@ -768,7 +838,7 @@ module chem_state_class
          A(1:nc,1:nz)=transpose(B)
          A(1:nc,nx)=bsum
          call this%solve_linprog(nx,nc,f,A,c,x,iret)
-         if(iret.eq.0) then  !  success,zmin>=0
+         if (iret.eq.0) then  !  success,zmin>=0
             zmin=x(nx)
             Nm=x(1:nz)+zmin
             return
@@ -779,7 +849,7 @@ module chem_state_class
          f(nx)=1.0_WP  ! minimize -zmin
          A(1:nc,nx)=-bsum
          call this%solve_linprog(nx,nc,f,A,c,x,iret)
-         if(iret.ne.0) return  ! failure
+         if (iret.ne.0) return  ! failure
          zmin=-x(nx)
          Nm=x(1:nz)+zmin
       end subroutine maxmin_comp
@@ -808,7 +878,7 @@ module chem_state_class
          !  S.B. Pope 10/1/06
          real(WP) :: eps=1e-9,ale(1,1),age(1,1),ble(1),bge(1)
          call lp(nx,0,0,nb,ale,age,A,ble,bge,b,f,xm,iret,toler=eps)
-         if(iret<0) then
+         if (iret<0) then
             !XXX write(0,*)'solve_linprog,iret=',iret  ! SBP XXX
          endif
       end subroutine solve_linprog
@@ -860,15 +930,35 @@ module chem_state_class
 
 
       !> Find the chemical equilibium state
-      subroutine eqiulibrate(this)
+      subroutine equilibrate(this)
          use messager, only: die
          implicit none
          class(chem_state), intent(inout) :: this
+         real(WP), dimension(:), allocatable :: Neq
+         integer :: isc
+         ! Allocate arrays
+         allocate(Neq(this%sys%ns))
+         ! Get the chemical equilibrium state
+         call this%get_ceq(Neq)
+         ! Reorder the composition
+         do isc=1,this%sys%ns
+            this%N(this%sys%sp_order(isc))=Neq(isc)
+         end do
+         ! Deallocate arrays
+         deallocate(Neq)
+      end subroutine equilibrate
+
+
+      !> Find the chemical equilibium state at constant pressure and temperature
+      subroutine get_ceq_PT(this,Neq)
+         use messager, only: die
+         implicit none
+         class(chem_state), intent(inout) :: this
+         real(WP), dimension(this%sys%ns), intent(inout) :: Neq
          integer :: i,j,iJ,jJ,info
          real(WP), dimension(:,:), allocatable :: Jac
-         real(WP), dimension(:),   allocatable :: dx,y,Neq
+         real(WP), dimension(:),   allocatable :: dx,y
          real(WP), dimension(:,:), allocatable :: BTB,PTP,BTP
-         real(WP), dimension(:,:), allocatable :: Btilde,Ptilde
          real(WP), dimension(:),   allocatable :: S,work
          real(WP) :: Rnorm,rcond
          integer  :: rank,lwork
@@ -878,37 +968,28 @@ module chem_state_class
          allocate(BTB   (this%sys%nrc,this%sys%nrc)); BTB=0.0_WP
          allocate(BTP   (this%sys%nrc,this%sys%np));  BTP=0.0_WP
          allocate(PTP   (this%sys%np,this%sys%np));   PTP=0.0_WP
-         allocate(Btilde(this%sys%nsu,this%sys%nrc)); Btilde=0.0_WP
-         allocate(Ptilde(this%sys%nsu,this%sys%np));  Ptilde=0.0_WP
          allocate(y     (this%sys%nsu));              y=0.0_WP
          allocate(S     (this%sys%nrc+this%sys%np))
-         allocate(Neq   (this%sys%ns))
          lwork=10*(this%sys%nrc+this%sys%np)
          allocate(work(lwork))
          rcond=-1.0_WP
          ! Newton-Raphson
-         this%iter=0
+         this%iter_N=0
          y=this%get_y()
-         Rnorm=10*this%tol
-         do while(Rnorm.ge.this%tol)
+         Rnorm=10.0_WP*this%tol_N
+         do while(Rnorm.ge.this%tol_N)
             ! Increment iteration number
-            this%iter=this%iter+1
-            if (this%iter.gt.this%iter_max) then
-               this%iter=this%iter-1
+            this%iter_N=this%iter_N+1
+            if (this%iter_N.gt.this%iter_N_max) then
+               this%iter_N=this%iter_N-1
+               print*,'Warning: Newton solver did not converge after ',this%iter_N,' iterations. Residual error = ',Rnorm
                exit
             end if
             ! Build the Jacobian matrix
-            do j=1,this%sys%nrc
-               Btilde(:,j)=y*this%sys%BR(:,j)
-            end do
-            do j=1,this%sys%np
-               Ptilde(:,j)=y*this%sys%P(this%sys%nsd+1:this%sys%ns,j)
-            end do
-            this%BtildeT=transpose(Btilde)
-            this%PtildeT=transpose(Ptilde)
-            BTB=matmul(this%BtildeT,Btilde)
-            PTP=matmul(this%PtildeT,Ptilde)
-            BTP=matmul(this%BtildeT,Ptilde)
+            call this%get_BP(y)
+            BTB=matmul(this%BtildeT,this%Btilde)
+            PTP=matmul(this%PtildeT,this%Ptilde)
+            BTP=matmul(this%BtildeT,this%Ptilde)
             do j=1,this%sys%nrc
                jJ=j
                do i=1,j
@@ -941,14 +1022,13 @@ module chem_state_class
                Jac(iJ,jJ)=Jac(iJ,jJ)-this%Nbar(i)
             end do
             ! Get the residual error
-            ! this%R=this%get_res(y)
             call this%get_res(y)
             Rnorm=norm2(this%R)
             ! Solve for dx
             dx=-this%R
             call dgelss(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np,1,Jac,this%sys%nrc+this%sys%np,dx,this%sys%nrc+this%sys%np,S,rcond,rank,work,lwork,info)
-            if (rank.ne.this%sys%nrc+this%sys%np) call die('chem_state equilibrate: Jacobian is not full rank')
-            if (info.ne.0) call die('chem_state equilibrate: Least-squares solver failed')
+            if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
+            if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
             ! Update the solution
             this%x=this%x+dx
             ! Get the species and phase moles
@@ -956,14 +1036,213 @@ module chem_state_class
             this%Nu=y*y
             this%Nbar=exp(this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np))
          end do
-         ! Reorder mole vector
+         ! Assemble the composition
          Neq=[this%Nd,this%Nu]
-         do i=1,this%sys%ns
-            this%N(this%sys%sp_order(i))=Neq(i)
-         end do
          ! Deallocate arrays
-         deallocate(Jac,BTB,BTP,PTP,Btilde,Ptilde,y,S,work,dx,Neq)
-      end subroutine eqiulibrate
+         deallocate(Jac,dx,BTB,BTP,PTP,y,S,work)
+      end subroutine get_ceq_PT
+
+
+      !> Find the chemical equilibium state at constant pressure and enthalpy
+      subroutine get_ceq_PH(this,Neq)
+         use messager, only: die
+         implicit none
+         class(chem_state), intent(inout) :: this
+         real(WP), dimension(this%sys%ns), intent(inout) :: Neq
+         real(WP), dimension(:), allocatable :: hort
+         real(WP) :: Tn,Tlo,Thi
+         real(WP) :: HoR0,hlo,hhi,Cp_eff
+         ! Allocate arrays
+         allocate(hort(this%sys%ns))
+         ! Initialize
+         HoR0=this%HoR
+         this%dT=10.0_WP*this%tol_T
+         this%iter_T=0
+         Tlo=-1e30 ! Lowest temperature at which h has been evaluated
+         Thi= 1e30 ! Highest temperature at which h has been evaluated
+         ! Iterate over temperature
+         do while(abs(this%dT).ge.this%tol_T)
+            ! Increment the iterations
+            this%iter_T=this%iter_T+1
+            if (this%iter_T.gt.this%iter_T_max) then
+               this%iter_T=this%iter_T-1
+               print*,'Warning: Temperature iterations did not converge after ',this%iter_T,' attempts. Residual error = ',this%dT
+               exit
+            end if
+            ! Determine equilibrium composition at current temperature
+            call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
+            call this%get_ceq_PT(Neq)
+            ! Get the effective Cp
+            call this%get_Cp_eff(Cp_eff)
+            ! Obtain species h/(RT)
+            call this%get_hort(this%sys%ns,this%T,this%sys%thermo,hort)
+            ! Mixture H/R
+            this%HoR=this%T*sum(Neq*hort)
+            ! Predict dT
+            this%dT=(HoR0-this%HoR)/Cp_eff
+            ! Check that T is within limits
+            if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) call die('[chem_state get_ceq_PH] T > T_high')
+            if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) call die('[chem_state get_ceq_PH] T < T_low')
+            ! Ensure that Tn is within limits  
+            Tn=this%T+this%dT  
+            Tn=max(min(Tn,T_high),T_low)
+            ! Use linear interpolation instead if Tn is closer to known bound
+            if (this%dT.gt.0.0_WP) then
+               Tlo=this%T
+               hlo=this%HoR
+               if (Tn.gt.0.5_WP*(Tlo+Thi)) then
+                  Tn=Tlo+(Thi-Tlo)*(HoR0-hlo)/(hhi-hlo)
+               endif
+            else
+               Thi=this%T
+               hhi=this%HoR
+               if (Tn.lt.0.5_WP*(Tlo+Thi)) then
+                  Tn=Tlo+(Thi-Tlo)*(HoR0-hlo)/(hhi-hlo)
+               endif
+            endif
+            ! Update temperature increment
+            this%dT=Tn-this%T   
+            ! Update temperature
+            this%T=Tn         
+         end do
+         ! Assemble the composition
+         Neq=[this%Nd,this%Nu]
+         ! Dellocate arrays
+         deallocate(hort)
+      end subroutine get_ceq_PH
+
+
+      !> Evaluate the effective specific heat
+      !> Cp_eff = (dh/dT)/R at constant constraints and p
+      subroutine get_Cp_eff(this,Cp_eff)
+         class(chem_state), intent(inout) :: this
+         real(WP), intent(out) :: Cp_eff
+         real(WP), dimension(:), allocatable :: dgudT,dxdT,cpor,hort,N,dNddT,dNudT,dNdT
+         ! Allocate arrays
+         allocate(dgudT(this%sys%nsu))
+         allocate(dxdT(this%sys%nrc+this%sys%np))
+         allocate(cpor(this%sys%ns))
+         allocate(hort(this%sys%ns))
+         allocate(N(this%sys%ns))
+         allocate(dNddT(this%sys%nsd))
+         allocate(dNudT(this%sys%nsu))
+         allocate(dNdT(this%sys%ns))
+         ! Get d(gu)/dT
+         call this%get_dgdT(this%sys%nsu,this%T,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),dgudT)
+         ! Get d(lambda)/dT and d(ln(Nbar))/dT
+         call this%get_dxdT(dgudT,dxdT)
+         ! Get the Gibbs and enthalpy
+         call this%get_cpor(this%sys%ns,this%T,this%sys%thermo,cpor)
+         call this%get_hort(this%sys%ns,this%T,this%sys%thermo,hort)
+         ! Rates of change of moles
+         N=[this%Nd,this%Nu]
+         dNddT=0.0_WP
+         dNudT=this%Nu*(-dgudT+matmul(this%sys%BR,dxdT(1:this%sys%nrc))+dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np))
+         dNdT=[dNddT,dNudT]
+         Cp_eff=sum(cpor*N)+this%T*sum(hort*dNdT)
+         Cp_eff=sum(cpor*N)
+         ! Deallocate arrays
+         deallocate(dgudT,dxdT,cpor,hort,N,dNddT,dNudT,dNdT)
+      end subroutine get_Cp_eff
+
+
+      !> Get the temperature derivative of the solution vector
+      subroutine get_dxdT(this,dgudT,dxdT)
+         use messager,  only: die
+         use mathtools, only: lss
+         class(chem_state), intent(inout) :: this
+         real(WP), dimension(this%sys%nsu), intent(in) :: dgudT
+         real(WP), dimension(this%sys%nrc+this%sys%np), intent(out) :: dxdT
+         real(WP), dimension(:),   allocatable :: lamdotg,Sig,Sinv,work,y,Ygdot,dlnNbardT,rhs
+         real(WP), dimension(:,:), allocatable :: Btildeinv,lamdoty,U,VT,M,Btilde_cp
+         real(WP) :: srlim=1e-9
+         integer :: info,lwork,i,n_small
+         ! Allocate arrays
+         allocate(Btildeinv(this%sys%nrc,this%sys%nsu))
+         allocate(lamdotg  (this%sys%nrc))
+         allocate(Sig      (this%sys%nrc))
+         allocate(Sinv     (this%sys%nrc))
+         allocate(work     (20*(this%sys%nsu+this%sys%nrc)))
+         allocate(y        (this%sys%nsu))
+         allocate(Ygdot    (this%sys%nsu))
+         allocate(dlnNbardT(this%sys%np))
+         allocate(rhs      (this%sys%np))
+         allocate(lamdoty  (this%sys%nrc,this%sys%np))
+         allocate(U        (this%sys%nsu,this%sys%nrc))
+         allocate(VT       (this%sys%nrc,this%sys%nrc))
+         allocate(M        (this%sys%np,this%sys%np))
+         allocate(Btilde_cp(this%sys%nsu,this%sys%nrc))
+         lwork=size(work)
+         ! Get the y vector and update the coefficient matrices
+         y=this%get_y()
+         call this%get_BP(y)
+         Btilde_cp=this%Btilde(1:this%sys%nsu,1:this%sys%nrc)
+         ! Get the SVD of Btilde
+         call dgesvd('S','A',this%sys%nsu,this%sys%nrc,Btilde_cp,this%sys%nsu,Sig(1:this%sys%nrc), &
+         &           U(1:this%sys%nsu,1:this%sys%nrc),this%sys%nsu,VT(1:this%sys%nrc,1:this%sys%nrc),this%sys%nrc,work(1:lwork),    &
+         &           lwork,info)
+         ! call dgesvd('S','A',this%sys%nsu,this%sys%nrc,Btilde_cp,this%sys%nsu,Sig,U,this%sys%nsu,VT,this%sys%nrc,work,lwork,info)
+         if (info.ne.0) call die('[chem_state get_dxdT] SVD of B tilde failed')
+         ! Get the inverse of Sigma
+         call get_Sinv(this%sys%nrc,Sig,Sinv,srlim,n_small)
+         ! Store Sinv * V' in VT
+         do i=1,this%sys%nrc
+            VT(i,:)=Sinv(i)*VT(i,:)
+         end do
+         ! Btilde^-1 = V * Sinv * U'
+         Btildeinv=transpose(matmul(U,VT))
+         ! Solve for dxdT
+         Ygdot=y*dgudT
+         lamdotg=matmul(Btildeinv,Ygdot)
+         lamdoty=matmul(Btildeinv,this%Ptilde)
+         M  =matmul(this%PtildeT,matmul(this%Btilde,lamdoty))
+         rhs=matmul(this%PtildeT,matmul(this%Btilde,lamdotg)-Ygdot)
+         call lss(this%sys%np,this%sys%np,M,rhs,dlnNbardT,info)
+         if (info.ne.0) call die('[chem_state get_dxdT] Least square solver failed')
+         dxdT(1:this%sys%nrc)=lamdotg-matmul(lamdoty,dlnNbardT)
+         dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np)=dlnNbardT
+         ! Deallocate arrays
+         deallocate(Btildeinv,lamdotg,lamdoty,Sig,Sinv,work,y,Ygdot,dlnNbardT,rhs,U,VT,M,Btilde_cp)
+         contains
+            ! Get the inverse of Sigma
+            subroutine get_Sinv(n,S,Si,srat_lim,n_s)
+               ! Given the n-vector of singular values, S, which are in decreasing order,
+               ! return the n-vector of pseudo-inverses, Si, and the number n_s of
+               ! small singular values.  The j-th singular value is deemed to be small
+               ! if S(j)/S(1) < srat_lim.
+               integer,  intent(in)  :: n
+               real(WP), intent(in)  :: S(n),srat_lim
+               integer,  intent(out) :: n_s
+               real(WP), intent(out) :: Si(n)
+               integer  :: j
+               real(WP) :: slim
+               slim=srat_lim*S(1)
+               do j=1,n
+                  if (S(j).gt.slim) then
+                     Si(j)=1.0_WP/S(j)
+                     n_s=n-j
+                  else
+                     Si(j)=0.0_WP
+                  endif
+               end do
+            end subroutine get_Sinv
+      end subroutine get_dxdT
+
+
+      !> Get Btilde and Ptilde
+      subroutine get_BP(this,y)
+         class(chem_state), intent(inout) :: this
+         real(WP), dimension(this%sys%nsu), intent(in) :: y
+         integer :: j
+         do j=1,this%sys%nrc
+            this%Btilde(:,j)=y*this%sys%BR(:,j)
+         end do
+         do j=1,this%sys%np
+            this%Ptilde(:,j)=y*this%sys%P(this%sys%nsd+1:this%sys%ns,j)
+         end do
+         this%BtildeT=transpose(this%Btilde)
+         this%PtildeT=transpose(this%Ptilde)
+      end subroutine get_BP
 
 
 end module chem_state_class

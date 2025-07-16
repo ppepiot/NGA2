@@ -377,12 +377,12 @@ contains
       jpvt=0
       ! Perform QR with column pivoting:  B P=Q R
       call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)),work(1:lwork),lwork,info)
-      if(info.ne.0) then
+      if (info.ne.0) then
          !write(0,*)'ceq_ind_col2: QR failed,info= ',info
          return
       end if
       do k=1,min(nc,nr)   !  loop over possibly dependent columns
-         if(abs(R(k,k)).ge.thresh) then
+         if (abs(R(k,k)).ge.thresh) then
             indcol(jpvt(k))=1	   
          else
             exit
@@ -390,7 +390,7 @@ contains
       end do
       ! Check that the first nci columns are dependent
       do k=1,nci
-         if(indcol(k).ne.1) then
+         if (indcol(k).ne.1) then
             info=-2
             return
          endif
@@ -398,7 +398,7 @@ contains
    end subroutine ind_col
    
 
-   !> Determine the least-squares/minimum-norm solution x to the linear equation A x=b.
+   !> Determine the least-squares/minimum-norm solution x to the linear equation Ax = b.
    subroutine lss(nb,nx,A,b,x,info)
       implicit none
       integer,  intent(in)  :: nb,nx
