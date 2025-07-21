@@ -223,14 +223,18 @@ contains
             case ('PT')
                call state%initialize(sys=sys,cond=fixed_PT,p=p,T=T,N=N_init)
             case ('PH')
-               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=N_init,T_h=T)
+               ! call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=[1.0_WP,0.17260218510310191_WP,0.82739781489689534_WP,3.71_WP],T_h=300.0_WP,T_g=320.0_WP)
+               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=[1.0_WP,0.17260218510310191_WP,0.82739781489689534_WP,3.71_WP],T_h=300.0_WP)
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select
          print*,'Equilibrium condition: Constant ',eq_cond
-         print*,'Initial temperature = ',state%T
+         ! print*,'Initial temperature = ',state%T
          ! Re-initialization of moles
          print*,'Re-initialization of moles:'
+         ! state%Nd=[1.0_WP,3.71_WP]
+         ! state%Nu=[0.23306392928484024_WP,0.76693607071516501_WP]
+         ! state%N=[state%Nd,state%Nu]
          do isc=1,sys%ns
             print*,trim(sp_names(isc)),': ',state%N(isc)
          end do
@@ -265,7 +269,7 @@ contains
 
       ! Output
       if (state%cond.eq.fixed_PH) then
-         print*,'Number of T iterations = ',state%iter_T
+         print*,'Number of temperature iterations = ',state%iter_T
          print*,'Relative residual error of T = ',state%dT/state%T
       else
          print*,'Number of Newton iterations = ',state%iter_N
