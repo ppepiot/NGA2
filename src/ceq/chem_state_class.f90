@@ -997,12 +997,6 @@ module chem_state_class
          allocate(work(lwork))
          rcond=-1.0_WP
          call this%x_init()
-         ! print*,'get_ceq_PT: Nu = ',this%Nu
-         ! print*,'get_ceq_PT: Nd = ',this%Nd
-         ! print*,'get_ceq_PT: x = ',this%x
-         ! print*,'get_ceq_PT: Nbar = ',this%Nbar
-         ! print*,'get_ceq_PT: gu = ',this%gu
-         ! print*,'get_ceq_PT: cr = ',this%cr
          ! Newton-Raphson
          this%iter_N=0
          y=this%get_y()
@@ -1065,8 +1059,6 @@ module chem_state_class
             this%Nu=y*y
             this%Nbar=exp(this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np))
          end do
-         ! print*,'PT iterations = ',this%iter_N
-         ! print*,'PT res = ',Rnorm
          ! Assemble the composition
          Neq=[this%Nd,this%Nu]
          ! Deallocate arrays
@@ -1109,11 +1101,7 @@ module chem_state_class
             ! Determine equilibrium composition at current temperature
             call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
             xold=this%x
-            ! print*,'iter_T = ',this%iter_T
-            ! print*,'T = ',this%T
-            ! print*,'Entering get_PT'
             call this%get_ceq_PT(Neq)
-            ! print*,'Neq = ',Neq
             ! Get the effective Cp
             call this%get_Cp_eff(Cp_eff)
             ! Obtain species h/(RT)
@@ -1122,9 +1110,6 @@ module chem_state_class
             this%HoR=this%T*sum(Neq*hort)
             ! Predict dT
             this%dT=(HoR0-this%HoR)/Cp_eff
-            ! this%dT=0.01_WP
-            ! print*,'dT=',this%dT
-            ! print*,'(this%x-xold)/dT = ',(this%x-xold)/this%dT
             ! Check that T is within limits
             if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) call die('[chem_state get_ceq_PH] T > T_high')
             if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) call die('[chem_state get_ceq_PH] T < T_low')
@@ -1176,7 +1161,6 @@ module chem_state_class
          call this%get_dgdT(this%sys%nsu,this%T,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),dgudT)
          ! Get d(lambda)/dT and d(ln(Nbar))/dT
          call this%get_dxdT(dgudT,dxdT)
-         ! print*,'dxdT = ',dxdT
          ! Get the Gibbs and enthalpy
          call this%get_cpor(this%sys%ns,this%T,this%sys%thermo,cpor)
          call this%get_hort(this%sys%ns,this%T,this%sys%thermo,hort)
@@ -1241,13 +1225,7 @@ module chem_state_class
          Ygdot=y*dgudT
          lamdotg=matmul(Btildeinv,Ygdot)
          lamdoty=matmul(Btildeinv,this%Ptilde)
-         ! print*,'N = ',y*y
-         ! print*,'get_dxdT: Nu = ',this%Nu
          M=matmul(this%PtildeT,matmul(this%Btilde,lamdoty))
-         ! print*,'M = '
-         ! do i=1,this%sys%np
-         !    print*,M(i,:)
-         ! end do
          rhs=matmul(this%PtildeT,matmul(this%Btilde,lamdotg)-Ygdot)
          call lss(this%sys%np,this%sys%np,M,rhs,dlnNbardT,info)
          if (info.ne.0) call die('[chem_state get_dxdT] Least squares solver failed')
