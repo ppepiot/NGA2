@@ -330,6 +330,9 @@ module chem_state_class
             this%HoR=sum(Neq*h)*this%T
          endif
 
+         ! Calculate the phase moles
+         this%Nbar=matmul(transpose(this%sys%P),Neq)
+
          ! Re-order species
          do i=1,ns
             this%N(sys%sp_order(i))=Neq(i)
@@ -929,10 +932,6 @@ module chem_state_class
          ! Allocate intermediate arrays
          allocate(rhs(this%sys%nrc))
          allocate(lam(this%sys%nrc))
-         ! Get the species and phase moles
-         this%Nbar=matmul(transpose(this%sys%P),[this%Nd,this%Nu])
-         ! Calculate the contribution of Nd in the residual
-         this%Rd=matmul(transpose(this%sys%P(1:this%sys%nsd,:)),this%Nd)
          ! Calculate the Lagrange multipliers
          call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
          rhs=log(this%Nu)-matmul(this%sys%P(this%sys%nsd+1:this%sys%ns,:),log(this%Nbar))+this%gu
@@ -955,6 +954,8 @@ module chem_state_class
          integer :: isc
          ! Allocate arrays
          allocate(Neq(this%sys%ns))
+         ! Calculate the contribution of Nd in the residual
+         this%Rd=matmul(transpose(this%sys%P(1:this%sys%nsd,:)),this%Nd)
          ! Get the chemical equilibrium state
          call this%get_ceq(Neq)
          ! Reorder the composition
@@ -1071,10 +1072,8 @@ module chem_state_class
          real(WP), dimension(:), allocatable :: hort
          real(WP) :: Tn,Tlo,Thi
          real(WP) :: HoR0,hlo,hhi,Cp_eff
-         real(WP), dimension(:), allocatable :: xold
          ! Allocate arrays
          allocate(hort(this%sys%ns))
-         allocate(xold(this%sys%nrc+this%sys%np))
          ! Initialize
          HoR0=this%HoR
          this%dT=1e5*this%tol_T
@@ -1090,11 +1089,7 @@ module chem_state_class
                call die('[chem_state get_ceq_PH] Temperature solver reached maximum number of iterations')
                exit
             end if
-            ! Update the phase moles
-            this%Nbar=exp(this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np))
             ! Determine equilibrium composition at current temperature
-            call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
-            xold=this%x
             call this%get_ceq_PT(Neq)
             ! Get the effective Cp
             call this%get_Cp_eff(Cp_eff)
@@ -1137,7 +1132,7 @@ module chem_state_class
 
 
       !> Evaluate the effective specific heat
-      !> Cp_eff = (dh/dT)/R at constant constraints and p
+      !> Cp_eff = (dH/dT)/R at constant constraints and p
       subroutine get_Cp_eff(this,Cp_eff)
          class(chem_state), intent(inout) :: this
          real(WP), intent(out) :: Cp_eff
@@ -1205,7 +1200,6 @@ module chem_state_class
          call dgesvd('S','A',this%sys%nsu,this%sys%nrc,Btilde_cp,this%sys%nsu,Sig(1:this%sys%nrc), &
          &           U(1:this%sys%nsu,1:this%sys%nrc),this%sys%nsu,VT(1:this%sys%nrc,1:this%sys%nrc),this%sys%nrc,work(1:lwork),    &
          &           lwork,info)
-         ! call dgesvd('S','A',this%sys%nsu,this%sys%nrc,Btilde_cp,this%sys%nsu,Sig,U,this%sys%nsu,VT,this%sys%nrc,work,lwork,info)
          if (info.ne.0) call die('[chem_state get_dxdT] SVD of B tilde failed')
          ! Get the inverse of Sigma
          call get_Sinv(this%sys%nrc,Sig,Sinv,srlim,n_small)

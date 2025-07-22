@@ -426,24 +426,24 @@ module chem_sys_class
 
          if (ifop<3) return
 
-      contains
-         subroutine check_input()
-            use, intrinsic :: iso_fortran_env, only: output_unit
-            integer :: myerr(5),i
-            myerr=0
-            if (this%ns.lt.1) myerr(1)=1
-            if (this%ne.lt.1) myerr(2)=1
-            if (this%ncs.lt.0.or.this%ncs.gt.this%ns) myerr(3)=1
-            if (this%ng.lt.0) myerr(4)=1
-            if (this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
-            if (maxval(myerr).eq.0) return
-            if (ifop.ge.1) then
-               write(output_unit,'(" >   chem_sys red_con: error in input")')
-               do i=1,5
-                  if (myerr(i).gt.0) write(output_unit,'(" >   chem_sys red_con: error in argument,i5")') i
-               end do
-            endif
-         end subroutine check_input
+         contains
+            subroutine check_input()
+               use, intrinsic :: iso_fortran_env, only: output_unit
+               integer :: myerr(5),i
+               myerr=0
+               if (this%ns.lt.1) myerr(1)=1
+               if (this%ne.lt.1) myerr(2)=1
+               if (this%ncs.lt.0.or.this%ncs.gt.this%ns) myerr(3)=1
+               if (this%ng.lt.0) myerr(4)=1
+               if (this%nc.ne. this%ne+this%ncs+this%ng) myerr(5)=1
+               if (maxval(myerr).eq.0) return
+               if (ifop.ge.1) then
+                  write(output_unit,'(" >   chem_sys red_con: error in input")')
+                  do i=1,5
+                     if (myerr(i).gt.0) write(output_unit,'(" >   chem_sys red_con: error in argument,i5")') i
+                  end do
+               endif
+            end subroutine check_input
       end subroutine red_con
 
 

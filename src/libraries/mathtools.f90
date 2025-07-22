@@ -346,7 +346,7 @@ contains
       integer :: i
       lb1=lbound(x,1); ub1=ubound(x,1)
       lb2=lbound(x,2); ub2=ubound(x,2)
-      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1)) .or.(lb2.ne.lbound(y,2)).or.(ub2.ne.ubound(y,2))) call die('Matrix bounds do not match')
+      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1)).or.(lb2.ne.lbound(y,2)).or.(ub2.ne.ubound(y,2))) call die('Matrix bounds do not match')
       do i=lb1,ub1
          y(i,:)=x(order(i),:)
       end do
