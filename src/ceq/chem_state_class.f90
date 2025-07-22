@@ -152,7 +152,7 @@ module chem_state_class
          real(WP), dimension(sys%ns)  :: N0,N1,h,Neq
          real(WP), dimension(sys%nsu) :: Nu,Nu0,Nm,Nupper,Ng,gu
          real(WP), dimension(sys%nrc) :: cr
-         logical :: fail,diag
+         logical :: fail,diag,use_mmg=.true.
 
          ! Point to chemical system
          this%sys=>sys
@@ -240,95 +240,89 @@ module chem_state_class
          if (nsu.eq.0) then
             Neq=Nd
             if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%thermo,this%T)
-            go to 500
-         endif
-         
-         ! Reduced constraint vector
-         cr(1:nrc) =cmod(nsd+1:nb)
-         cr_norm   =norm2(cr)
+         else
 
-         if (cr_norm.le.0.0_WP) then
-         ! SBP added 4/9/2009
-            if (cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(Nd(1:nsd)).gt.0.0_WP) then
-               !  only determined species
-               Neq=0.0_WP
-               Neq(1:nsd)=Nd(1:nsd)
-               if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%thermo,this%T)
-               go to 500
-            endif
-            ! SBP end of added
-            call die('[chem_sys initialize] All zero composition')
-         endif
+            ! Reduced constraint vector
+            cr(1:nrc) =cmod(nsd+1:nb)
+            cr_norm   =norm2(cr)
 
-         ! Use initial guess N_g if provided
-         if (present(N_g)) then
-            call reorder_rows(N_g,sys%sp_order,N0)
-            ! Guessed undetermined species
-            Nu0(1:nsu)=N0(nsd+1:ns)
-            ! Reduced c.v. based on N_g
-            cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR)
-            cb_norm  =norm2(cb)
-            if (cb_norm.eq.0.0_WP) go to 50
-            res=norm2((cb(1:nrc)/cb_norm-cr/cr_norm))
-            ! Adjust initial guess Nu0,store in Nm
-            if (res.gt.res_tol) then
-               N_low=sum(cr(1:sys%neu))*1e-15
-               call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,iret)
-               ! min_pert failed
-               if (iret.ne.0) then
-                  call die('[chem_state initialize] min_pert failed')
-                  go to 50
+            if (cr_norm.le.0.0_WP) then
+            ! SBP added 4/9/2009
+               if (cr_norm.eq.0.0_WP.and.nsd.gt.0.and.sum(Nd(1:nsd)).gt.0.0_WP) then
+                  !  only determined species
+                  Neq=0.0_WP
+                  Neq(1:nsd)=Nd(1:nsd)
+                  if (cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,sys%thermo,this%T)
                endif
-               Nu0=Nm
+               ! SBP end of added
+               call die('[chem_sys initialize] All zero composition')
             endif
 
-            ! Accept initial guess (Nu0); skip max-min and min_g
-            this%Nd=Nd
-            this%cr=cr
-            go to 100
+            ! Use initial guess N_g if provided
+            if (present(N_g)) then
+               use_mmg=.false.
+               call reorder_rows(N_g,sys%sp_order,N0)
+               ! Guessed undetermined species
+               Nu0(1:nsu)=N0(nsd+1:ns)
+               ! Reduced c.v. based on N_g
+               cb(1:nrc)=matmul(Nu0(1:nsu),sys%BR)
+               cb_norm  =norm2(cb)
+               if (cb_norm.eq.0.0_WP) then
+                  use_mmg=.true.
+               else
+                  res=norm2((cb(1:nrc)/cb_norm-cr/cr_norm))
+                  ! Adjust initial guess Nu0,store in Nm
+                  if (res.gt.res_tol) then
+                     N_low=sum(cr(1:sys%neu))*1e-15
+                     call this%min_pert(nsu,nrc,sys%BR,cr,Nu0,N_low,Nm,iret)
+                     ! min_pert failed
+                     if (iret.ne.0) then
+                        print*,'Warning: min_pert failed. Could not use N_g'
+                        use_mmg=.true.
+                     else
+                        Nu0=Nm
+                     endif
+                  endif
+               end if
+            endif
+
+            ! Use max-min and min_g if needed
+            if (use_mmg) then
+               ! Perturb if necessary
+               call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,Nd,cr,sys%BR,sys%E,sys%diag,sys%eps_el,sys%eps_sp, &
+               &                 sys%pert_tol,sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
+               if (iret.eq.-1) then 
+                  write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
+               elseif(iret.eq.-2) then 
+                  call die('[chem_state initialize] Perturb failed')
+               endif
+               ! Determine min_g composition
+               call this%get_Nming(nsu,nrc,sys%BR,this%cr,gu,Ng,iret)
+               if (iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
+               ! Form initial guess Nu0
+               Nu0=Ng+frac_Nm*(Nm-Ng)
+            else
+               this%Nd=Nd
+               this%cr=cr
+            end if
+
+            ! Re-estimate T0 and re-evaluate gu if required
+            if ((cond.eq.fixed_PH).and.(.not.present(T_g))) then
+               N1(1:nsd)   =this%Nd
+               N1(nsd+1:ns)=Nu0
+               call this%hor2T(ns,N1,this%HoR,sys%thermo,this%T)
+               ! Set gu based on T0
+               call this%get_gort(nsu,this%T,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
+            endif
+
+            ! Set the Gibbs functin and the undetermined species moles
+            this%gu=gu
+            this%Nu=Nu0
+
+            ! Determine required output
+            Neq=[this%Nd,this%Nu]
 
          endif
-
-         50    continue  !  proceed without using initial guess N_g
-
-         ! Perturb if necessary
-         call this%perturb(ns,nsd,nsu,sys%ne,sys%ned,sys%neu,nrc,Nd,cr,sys%BR,sys%E,sys%diag,sys%eps_el,sys%eps_sp, &
-         &                 sys%pert_tol,sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
-
-         if (iret.eq.-1) then 
-            write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
-         elseif(iret.eq.-2) then 
-            call die('[chem_state initialize] Perturb failed')
-         endif
-
-         ! Determine min_g composition
-         call this%get_Nming(nsu,nrc,sys%BR,this%cr,gu,Ng,iret)
-         if (iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
-
-         ! Form initial guess Nu0
-         Nu0=Ng+frac_Nm*(Nm-Ng)
-
-         ! Skip to here if Nu0 based on N_g accepted
-         100 continue
-
-         ! Re-estimate T0 and re-evaluate gu if required
-         if ((cond.eq.fixed_PH).and.(.not.present(T_g))) then
-            N1(1:nsd)   =this%Nd
-            N1(nsd+1:ns)=Nu0
-            call this%hor2T(ns,N1,this%HoR,sys%thermo,this%T)
-            ! Set gu based on T0
-            call this%get_gort(nsu,this%T,p,sys%thermo(nsd+1:ns,:),sys%P(nsd+1:ns,Gphase),gu)
-         endif
-
-         ! Set the Gibbs functin and the undetermined species moles
-         this%gu=gu
-         this%Nu=Nu0
-
-         ! Determine required output
-         Neq=[this%Nd,this%Nu]
-
-         ! Jump to here if there are no undetermined species
-         500	   continue
 
          ! Update the enthalpy
          if (cond.eq.fixed_PT) then
