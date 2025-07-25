@@ -223,7 +223,7 @@ contains
             case ('PT')
                call state%initialize(sys=sys,cond=fixed_PT,p=p,T=T,N=N_init)
             case ('PH')
-               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=[1.0_WP,0.17260218510310191_WP,0.82739781489689534_WP,3.71_WP],T_h=300.0_WP)
+               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=[1.0_WP,1.0_WP,0.0000000014704586659375472_WP,3.71_WP],T_h=390.0_WP)
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select

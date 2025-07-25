@@ -5,7 +5,7 @@ Mechanism file : gri30.yaml
 Equilibrium condition : PH
 
 # Temperature and pressure
-Temperature : 300
+Temperature : 390
 Pressure    : 101325
 
 # Species
