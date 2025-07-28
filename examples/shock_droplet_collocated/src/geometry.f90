@@ -23,24 +23,25 @@ contains
       create_grid: block
          use sgrid_class, only: cartesian
          integer :: i,j,k,nx,ny,nz
-         real(WP) :: Lx,Ly,Lz,dx
+         real(WP) :: Lx,Ly,Lz,X0
          real(WP), dimension(:), allocatable :: x,y,z
+         
          ! Read in grid definition
-         call param_read('Lx',Lx           ); call param_read('nx',nx          ); allocate(x(nx+1)); dx=Lx/real(nx,WP)
-         call param_read('Ly',Ly,default=dx); call param_read('ny',ny,default=1); allocate(y(ny+1)); if (ny.eq.1) Ly=dx
-         call param_read('Lz',Lz,default=dx); call param_read('nz',nz,default=1); allocate(z(nz+1)); if (nz.eq.1) Lz=dx
+         call param_read('Lx',Lx); call param_read('nx',nx); allocate(x(nx+1)); call param_read('X0',X0,default=-0.5_WP*Lx)
+         call param_read('Ly',Ly); call param_read('ny',ny); allocate(y(ny+1))
+         call param_read('Lz',Lz); call param_read('nz',nz); allocate(z(nz+1))
+         
+         ! Handle 2D case
+         if (nz.eq.1) Lz=Lx/real(nx,WP)
+         
          ! Create simple rectilinear grid
-         do i=1,nx+1
-            x(i)=real(i-1,WP)/real(nx,WP)*Lx-0.5_WP*Lx
-         end do
-         do j=1,ny+1
-            y(j)=real(j-1,WP)/real(ny,WP)*Ly-0.5_WP*Ly
-         end do
-         do k=1,nz+1
-            z(k)=real(k-1,WP)/real(nz,WP)*Lz-0.5_WP*Lz
-         end do
+         do i=1,nx+1; x(i)=real(i-1,WP)/real(nx,WP)*Lx+X0       ; end do
+         do j=1,ny+1; y(j)=real(j-1,WP)/real(ny,WP)*Ly-0.5_WP*Ly; end do
+         do k=1,nz+1; z(k)=real(k-1,WP)/real(nz,WP)*Lz-0.5_WP*Lz; end do
+         
          ! General serial grid object
-         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.true.,zper=.true.,name='staticshock')
+         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.true.,zper=.true.,name='ShockDrop')
+         
       end block create_grid
       
       ! Create a config from that grid on our entire group
