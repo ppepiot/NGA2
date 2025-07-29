@@ -33,7 +33,7 @@ Max timestep size : 0.7
 Max cfl number    : 0.9
 Sub-iterations    : 2
 Scalar time step  : 0.07
-Max time          : 80
+Max time          : 7
 
 # Evaporation
 Max pseudo timestep size : 2e-2
@@ -47,4 +47,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 10
+Ensight output period : 0.7

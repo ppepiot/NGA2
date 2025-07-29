@@ -1131,7 +1131,7 @@ module chem_state_class
       end subroutine get_ceq_PH
 
 
-      !> Evaluate the effective specific heat
+      !> Evaluate the effective heat capacity (extensive)
       !> Cp_eff = (dH/dT)/R at constant constraints and p
       subroutine get_Cp_eff(this,Cp_eff)
          class(chem_state), intent(inout) :: this
