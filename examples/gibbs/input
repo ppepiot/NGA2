@@ -2,15 +2,15 @@
 Mechanism file : gri30.yaml
 
 # Equilibrium condition (choose either PH or PT)
-Equilibrium condition : PH
+Equilibrium condition : PT
 
 # Temperature and pressure
-Temperature : 390
+Temperature : 373.15
 Pressure    : 101325
 
 # Species
-Species       : H2O(L) H2O O2 N2
-Initial moles : 0.4    0.6   1  3.71
+Species             : H2O(L) H2O O2 N2
+Initial moles       : 0      1   1  3.71
 Constrained species : O2 N2
 
 # Newton iterations

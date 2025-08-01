@@ -136,15 +136,15 @@ contains
       this%first_bc=>NULL()
       
       ! Allocate variables
-      allocate(this%SC    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%SC        =0.0_WP
-      allocate(this%SCold (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%SCold     =0.0_WP
-      allocate(this%diff  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%diff      =0.0_WP
-      allocate(this%PVF   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));            this%PVF       =0.0_WP
-      allocate(this%PVFold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));            this%PVFold    =0.0_WP
-      allocate(this%face_apt_x(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));        this%face_apt_x=0.0_WP
-      allocate(this%face_apt_y(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));        this%face_apt_y=0.0_WP
-      allocate(this%face_apt_z(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));        this%face_apt_z=0.0_WP
-      allocate(this%Prho  (0:1));                                                                                                            this%Prho      =0.0_WP
+      allocate(this%SC    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%SC        =0.0_WP
+      allocate(this%SCold (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%SCold     =0.0_WP
+      allocate(this%diff  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%diff      =0.0_WP
+      allocate(this%PVF   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase));     this%PVF       =0.0_WP
+      allocate(this%PVFold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase));     this%PVFold    =0.0_WP
+      allocate(this%face_apt_x(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_x=0.0_WP
+      allocate(this%face_apt_y(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_y=0.0_WP
+      allocate(this%face_apt_z(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_z=0.0_WP
+      allocate(this%Prho  (Lphase:Gphase));                                                                                                     this%Prho      =0.0_WP
       
       ! Check current overlap
 		if (this%cfg%no.lt.1) call die('[tpscalar constructor] Scalar transport scheme requires larger overlap')

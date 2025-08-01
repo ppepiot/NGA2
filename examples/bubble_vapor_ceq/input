@@ -1,14 +1,18 @@
 # Parallelization
-Partition : 2 4 1
+Partition : 2 2 2
 
 # Mesh definition
-L : 0.012
-n : 256
+L : 12 ! 0.012
+n : 128
 
 # Case parameters
 Bubble center         : 0 0 0
 Far-field temperature : 374.13865837667817
-Initial time          : 0.15216
+Pressure              : 101325
+Initial time          : 150000 ! 0.15216
+
+# Mechanism
+Mechanism file : gri30.yaml
 
 # Fluid properties (water)
 Gravity                       : 0 0 0
@@ -24,12 +28,25 @@ Gas specific heat capacity    : 2034
 Saturation temperature        : 373.15
 Latent heat                   : 2.256e6
 
+# Species
+Species             : H2O(L) H2O O2 N2
+Initial moles       : 0      1   1  3.71
+Constrained species : O2 N2
+
+# Newton iterations
+Newton tolerance      : 1e-7
+Newton max iterations : 30
+
+# Temperature iterations
+T tolerance      : 1e-7
+T max iterations : 30
+
 # Time integration
-Max timestep size : 8e-5
+Max timestep size : 2.4e-4
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 8e-6
-Max time          : 8e-3
+Scalar time step  : 2.4e-5
+Max time          : 0
 
 # Evaporation
 Max pseudo timestep size : 4e-5
@@ -43,4 +60,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 8e-4
+Ensight output period : 2.4e-4

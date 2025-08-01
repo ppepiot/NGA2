@@ -2,44 +2,40 @@
 Partition : 2 2 2
 
 # Mesh definition
-Lx : 3.7
-Ly : 3.7
-Lz : 3.7
-nx : 128
-ny : 128
-nz : 128
+L : 0.012
+n : 128
 
 # Case parameters
 Bubble center         : 0 0 0
-Far-field temperature : 3
-Initial time          : 20
+Far-field temperature : 374.13865837667817
+Initial time          : 0.15216
 
-# Fluid properties
+# Fluid properties (water)
 Gravity                       : 0 0 0
-Liquid dynamic viscosity      : 7e-3
-Gas dynamic viscosity         : 7e-4
-Liquid density                : 2.5
-Gas density                   : 0.25
-Surface tension coefficient   : 0
-Liquid thermal conductivity   : 0.07
-Gas thermal conductivity      : 0.007
-Liquid specific heat capacity : 2.5
-Gas specific heat capacity    : 1
-Saturation temperature        : 1
-Latent heat                   : 100
+Liquid dynamic viscosity      : 2.81e-4
+Gas dynamic viscosity         : 1.26e-6
+Liquid density                : 958
+Gas density                   : 0.59
+Surface tension coefficient   : 0.001
+Liquid thermal conductivity   : 0.6
+Gas thermal conductivity      : 0.026
+Liquid specific heat capacity : 4216
+Gas specific heat capacity    : 2034
+Saturation temperature        : 373.15
+Latent heat                   : 2.256e6
 
 # Time integration
-Max timestep size : 0.7
+Max timestep size : 2.4e-4
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 0.07
-Max time          : 7
+Scalar time step  : 2.4e-5
+Max time          : 2.4e-2
 
 # Evaporation
-Max pseudo timestep size : 2e-2
+Max pseudo timestep size : 4e-5
 Max pseudo cfl number    : 0.9
 Max pseudo time steps    : 10
-Mass flux tolerence      : 1e-22
+Mass flux tolerence      : 1e-15
 
 # Pressure solver
 Pressure tolerance    : 1e-6
@@ -47,4 +43,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 0.7
+Ensight output period : 2.4e-3

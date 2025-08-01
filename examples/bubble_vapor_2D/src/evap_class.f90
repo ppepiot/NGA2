@@ -218,9 +218,9 @@ contains
          end do
       end do
       ! Check dimensions
-      do dir=1,3
-         if (this%nCell(dir).eq.1) this%normal(:,:,:,dir)=0.0_WP
-      end do
+      ! do dir=1,3
+      !    if (this%nCell(dir).eq.1) this%normal(:,:,:,dir)=0.0_WP
+      ! end do
    end subroutine get_normal
 
 
@@ -255,11 +255,11 @@ contains
                   this%normal(i,j,k,dir)=0.0_WP
                   ! Loop over the stencils
                   do stz=-1,1
-                     if (.not.(k+stz.ge.this%cfg%kmin.and.k+stz.le.this%cfg%kmax)) cycle
+                     if (k+stz.lt.this%cfg%kmin.or.k+stz.gt.this%cfg%kmax) cycle
                      do sty=-1,1
-                        if (.not.(j+sty.ge.this%cfg%jmin.and.j+sty.le.this%cfg%jmax)) cycle
+                        if (j+sty.lt.this%cfg%jmin.or.j+sty.gt.this%cfg%jmax) cycle
                         do stx=-1,1
-                           if (.not.(i+stx.ge.this%cfg%imin.and.i+stx.le.this%cfg%imax)) cycle
+                           if (i+stx.lt.this%cfg%imin.and.i+stx.gt.this%cfg%imax) cycle
                            vol=vol+this%cfg%vol(i+stx,j+sty,k+stz)
                            this%normal(i,j,k,dir)=this%normal(i,j,k,dir)+this%cfg%vol(i+stx,j+sty,k+stz)*normal_tmp(i+stx,j+sty,k+stz,dir)
                         end do
@@ -276,68 +276,6 @@ contains
       ! Deallocate the normal copy
       deallocate(normal_tmp)
    end subroutine extend_normal
-
-
-   ! !> Extend the interface normal for a smoother transition to zero
-   ! subroutine extend_normal(this)
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    integer  :: n,dir,i,j,k,index,index_pure
-   !    integer  :: stx,sty,stz
-   !    real(WP) :: vol
-   !    real(WP), dimension(:,:,:,:), allocatable :: normal_tmp
-   !    ! Allocate memory for the temporary field
-   !    allocate(normal_tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:3))
-   !    ! Loop over the extension levels
-   !    do n=1,ext_lvl
-   !       ! Take a copy of the normal
-   !       normal_tmp=this%normal
-   !          ! Loop over the pure cells within the band
-   !          do index=1,sum(this%vf%band_count(1:ext_lvl))
-   !             ! Offset for the interfacial cells' index
-   !             index_pure=this%vf%band_count(0)+index
-   !             ! Get the cell indices
-   !             i=this%vf%band_map(1,index_pure)
-   !             j=this%vf%band_map(2,index_pure)
-   !             k=this%vf%band_map(3,index_pure)
-   !             ! Initialize with zero
-   !             vol=0.0_WP
-   !             this%normal(i,j,k,3)=0.0_WP
-   !             ! Loop over the stencils
-   !             do stz=-1,1
-   !                if (.not.(k+stz.ge.this%cfg%kmin.and.k+stz.le.this%cfg%kmax)) cycle
-   !                   vol=vol+this%cfg%vol(i,j,k+stz)
-   !                   this%normal(i,j,k,3)=this%normal(i,j,k,3)+this%cfg%vol(i,j,k+stz)*normal_tmp(i,j,k+stz,3)
-   !             end do
-   !             ! Scale by volume
-   !             if (vol.gt.0.0_WP) this%normal(i,j,k,3)=this%normal(i,j,k,3)/vol
-   !             ! Initialize with zero
-   !             vol=0.0_WP
-   !             this%normal(i,j,k,2)=0.0_WP
-   !             do sty=-1,1
-   !                if (.not.(j+sty.ge.this%cfg%jmin.and.j+sty.le.this%cfg%jmax)) cycle
-   !                   vol=vol+this%cfg%vol(i,j+sty,k)
-   !                   this%normal(i,j,k,2)=this%normal(i,j,k,2)+this%cfg%vol(i,j+sty,k)*normal_tmp(i,j+sty,k,2)
-   !             end do
-   !             ! Scale by volume
-   !             if (vol.gt.0.0_WP) this%normal(i,j,k,2)=this%normal(i,j,k,2)/vol
-   !             ! Initialize with zero
-   !             vol=0.0_WP
-   !             this%normal(i,j,k,1)=0.0_WP
-   !             do stx=-1,1
-   !                if (.not.(i+stx.ge.this%cfg%imin.and.i+stx.le.this%cfg%imax)) cycle
-   !                vol=vol+this%cfg%vol(i+stx,j,k)
-   !                this%normal(i,j,k,1)=this%normal(i,j,k,1)+this%cfg%vol(i+stx,j,k)*normal_tmp(i+stx,j,k,1)
-   !             end do
-   !             ! Scale by volume
-   !             if (vol.gt.0.0_WP) this%normal(i,j,k,1)=this%normal(i,j,k,1)/vol
-   !          end do
-   !          ! Sync
-   !          call this%cfg%sync(this%normal(:,:,:,dir))
-   !       end do
-   !       ! Deallocate the normal copy
-   !       deallocate(normal_tmp)
-   ! end subroutine extend_normal
 
 
    !> Calculate the pseudo velocity used to shift the evaporation mass flux
@@ -538,163 +476,7 @@ contains
       ! Deallocate mflux residuals
       deallocate(resmfluxL,resmfluxG)
 
-      ! debug: block
-      !    real(WP) :: mg,ml
-      !    mg=0.0_WP
-      !    ml=0.0_WP
-      !    do k=this%cfg%kmin,this%cfg%kmax
-      !       do j=this%cfg%jmin,this%cfg%jmax
-      !          do i=this%cfg%imino,this%cfg%imin-1
-      !             if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
-      !             if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
-      !          end do
-      !       end do
-      !    end do
-      !    do k=this%cfg%kmin,this%cfg%kmax
-      !       do j=this%cfg%jmin,this%cfg%jmax
-      !          do i=this%cfg%imax+1,this%cfg%imaxo
-      !             if (abs(this%mfluxLG(i,j,k,Gphase)).gt.abs(mg)) mg=this%mfluxLG(i,j,k,Gphase)
-      !             if (abs(this%mfluxLG(i,j,k,Lphase)).gt.abs(ml)) ml=this%mfluxLG(i,j,k,Lphase)
-      !          end do
-      !       end do
-      !    end do
-      !    print*,'mfluxL',ml
-      !    print*,'mfluxG',mg
-      ! end block debug
-
    end subroutine shift_mflux
-
-
-   !> Shift mflux away from the interface (Boyd and Ling)
-   ! subroutine shift_mflux(this)
-   !    use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
-   !    use parallel,  only: MPI_REAL_WP
-   !    implicit none
-   !    class(evap), intent(inout) :: this
-   !    real(WP), dimension(:,:,:), allocatable :: resmfluxL,resmfluxG
-   !    integer  :: i,j,k,ihat,jhat,khat,index,ierr
-   !    real(WP) :: my_mflux_int,mflux_err,w
-   !    real(WP), dimension(:,:,:), allocatable :: wG,wL
-   !    integer :: stxm,stym,stzm
-   !    integer :: stxp,styp,stzp
-   !    integer :: stx,sty,stz
-   !    real(WP), dimension(3) :: d
-      
-   !    ! Check the dimensions
-   !    if (this%nCell(1).gt.1) then
-   !       stxm=-extp_stc; stxp=+extp_stc
-   !    else
-   !       stxm= 0; stxp= 0
-   !    end if
-   !    if (this%nCell(2).gt.1) then
-   !       stym=-extp_stc; styp=+extp_stc
-   !    else
-   !       stym= 0; styp= 0
-   !    end if
-   !    if (this%nCell(3).gt.1) then
-   !       stzm=-extp_stc; stzp=+extp_stc
-   !    else
-   !       stzm= 0; stzp= 0
-   !    end if
-
-   !    ! Allocate the weight matrix
-   !    allocate(wG(stxm:stxp,stym:styp,stzm:stzp))
-   !    allocate(wL(stxm:stxp,stym:styp,stzm:stzp))
-
-   !    ! Get the interface normal
-   !    call this%get_normal()
-
-   !    ! Initialize one sided mfluxes
-   !    this%mfluxLG=0.0_WP
-
-   !    ! Loop over the interfacial cells
-   !    do index=1,this%vf%band_count(0)
-   !       ! Get the interfacial cell indices
-   !       ihat=this%vf%band_map(1,index)
-   !       jhat=this%vf%band_map(2,index)
-   !       khat=this%vf%band_map(3,index)
-   !       ! Initialize weights
-   !       wG=0.0_WP
-   !       wL=0.0_WP
-   !       ! Loop over the stencil
-   !       do stz=stzm,stzp
-   !          k=khat+stz
-   !          do sty=stym,styp
-   !             j=jhat+sty
-   !             do stx=stxm,stxp
-   !                i=ihat+stx
-   !                ! Calculate the weight
-   !                d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
-   !                w=abs(sum(d*this%normal(ihat,jhat,khat,:)))/norm2(d)
-   !                ! Assign the weight to the pure cells
-   !                if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                   wG(stx,sty,stz)=w
-   !                else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                   wL(stx,sty,stz)=w
-   !                end if
-   !             end do
-   !          end do
-   !       end do
-   !       ! Normalize the weights
-   !       wG=wG/sum(wG)
-   !       wL=wL/sum(wL)
-   !       ! Loop over the stencil
-   !       do stz=stzm,stzp
-   !          k=khat+stz
-   !          do sty=stym,styp
-   !             j=jhat+sty
-   !             do stx=stxm,stxp
-   !                i=ihat+stx
-   !                ! Update the mflux of the pure cells
-   !                if (this%vf%VF(i,j,k).eq.0.0_WP) then
-   !                   this%mfluxLG(i,j,k,Gphase)=this%mfluxLG(i,j,k,Gphase)+wG(stx,sty,stz)*this%mflux(ihat,jhat,khat)
-   !                else if (this%vf%VF(i,j,k).eq.1.0_WP) then
-   !                   this%mfluxLG(i,j,k,Lphase)=this%mfluxLG(i,j,k,Lphase)-wL(stx,sty,stz)*this%mflux(ihat,jhat,khat)
-   !                end if
-   !             end do
-   !          end do
-   !       end do
-   !    end do
-
-   !    ! Sync the liquid and gas mfluxes
-   !    call this%cfg%syncsum(this%mfluxLG(:,:,:,Gphase))
-   !    call this%cfg%syncsum(this%mfluxLG(:,:,:,Lphase))
-   !    call this%cfg%sync(this%mfluxLG(:,:,:,Gphase))
-   !    call this%cfg%sync(this%mfluxLG(:,:,:,Lphase))
-
-   !    ! Calculate the integral of the residual error of mfluxL
-   !    my_mflux_int=0.0_WP
-   !    do k=this%cfg%kmin_,this%cfg%kmax_
-   !       do j=this%cfg%jmin_,this%cfg%jmax_
-   !          do i=this%cfg%imin_,this%cfg%imax_
-   !             if (this%vf%VF(i,j,k).lt.VFhi) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*this%vf%VF(i,j,k)*abs(this%mfluxLG(i,j,k,Lphase))
-   !          end do
-   !       end do
-   !    end do
-   !    call MPI_ALLREDUCE(my_mflux_int,this%mfluxL_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
-      
-   !    ! Calculate the integral of the residual error of mfluxG
-   !    my_mflux_int=0.0_WP
-   !    do k=this%cfg%kmin_,this%cfg%kmax_
-   !       do j=this%cfg%jmin_,this%cfg%jmax_
-   !          do i=this%cfg%imin_,this%cfg%imax_
-   !             if (this%vf%VF(i,j,k).gt.VFlo) my_mflux_int=my_mflux_int+this%cfg%vol(i,j,k)*this%cfg%VF(i,j,k)*(1.0_WP-this%vf%VF(i,j,k))*abs(this%mfluxLG(i,j,k,Gphase))
-   !          end do
-   !       end do
-   !    end do
-   !    call MPI_ALLREDUCE(my_mflux_int,this%mfluxG_err,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
-
-   !    ! Integral of mflux
-   !    call this%cfg%integrate(this%mflux,this%mflux_int)
-   !    call this%cfg%integrate(this%mfluxLG(:,:,:,Lphase),this%mfluxL_int)
-   !    call this%cfg%integrate(this%mfluxLG(:,:,:,Gphase),this%mfluxG_int)
-   !    this%mfluxL_int_err=abs(abs(this%mfluxL_int)-this%mflux_int)
-   !    this%mfluxG_int_err=abs(abs(this%mfluxG_int)-this%mflux_int)
-
-   !    ! Deallocate
-   !    deallocate(wG,wL)
-
-   ! end subroutine shift_mflux
 
 
    !> Extrapolate a scalar field from pure to interfacial cells

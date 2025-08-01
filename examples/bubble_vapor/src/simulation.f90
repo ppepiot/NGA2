@@ -45,10 +45,12 @@ module simulation
    !> Problem definition
    real(WP) :: R0,R,R_ext,V_b
    real(WP), dimension(3) :: center
-   integer  :: iTl,iTg,iYv
+   integer  :: iTl,iTg
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
    real(WP) :: T_inf,beta,f_b_cnst,t0
-   real(WP) :: mdotdp,prhs_int
+   ! Debug
+   real(WP) :: prhs_int
+   real(WP) :: mfr_err
    
 contains
 
@@ -197,11 +199,27 @@ contains
 
    !> Function that governs beta
    function f_beta(b)
-      use mathtools, only: Pi
       real(WP), intent(in) :: b
       real(WP) :: f_beta
       f_beta=2.0_WP*b**2*Simpson(integrand,b,0.0_WP,1.0_WP,20)-f_b_cnst
-   end function
+   end function f_beta
+
+
+   !> Function that returns the analytical bubble radius
+   function get_Rext(tim)
+      real(WP), intent(in) :: tim
+      real(WP) :: get_Rext
+      get_Rext=2.0_WP*beta*sqrt(alpha_l*tim)
+   end function get_Rext
+
+
+   !> Function that returns the numerical bubble radius
+   function get_R()
+      use mathtools, only: Pi
+      real(WP) :: get_R
+      call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
+      get_R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
+   end function get_R
 
    
    !> Initialization of problem solver
@@ -270,7 +288,7 @@ contains
             itmax=200
             tol=1e-9
             betaL=0.0_WP
-            betaR=1.0_WP
+            betaR=5.0_WP
             do it=1,itmax
                beta=0.5_WP*(betaL+betaR)
                fM=f_beta(beta)
@@ -280,25 +298,19 @@ contains
                   exit
                end if
                fL=f_beta(betaL)
-               if (fL.lt.tol) then
-                  beta=betaL
-                  convergence=.true.
-                  exit
-               end if
                fR=f_beta(betaR)
                if (fL*fM.lt.0.0_WP) then
                   betaR=beta
-                else if
+               else
                   betaL=beta
-                else
-                  print*,'Bad intial guess'
-                  exit
-                endif
+               endif
             end do
             print*,'Convergence = ',convergence
             print*,'beta =',beta
             print*,'Absolute error =',err
             print*,'Bi-section iterations =',it
+            ! Debug
+            print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -324,7 +336,7 @@ contains
          call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
          call param_read('Bubble center',center)
-         R0=2.0_WP*beta*sqrt(alpha_l*t0)
+         R0=get_Rext(t0)
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
             do j=vf%cfg%jmino_,vf%cfg%jmaxo_
                do i=vf%cfg%imino_,vf%cfg%imaxo_
@@ -352,7 +364,7 @@ contains
             end do
          end do
          ! Apply boundary conditions
-         ! call vf%apply_bcond(time%t,time%dt)
+         call vf%apply_bcond(time%t,time%dt)
          ! Update the band
          call vf%update_band()
          ! Perform interface reconstruction from VOF field
@@ -360,62 +372,62 @@ contains
          ! Set interface planes at the boundaries
          call vf%set_full_bcond()
          ! Apply symmetry condition
-         symmetry_irl: block
-            use irl_fortran_interface, only: getPlane,new,construct_2pt,RectCub_type,&
-            &                                setNumberOfPlanes,setPlane,matchVolumeFraction
-            real(WP), dimension(1:4) :: plane
-            type(RectCub_type) :: cell
-            integer :: ii,jj,kk
-            call new(cell)
-            if (vf%cfg%iproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmaxo_
-                  do j=vf%cfg%jmino_,vf%cfg%jmaxo_
-                     do i=vf%cfg%imino_,vf%cfg%imin_-1
-                        ii=(vf%cfg%imin_-i)+vf%cfg%imin_-1
-                        plane=getPlane(vf%liquid_gas_interface(ii,j,k),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([-plane(1),plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[-plane(1),plane(2),plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-            if (vf%cfg%jproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmaxo_
-                  do j=vf%cfg%jmino_,vf%cfg%jmin_-1
-                     jj=(vf%cfg%jmin_-j)+vf%cfg%jmin_-1
-                     do i=vf%cfg%imino_,vf%cfg%imaxo_
-                        plane=getPlane(vf%liquid_gas_interface(i,jj,k),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([plane(1),-plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),-plane(2),plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-            if (vf%cfg%kproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmin_-1
-                  kk=(vf%cfg%kmin_-k)+vf%cfg%kmin_-1
-                  do j=vf%cfg%jmino_,vf%cfg%jmaxo_
-                     do i=vf%cfg%imino_,vf%cfg%imaxo_
-                        plane=getPlane(vf%liquid_gas_interface(i,j,kk),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([plane(1),plane(2),-plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),plane(2),-plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-         end block symmetry_irl
+         ! symmetry_irl: block
+         !    use irl_fortran_interface, only: getPlane,new,construct_2pt,RectCub_type,&
+         !    &                                setNumberOfPlanes,setPlane,matchVolumeFraction
+         !    real(WP), dimension(1:4) :: plane
+         !    type(RectCub_type) :: cell
+         !    integer :: ii,jj,kk
+         !    call new(cell)
+         !    if (vf%cfg%iproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmaxo_
+         !          do j=vf%cfg%jmino_,vf%cfg%jmaxo_
+         !             do i=vf%cfg%imino_,vf%cfg%imin_-1
+         !                ii=(vf%cfg%imin_-i)+vf%cfg%imin_-1
+         !                plane=getPlane(vf%liquid_gas_interface(ii,j,k),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([-plane(1),plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[-plane(1),plane(2),plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         !    if (vf%cfg%jproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmaxo_
+         !          do j=vf%cfg%jmino_,vf%cfg%jmin_-1
+         !             jj=(vf%cfg%jmin_-j)+vf%cfg%jmin_-1
+         !             do i=vf%cfg%imino_,vf%cfg%imaxo_
+         !                plane=getPlane(vf%liquid_gas_interface(i,jj,k),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([plane(1),-plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),-plane(2),plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         !    if (vf%cfg%kproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmin_-1
+         !          kk=(vf%cfg%kmin_-k)+vf%cfg%kmin_-1
+         !          do j=vf%cfg%jmino_,vf%cfg%jmaxo_
+         !             do i=vf%cfg%imino_,vf%cfg%imaxo_
+         !                plane=getPlane(vf%liquid_gas_interface(i,j,kk),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([plane(1),plane(2),-plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),plane(2),-plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         ! end block symmetry_irl
          ! Create discontinuous polygon mesh from IRL interface
          call vf%polygonalize_interface()
          ! Calculate distance from polygons
@@ -427,13 +439,13 @@ contains
          ! Reset moments to guarantee compatibility with interface reconstruction
          call vf%reset_volume_moments()
       end block create_and_initialize_vof
-      
+
 
       ! Create a two-phase flow solver without bconds
       create_and_initialize_flow_solver: block
-         use hypre_str_class, only: pcg_pfmg2
+         use hypre_str_class, only: gmres_pfmg2
          use mathtools,       only: Pi
-         use tpns_class,      only: clipped_neumann,slip,bcond
+         use tpns_class,      only: clipped_neumann,bcond
          type(bcond), pointer :: mybc
          ! Create flow solver
          fs=tpns(cfg=cfg,name='Two-phase NS')
@@ -449,14 +461,14 @@ contains
          ! Assign acceleration of gravity
          call param_read('Gravity',fs%gravity)
          ! Boundary conditions
-         call fs%add_bcond(name='xm',type=slip           ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
-         call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true. ,locator=xp_locator)
-         call fs%add_bcond(name='ym',type=slip           ,face='y',dir=-1,canCorrect=.false.,locator=ym_locator)
-         call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true. ,locator=yp_locator)
-         call fs%add_bcond(name='zm',type=slip           ,face='z',dir=-1,canCorrect=.false.,locator=zm_locator)
-         call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true. ,locator=zp_locator)
+         call fs%add_bcond(name='xm',type=clipped_neumann,face='x',dir=-1,canCorrect=.true.,locator=xm_locator)
+         call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
+         call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
+         call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+         call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
+         call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
-         ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
+         ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
          call param_read('Pressure iteration',ps%maxit)
          call param_read('Pressure tolerance',ps%rcvg)
          call param_read('Max coarsening levels',ps%maxlevel)
@@ -480,7 +492,7 @@ contains
          use tpscalar_class,  only: bcond,neumann,dirichlet
          type(bcond), pointer :: mybc
          real(WP) :: radius
-         integer  :: i,j,k,n
+         integer  :: i,j,k
          ! Create scalar solver
          call sc%initialize(cfg=cfg,nscalar=2,name='tpscalar')
          ! Boundary conditinos
@@ -512,43 +524,6 @@ contains
             sc%SC(:,:,:,iTl)=T_sat
             sc%SC(:,:,:,iTg)=T_sat
          end where
-         ! Apply boundary conditions
-         ! call sc%get_bcond('xp',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
-         ! call sc%get_bcond('yp',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
-         ! call sc%get_bcond('zp',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
-         ! call sc%get_bcond('xm',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
-         ! call sc%get_bcond('ym',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
-         ! call sc%get_bcond('zm',mybc)
-         ! do n=1,mybc%itr%no_
-         !    i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !    sc%SC(i,j,k,iTl)=T_inf
-         !    sc%SC(i,j,k,iTg)=0
-         ! end do
          call sc%apply_bcond(time%t,time%dt)
          ! Initialize the phasic density and VOF
          sc%Prho(Lphase)=fs%rho_l
@@ -562,8 +537,14 @@ contains
 
       ! Create and initialize an evp object
       create_evp: block
-         use evap_class, only: symmetry
-         integer :: index,index_pure,i,j,k
+         ! Debug
+         use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
+         use parallel,  only: MPI_REAL_WP
+         ! use evap_class, only: symmetry
+         integer :: i,j,k
+         ! Debug
+         real(WP) :: my_mdotdp_max,mdotdp_max
+         integer :: ierr
          ! Create the object
          call evp%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     evp%mflux_tol)
@@ -572,9 +553,9 @@ contains
          call param_read('Max pseudo time steps',   evp%pseudo_time%nmax)
          evp%pseudo_time%dt=evp%pseudo_time%dtmax
          ! Boundary conditions
-         call evp%add_bcond(name='xm',type=symmetry,face='x',dir=-1,locator=xm_locator_sc)
-         call evp%add_bcond(name='ym',type=symmetry,face='y',dir=-1,locator=ym_locator_sc)
-         call evp%add_bcond(name='zm',type=symmetry,face='z',dir=-1,locator=zm_locator_sc)
+         ! call evp%add_bcond(name='xm',type=symmetry,face='x',dir=-1,locator=xm_locator_sc)
+         ! call evp%add_bcond(name='ym',type=symmetry,face='y',dir=-1,locator=ym_locator_sc)
+         ! call evp%add_bcond(name='zm',type=symmetry,face='z',dir=-1,locator=zm_locator_sc)
          ! Get densities from the flow solver
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
@@ -598,14 +579,16 @@ contains
          call evp%init_mfluxLG()
          ! Get the interface normal
          call evp%get_normal()
+         ! Debug
+         my_mdotdp_max=maxval(evp%mdotdp)
+         call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
+         if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
       end block create_evp
 
 
       ! Initialize bubble radius
-      call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-      V_b=8.0_WP*V_b
-      R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
-      R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
+      R=get_R()
+      R_ext=get_Rext(time%t+t0)
 
 
       ! Create surfmesh object for interface polygon output
@@ -673,6 +656,11 @@ contains
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
          call mfile%add_column(prhs_int,'prhs_int')
+         ! Debug
+         call fs%get_mfr()
+         call evp%cfg%integrate(evp%div_src,mfr_err)
+         mfr_err=abs(mfr_err-sum(fs%mfr))
+         call mfile%add_column(mfr_err,'mfr_err')
          call mfile%write()
          ! Create CFL monitor
          cflfile=monitor(fs%cfg%amRoot,'cfl')
@@ -758,62 +746,62 @@ contains
          call vf%apply_bcond(time%t,time%dt)
 
          ! Apply symmetry condition
-         symmetry_irl: block
-            use irl_fortran_interface, only: getPlane,new,construct_2pt,RectCub_type,&
-            &                                setNumberOfPlanes,setPlane,matchVolumeFraction
-            real(WP), dimension(1:4) :: plane
-            type(RectCub_type) :: cell
-            integer :: ii,jj,kk
-            call new(cell)
-            if (vf%cfg%iproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmaxo_
-                  do j=vf%cfg%jmino_,vf%cfg%jmaxo_
-                     do i=vf%cfg%imino_,vf%cfg%imin_-1
-                        ii=(vf%cfg%imin_-i)+vf%cfg%imin_-1
-                        plane=getPlane(vf%liquid_gas_interface(ii,j,k),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([-plane(1),plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[-plane(1),plane(2),plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-            if (vf%cfg%jproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmaxo_
-                  do j=vf%cfg%jmino_,vf%cfg%jmin_-1
-                     jj=(vf%cfg%jmin_-j)+vf%cfg%jmin_-1
-                     do i=vf%cfg%imino_,vf%cfg%imaxo_
-                        plane=getPlane(vf%liquid_gas_interface(i,jj,k),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([plane(1),-plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),-plane(2),plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-            if (vf%cfg%kproc.eq.1) then
-               do k=vf%cfg%kmino_,vf%cfg%kmin_-1
-                  kk=(vf%cfg%kmin_-k)+vf%cfg%kmin_-1
-                  do j=vf%cfg%jmino_,vf%cfg%jmaxo_
-                     do i=vf%cfg%imino_,vf%cfg%imaxo_
-                        plane=getPlane(vf%liquid_gas_interface(i,j,kk),0)
-                        call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
-                        &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
-                        plane(4)=dot_product([plane(1),plane(2),-plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
-                        call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
-                        call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),plane(2),-plane(3)],plane(4))
-                        call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
-                     end do
-                  end do
-               end do
-            end if
-         end block symmetry_irl
+         ! symmetry_irl: block
+         !    use irl_fortran_interface, only: getPlane,new,construct_2pt,RectCub_type,&
+         !    &                                setNumberOfPlanes,setPlane,matchVolumeFraction
+         !    real(WP), dimension(1:4) :: plane
+         !    type(RectCub_type) :: cell
+         !    integer :: ii,jj,kk
+         !    call new(cell)
+         !    if (vf%cfg%iproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmaxo_
+         !          do j=vf%cfg%jmino_,vf%cfg%jmaxo_
+         !             do i=vf%cfg%imino_,vf%cfg%imin_-1
+         !                ii=(vf%cfg%imin_-i)+vf%cfg%imin_-1
+         !                plane=getPlane(vf%liquid_gas_interface(ii,j,k),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([-plane(1),plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[-plane(1),plane(2),plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         !    if (vf%cfg%jproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmaxo_
+         !          do j=vf%cfg%jmino_,vf%cfg%jmin_-1
+         !             jj=(vf%cfg%jmin_-j)+vf%cfg%jmin_-1
+         !             do i=vf%cfg%imino_,vf%cfg%imaxo_
+         !                plane=getPlane(vf%liquid_gas_interface(i,jj,k),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([plane(1),-plane(2),plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),-plane(2),plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         !    if (vf%cfg%kproc.eq.1) then
+         !       do k=vf%cfg%kmino_,vf%cfg%kmin_-1
+         !          kk=(vf%cfg%kmin_-k)+vf%cfg%kmin_-1
+         !          do j=vf%cfg%jmino_,vf%cfg%jmaxo_
+         !             do i=vf%cfg%imino_,vf%cfg%imaxo_
+         !                plane=getPlane(vf%liquid_gas_interface(i,j,kk),0)
+         !                call construct_2pt(cell,[vf%cfg%x(i  ),vf%cfg%y(j  ),vf%cfg%z(k  )],&
+         !                &                       [vf%cfg%x(i+1),vf%cfg%y(j+1),vf%cfg%z(k+1)])
+         !                plane(4)=dot_product([plane(1),plane(2),-plane(3)],[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)])
+         !                call setNumberOfPlanes(vf%liquid_gas_interface(i,j,k),1)
+         !                call setPlane(vf%liquid_gas_interface(i,j,k),0,[plane(1),plane(2),-plane(3)],plane(4))
+         !                call matchVolumeFraction(cell,vf%VF(i,j,k),vf%liquid_gas_interface(i,j,k))
+         !             end do
+         !          end do
+         !       end do
+         !    end if
+         ! end block symmetry_irl
 
          ! Transport scalars
          advance_scalar: block
@@ -840,6 +828,7 @@ contains
                sc%SC(:,:,:,iTg)=T_sat
             end where
 
+            ! Advance scalar diffusion
             do while (timeSC%t.lt.time%t)
 
                if (timeSC%t+timeSC%dt.gt.time%t) then
@@ -859,10 +848,10 @@ contains
                   where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
                end do
 
-               ! Form implicit diffusive residual
+               ! Form implicit diffusive residuals
                call sc%solve_implicit_diff(timeSC%dt,resSC)
 
-               ! Advance scalar diffusion
+               ! Apply the residuals
                sc%SC=sc%SC+resSC
 
                ! Apply boundary conditions
@@ -872,10 +861,10 @@ contains
                end where
                call sc%apply_bcond(timeSC%t,timeSC%dt)
 
-               ! One-field temperature
-               T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-
             end do
+
+            ! Update the one-field temperature
+            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
 
          end block advance_scalar
 
@@ -970,6 +959,11 @@ contains
             call fs%interp_vel(Ui,Vi,Wi)
             call fs%get_div(src=evp%div_src)
 
+            ! Debug
+            call fs%get_mfr()
+            call evp%cfg%integrate(evp%div_src,mfr_err)
+            mfr_err=abs(mfr_err-sum(fs%mfr))
+
          end block advance_flow
          
          ! Output to ensight
@@ -979,10 +973,8 @@ contains
          end if
          
          ! Update bubble radius
-         call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-         V_b=8.0_WP*V_b
-         R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
-         R_ext=2.0_WP*beta*sqrt(alpha_l*(time%t+t0))
+         R=get_R()
+         R_ext=get_Rext(time%t+t0)
 
          ! Perform and output monitoring
          call fs%get_max()

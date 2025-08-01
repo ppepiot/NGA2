@@ -11,7 +11,7 @@ module simulation
    !> The array of the species. Eeach stored as a YAMLElement object
    type(YAMLElement), dimension(:), allocatable :: species
 
-   !> Species and elements names
+   !> Species names
    character(len=str_medium), dimension(:), allocatable :: sp_names
 
    !> Thermodynamic quantities
@@ -32,7 +32,6 @@ contains
    subroutine simulation_init
       use param,     only: param_read,param_getsize
       use messager,  only: die
-      use mathtools, only: lss
       implicit none
       integer :: np=2,ns,ne,ncs
       character(len=str_short), dimension(:), allocatable :: e_names
@@ -45,7 +44,8 @@ contains
 
       ! Parse the mechanism file
       parse_mech: block
-         use YAMLRead, only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
+         use chem_sys_class, only: ncof
+         use YAMLRead,       only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
          character(len=str_medium) :: mch_file
          character(len=str_short), dimension(:), allocatable :: sp_names_copy,const_sp_copy
          real(WP), dimension(:), allocatable :: N_init_copy
@@ -70,7 +70,7 @@ contains
          allocate(N_init_copy(1:ns))
          allocate(const_sp(1:ncs))
          allocate(const_sp_copy(1:ncs))
-         allocate(CS(ncs));    CS=[1,4]
+         allocate(CS(ncs))
          call param_read('Species',sp_names)
          call param_read('Initial moles',N_init)
          call param_read('Constrained species',const_sp)
@@ -156,8 +156,8 @@ contains
             end do
          end do
          ! Read the NASA-7 polynomials
-         allocate(nasa_coef(1:ns,15)); nasa_coef=0.0_WP
-         allocate(a(1:2,1:7)); a=0.0_WP
+         allocate(nasa_coef(1:ns,2*ncof+1)); nasa_coef=0.0_WP
+         allocate(a(1:2,1:ncof)); a=0.0_WP
          do isc=1,ns
             sp=species(isc)
             thermo=sp%value_map('thermo')
@@ -170,9 +170,9 @@ contains
             case default
                call die('Invalid temperature range')
             end select
-            nasa_coef(isc,1   )=T_range(2)
-            nasa_coef(isc,2:8 )=a(1,:)
-            nasa_coef(isc,9:15)=a(2,:)
+            nasa_coef(isc,1)=T_range(2)
+            nasa_coef(isc,2:  ncof+1)=a(1,:)
+            nasa_coef(isc,9:2*ncof+1)=a(2,:)
          end do
          ! Form the phase summation matrix
          allocate(phse_mat(ns,Lphase:Gphase)); phse_mat(:,Lphase)=0.0_WP; phse_mat(:,Gphase)=1.0_WP
@@ -221,9 +221,11 @@ contains
          ! Initialize the chemical state
          select case (eq_cond)
             case ('PT')
-               call state%initialize(sys=sys,cond=fixed_PT,p=p,T=T,N=N_init)
+               call state%initialize(sys=sys,cond=fixed_PT,p=p)
+               call state%N_init(T=T,N=N_init)
             case ('PH')
-               call state%initialize(sys=sys,cond=fixed_PH,p=p,T=T,N=N_init,N_h=[1.0_WP,1.0_WP,0.0000000014704586659375472_WP,3.71_WP],T_h=390.0_WP)
+               call state%initialize(sys=sys,cond=fixed_PH,p=p)
+               call state%N_init(N=N_init,N_h=[1.0_WP,1.0_WP,0.0000000014704586659375472_WP,3.71_WP],T_h=390.0_WP)
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select
@@ -234,7 +236,6 @@ contains
             print*,trim(sp_names(isc)),': ',state%N(isc)
          end do
          ! Initialize the chemical state solution vector
-         call state%x_init()
          ! Deallocate arrays
          deallocate(Bg)
       end block ceq_init
@@ -249,7 +250,7 @@ contains
 
       ! Deallocate arrays
       deallocate(nasa_coef,const_sp,CS,N_init,e_names,elem_mat,phse_mat)
-
+      
    end subroutine simulation_init
 
 

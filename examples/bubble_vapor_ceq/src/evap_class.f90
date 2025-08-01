@@ -140,16 +140,16 @@ contains
       this%vf=>vf
 
       ! Allocate variables
-      allocate(this%mdotdp     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%mdotdp     =0.0_WP
-      allocate(this%mflux      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%mflux      =0.0_WP
-      allocate(this%mfluxLG    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,0:1));this%mfluxLG    =0.0_WP
-      allocate(this%mfluxLG_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,0:1));this%mfluxLG_old=0.0_WP
-      allocate(this%div_src    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%div_src    =0.0_WP
-      allocate(this%div_src_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%div_src_old=0.0_WP
-      allocate(this%normal     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));this%normal     =0.0_WP
-      allocate(this%pseudo_vel (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));this%pseudo_vel =0.0_WP
-      allocate(this%Tl_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%Tl_grd     =0.0_WP
-      allocate(this%Tg_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));    this%Tg_grd     =0.0_WP
+      allocate(this%mdotdp     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%mdotdp     =0.0_WP
+      allocate(this%mflux      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%mflux      =0.0_WP
+      allocate(this%mfluxLG    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase));this%mfluxLG    =0.0_WP
+      allocate(this%mfluxLG_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase));this%mfluxLG_old=0.0_WP
+      allocate(this%div_src    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%div_src    =0.0_WP
+      allocate(this%div_src_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%div_src_old=0.0_WP
+      allocate(this%normal     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));          this%normal     =0.0_WP
+      allocate(this%pseudo_vel (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));          this%pseudo_vel =0.0_WP
+      allocate(this%Tl_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%Tl_grd     =0.0_WP
+      allocate(this%Tg_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%Tg_grd     =0.0_WP
       allocate(this%itp(3))
       allocate(this%div(3))
 

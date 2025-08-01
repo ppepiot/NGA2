@@ -65,6 +65,7 @@ module chem_sys_class
       procedure :: param_def=>chem_sys_param_def      !< Define parameters
       procedure :: param_set=>chem_sys_param_set      !< Reset parameters
       procedure :: red_con                            !< Reduce the constraints
+      procedure :: get_pind                           !< Get the phase index of an input species
    end type chem_sys
 
 
@@ -445,6 +446,16 @@ module chem_sys_class
                endif
             end subroutine check_input
       end subroutine red_con
+
+
+      !> Returns the phase index of a given species (the output matches the IRL indexing: 0 for liquid, 1 for gas)
+      function get_pind(this,i)
+         implicit none
+         class(chem_sys), intent(in) :: this
+         integer, intent(in) :: i
+         integer :: get_pind
+         get_pind=this%P(findloc(this%sp_order,i,1),Gphase)
+      end function get_pind
 
 
 end module chem_sys_class

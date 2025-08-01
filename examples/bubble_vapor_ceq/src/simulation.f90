@@ -1,13 +1,16 @@
 !> Various definitions and tools for running an NGA2 simulation
 module simulation
    use precision,         only: WP
-   use geometry,          only: cfg,Lz
+   use geometry,          only: cfg
    use hypre_str_class,   only: hypre_str
    use ddadi_class,       only: ddadi
    use tpns_class,        only: tpns
    use vfs_class,         only: vfs,VFlo,VFhi
    use tpscalar_class,    only: tpscalar,Lphase,Gphase
    use evap_class,        only: evap
+   use string,            only: str_short,str_medium
+   use YAMLRead,          only: YAMLElement
+   use chem_sys_class,    only: chem_sys
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use surfmesh_class,    only: surfmesh
@@ -17,7 +20,7 @@ module simulation
    implicit none
    private
    
-   !> Get a couple linear solvers, a two-phase flow solver and volume fraction solver and corresponding time tracker
+   !> Get a couple linear solvers, a two-phase flow solver, a volume fraction solver and corresponding time tracker
    type(hypre_str),   public :: ps
    type(ddadi),       public :: ss,vs
    type(tpns),        public :: fs
@@ -25,6 +28,15 @@ module simulation
    type(tpscalar),    public :: sc
    type(evap),        public :: evp
    type(timetracker), public :: time,timeSC
+
+   !> The array of the species. Eeach stored as a YAMLElement object
+   type(YAMLElement), dimension(:), allocatable :: species
+
+   !> Species names
+   character(len=str_medium), dimension(:), allocatable :: sp_names
+
+   !> Chemical system
+   type(chem_sys)   :: sys
    
    !> Ensight postprocessing
    type(surfmesh) :: smesh
@@ -41,13 +53,16 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: resU,resV,resW
    real(WP), dimension(:,:,:),   allocatable :: Ui,Vi,Wi
    real(WP), dimension(:,:,:),   allocatable :: T
+   real(WP), dimension(:),       allocatable :: MM
    
    !> Problem definition
    real(WP) :: R0,R,R_ext,V_b
    real(WP), dimension(3) :: center
-   integer  :: iTl,iTg
+   integer  :: iTl,iTg,iO2=1,iWg=2,iWl=3,iN2=4
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
    real(WP) :: T_inf,beta,f_b_cnst,t0
+   real(WP) :: pressure
+   integer :: ns
    ! Debug
    real(WP) :: prhs_int
    real(WP) :: mfr_err
@@ -143,26 +158,26 @@ contains
    end function zm_locator
 
 
-   ! !> Function that localizes z- boundary for scalar fields
-   ! function zm_locator_sc(pg,i,j,k) result(isIn)
-   !    use pgrid_class, only: pgrid
-   !    class(pgrid), intent(in) :: pg
-   !    integer, intent(in) :: i,j,k
-   !    logical :: isIn
-   !    isIn=.false.
-   !    if (k.eq.pg%kmin-1) isIn=.true.
-   ! end function zm_locator_sc
+   !> Function that localizes z- boundary for scalar fields
+   function zm_locator_sc(pg,i,j,k) result(isIn)
+      use pgrid_class, only: pgrid
+      class(pgrid), intent(in) :: pg
+      integer, intent(in) :: i,j,k
+      logical :: isIn
+      isIn=.false.
+      if (k.eq.pg%kmin-1) isIn=.true.
+   end function zm_locator_sc
    
    
-   ! !> Function that localizes z+ boundary
-   ! function zp_locator(pg,i,j,k) result(isIn)
-   !    use pgrid_class, only: pgrid
-   !    class(pgrid), intent(in) :: pg
-   !    integer, intent(in) :: i,j,k
-   !    logical :: isIn
-   !    isIn=.false.
-   !    if (k.eq.pg%kmax+1) isIn=.true.
-   ! end function zp_locator
+   !> Function that localizes z+ boundary
+   function zp_locator(pg,i,j,k) result(isIn)
+      use pgrid_class, only: pgrid
+      class(pgrid), intent(in) :: pg
+      integer, intent(in) :: i,j,k
+      logical :: isIn
+      isIn=.false.
+      if (k.eq.pg%kmax+1) isIn=.true.
+   end function zp_locator
    
 
    ! Integrand function for beta equation
@@ -218,15 +233,174 @@ contains
       use mathtools, only: Pi
       real(WP) :: get_R
       call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-      get_R=sqrt(V_b/(Pi*Lz))
+      get_R=(3.0_WP*V_b/(4.0_WP*Pi))**(1.0_WP/3.0_WP)
    end function get_R
 
    
    !> Initialization of problem solver
    subroutine simulation_init
-      use param, only: param_read
+      use param,    only: param_read,param_getsize
+      use messager, only: die
       implicit none
+      integer :: np=2,ne,ncs
+      character(len=str_short), dimension(:), allocatable :: e_names
+      real(WP), dimension(:,:), allocatable :: elem_mat
+      real(WP), dimension(:,:), allocatable :: phse_mat
+      real(WP), allocatable :: nasa_coef(:,:)
+      real(WP), dimension(:), allocatable :: N_init
+      character(len=str_medium), dimension(:), allocatable :: const_sp
+      integer,  dimension(:), allocatable :: CS
       
+
+      ! Parse the mechanism file
+      parse_mech: block
+         use chem_sys_class, only: ncof
+         use YAMLRead,       only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
+         character(len=str_medium) :: mch_file
+         character(len=str_short), dimension(:), allocatable :: sp_names_copy,const_sp_copy
+         real(WP), dimension(:), allocatable :: N_init_copy
+         type(YAMLHandler)  :: domain
+         type(YAMLSequence) :: sp_list,phases,elements
+         type(YAMLElement)  :: sp,gas
+         type(YAMLMap)      :: thermo,comp
+         integer :: isc,nn,i,j,k,e,code
+         character(len=:), allocatable :: name_arr(:)
+         character(len=:), allocatable :: name
+         real(WP), allocatable :: T_range(:)
+         real(WP), dimension(:,:), allocatable :: a
+         logical :: new_elem
+         ! Get the target species from input
+         ns=param_getsize('Species')
+         ncs=param_getsize('Constrained species')
+         allocate(sp_names(1:ns))
+         allocate(sp_names_copy(1:ns))
+         allocate(N_init(1:ns))
+         allocate(N_init_copy(1:ns))
+         allocate(const_sp(1:ncs))
+         allocate(const_sp_copy(1:ncs))
+         allocate(CS(ncs))
+         call param_read('Species',sp_names)
+         call param_read('Initial moles',N_init)
+         call param_read('Constrained species',const_sp)
+         sp_names_copy=sp_names
+         N_init_copy=N_init
+         const_sp_copy=const_sp
+         ! Read the mechanism file path
+         call param_read('Mechanism file',mch_file)
+         ! Open the mechanism
+         domain=yaml_open_file(trim(mch_file))
+         ! Get the list of all species
+         sp_list=yaml_start_from_sequence(domain,'species')
+         ! Extract the target species from the mechanism
+         allocate(species(1:ns))
+         nn=0
+         k=0
+         do isc=0,sp_list%size-1 ! Index in YAMLSequence starts from 0
+            sp=sp_list%element(isc)
+            name_arr=sp%value_str('name',code)
+            name=''
+            do i=1,size(name_arr)
+               name=trim(name//name_arr(i))
+            end do
+            do i=1,ns
+               if (sp_names_copy(i).eq.name) then
+                  nn=nn+1
+                  species(nn)=sp
+                  sp_names(nn)=name
+                  N_init(nn)=N_init_copy(i)
+                  do j=1,ncs
+                     if (const_sp_copy(j).eq.name) then
+                        k=k+1
+                        const_sp(k)=name
+                        CS(k)=nn
+                     end if
+                  end do
+               end if
+            end do
+            call sp%destroy()
+         end do
+         if(nn.ne.ns) call die('Some species are missing in the mechanism file.')
+         ! Get the elements that exist in the target species
+         phases=yaml_start_from_sequence(domain,'phases')
+         gas=phases%element(0)
+         elements=gas%value_sequence('elements',code) ! For some reason I couldn't directly get the element names using yaml-fortran
+         allocate(e_names(elements%size)); e_names=''
+         ne=0
+         do isc=1,ns
+            sp=species(isc)
+            comp=sp%value_map('composition')
+            do e=1,size(comp%labels)
+               name=''
+               do i=1,size(comp%labels(e)%str)
+                  name=name//trim(comp%labels(e)%str(i))
+               end do
+               new_elem=.true.
+               do i=1,ne
+                  if (trim(e_names(i)).eq.trim(name)) then
+                     new_elem=.false.
+                     exit
+                  end if
+               end do
+               if (new_elem) then
+                  ne=ne+1
+                  e_names(ne)=trim(name)
+               end if
+            end do
+         end do
+         e_names=e_names(1:ne)
+         ! Form the element matrix
+         allocate(elem_mat(ns,ne)); elem_mat=0.0_WP
+         do isc=1,ns
+            sp=species(isc)
+            comp=sp%value_map('composition')
+            do i=1,size(comp%labels)
+               name=''
+               do nn=1,size(comp%labels(i)%str)
+                  name=name//trim(comp%labels(i)%str(nn))
+               end do
+               do e=1,ne
+                  if (trim(e_names(e)).eq.trim(name)) elem_mat(isc,e)=real(comp%value_int(name,code),WP)
+               end do
+            end do
+         end do
+         ! Read the NASA-7 polynomials
+         allocate(nasa_coef(1:ns,2*ncof+1)); nasa_coef=0.0_WP
+         allocate(a(1:2,1:ncof)); a=0.0_WP
+         do isc=1,ns
+            sp=species(isc)
+            thermo=sp%value_map('thermo')
+            T_range=thermo%value_double_1d('temperature-ranges',code)
+            select case (size(T_range))
+            case (3)
+               a=thermo%value_double_2d('data',code)
+            case (2)
+               a(1,:)=thermo%value_double_1d('data',code)
+            case default
+               call die('Invalid temperature range')
+            end select
+            nasa_coef(isc,1)=T_range(2)
+            nasa_coef(isc,2:  ncof+1)=a(1,:)
+            nasa_coef(isc,9:2*ncof+1)=a(2,:)
+         end do
+         ! Form the phase summation matrix
+         allocate(phse_mat(ns,Lphase+1:Gphase+1)); phse_mat(:,Lphase+1)=0.0_WP; phse_mat(:,Gphase+1)=1.0_WP
+         do isc=1,ns
+            if (len_trim(sp_names(isc)).ge.3) then
+               if (sp_names(isc)(len_trim(sp_names(isc))-2:len_trim(sp_names(isc))).eq.'(L)') then
+                  phse_mat(isc,Lphase+1)=1.0_WP
+                  phse_mat(isc,Gphase+1)=0.0_WP
+               end if
+            end if
+         end do
+         ! Close the mechanism file and clean up
+         call yaml_close_file(domain)
+         call sp_list%destroy()
+         call sp%destroy()
+         call comp%destroy()
+         call thermo%destroy()
+         deallocate(sp_names_copy,N_init_copy,const_sp_copy)
+      end block parse_mech
+
       
       ! Allocate work arrays
       allocate_work_arrays: block
@@ -238,7 +412,29 @@ contains
          allocate(Vi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(T     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(MM(ns)); MM=[32.0_WP,18.0_WP,18.0_WP,28.0_WP]; MM=0.001_WP*MM
       end block allocate_work_arrays
+
+
+      ! Initialize the chemical system
+      sys_init: block
+         use messager, only: die
+         integer :: ng=1
+         real(WP), dimension(:,:), allocatable :: Bg
+         character(len=2) :: eq_cond
+         integer :: isc
+         ! Allocate arrays
+         allocate(Bg(ns,ng));  Bg=0.0_WP
+         ! Create the general constraints
+         do isc=1,ns
+            if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
+            if (sp_names(isc).eq.'H2O(L)') Bg(isc,1)=1.0_WP
+         end do
+         ! Chemical system object
+         call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
+         ! Deallocate arrays
+         deallocate(Bg)
+      end block sys_init
       
       
       ! Initialize time tracker
@@ -269,6 +465,7 @@ contains
          call param_read('Gas thermal conductivity',k_g)
          call param_read('Gas specific heat capacity',Cp_g)
          call param_read('Far-field temperature',T_inf)
+         call param_read('Pressure',Pressure)
          alpha_l=k_l/(rho_l*Cp_l)
          alpha_g=k_g/(rho_g*Cp_g)
          f_b_cnst=(rho_l*Cp_l*(T_inf-T_sat))/(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))
@@ -332,8 +529,8 @@ contains
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
          call vf%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
          call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
+         call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
+         call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
          call param_read('Bubble center',center)
          R0=get_Rext(t0)
@@ -465,8 +662,8 @@ contains
          call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
          call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
          call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
-         ! call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
-         ! call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
+         call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
+         call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
          call param_read('Pressure iteration',ps%maxit)
@@ -491,32 +688,67 @@ contains
          use param, only: param_read
          use tpscalar_class,  only: bcond,neumann,dirichlet
          type(bcond), pointer :: mybc
-         real(WP) :: radius
-         integer  :: i,j,k
+         real(WP) :: radius,mp
+         integer  :: i,j,k,isc,p
+         integer  :: pos_open,pos_close
          ! Create scalar solver
-         call sc%initialize(cfg=cfg,nscalar=2,name='tpscalar')
+         call sc%initialize(cfg=cfg,nscalar=ns+2,name='tpscalar')
          ! Boundary conditinos
          call sc%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call sc%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
          call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
          call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
-         sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
-         sc%phase =[Lphase,Gphase]
+         call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
+         call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
+         sc%SCname=[sp_names,'Tl','Tg']; iTl=ns+1; iTg=ns+2
+         do isc=1,ns
+            pos_open =index(sc%SCname(isc),'(')
+            pos_close=index(sc%SCname(isc),')')
+            if (pos_open > 0 .and. pos_close > pos_open) then
+               sc%SCname(isc)(pos_open:pos_open)   = '_'
+               sc%SCname(isc)(pos_close:pos_close) = ' '
+               sc%SCname(isc)=adjustl(trim(sc%SCname(isc)))
+            end if
+            sc%phase(isc)=sys%get_pind(isc)
+         end do
+         sc%phase(iTl)=Lphase
+         sc%phase(iTg)=Gphase
          sc%diff(:,:,:,iTl)=alpha_l
          sc%diff(:,:,:,iTg)=alpha_g
          ! Initialize the linear solver
          ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
+         ! Initialize the phasic density and VOF
+         sc%Prho(Lphase)=fs%rho_l
+         sc%Prho(Gphase)=fs%rho_g
+         sc%PVF(:,:,:,Lphase)=vf%VF
+         sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
          ! Initialize scalar fields
+         do p=0,1
+            mp=0.0_WP
+            do isc=1,ns
+               if (sc%phase(isc).eq.p) mp=mp+MM(isc)*N_init(isc)
+            end do
+            do isc=1,ns
+               where (sc%PVF(:,:,:,p).gt.VFlo)
+                  sc%SC(:,:,:,isc)=MM(isc)*N_init(isc)/mp
+               else where
+                  sc%SC(:,:,:,isc)=0.0_WP
+               end where
+            end do
+         end do
          do i=sc%cfg%imino_,sc%cfg%imaxo_
             do j=sc%cfg%jmino_,sc%cfg%jmaxo_
                do k=sc%cfg%kmino_,sc%cfg%kmaxo_
                   radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
-                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_sat
+                  if (vf%VF(i,j,k).gt.VFlo) then
+                     sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+                     sc%SC(i,j,k,iWl)=1.0_WP
+                  end if
+                  if (vf%VF(i,j,k).lt.VFhi) then
+                     sc%SC(i,j,k,iTg)=T_sat
+                  end if
                end do
             end do
          end do
@@ -525,11 +757,6 @@ contains
             sc%SC(:,:,:,iTg)=T_sat
          end where
          call sc%apply_bcond(time%t,time%dt)
-         ! Initialize the phasic density and VOF
-         sc%Prho(Lphase)=fs%rho_l
-         sc%Prho(Gphase)=fs%rho_g
-         sc%PVF(:,:,:,Lphase)=vf%VF
-         sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
          ! Post process
          T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
       end block create_scalar
@@ -537,14 +764,8 @@ contains
 
       ! Create and initialize an evp object
       create_evp: block
-         ! Debug
-         use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
-         use parallel,  only: MPI_REAL_WP
          ! use evap_class, only: symmetry
          integer :: i,j,k
-         ! Debug
-         real(WP) :: my_mdotdp_max,mdotdp_max
-         integer :: ierr
          ! Create the object
          call evp%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     evp%mflux_tol)
@@ -559,20 +780,112 @@ contains
          ! Get densities from the flow solver
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
-         ! Get temperature gradient
-         call evp%get_temperature_grad()
-         ! Interface jump conditions
-         evp%mdotdp=0.0_WP
-         do k=evp%cfg%kmin_,evp%cfg%kmax_
-            do j=evp%cfg%jmin_,evp%cfg%jmax_
-               do i=evp%cfg%imin_,evp%cfg%imax_
-                  if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     evp%mdotdp(i,j,k)=-(k_g*evp%Tg_grd(i,j,k)-k_l*evp%Tl_grd(i,j,k))/h_lg
-                  end if
-               end do
-            end do
+      end block create_evp
+
+
+      ! Interface jump conditions
+      interface_jump: block
+         ! Debug
+         use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
+         use parallel,  only: MPI_REAL_WP
+         use chem_state_class, only: chem_state,fixed_PT
+         type(chem_state) :: state
+         real(WP), dimension(:), allocatable :: vol,mp,N
+         real(WP) :: V
+         integer :: i,j,k,index,isc,p
+         ! Debug
+         real(WP) :: my_mdotdp_max,mdotdp_max
+         integer :: ierr
+         ! Allocate arrays
+         allocate(vol(Lphase:Gphase))
+         allocate(mp(Lphase:Gphase))
+         allocate(N(ns))
+         print*,'N_init = ',N_init
+         ! Calculate the phase masses based on the initial mole numbers
+         ! mp=0.0_WP
+         ! do isc=1,ns
+         !    mp(sc%phase(isc))=mp(sc%phase(isc))+N_init(isc)*MM(isc)
+         ! end do
+         ! Initialize the chemical state
+         call state%initialize(sys=sys,cond=fixed_PT,p=pressure)
+         call param_read('Newton tolerance',state%tol_N)
+         call param_read('Newton max iterations',state%iter_N_max)
+         ! Get the chemical equilibrium
+         call state%N_init(T=T_sat,N=N_init)
+         call state%equilibrate()
+         print*,'state%N = ',state%N
+         mp=0.0_WP
+         do isc=1,ns
+            mp(sc%phase(isc))=mp(sc%phase(isc))+state%N(isc)*MM(isc)
          end do
-         call evp%cfg%sync(evp%mdotdp)
+         print*,'mp = ',mp
+         ! Loop over the interfacial cells
+         do index=1,vf%band_count(0)
+            ! Get the interfacial cell indices
+            i=vf%band_map(1,index)
+            j=vf%band_map(2,index)
+            k=vf%band_map(3,index)
+            ! Re-scale moles to match the actual phase masses in the cell
+            ! do isc=1,ns
+            !    p=sc%phase(isc)
+            !    if (mp(p).gt.0.0_WP) then
+            !       N(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)/mp(p)*N_init(isc)
+            !    else
+            !       N(isc)=0.0_WP
+            !    end if
+            ! end do
+            do isc=1,ns
+               p=sc%phase(isc)
+               if (mp(p).gt.0.0_WP) then
+                  N(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)/mp(p)*state%N(isc)
+               else
+                  N(isc)=0.0_WP
+               end if
+            end do
+            print*,'sc%Prho(:)*sc%PVF(i,j,k,:)*cfg%vol(i,j,k) = ',sc%Prho(:)*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+            print*,'N = ',N
+            ! Get the chemical equilibrium
+            ! call state%N_init(T=T_sat,N=N)
+            ! call state%equilibrate()
+            ! Get the phase masses
+            mp=0.0_WP
+            do isc=1,ns
+               mp(sc%phase(isc))=mp(sc%phase(isc))+N(isc)*MM(isc)
+            end do
+            ! Get the volumes
+            vol=0.0_WP
+            vol=mp/sc%Prho
+            V=sum(vol)
+            print*,'cell vol = ',cfg%vol(i,j,k)
+            print*,'V = ',V
+            ! Relax the interface temperature
+            sc%SC(i,j,k,iTl)=state%T
+            sc%SC(i,j,k,iTg)=state%T
+            T(i,j,k)=state%T
+            ! Relax the interface VOF (Need to update the corresponding IRL quantities in vf?)
+            vf%VF(i,j,k)=vol(Lphase)/V
+            sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
+            sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
+            ! Relax the interface composition
+            do isc=1,ns
+               sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+            end do
+            ! Get the phase change mass flux
+            evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
+         end do
+         ! Correct Y_H2O(G) inside the bubble (Assuming homogenous gas mixture at initial time)
+         where (vf%VF.le.VFlo) sc%SC(:,:,:,iWg)=MM(iWg)*N(iWg)/mp(sc%phase(iWg))
+         ! Sync fields
+         do isc=1,sc%nscalar
+            call cfg%sync(sc%SC(:,:,:,isc))
+         end do
+         call cfg%sync(vf%VF)
+         call cfg%sync(sc%PVF(:,:,:,Lphase))
+         call cfg%sync(sc%PVF(:,:,:,Gphase))
+         call cfg%sync(evp%mdotdp)
+         ! Apply boundary conditions
+         call sc%apply_bcond(time%t,time%dt)
+         call vf%apply_bcond(time%t,time%dt)
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
          ! Initialize the liquid and gas side mass fluxes
@@ -583,7 +896,9 @@ contains
          my_mdotdp_max=maxval(evp%mdotdp)
          call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
          if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
-      end block create_evp
+         ! Deallocate arrays
+         deallocate(N_init,vol,mp,N)
+      end block interface_jump
 
 
       ! Initialize bubble radius
@@ -600,7 +915,7 @@ contains
 
       ! Add Ensight output
       create_ensight: block
-         integer :: nsc
+         integer :: isc
          ! Create Ensight output from cfg
          ens_out=ensight(cfg=cfg,name='Bubble_vapor')
          ! Create event for Ensight output
@@ -611,8 +926,11 @@ contains
          call ens_out%add_scalar('VOF',vf%VF)
          call ens_out%add_scalar('pressure',fs%P)
          call ens_out%add_surface('plic',smesh)
-         do nsc=1,sc%nscalar
-           call ens_out%add_scalar(trim(sc%SCname(nsc)),sc%SC(:,:,:,nsc))
+         do isc=1,ns
+           call ens_out%add_scalar('Y_'//trim(sc%SCname(isc)),sc%SC(:,:,:,isc))
+         end do
+         do isc=ns+1,sc%nscalar
+           call ens_out%add_scalar(trim(sc%SCname(isc)),sc%SC(:,:,:,isc))
          end do
          call ens_out%add_scalar('mflux',evp%mflux)
          call ens_out%add_scalar('evp_div',evp%div_src)
@@ -624,6 +942,9 @@ contains
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
          call ens_out%add_scalar('Tl_grd',evp%Tl_grd)
          call ens_out%add_scalar('Tg_grd',evp%Tg_grd)
+         ! Debug
+         call ens_out%add_scalar('PVFG',sc%PVF(:,:,:,Gphase))
+         call ens_out%add_scalar('PVFL',sc%PVF(:,:,:,Lphase))
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -631,7 +952,7 @@ contains
       
       ! Create a monitor file
       create_monitor: block
-         integer :: nsc
+         integer :: isc
          ! Prepare some info about fields
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
@@ -678,10 +999,10 @@ contains
          scfile=monitor(sc%cfg%amRoot,'scalar')
          call scfile%add_column(time%n,'Timestep number')
          call scfile%add_column(time%t,'Time')
-         do nsc=1,sc%nscalar
-           call scfile%add_column(sc%SCmin(nsc),trim(sc%SCname(nsc))//'_min')
-           call scfile%add_column(sc%SCmax(nsc),trim(sc%SCname(nsc))//'_max')
-           call scfile%add_column(sc%SCint(nsc),trim(sc%SCname(nsc))//'_int')
+         do isc=1,sc%nscalar
+           call scfile%add_column(sc%SCmin(isc),trim(sc%SCname(isc))//'_min')
+           call scfile%add_column(sc%SCmax(isc),trim(sc%SCname(isc))//'_max')
+           call scfile%add_column(sc%SCint(isc),trim(sc%SCname(isc))//'_int')
          end do
          call scfile%write()
          ! Create evaporation monitor
@@ -708,7 +1029,7 @@ contains
    !> Perform an NGA2 simulation-this mimicks NGA's old time integration for multiphase
    subroutine simulation_run
       use tpns_class, only: static_contact,harmonic_visc
-      use mathtools, only: Pi
+      use mathtools,  only: Pi
       implicit none
       integer  :: i,j,k
 
@@ -805,7 +1126,7 @@ contains
 
          ! Transport scalars
          advance_scalar: block
-            integer  :: nsc
+            integer  :: isc
             real(WP) :: dt_sc
 
             ! Update the phas-specific VOF
@@ -819,14 +1140,14 @@ contains
             call sc%get_dSCdt_adv(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,detailed_face_flux=vf%detailed_face_flux,dt=time%dt)
 
             ! Advance scalar advection
-            do nsc=1,sc%nscalar
-               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.VFlo) sc%SC(:,:,:,nsc)=(sc%PVFold(:,:,:,sc%phase(nsc))*sc%SCold(:,:,:,nsc)+time%dt*(resSC(:,:,:,nsc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,nsc)))/sc%PVF(:,:,:,sc%phase(nsc))
-               where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) sc%SC(:,:,:,nsc)=0.0_WP
+            do isc=1,sc%nscalar
+               where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(isc)).gt.VFlo) sc%SC(:,:,:,isc)=(sc%PVFold(:,:,:,sc%phase(isc))*sc%SCold(:,:,:,isc)+time%dt*(resSC(:,:,:,isc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,isc)))/sc%PVF(:,:,:,sc%phase(isc))
+               where (sc%PVF(:,:,:,sc%phase(isc)).eq.0.0_WP) sc%SC(:,:,:,isc)=0.0_WP
             end do
-            where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-               sc%SC(:,:,:,iTl)=T_sat
-               sc%SC(:,:,:,iTg)=T_sat
-            end where
+            ! where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+            !    sc%SC(:,:,:,iTl)=T_sat
+            !    sc%SC(:,:,:,iTg)=T_sat
+            ! end where
 
             ! Advance scalar diffusion
             do while (timeSC%t.lt.time%t)
@@ -843,9 +1164,9 @@ contains
 
                ! Explicit calculation of dVOFSC/dt from scalar diffusion
                call sc%get_dSCdt_dff(dSCdt=resSC)
-               do nsc=1,sc%nscalar
-                  where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(nsc)).gt.VFlo) resSC(:,:,:,nsc)=timeSC%dt*resSC(:,:,:,nsc)/sc%PVF(:,:,:,sc%phase(nsc))
-                  where (sc%PVF(:,:,:,sc%phase(nsc)).eq.0.0_WP) resSC(:,:,:,nsc)=0.0_WP
+               do isc=1,sc%nscalar
+                  where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(isc)).gt.VFlo) resSC(:,:,:,isc)=timeSC%dt*resSC(:,:,:,isc)/sc%PVF(:,:,:,sc%phase(isc))
+                  where (sc%PVF(:,:,:,sc%phase(isc)).eq.0.0_WP) resSC(:,:,:,isc)=0.0_WP
                end do
 
                ! Form implicit diffusive residuals
@@ -855,10 +1176,10 @@ contains
                sc%SC=sc%SC+resSC
 
                ! Apply boundary conditions
-               where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-                  sc%SC(:,:,:,iTl)=T_sat
-                  sc%SC(:,:,:,iTg)=T_sat
-               end where
+               ! where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+               !    sc%SC(:,:,:,iTl)=T_sat
+               !    sc%SC(:,:,:,iTg)=T_sat
+               ! end where
                call sc%apply_bcond(timeSC%t,timeSC%dt)
 
             end do
@@ -868,21 +1189,68 @@ contains
 
          end block advance_scalar
 
-         ! Get temperature gradient
-         call evp%get_temperature_grad()
-
          ! Interface jump conditions
-         evp%mdotdp=0.0_WP
-         do k=evp%cfg%kmin_,evp%cfg%kmax_
-            do j=evp%cfg%jmin_,evp%cfg%jmax_
-               do i=evp%cfg%imin_,evp%cfg%imax_
-                  if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     evp%mdotdp(i,j,k)=-(k_g*evp%Tg_grd(i,j,k)-k_l*evp%Tl_grd(i,j,k))/h_lg
-                  end if
+         interface_jump: block
+            use chem_state_class, only: chem_state,fixed_PH
+            type(chem_state) :: state
+            real(WP), dimension(:), allocatable :: N_h,vol
+            real(WP) :: T_h,V
+            integer :: index,isc,p
+            ! Allocate arrays
+            allocate(N_h(ns))
+            allocate(vol(Lphase:Gphase))
+            ! Initialize the chemical state
+            call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
+            ! Loop over the interfacial cells
+            do index=1,vf%band_count(0)
+               ! Get the interfacial cell indices
+               i=vf%band_map(1,index)
+               j=vf%band_map(2,index)
+               k=vf%band_map(3,index)
+               ! Calculate the mole numbers
+               do isc=1,ns
+                  p=sc%phase(isc)
+                  N_h(isc)=sc%Prho(p)*cfg%vol(i,j,k)/MM(isc)*sc%PVF(i,j,k,p)*sc%SC(i,j,k,isc)
                end do
+               ! Initialize the chemical state (what should be T_h?)
+               T_h=T_sat
+               ! Get the chemical equilibrium
+               call state%N_init(N=N_h,N_h=N_h,T_h=T_h)
+               call state%equilibrate()
+               ! Get the new volume of the system
+               vol=0.0_WP
+               do isc=1,ns
+                  vol(sc%phase(isc))=vol(sc%phase(isc))+state%N(isc)*MM(isc)
+               end do
+               vol=vol/sc%Prho
+               V=sum(vol)
+               ! Relax the interface temperature
+               sc%SC(i,j,k,iTl)=state%T
+               sc%SC(i,j,k,iTg)=state%T
+               T(i,j,k)=state%T
+               ! Relax the interface VOF (Need to update the corresponding IRL quantities in vf?)
+               vf%VF(i,j,k)=vol(Lphase)/V
+               sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
+               sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
+               ! Relax the interface composition
+               do isc=1,ns
+                  p=sc%phase(isc)
+                  sc%SC(i,j,k,isc)=MM(isc)*state%N(isc)/(sc%Prho(p)*cfg%vol(i,j,k)*sc%PVF(i,j,k,p))
+               end do
+               ! Get the phase change mass flux
+               evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
             end do
-         end do
-         call evp%cfg%sync(evp%mdotdp)
+            ! Sync fields
+            do isc=1,ns+2
+               call cfg%sync(sc%SC(:,:,:,isc))
+            end do
+            call cfg%sync(vf%VF)
+            call cfg%sync(sc%PVF(:,:,:,Lphase))
+            call cfg%sync(sc%PVF(:,:,:,Gphase))
+            call cfg%sync(evp%mdotdp)
+            ! Deallocate arrays
+            deallocate(N_h,vol)
+         end block interface_jump
 
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
