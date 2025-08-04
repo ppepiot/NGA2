@@ -339,8 +339,8 @@ contains
    subroutine reorder_rows_rank2(x,order,y)
       use messager, only: die
       implicit none
-      integer,  intent(in)  :: order(:)
-      real(WP), intent(in)  :: x(:,:)
+      integer,  intent(in)    :: order(:)
+      real(WP), intent(in)    :: x(:,:)
       real(WP), intent(inout) :: y(:,:)
       integer :: lb1,lb2,ub1,ub2
       integer :: i

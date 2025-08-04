@@ -61,7 +61,7 @@ module simulation
    integer  :: iTl,iTg,iO2=1,iWg=2,iWl=3,iN2=4
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
    real(WP) :: T_inf,beta,f_b_cnst,t0
-   real(WP) :: pressure
+   real(WP) :: pressure,air2vw_rat,N2O_rat
    integer :: ns
    ! Debug
    real(WP) :: prhs_int
@@ -247,7 +247,7 @@ contains
       real(WP), dimension(:,:), allocatable :: elem_mat
       real(WP), dimension(:,:), allocatable :: phse_mat
       real(WP), allocatable :: nasa_coef(:,:)
-      real(WP), dimension(:), allocatable :: N_init
+      ! real(WP), dimension(:), allocatable :: N_init
       character(len=str_medium), dimension(:), allocatable :: const_sp
       integer,  dimension(:), allocatable :: CS
       
@@ -258,7 +258,7 @@ contains
          use YAMLRead,       only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
          character(len=str_medium) :: mch_file
          character(len=str_short), dimension(:), allocatable :: sp_names_copy,const_sp_copy
-         real(WP), dimension(:), allocatable :: N_init_copy
+         ! real(WP), dimension(:), allocatable :: N_init_copy
          type(YAMLHandler)  :: domain
          type(YAMLSequence) :: sp_list,phases,elements
          type(YAMLElement)  :: sp,gas
@@ -274,16 +274,16 @@ contains
          ncs=param_getsize('Constrained species')
          allocate(sp_names(1:ns))
          allocate(sp_names_copy(1:ns))
-         allocate(N_init(1:ns))
-         allocate(N_init_copy(1:ns))
+         ! allocate(N_init(1:ns))
+         ! allocate(N_init_copy(1:ns))
          allocate(const_sp(1:ncs))
          allocate(const_sp_copy(1:ncs))
          allocate(CS(ncs))
          call param_read('Species',sp_names)
-         call param_read('Initial moles',N_init)
+         ! call param_read('Initial moles',N_init)
          call param_read('Constrained species',const_sp)
          sp_names_copy=sp_names
-         N_init_copy=N_init
+         ! N_init_copy=N_init
          const_sp_copy=const_sp
          ! Read the mechanism file path
          call param_read('Mechanism file',mch_file)
@@ -307,7 +307,7 @@ contains
                   nn=nn+1
                   species(nn)=sp
                   sp_names(nn)=name
-                  N_init(nn)=N_init_copy(i)
+                  ! N_init(nn)=N_init_copy(i)
                   do j=1,ncs
                      if (const_sp_copy(j).eq.name) then
                         k=k+1
@@ -398,7 +398,8 @@ contains
          call sp%destroy()
          call comp%destroy()
          call thermo%destroy()
-         deallocate(sp_names_copy,N_init_copy,const_sp_copy)
+         ! deallocate(sp_names_copy,N_init_copy,const_sp_copy)
+         deallocate(sp_names_copy,const_sp_copy)
       end block parse_mech
 
       
@@ -688,9 +689,12 @@ contains
          use param, only: param_read
          use tpscalar_class,  only: bcond,neumann,dirichlet
          type(bcond), pointer :: mybc
-         real(WP) :: radius,mp
+         real(WP) :: radius,mp(2),N_init(ns)
          integer  :: i,j,k,isc,p
          integer  :: pos_open,pos_close
+         ! Read-in inputs
+         call param_read('Air to water vapor mole ratio',air2vw_rat)
+         call param_read('Nitrogen to oxygen mole ratio',N2O_rat)
          ! Create scalar solver
          call sc%initialize(cfg=cfg,nscalar=ns+2,name='tpscalar')
          ! Boundary conditinos
@@ -725,18 +729,22 @@ contains
          sc%PVF(:,:,:,Lphase)=vf%VF
          sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
          ! Initialize scalar fields
-         do p=0,1
-            mp=0.0_WP
-            do isc=1,ns
-               if (sc%phase(isc).eq.p) mp=mp+MM(isc)*N_init(isc)
-            end do
-            do isc=1,ns
-               where (sc%PVF(:,:,:,p).gt.VFlo)
-                  sc%SC(:,:,:,isc)=MM(isc)*N_init(isc)/mp
-               else where
-                  sc%SC(:,:,:,isc)=0.0_WP
-               end where
-            end do
+         N_init(iWl)=1.0_WP
+         N_init(iWg)=1.0_WP
+         N_init(iO2)=air2vw_rat*N_init(iWg)
+         N_init(iN2)=N2O_rat*N_init(iO2)
+         mp=0.0_WP
+         do isc=1,ns
+            p=sc%phase(isc)
+            mp(p)=mp(p)+N_init(isc)*MM(isc)
+         end do
+         do isc=1,ns
+            p=sc%phase(isc)
+            where (sc%PVF(:,:,:,p).gt.VFlo)
+               sc%SC(:,:,:,isc)=MM(isc)*N_init(isc)/mp(p)
+            else where
+               sc%SC(:,:,:,isc)=0.0_WP
+            end where
          end do
          do i=sc%cfg%imino_,sc%cfg%imaxo_
             do j=sc%cfg%jmino_,sc%cfg%jmaxo_
@@ -744,7 +752,6 @@ contains
                   radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
                   if (vf%VF(i,j,k).gt.VFlo) then
                      sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
-                     sc%SC(i,j,k,iWl)=1.0_WP
                   end if
                   if (vf%VF(i,j,k).lt.VFhi) then
                      sc%SC(i,j,k,iTg)=T_sat
@@ -788,80 +795,83 @@ contains
          ! Debug
          use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
          use parallel,  only: MPI_REAL_WP
-         use chem_state_class, only: chem_state,fixed_PT
+         use chem_state_class, only: chem_state,fixed_PT,fixed_PH
          type(chem_state) :: state
          real(WP), dimension(:), allocatable :: vol,mp,N
          real(WP) :: V
          integer :: i,j,k,index,isc,p
          ! Debug
-         real(WP) :: my_mdotdp_max,mdotdp_max
+         real(WP) :: my_mdotdp_max,mdotdp_max,m_old
          integer :: ierr
          ! Allocate arrays
          allocate(vol(Lphase:Gphase))
          allocate(mp(Lphase:Gphase))
          allocate(N(ns))
-         print*,'N_init = ',N_init
-         ! Calculate the phase masses based on the initial mole numbers
-         ! mp=0.0_WP
-         ! do isc=1,ns
-         !    mp(sc%phase(isc))=mp(sc%phase(isc))+N_init(isc)*MM(isc)
-         ! end do
          ! Initialize the chemical state
-         call state%initialize(sys=sys,cond=fixed_PT,p=pressure)
+         ! call state%initialize(sys=sys,cond=fixed_PT,p=pressure)
+         call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
          call param_read('Newton tolerance',state%tol_N)
          call param_read('Newton max iterations',state%iter_N_max)
-         ! Get the chemical equilibrium
-         call state%N_init(T=T_sat,N=N_init)
-         call state%equilibrate()
-         print*,'state%N = ',state%N
-         mp=0.0_WP
-         do isc=1,ns
-            mp(sc%phase(isc))=mp(sc%phase(isc))+state%N(isc)*MM(isc)
-         end do
-         print*,'mp = ',mp
+         if (state%cond.eq.fixed_PH) then
+            call param_read('T tolerance',state%tol_T)
+            call param_read('T max iterations',state%iter_T_max)
+         end if
          ! Loop over the interfacial cells
          do index=1,vf%band_count(0)
+            print*,''
+            print*,''
+            print*,'------------------------------------------------------------------------------------------------------------------------'
             ! Get the interfacial cell indices
             i=vf%band_map(1,index)
             j=vf%band_map(2,index)
             k=vf%band_map(3,index)
-            ! Re-scale moles to match the actual phase masses in the cell
-            ! do isc=1,ns
-            !    p=sc%phase(isc)
-            !    if (mp(p).gt.0.0_WP) then
-            !       N(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)/mp(p)*N_init(isc)
-            !    else
-            !       N(isc)=0.0_WP
-            !    end if
-            ! end do
+            print*,'VOF(',i,',',j,',',k,') = ',vf%VF(i,j,k)
+            ! Calculate the phase masses
+            mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+            m_old=sum(mp)
+            print*,'Phase mass in the cell prior to equilibrium = ',mp
+            print*,'Total mass in the cell prior to equilibrium = ',m_old
+            ! Calculate the moles numbers
             do isc=1,ns
                p=sc%phase(isc)
-               if (mp(p).gt.0.0_WP) then
-                  N(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)/mp(p)*state%N(isc)
-               else
-                  N(isc)=0.0_WP
-               end if
+               N(isc)=sc%SC(i,j,k,isc)*mp(p)/MM(isc)
             end do
-            print*,'sc%Prho(:)*sc%PVF(i,j,k,:)*cfg%vol(i,j,k) = ',sc%Prho(:)*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
-            print*,'N = ',N
+            print*,'N prior to equilibrium = ',N
+            print*,'Total moles prior to equilibrium = ',sum(N)
             ! Get the chemical equilibrium
             ! call state%N_init(T=T_sat,N=N)
-            ! call state%equilibrate()
-            ! Get the phase masses
+            call state%N_init(N=N,N_h=N,T_h=T_sat)
+            print*,'N reinitialized = ',state%N
+            print*,'Total moles prior to equilibrium after reinitialization = ',sum(N)
+            print*,''
+            call state%equilibrate()
+            print*,'Relative change in total moles of the system = ',(sum(state%N)-sum(N))/sum(N)
+            N=state%N
+            print*,'Equilibrium N = ',N
+            print*,'Total equilibrium moles = ',sum(N)
+            ! Update the phase masses
             mp=0.0_WP
             do isc=1,ns
                mp(sc%phase(isc))=mp(sc%phase(isc))+N(isc)*MM(isc)
             end do
-            ! Get the volumes
+            print*,'Equilibrium mass of phases = ',mp
+            print*,'Equilibrium mass of system = ',sum(mp)
+            print*,'Relative change in the total mass of system = ',(sum(mp)-m_old)/m_old
+            ! Get the phase volumes
             vol=0.0_WP
             vol=mp/sc%Prho
             V=sum(vol)
             print*,'cell vol = ',cfg%vol(i,j,k)
-            print*,'V = ',V
+            print*,'Equilibrium phase volumes = ',vol
+            print*,'Equilibrium system volume = ',V
+            ! Get the phase change mass flux
+            evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
+            print*,'evp%mdotdp(i,j,k) = ',evp%mdotdp(i,j,k)
             ! Relax the interface temperature
             sc%SC(i,j,k,iTl)=state%T
             sc%SC(i,j,k,iTg)=state%T
             T(i,j,k)=state%T
+            print*,'Temperature = ',state%T
             ! Relax the interface VOF (Need to update the corresponding IRL quantities in vf?)
             vf%VF(i,j,k)=vol(Lphase)/V
             sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
@@ -870,11 +880,9 @@ contains
             do isc=1,ns
                sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
             end do
-            ! Get the phase change mass flux
-            evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
          end do
          ! Correct Y_H2O(G) inside the bubble (Assuming homogenous gas mixture at initial time)
-         where (vf%VF.le.VFlo) sc%SC(:,:,:,iWg)=MM(iWg)*N(iWg)/mp(sc%phase(iWg))
+         ! where (vf%VF.le.VFlo) sc%SC(:,:,:,iWg)=MM(iWg)*N(iWg)/mp(sc%phase(iWg))
          ! Sync fields
          do isc=1,sc%nscalar
             call cfg%sync(sc%SC(:,:,:,isc))
@@ -897,7 +905,7 @@ contains
          call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
          if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
          ! Deallocate arrays
-         deallocate(N_init,vol,mp,N)
+         deallocate(vol,mp,N)
       end block interface_jump
 
 

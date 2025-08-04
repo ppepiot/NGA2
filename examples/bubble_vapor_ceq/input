@@ -1,15 +1,15 @@
 # Parallelization
-Partition : 2 2 2
+Partition : 1 1 1 ! 2 2 2
 
 # Mesh definition
-L : 12 ! 0.012
+L : 12 ! 1.2 ! 0.12 ! 0.012 ! 12
 n : 128
 
 # Case parameters
 Bubble center         : 0 0 0
 Far-field temperature : 374.13865837667817
 Pressure              : 101325
-Initial time          : 150000 ! 0.15216
+Initial time          : 150000 ! 1500 ! 15 ! 0.15216 ! 150000
 
 # Mechanism
 Mechanism file : gri30.yaml
@@ -28,17 +28,18 @@ Gas specific heat capacity    : 2034
 Saturation temperature        : 373.15
 Latent heat                   : 2.256e6
 
-# Species
-Species             : H2O(L) H2O O2 N2
-Initial moles       : 0      1   1  3.71
-Constrained species : O2 N2
+# Species and mole ratios
+Species                        : H2O(L) H2O O2 N2
+Constrained species            : O2 N2
+Air to water vapor mole ratio  : 1
+Nitrogen to oxygen mole ratio  : 3.71
 
 # Newton iterations
 Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-T tolerance      : 1e-7
+T tolerance      : 1e-5
 T max iterations : 30
 
 # Time integration

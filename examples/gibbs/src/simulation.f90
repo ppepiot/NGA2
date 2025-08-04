@@ -13,6 +13,7 @@ module simulation
 
    !> Species names
    character(len=str_medium), dimension(:), allocatable :: sp_names
+   integer, dimension(:), allocatable :: inpt2mch_sp_order
 
    !> Thermodynamic quantities
    real(WP) :: T,p
@@ -44,6 +45,7 @@ contains
 
       ! Parse the mechanism file
       parse_mech: block
+         use mathtools,      only: reorder_rows
          use chem_sys_class, only: ncof
          use YAMLRead,       only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
          character(len=str_medium) :: mch_file
@@ -65,6 +67,7 @@ contains
          ncs=param_getsize('Constrained species')
          if (ns.ne.nn) call die('Unequal number of species and moles in the input file.')
          allocate(sp_names(1:ns))
+         allocate(inpt2mch_sp_order(1:ns))
          allocate(sp_names_copy(1:ns))
          allocate(N_init(1:ns))
          allocate(N_init_copy(1:ns))
@@ -99,7 +102,7 @@ contains
                   nn=nn+1
                   species(nn)=sp
                   sp_names(nn)=name
-                  N_init(nn)=N_init_copy(i)
+                  inpt2mch_sp_order(nn)=i
                   do j=1,ncs
                      if (const_sp_copy(j).eq.name) then
                         k=k+1
@@ -112,6 +115,7 @@ contains
             call sp%destroy()
          end do
          if(nn.ne.ns) call die('Some species are missing in the mechanism file.')
+         call reorder_rows(N_init_copy,inpt2mch_sp_order,N_init)
          ! Get the elements that exist in the target species
          phases=yaml_start_from_sequence(domain,'phases')
          gas=phases%element(0)
@@ -195,9 +199,12 @@ contains
 
       ! Initialize the chemical equilibrium framework
       ceq_init: block
-         use messager, only: die
+         use mathtools, only: reorder_rows
+         use messager,  only: die
          integer :: ng=1
          real(WP), dimension(:,:), allocatable :: Bg
+         real(WP), dimension(:),   allocatable :: N_h,N_h_c
+         real(WP) :: T_h
          character(len=2) :: eq_cond
          integer :: isc
          ! Read inputs
@@ -206,6 +213,8 @@ contains
          call param_read('Equilibrium condition',eq_cond)
          ! Allocate arrays
          allocate(Bg(ns,ng));  Bg=0.0_WP
+         allocate(N_h(ns))
+         allocate(N_h_c(ns))
          ! Create the general constraints
          do isc=1,ns
             if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
@@ -225,7 +234,11 @@ contains
                call state%N_init(T=T,N=N_init)
             case ('PH')
                call state%initialize(sys=sys,cond=fixed_PH,p=p)
-               call state%N_init(N=N_init,N_h=[1.0_WP,1.0_WP,0.0000000014704586659375472_WP,3.71_WP],T_h=390.0_WP)
+               call param_read('Temperature for enthalpy calculation',T_h)
+               call param_read('Composition for enthalpy calculation',N_h)
+               N_h_c=N_h
+               call reorder_rows(N_h_c,inpt2mch_sp_order,N_h)
+               call state%N_init(N=N_init,N_h=N_h,T_h=T_h)
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select
@@ -237,7 +250,7 @@ contains
          end do
          ! Initialize the chemical state solution vector
          ! Deallocate arrays
-         deallocate(Bg)
+         deallocate(Bg,N_h,N_h_c)
       end block ceq_init
 
       ! Read in Newton and temperature iterations inputs
@@ -285,7 +298,7 @@ contains
       implicit none
       
       ! Get rid of all objects-need destructors
-      deallocate(species,sp_names)
+      deallocate(species,sp_names,inpt2mch_sp_order)
 
    end subroutine simulation_final
 

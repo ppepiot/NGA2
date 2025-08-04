@@ -2,16 +2,20 @@
 Mechanism file : gri30.yaml
 
 # Equilibrium condition (choose either PH or PT)
-Equilibrium condition : PT
+Equilibrium condition : PH
 
-# Temperature and pressure
+# Temperature (used for PT case) and pressure
 Temperature : 373.15
 Pressure    : 101325
 
 # Species
 Species             : H2O(L) H2O O2 N2
-Initial moles       : 0      1   1  3.71
+Initial moles       : 0      2   1  3.71
 Constrained species : O2 N2
+
+# Constant enthaply inputs
+Temperature for enthalpy calculation : 373.15
+Composition for enthalpy calculation : 0 2 1 3.71
 
 # Newton iterations
 Newton tolerance      : 1e-7
