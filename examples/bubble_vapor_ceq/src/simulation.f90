@@ -793,8 +793,8 @@ contains
       ! Interface jump conditions
       interface_jump: block
          ! Debug
-         use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
-         use parallel,  only: MPI_REAL_WP
+         use mpi_f08,          only: MPI_MAX,MPI_ALLREDUCE
+         use parallel,         only: MPI_REAL_WP
          use chem_state_class, only: chem_state,fixed_PT,fixed_PH
          type(chem_state) :: state
          real(WP), dimension(:), allocatable :: vol,mp,N
@@ -802,6 +802,7 @@ contains
          integer :: i,j,k,index,isc,p
          ! Debug
          real(WP) :: my_mdotdp_max,mdotdp_max,m_old
+         real(WP) :: T_g
          integer :: ierr
          ! Allocate arrays
          allocate(vol(Lphase:Gphase))
@@ -815,6 +816,7 @@ contains
          if (state%cond.eq.fixed_PH) then
             call param_read('T tolerance',state%tol_T)
             call param_read('T max iterations',state%iter_T_max)
+            call param_read('Temperature initial guess',T_g)
          end if
          ! Loop over the interfacial cells
          do index=1,vf%band_count(0)
@@ -836,11 +838,14 @@ contains
                p=sc%phase(isc)
                N(isc)=sc%SC(i,j,k,isc)*mp(p)/MM(isc)
             end do
-            print*,'N prior to equilibrium = ',N
+            print*,'N prior to equilibrium: '
+            do isc=1,ns
+               print*,sc%SCname(isc),': ',N(isc)
+            end do
             print*,'Total moles prior to equilibrium = ',sum(N)
             ! Get the chemical equilibrium
             ! call state%N_init(T=T_sat,N=N)
-            call state%N_init(N=N,N_h=N,T_h=T_sat)
+            call state%N_init(N=N,N_h=N,T_h=T_sat,T_g=T_g)
             print*,'N reinitialized = ',state%N
             print*,'Total moles prior to equilibrium after reinitialization = ',sum(N)
             print*,''

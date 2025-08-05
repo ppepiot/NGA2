@@ -537,7 +537,7 @@ contains
                   if (this%vf%VF(i,j,k).ne.real(phase,WP)) then
                      d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
                      w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*norm2(d)**2.0_WP
-                     ! if (norm2(d).gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/norm2(d)
+                     ! if (norm2(d).gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/(norm2(d)**2.0_WP)
                   end if
                end do
             end do

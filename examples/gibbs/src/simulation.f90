@@ -199,12 +199,13 @@ contains
 
       ! Initialize the chemical equilibrium framework
       ceq_init: block
+         use param,     only: param_exists
          use mathtools, only: reorder_rows
          use messager,  only: die
          integer :: ng=1
          real(WP), dimension(:,:), allocatable :: Bg
          real(WP), dimension(:),   allocatable :: N_h,N_h_c
-         real(WP) :: T_h
+         real(WP) :: T_h,T_g
          character(len=2) :: eq_cond
          integer :: isc
          ! Read inputs
@@ -238,7 +239,12 @@ contains
                call param_read('Composition for enthalpy calculation',N_h)
                N_h_c=N_h
                call reorder_rows(N_h_c,inpt2mch_sp_order,N_h)
-               call state%N_init(N=N_init,N_h=N_h,T_h=T_h)
+               if (param_exists('Temperature initial guess')) then
+                  call param_read('Temperature initial guess',T_g)
+                  call state%N_init(N=N_init,N_h=N_h,T_h=T_h,T_g=T_g)
+               else
+                  call state%N_init(N=N_init,N_h=N_h,T_h=T_h)
+               end if
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select
@@ -248,7 +254,6 @@ contains
          do isc=1,sys%ns
             print*,trim(sp_names(isc)),': ',state%N(isc)
          end do
-         ! Initialize the chemical state solution vector
          ! Deallocate arrays
          deallocate(Bg,N_h,N_h_c)
       end block ceq_init

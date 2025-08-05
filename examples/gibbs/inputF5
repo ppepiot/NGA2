@@ -10,18 +10,18 @@ Pressure    : 101325
 
 # Species
 Species             : H2O(L) H2O O2 N2
-Initial moles       : 1      1   1  3.71
+Initial moles       : 43.753772327603905 7.2031468803334662E-006 7.2031468803334662E-006 2.6723674926037159E-005
 Constrained species : O2 N2
 
 # Constant enthaply inputs
-Temperature initial guess            : 600
+Temperature initial guess            : 371
 Temperature for enthalpy calculation : 373.15
-Composition for enthalpy calculation : 0 2 1 3.71
+Composition for enthalpy calculation : 43.753772327603905 7.2031468803334662E-006 7.2031468803334662E-006 2.6723674926037159E-005
 
 # Newton iterations
 Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-T tolerance      : 1e-7
+T tolerance      : 1e-5
 T max iterations : 30

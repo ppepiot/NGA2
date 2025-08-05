@@ -39,8 +39,9 @@ Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-T tolerance      : 1e-5
-T max iterations : 30
+Temperature initial guess : 340
+T tolerance               : 1e-5
+T max iterations          : 30
 
 # Time integration
 Max timestep size : 2.4e-4

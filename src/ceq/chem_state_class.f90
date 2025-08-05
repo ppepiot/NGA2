@@ -234,6 +234,8 @@ module chem_state_class
                   this%T=sqrt(T_low*T_high)
                   this%T=max(this%T,0.1_WP*T_high)
                endif
+               ! Debug
+               print*,'Initial guess for temperature = ',this%T
          end select
 
          ! Obtain indexes
@@ -1101,7 +1103,7 @@ module chem_state_class
          allocate(hort(this%sys%ns))
          ! Initialize
          HoR0=this%HoR
-         this%dT=1e5*this%tol_T
+         this%dT=1e5*this%tol_T*this%T
          this%iter_T=0
          Tlo=-1e30 ! Lowest temperature at which h has been evaluated
          Thi= 1e30 ! Highest temperature at which h has been evaluated
