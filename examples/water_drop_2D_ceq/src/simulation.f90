@@ -11,6 +11,7 @@ module simulation
    use string,            only: str_short,str_medium
    use YAMLRead,          only: YAMLElement
    use chem_sys_class,    only: chem_sys
+   use chem_state_class,  only: chem_state,fixed_PH
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use surfmesh_class,    only: surfmesh
@@ -35,8 +36,9 @@ module simulation
    !> Species names
    character(len=str_medium), dimension(:), allocatable :: sp_names
 
-   !> Chemical system
+   !> Chemical system and state
    type(chem_sys)   :: sys
+   type(chem_state) :: state
    
    !> Ensight postprocessing
    type(surfmesh) :: smesh
@@ -60,7 +62,7 @@ module simulation
    real(WP) :: R0,R,V_d
    integer  :: iTl,iTg
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg
-   real(WP) :: T_amb,T_drp
+   real(WP) :: T_amb,T_drp,T_g
    real(WP) :: pressure,air2vw_rat,N2O_rat
    integer  :: ns,np=2
    ! Debug
@@ -205,6 +207,99 @@ contains
    end function get_R
 
    
+   !> Impose the interface jump conditions
+   subroutine interface_jump()
+      implicit none
+      real(WP), dimension(:), allocatable :: vol,mp,N,phasicHoR
+      real(WP) :: V
+      integer  :: i,j,k,index,isc,p
+
+      ! Allocate arrays
+      allocate(vol(Lphase:Gphase))
+      allocate(mp(Lphase:Gphase))
+      allocate(N(ns))
+      allocate(phasicHoR(Lphase:Gphase))
+      
+      ! Loop over the interfacial cells
+      do index=1,vf%band_count(0)
+
+         ! Get the interfacial cell indices
+         i=vf%band_map(1,index)
+         j=vf%band_map(2,index)
+         k=vf%band_map(3,index)
+
+         ! Calculate the phase masses
+         mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+
+         ! Calculate the mole numbers
+         do isc=1,ns
+            p=sc%phase(isc)
+            N(isc)=sc%SC(i,j,k,isc)*mp(p)/MM(isc)
+         end do
+
+         ! Get the liquid and gas enthalpies
+         call state%get_phasic_HoR(Lphase,N,sc%SC(i,j,k,iTl),phasicHoR(Lphase))
+         call state%get_phasic_HoR(Gphase,N,sc%SC(i,j,k,iTg),phasicHoR(Gphase))
+
+         ! Reinitialize the mole numbers
+         call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
+         ! Get the chemical equilibrium
+         call state%equilibrate()
+         N=state%N
+
+         ! Update the phase masses
+         mp=0.0_WP
+         do isc=1,ns
+            mp(sc%phase(isc))=mp(sc%phase(isc))+N(isc)*MM(isc)
+         end do
+
+         ! Get the phase volumes
+         vol=0.0_WP
+         vol=mp/sc%Prho
+         V=sum(vol)
+
+         ! Get the phase change mass flux
+         evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
+
+         ! Relax the interface temperature
+         sc%SC(i,j,k,iTl)=state%T
+         sc%SC(i,j,k,iTg)=state%T
+         T(i,j,k)=state%T
+
+         ! Relax the interface VOF (Need to update the corresponding IRL quantities in vf?)
+         vf%VF(i,j,k)=vol(Lphase)/V
+         sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
+         sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
+
+         ! Relax the interface composition
+         do isc=1,ns
+            sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+         end do
+
+      end do
+
+      ! Sync fields
+      do isc=1,sc%nscalar
+         call cfg%sync(sc%SC(:,:,:,isc))
+      end do
+      call cfg%sync(vf%VF)
+      call cfg%sync(sc%PVF(:,:,:,Lphase))
+      call cfg%sync(sc%PVF(:,:,:,Gphase))
+      call cfg%sync(evp%mdotdp)
+
+      ! Apply boundary conditions
+      call sc%apply_bcond(time%t,time%dt)
+      call vf%apply_bcond(time%t,time%dt)
+
+      ! Filter the pahse change mass flux
+      call evp%filter(F=evp%mdotdp,lvl=2,stc=3)
+
+      ! Deallocate arrays
+      deallocate(vol,mp,N)
+
+   end subroutine interface_jump
+
+
    !> Initialization of problem solver
    subroutine simulation_init
       use param,    only: param_read,param_getsize
@@ -218,6 +313,23 @@ contains
       character(len=str_medium), dimension(:), allocatable :: const_sp
       integer,  dimension(:), allocatable :: CS
       
+
+      ! Read problem inputs
+      read_inputs: block
+         call param_read('Liquid density',rho_l)
+         call param_read('Gas density',rho_g)
+         call param_read('Latent heat',h_lg)
+         call param_read('Liquid thermal conductivity',k_l)
+         call param_read('Liquid specific heat capacity',Cp_l)
+         call param_read('Gas thermal conductivity',k_g)
+         call param_read('Gas specific heat capacity',Cp_g)
+         call param_read('Ambient temperature',T_amb)
+         call param_read('Drop temperature',T_drp)
+         call param_read('Pressure',Pressure)
+         alpha_l=k_l/(rho_l*Cp_l)
+         alpha_g=k_g/(rho_g*Cp_g)
+      end block read_inputs
+
 
       ! Parse the mechanism file
       parse_mech: block
@@ -377,8 +489,8 @@ contains
       end block allocate_work_arrays
 
 
-      ! Initialize the chemical system
-      sys_init: block
+      ! Initialize the chemical equilibrium framework
+      ceq_init: block
          use messager, only: die
          integer :: ng=1
          real(WP), dimension(:,:), allocatable :: Bg
@@ -393,9 +505,18 @@ contains
          end do
          ! Chemical system object
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
+         ! Initialize the chemical state
+         call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
+         call param_read('Newton tolerance',state%tol_N)
+         call param_read('Newton max iterations',state%iter_N_max)
+         if (state%cond.eq.fixed_PH) then
+            call param_read('T tolerance',state%tol_T)
+            call param_read('T max iterations',state%iter_T_max)
+            call param_read('Temperature initial guess',T_g)
+         end if
          ! Deallocate arrays
          deallocate(Bg)
-      end block sys_init
+      end block ceq_init
       
       
       ! Initialize time tracker
@@ -411,23 +532,6 @@ contains
          timeSC%tmax=time%tmax
          timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
-
-
-      ! Read problem inputs
-      read_inputs: block
-         call param_read('Liquid density',rho_l)
-         call param_read('Gas density',rho_g)
-         call param_read('Latent heat',h_lg)
-         call param_read('Liquid thermal conductivity',k_l)
-         call param_read('Liquid specific heat capacity',Cp_l)
-         call param_read('Gas thermal conductivity',k_g)
-         call param_read('Gas specific heat capacity',Cp_g)
-         call param_read('Ambient temperature',T_amb)
-         call param_read('Drop temperature',T_drp)
-         call param_read('Pressure',Pressure)
-         alpha_l=k_l/(rho_l*Cp_l)
-         alpha_g=k_g/(rho_g*Cp_g)
-      end block read_inputs
       
       
       ! Initialize our VOF solver and field
@@ -556,6 +660,7 @@ contains
          call param_read('Nitrogen to oxygen mole ratio',N2O_rat)
          ! Create scalar solver
          call sc%initialize(cfg=cfg,nscalar=ns+2,name='tpscalar')
+         sc%skip(get_sp_ind('H2O(L)'))=.true.
          ! Boundary conditinos
          call sc%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call sc%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
@@ -575,6 +680,7 @@ contains
             end if
             sc%phase(isc)=sys%get_pind(isc)
          end do
+         sc%SCname(get_sp_ind('H2O'))='H2O_g'
          sc%phase(iTl)=Lphase
          sc%phase(iTg)=Gphase
          ! Initialize the phasic density and VOF
@@ -655,96 +761,15 @@ contains
       end block create_evp
 
 
-      ! Interface jump conditions
-      interface_jump: block
-         use chem_state_class, only: chem_state,fixed_PT,fixed_PH
-         type(chem_state) :: state
-         real(WP), dimension(:), allocatable :: vol,mp,N,phasicHoR
-         real(WP) :: V
-         integer :: i,j,k,index,isc,p
-         real(WP) :: T_g
-         ! Allocate arrays
-         allocate(vol(Lphase:Gphase))
-         allocate(mp(Lphase:Gphase))
-         allocate(N(ns))
-         allocate(phasicHoR(Lphase:Gphase))
-         ! Initialize the chemical state
-         call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
-         call param_read('Newton tolerance',state%tol_N)
-         call param_read('Newton max iterations',state%iter_N_max)
-         if (state%cond.eq.fixed_PH) then
-            call param_read('T tolerance',state%tol_T)
-            call param_read('T max iterations',state%iter_T_max)
-            call param_read('Temperature initial guess',T_g)
-         end if
-         ! Loop over the interfacial cells
-         do index=1,vf%band_count(0)
-            ! Get the interfacial cell indices
-            i=vf%band_map(1,index)
-            j=vf%band_map(2,index)
-            k=vf%band_map(3,index)
-            ! Calculate the phase masses
-            mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
-            ! Calculate the mole numbers
-            do isc=1,ns
-               p=sc%phase(isc)
-               N(isc)=sc%SC(i,j,k,isc)*mp(p)/MM(isc)
-            end do
-            ! Get the liquid and gas enthalpies
-            call state%get_phasic_HoR(Lphase,N,sc%SC(i,j,k,iTl),phasicHoR(Lphase))
-            call state%get_phasic_HoR(Gphase,N,sc%SC(i,j,k,iTg),phasicHoR(Gphase))
-            ! Reinitialize the mole numbers
-            call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
-            ! Get the chemical equilibrium
-            call state%equilibrate()
-            N=state%N
-            ! Update the phase masses
-            mp=0.0_WP
-            do isc=1,ns
-               mp(sc%phase(isc))=mp(sc%phase(isc))+N(isc)*MM(isc)
-            end do
-            ! Get the phase volumes
-            vol=0.0_WP
-            vol=mp/sc%Prho
-            V=sum(vol)
-            ! Get the phase change mass flux
-            evp%mdotdp(i,j,k)=(V-cfg%vol(i,j,k))/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*cfg%vol(i,j,k)*vf%SD(i,j,k))
-            ! Relax the interface temperature
-            sc%SC(i,j,k,iTl)=state%T
-            sc%SC(i,j,k,iTg)=state%T
-            T(i,j,k)=state%T
-            ! Relax the interface VOF (Need to update the corresponding IRL quantities in vf?)
-            vf%VF(i,j,k)=vol(Lphase)/V
-            sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
-            sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
-            ! Relax the interface composition
-            do isc=1,ns
-               sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
-            end do
-         end do
-         ! Sync fields
-         do isc=1,sc%nscalar
-            call cfg%sync(sc%SC(:,:,:,isc))
-         end do
-         call cfg%sync(vf%VF)
-         call cfg%sync(sc%PVF(:,:,:,Lphase))
-         call cfg%sync(sc%PVF(:,:,:,Gphase))
-         call cfg%sync(evp%mdotdp)
-         ! Apply boundary conditions
-         call sc%apply_bcond(time%t,time%dt)
-         call vf%apply_bcond(time%t,time%dt)
-         ! Get the volumetric evaporation mass flux
-         call evp%get_mflux()
-         ! Initialize the liquid and gas side mass fluxes
-         call evp%init_mfluxLG()
-         ! Get the interface normal
-         call evp%get_normal()
-         ! Deallocate arrays
-         deallocate(vol,mp,N)
-      end block interface_jump
-
-
-      ! Initialize drop radius
+      ! Apply the interface jump conditions
+      call interface_jump()
+      ! Get the volumetric evaporation mass flux
+      call evp%get_mflux()
+      ! Initialize the liquid and gas mass fluxes
+      call evp%init_mfluxLG()
+      ! Get the interface normal
+      call evp%get_normal()
+      ! Get the drop radius
       R=get_R()
 
 
@@ -914,6 +939,7 @@ contains
 
             ! Advance scalar advection
             do isc=1,sc%nscalar
+               if (sc%skip(isc)) cycle
                where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(isc)).gt.VFlo) sc%SC(:,:,:,isc)=(sc%PVFold(:,:,:,sc%phase(isc))*sc%SCold(:,:,:,isc)+time%dt*(resSC(:,:,:,isc)+evp%div_src_old(:,:,:)*sc%SCold(:,:,:,isc)))/sc%PVF(:,:,:,sc%phase(isc))
                where (sc%PVF(:,:,:,sc%phase(isc)).eq.0.0_WP) sc%SC(:,:,:,isc)=0.0_WP
             end do
@@ -934,6 +960,7 @@ contains
                ! Explicit calculation of dVOFSC/dt from scalar diffusion
                call sc%get_dSCdt_dff(dSCdt=resSC)
                do isc=1,sc%nscalar
+                  if (sc%skip(isc)) cycle
                   where (sc%mask.eq.0.and.sc%PVF(:,:,:,sc%phase(isc)).gt.VFlo) resSC(:,:,:,isc)=timeSC%dt*resSC(:,:,:,isc)/sc%PVF(:,:,:,sc%phase(isc))
                   where (sc%PVF(:,:,:,sc%phase(isc)).eq.0.0_WP) resSC(:,:,:,isc)=0.0_WP
                end do
@@ -954,8 +981,9 @@ contains
 
          end block advance_scalar
 
-         ! Interface jump conditions
-
+         ! Apply the interface jump conditions
+         call interface_jump()
+         
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
 

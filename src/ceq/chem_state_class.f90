@@ -115,12 +115,12 @@ module chem_state_class
             case (fixed_PH)
                this%get_ceq=>get_ceq_PH
             case default
-               call die('[chem_sys initialize] The chemical state must be at either constant temperature or constant enthalpy')
+               call die('[chem_state initialize] The chemical state must be at either constant temperature or constant enthalpy')
          end select
          this%cond=cond
 
          ! Determine pressure in standard atmospheres
-         if (p.le.0.0_WP) call die('[chem_sys initialize] Pressure must be strictly positive')
+         if (p.le.0.0_WP) call die('[chem_state initialize] Pressure must be strictly positive')
          this%p=p/p0
 
          ! Obtain indexes
@@ -213,10 +213,10 @@ module chem_state_class
          select case (this%cond)
             case (fixed_PT)
                if (present(T)) then
-                  if (T.lt.T_low.or.T.gt.T_high) call die('[chem_sys initialize] Temperature out of range')
+                  if (T.lt.T_low.or.T.gt.T_high) call die('[chem_state initialize] Temperature out of range')
                   this%T=T
                else
-                  call die('[chem_sys initialize] Temperature is required for the fixed temperature condition')
+                  call die('[chem_state initialize] Temperature is required for the fixed temperature condition')
                end if
             case (fixed_PH)
                if (present(HoR)) then
@@ -226,11 +226,11 @@ module chem_state_class
                   call this%get_hort(this%sys%ns,T_h,this%sys%thermo,h)
                   this%HoR=sum(N0*h)*T_h
                else
-                  call die('[chem_sys initialize] Both N_h and T_h are required for the fixed enthalpy case')
+                  call die('[chem_state initialize] Both N_h and T_h are required for the fixed enthalpy case')
                end if
                if (present(T_g)) then
                   this%T=T_g
-                  if (T_g.lt.T_low.or.T_g.gt.T_high) call die('[chem_sys initialize] Guessed temperature out of range')
+                  if (T_g.lt.T_low.or.T_g.gt.T_high) call die('[chem_state initialize] Guessed temperature out of range')
                else
                   this%T=sqrt(T_low*T_high)
                   this%T=max(this%T,0.1_WP*T_high)
@@ -255,7 +255,7 @@ module chem_state_class
          elseif(present(N)) then
             cb(1:nc)=matmul(N,this%sys%B)
          else
-            call die('[chem_sys initialize] Neither c nor N specified')
+            call die('[chem_state initialize] Neither c nor N specified')
          endif
 
          ! Form modified and reduced constraints
@@ -281,7 +281,7 @@ module chem_state_class
                   if (this%cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,this%sys%thermo,this%T)
                endif
                ! SBP end of added
-               call die('[chem_sys initialize] All zero composition')
+               call die('[chem_state initialize] All zero composition')
             endif
 
             ! Use initial guess N_g if provided
@@ -324,7 +324,7 @@ module chem_state_class
                endif
                ! Determine min_g composition
                call this%get_Nming(nsu,nrc,this%sys%BR,this%cr,gu,Ng,iret)
-               if (iret.lt.0) call die('[chem_sys initialize] get_Nming failed')
+               if (iret.lt.0) call die('[chem_state initialize] get_Nming failed')
                ! Form initial guess Nu0
                Nu0=Ng+frac_Nm*(Nm-Ng)
             else

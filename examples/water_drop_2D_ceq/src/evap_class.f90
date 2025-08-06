@@ -102,6 +102,7 @@ module evap_class
       procedure :: get_bcond                                           !< Get a boundary condition
       procedure :: apply_bcond                                         !< Apply all boundary conditions
       procedure :: get_temperature_grad                                !< Get the temperature gradient
+      procedure :: filter                                              !< Conservatively volume filter a filed that is defined at the interface
 
    end type evap
 
@@ -819,6 +820,124 @@ contains
       call this%pure_interfacial_extp(Lphase,this%Tl_grd)
       call this%pure_interfacial_extp(Gphase,this%Tg_grd)
    end subroutine get_temperature_grad
+
+
+   !> Filter an interfacial field in a conservative way
+   subroutine filter(this,F,lvl,stc)
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
+      use parallel,  only: MPI_REAL_WP
+      implicit none
+      class(evap), intent(in) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F
+      integer, intent(in) :: lvl,stc
+      real(WP), dimension(:,:,:), allocatable   :: F_c
+      real(WP), dimension(:,:,:), allocatable   :: w
+      integer  :: i,j,k,ihat,jhat,khat,index,ierr,ilvl
+      integer :: stxm,stym,stzm
+      integer :: stxp,styp,stzp
+      integer :: stx,sty,stz
+      real(WP) :: my_F_int,F_int,F_int_org
+      
+      if (lvl.lt.1) return
+
+      ! Check the dimensions
+      if (this%nCell(1).gt.1) then
+         stxm=-stc; stxp=+stc
+      else
+         stxm= 0; stxp= 0
+      end if
+      if (this%nCell(2).gt.1) then
+         stym=-stc; styp=+stc
+      else
+         stym= 0; styp= 0
+      end if
+      if (this%nCell(3).gt.1) then
+         stzm=-stc; stzp=+stc
+      else
+         stzm= 0; stzp= 0
+      end if
+
+      ! Allocate the arrays
+      allocate(w(stxm:stxp,stym:styp,stzm:stzp))
+      allocate(F_c(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+
+      ! Loop over the filtering levels
+      do ilvl=1,lvl
+
+         ! Initialize 
+         F_c=F
+         F=0.0_WP
+
+         ! Loop over the interfacial cells
+         do index=1,this%vf%band_count(0)
+            ! Get the interfacial cell indices
+            ihat=this%vf%band_map(1,index)
+            jhat=this%vf%band_map(2,index)
+            khat=this%vf%band_map(3,index)
+            ! Initialize weights
+            w=0.0_WP
+            ! Loop over the stencil
+            do stz=stzm,stzp
+               k=khat+stz
+               do sty=stym,styp
+                  j=jhat+sty
+                  do stx=stxm,stxp
+                     i=ihat+stx
+                     ! Calculate the weight
+                     if (this%vf%VF(i,j,k).gt.VFlo.and.this%vf%VF(i,j,k).lt.VFhi) w(stx,sty,stz)=this%cfg%vol(i,j,k)
+                  end do
+               end do
+            end do
+            ! Normalize the weights
+            w=w/sum(w)
+            ! Loop over the stencil
+            do stz=stzm,stzp
+               k=khat+stz
+               do sty=stym,styp
+                  j=jhat+sty
+                  do stx=stxm,stxp
+                     i=ihat+stx
+                     ! Apply the filter
+                     if (this%vf%VF(i,j,k).gt.VFlo.and.this%vf%VF(i,j,k).lt.VFhi) F(i,j,k)=F(i,j,k)+w(stx,sty,stz)*F_c(ihat,jhat,khat)
+                  end do
+               end do
+            end do
+         end do
+
+         ! Sync the field
+         call this%cfg%syncsum(F)
+         call this%cfg%sync(F)
+
+      end do
+
+      ! Calculate the integral of the field
+      my_F_int=0.0_WP
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               my_F_int=my_F_int+this%cfg%vol(i,j,k)*F(i,j,k)
+            end do
+         end do
+      end do
+      call MPI_ALLREDUCE(my_F_int,F_int,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
+
+      my_F_int=0.0_WP
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               my_F_int=my_F_int+this%cfg%vol(i,j,k)*F_c(i,j,k)
+            end do
+         end do
+      end do
+      call MPI_ALLREDUCE(my_F_int,F_int_org,1,MPI_REAL_WP,MPI_SUM,this%cfg%comm,ierr)
+
+      if (this%cfg%amRoot) print*,'Integral error = ',F_int-F_int_org
+
+      ! Deallocate arrays
+      deallocate(w,F_c)
+
+   end subroutine filter
+
 
 
    !> Calculate the CFL

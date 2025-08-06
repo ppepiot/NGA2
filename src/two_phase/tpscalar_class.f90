@@ -59,6 +59,7 @@ module tpscalar_class
       character(len=str_medium), dimension(:), allocatable :: SCname     !< Names of scalars
       real(WP), dimension(:,:,:,:),            allocatable :: SC         !< SC array
       real(WP), dimension(:,:,:,:),            allocatable :: SCold      !< SCold array
+      logical, dimension(:),                   allocatable :: skip       !< Skip solving for scalar
 
       ! Phas-specific quantities
       real(WP), dimension(:,:,:,:),            allocatable :: PVF        !< Phasic VOF
@@ -127,6 +128,10 @@ contains
       ! Initialize scalar phase
       allocate(this%phase(1:this%nscalar))
       this%phase=0  ! User will set phase
+
+      ! Initialize skip
+      allocate(this%skip(1:this%nscalar))
+      this%skip=.false. ! User will set them if needed
       
       ! Point to pgrid object
       this%cfg=>cfg
@@ -447,6 +452,7 @@ contains
                
                ! Implement based on bcond direction
                do nsc=1,this%nscalar
+                  if (this%skip(nsc)) cycle
                   do n=1,my_bc%itr%n_
                      i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                      this%SC(i,j,k,nsc)=this%SC(i-shift(1,my_bc%dir),j-shift(2,my_bc%dir),k-shift(3,my_bc%dir),nsc)
@@ -466,6 +472,7 @@ contains
       
       ! Sync full fields after all bcond
       do nsc=1,this%nscalar
+         if (this%skip(nsc)) cycle
          call this%cfg%sync(this%SC(:,:,:,nsc))
       end do
       
@@ -553,6 +560,7 @@ contains
       allocate(grad(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       ! Work on each scalar
       do nsc=1,this%nscalar
+         if (this%skip(nsc)) cycle
          ! Get the phase index
          p=this%phase(nsc)
          ! Reset fluxes and gradient to zero
@@ -759,6 +767,7 @@ contains
       allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       ! Work on each scalar
       do nsc=1,this%nscalar
+         if (this%skip(nsc)) cycle
          ! Get the phase index
          p=this%phase(nsc)
          ! Reset fluxes to zero
@@ -855,6 +864,9 @@ contains
 
       ! Apply implicit treatment for each scalar
       do nsc=1,this%nscalar
+
+         if (this%skip(nsc)) cycle
+
          ! Get the phase index
          p=this%phase(nsc)
 
