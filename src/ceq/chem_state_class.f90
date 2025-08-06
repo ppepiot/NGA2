@@ -60,6 +60,7 @@ module chem_state_class
       procedure :: initialize                                  !< Object initializer
       procedure :: N_init                                      !< Initialize the number of moles of species
       procedure :: get_hort                                    !< Get the normalized enthalpy
+      procedure :: get_phasic_HoR                              !< Get the phasic H/R
       procedure :: get_gort                                    !< Get the normalized Gibbs free energy
       procedure :: hor2T                                       !< Convert enthalpy to temperature
       procedure :: get_dgdT                                    !< 
@@ -176,14 +177,14 @@ module chem_state_class
 
          !  p   -pressure
 
-         ! (For a fixed (p,T) equilibrium calculation,specify T: do not specify HoR,N_h or T_h.)
+         ! (For a fixed (p,T) equilibrium calculation, specify T: do not specify HoR, N_h or T_h.)
          ! T-temperature (K) for fixed-temperature problem
 
-         ! (For a fixed (p,H) equilibrium calculation,specify either HoR or N_h and T_h: 
+         ! (For a fixed (p,H) equilibrium calculation, specify either HoR or N_h and T_h: 
          !  do not specify T.)
-         ! HoR the fixed value of H/R [moles K],where H=enthalpy,R=universal gas constant.
+         ! HoR the fixed value of H/R [moles K], where H=enthalpy, R=universal gas constant.
          ! N_h species moles used to calculate H  (real(ns))
-         ! T_h temperature used to calculate H as:  H/R=sum(N_h h(T_h)/R),where
+         ! T_h temperature used to calculate H as:  H/R=sum(N_h h(T_h)/R), where
          !     h(T_h)/R [which has dimensions K] is the molar specific species enthalpy.
 
          ! (Initial guesses are not needed, and should not be specified unless they
@@ -234,8 +235,6 @@ module chem_state_class
                   this%T=sqrt(T_low*T_high)
                   this%T=max(this%T,0.1_WP*T_high)
                endif
-               ! Debug
-               print*,'Initial guess for temperature = ',this%T
          end select
 
          ! Obtain indexes
@@ -401,6 +400,41 @@ module chem_state_class
             endif
          end do
       end subroutine get_hort
+
+
+      !> Get the phasic enthalpy (H/R) at temperature T
+      subroutine get_phasic_HoR(this,phase,N,T,HoR)
+         use mathtools, only: reorder_rows
+         implicit none
+         class(chem_state), intent(in) :: this
+         integer, intent(in)  :: phase ! Follows IRL convention; 0 if liquid, 1 if gas
+         real(WP), intent(in) :: T,N(this%sys%ns)
+         real(WP), intent(out) :: HoR
+         real(WP) :: th(6),Tpnm1,Nro(this%sys%ns)
+         integer :: k,m
+         ! Reorder mole numbers
+         call reorder_rows(N,this%sys%sp_order,Nro)
+         ! Initialize with zero
+         HoR=0.0_WP
+         ! Use NASA polynomials
+         th(1)=1.0_WP  ! coefficient multipliers for enthalpy
+         th(6)=1./T
+         Tpnm1=1.0_WP
+         do m=2,5
+            Tpnm1=Tpnm1*T            ! =T.^(m-1)
+            th(m)=Tpnm1/float(m)     ! =T.^(m-1) ./ m
+         end do
+         do k=1,this%sys%ns
+            if (int(this%sys%P(k,Gphase)).eq.phase) then
+               if (T<this%sys%thermo(k,1)) then
+                  HoR=HoR+Nro(k)*dot_product(this%sys%thermo(k,2:7),th)  ! coefficients in lower temperature range
+               else
+                  HoR=HoR+Nro(k)*dot_product(this%sys%thermo(k,9:14),th) ! coefficients in upper temperature range
+               endif
+            end if
+         end do
+         HoR=T*HoR
+      end subroutine get_phasic_HoR
 
 
       !> Get normalized Gibbs functions at temperature T

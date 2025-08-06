@@ -195,7 +195,8 @@ module chem_sys_class
       
          ! Re-order P
          call reorder_rows(P,this%sp_order,this%P)
-      
+
+         ! Diagnostics level
          this%diag=diag
 
       end subroutine initialize
