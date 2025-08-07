@@ -202,7 +202,7 @@ contains
    function get_R()
       use mathtools, only: Pi
       real(WP) :: get_R
-      call sc%cfg%integrate(sc%PVF(:,:,:,Lphase),V_d)
+      call sc%cfg%integrate(vf%VF,V_d)
       get_R=sqrt(V_d/(Lz*Pi))
    end function get_R
 
