@@ -561,6 +561,9 @@ contains
          evp%rho_g=fs%rho_g
          ! Get temperature gradient
          call evp%get_temperature_grad()
+         ! Debug
+         where (vf%VF.eq.1.0_WP) evp%Tl_grd=0.0_WP
+         where (vf%VF.eq.0.0_WP) evp%Tg_grd=0.0_WP
          ! Interface jump conditions
          evp%mdotdp=0.0_WP
          do k=evp%cfg%kmin_,evp%cfg%kmax_

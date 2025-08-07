@@ -489,7 +489,7 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer  :: i,j,k,ihat,jhat,khat,index,ierr
       real(WP), dimension(:,:,:), allocatable :: w
-      real(WP) :: wsum
+      real(WP) :: wsum,dsqrd
       integer :: stxm,stym,stzm
       integer :: stxp,styp,stzp
       integer :: stx,sty,stz
@@ -534,10 +534,12 @@ contains
                do stx=stxm,stxp
                   i=ihat+stx
                   ! Calculate the weight
-                  if (this%vf%VF(i,j,k).ne.real(phase,WP)) then
+                  if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
                      d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
-                     w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*norm2(d)**2.0_WP
-                     ! if (norm2(d).gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/(norm2(d)**2.0_WP)
+                     dsqrd=sum(d*d)
+                     ! w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*dsqrd
+                     dsqrd=dsqrd*dsqrd
+                     if (dsqrd.gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/dsqrd
                   end if
                end do
             end do
@@ -555,13 +557,14 @@ contains
                do stx=stxm,stxp
                   i=ihat+stx
                   ! Update the interfacial value
-                  A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
+                  if (w(stx,sty,stz).gt.0.0_WP) A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
                end do
             end do
          end do
       end do
 
       ! Sync the scalar field
+      call this%cfg%syncsum(A)
       call this%cfg%sync(A)
 
       ! Deallocate weights
@@ -591,20 +594,20 @@ contains
          j=this%vf%band_map(2,index_pure)
          k=this%vf%band_map(3,index_pure)
          ! Calculate the Gauss gradient
-         if (this%vf%VF(i,j,k).ne.real(phase,WP)) then
-            ! A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
-            ! &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
-            ! &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
-            grdm=this%cfg%dxmi(i  )*(A(i  ,j,k)-A(i-1,j,k))
-            grdp=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i  ,j,k))
-            grdX=minmod(grdm,grdp)
-            grdm=this%cfg%dymi(j  )*(A(i,j  ,k)-A(i,j-1,k))
-            grdp=this%cfg%dymi(j+1)*(A(i,j+1,k)-A(i,j ,k))
-            grdY=minmod(grdm,grdp)
-            grdm=this%cfg%dzmi(k  )*(A(i,j,k  )-A(i,j,k-1))
-            grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
-            grdZ=minmod(grdm,grdp)
-            A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
+         if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
+            A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
+            &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
+            &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
+            ! grdm=this%cfg%dxmi(i  )*(A(i  ,j,k)-A(i-1,j,k))
+            ! grdp=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i  ,j,k))
+            ! grdX=minmod(grdm,grdp)
+            ! grdm=this%cfg%dymi(j  )*(A(i,j  ,k)-A(i,j-1,k))
+            ! grdp=this%cfg%dymi(j+1)*(A(i,j+1,k)-A(i,j ,k))
+            ! grdY=minmod(grdm,grdp)
+            ! grdm=this%cfg%dzmi(k  )*(A(i,j,k  )-A(i,j,k-1))
+            ! grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
+            ! grdZ=minmod(grdm,grdp)
+            ! A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
          end if
       end do
       ! Sync it
