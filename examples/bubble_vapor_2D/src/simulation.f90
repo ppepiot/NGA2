@@ -51,6 +51,8 @@ module simulation
    ! Debug
    real(WP) :: prhs_int
    real(WP) :: mfr_err
+   real(WP) :: Tlgrd_min,Tlgrd_max,Tlgrd_avg,Tlgrd_ext
+   type(monitor) :: tlgrd_file
    
 contains
 
@@ -221,6 +223,35 @@ contains
       get_R=sqrt(V_b/(Pi*Lz))
    end function get_R
 
+
+   ! Debug
+   subroutine get_tlgrd()
+      use mpi_f08,   only: MPI_MAX,MPI_MIN,MPI_SUM,MPI_ALLREDUCE
+      use parallel,  only: MPI_REAL_WP
+      integer :: index,i,j,k,ierr
+      real(WP) :: my_area,area,my_Tlgrd_min,my_Tlgrd_max,my_Tlgrd_avg,tlgrd
+      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t+t0)*integrand(0.0_WP,beta)
+      my_Tlgrd_min=1e6
+      my_Tlgrd_max=0.0_WP
+      my_Tlgrd_avg=0.0_WP
+      my_area=0.0_WP
+      do index=1,vf%band_count(0)
+         i=vf%band_map(1,index)
+         j=vf%band_map(2,index)
+         k=vf%band_map(3,index)
+         tlgrd=evp%Tl_grd(i,j,k)
+         if (tlgrd.lt.my_Tlgrd_min) my_Tlgrd_min=tlgrd
+         if (tlgrd.gt.my_Tlgrd_max) my_Tlgrd_max=tlgrd
+         my_area=my_area+cfg%vol(i,j,k)*vf%SD(i,j,k)
+         my_Tlgrd_avg=my_Tlgrd_avg+cfg%vol(i,j,k)*vf%SD(i,j,k)*tlgrd
+      end do
+      call MPI_ALLREDUCE(my_Tlgrd_min,Tlgrd_min,1,MPI_REAL_WP,MPI_MIN,cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_Tlgrd_max,Tlgrd_max,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_area,area,1,MPI_REAL_WP,MPI_SUM,cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_Tlgrd_avg,Tlgrd_avg,1,MPI_REAL_WP,MPI_SUM,cfg%comm,ierr)
+      Tlgrd_avg=Tlgrd_avg/area
+   end subroutine get_tlgrd
+
    
    !> Initialization of problem solver
    subroutine simulation_init
@@ -310,7 +341,8 @@ contains
             print*,'Absolute error =',err
             print*,'Bi-section iterations =',it
             ! Debug
-            print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
+            ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
+            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*integrand(0.0_WP,beta)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -538,12 +570,12 @@ contains
       ! Create and initialize an evp object
       create_evp: block
          ! Debug
-         use mpi_f08, only: MPI_MAX,MPI_ALLREDUCE
+         use mpi_f08, only: MPI_MAX,MPI_MIN,MPI_ALLREDUCE
          use parallel,  only: MPI_REAL_WP
          ! use evap_class, only: symmetry
-         integer :: i,j,k
+         integer :: i,j,k,index
          ! Debug
-         real(WP) :: my_mdotdp_max,mdotdp_max
+         real(WP) :: my_mdotdp_max,mdotdp_max,my_Tgrd,Tgrd
          integer :: ierr
          ! Create the object
          call evp%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
@@ -583,9 +615,22 @@ contains
          ! Get the interface normal
          call evp%get_normal()
          ! Debug
-         my_mdotdp_max=maxval(evp%mdotdp)
-         call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
-         if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
+         ! my_mdotdp_max=maxval(evp%mdotdp)
+         ! call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
+         ! if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
+         my_Tgrd=maxval(evp%Tl_grd)
+         call MPI_ALLREDUCE(my_Tgrd,Tgrd,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
+         if (evp%cfg%amRoot) print*,'Numerical T grad max = ',Tgrd
+         ! Loop over the interfacial cells
+         my_Tgrd=1e6
+         do index=1,vf%band_count(0)
+            i=vf%band_map(1,index)
+            j=vf%band_map(2,index)
+            k=vf%band_map(3,index)
+            if (evp%Tl_grd(i,j,k).lt.my_Tgrd) my_Tgrd=evp%Tl_grd(i,j,k)
+         end do
+         call MPI_ALLREDUCE(my_Tgrd,Tgrd,1,MPI_REAL_WP,MPI_MIN,evp%cfg%comm,ierr)
+         if (evp%cfg%amRoot) print*,'Numerical T grad min = ',Tgrd
       end block create_evp
 
 
@@ -665,6 +710,15 @@ contains
          mfr_err=abs(mfr_err-sum(fs%mfr))
          call mfile%add_column(mfr_err,'mfr_err')
          call mfile%write()
+         call get_tlgrd()
+         tlgrd_file=monitor(cfg%amRoot,'Tl_grad')
+         call tlgrd_file%add_column(time%n,'Timestep number')
+         call tlgrd_file%add_column(time%t,'Time')
+         call tlgrd_file%add_column(Tlgrd_min,'Tl grad min')
+         call tlgrd_file%add_column(Tlgrd_max,'Tl grad max')
+         call tlgrd_file%add_column(Tlgrd_avg,'Tl grad avg')
+         call tlgrd_file%add_column(Tlgrd_ext,'Tl grad ext')
+         call tlgrd_file%write()
          ! Create CFL monitor
          cflfile=monitor(fs%cfg%amRoot,'cfl')
          call cflfile%add_column(time%n,'Timestep number')
@@ -987,6 +1041,9 @@ contains
          call cflfile%write()
          call scfile%write()
          call evpfile%write()
+         ! Debug
+         call get_tlgrd()
+         call tlgrd_file%write()
          
       end do
 
