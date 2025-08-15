@@ -564,7 +564,6 @@ contains
       end do
 
       ! Sync the scalar field
-      call this%cfg%syncsum(A)
       call this%cfg%sync(A)
 
       ! Deallocate weights
