@@ -3,10 +3,10 @@ Partition : 2 4 1
 
 # Mesh definition
 L  : 0.01
-#n  : 256 ! 128 ! 512
-Lu : 0.004
-nu : 350
-r  : 1.01
+n  : 256 ! 128 ! 512
+# Lu : 0.004
+# nu : 350
+# r  : 1.01
 
 # Case parameters
 Bubble center         : 0 0 0
@@ -28,14 +28,14 @@ Saturation temperature        : 373.15
 Latent heat                   : 2.256e6
 
 # Time integration
-Max timestep size : 9.60377E-06 ! 6.06868E-05 ! 1.71648E-04 ! 2.14560E-05
+Max timestep size : 9.60377E-06 ! 1.71648E-04 ! 2.14560E-05
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 9.60377E-08 ! 6.06868E-07 ! 1.71648E-06 ! 2.14560E-07
+Scalar time step  : 9.60377E-08 ! 1.71648E-06 ! 2.14560E-07
 Max time          : 0.224784
 
 # Evaporation
-Max pseudo timestep size : 1.03468E-05 ! 3.59969E-05 ! 7.51668E-05 ! 1.76458E-05
+Max pseudo timestep size : 1.03468E-05 ! 7.51668E-05 ! 1.76458E-05
 Max pseudo cfl number    : 0.9
 Max pseudo time steps    : 10
 Mass flux tolerence      : 1e-15

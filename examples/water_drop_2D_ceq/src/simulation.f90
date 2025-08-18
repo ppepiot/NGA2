@@ -211,7 +211,7 @@ contains
    subroutine interface_jump()
       implicit none
       real(WP), dimension(:), allocatable :: vol,mp,N,phasicHoR
-      real(WP) :: V
+      real(WP) :: V,Nsum
       integer  :: i,j,k,index,isc,p
 
       ! Allocate arrays
@@ -237,6 +237,10 @@ contains
             N(isc)=sc%SC(i,j,k,isc)*mp(p)/MM(isc)
          end do
 
+         ! Normalize the mole numbers
+         Nsum=sum(N)
+         N=N/Nsum
+
          ! Get the liquid and gas enthalpies
          call state%get_phasic_HoR(Lphase,N,sc%SC(i,j,k,iTl),phasicHoR(Lphase))
          call state%get_phasic_HoR(Gphase,N,sc%SC(i,j,k,iTg),phasicHoR(Gphase))
@@ -245,7 +249,8 @@ contains
          call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
          ! Get the chemical equilibrium
          call state%equilibrate()
-         N=state%N
+         ! N=state%N
+         N=state%N*Nsum
 
          ! Update the phase masses
          mp=0.0_WP

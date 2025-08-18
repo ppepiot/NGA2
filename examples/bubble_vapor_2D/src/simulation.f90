@@ -308,6 +308,7 @@ contains
 
       ! Analytical solution
       analytical_solution: block
+         use messager, only: die
          use mpi_f08,  only: MPI_BCAST
          use parallel, only: MPI_REAL_WP
          real(WP) :: err,tol
@@ -336,10 +337,12 @@ contains
                   betaL=beta
                endif
             end do
+            it=min(it,itmax)
             print*,'Convergence = ',convergence
             print*,'beta =',beta
             print*,'Absolute error =',err
             print*,'Bi-section iterations =',it
+            if (.not.convergence) call die('[simulation_init] Bi-section failed')
             ! Debug
             ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
             print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*integrand(0.0_WP,beta)
@@ -569,14 +572,8 @@ contains
 
       ! Create and initialize an evp object
       create_evp: block
-         ! Debug
-         use mpi_f08, only: MPI_MAX,MPI_MIN,MPI_ALLREDUCE
-         use parallel,  only: MPI_REAL_WP
          ! use evap_class, only: symmetry
          integer :: i,j,k,index
-         ! Debug
-         real(WP) :: my_mdotdp_max,mdotdp_max,my_Tgrd,Tgrd
-         integer :: ierr
          ! Create the object
          call evp%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     evp%mflux_tol)
@@ -611,23 +608,6 @@ contains
          call evp%init_mfluxLG()
          ! Get the interface normal
          call evp%get_normal()
-         ! Debug
-         ! my_mdotdp_max=maxval(evp%mdotdp)
-         ! call MPI_ALLREDUCE(my_mdotdp_max,mdotdp_max,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
-         ! if (evp%cfg%amRoot) print*,'Numerical mass flux = ',mdotdp_max
-         my_Tgrd=maxval(evp%Tl_grd)
-         call MPI_ALLREDUCE(my_Tgrd,Tgrd,1,MPI_REAL_WP,MPI_MAX,evp%cfg%comm,ierr)
-         if (evp%cfg%amRoot) print*,'Numerical T grad max = ',Tgrd
-         ! Loop over the interfacial cells
-         my_Tgrd=1e6
-         do index=1,vf%band_count(0)
-            i=vf%band_map(1,index)
-            j=vf%band_map(2,index)
-            k=vf%band_map(3,index)
-            if (evp%Tl_grd(i,j,k).lt.my_Tgrd) my_Tgrd=evp%Tl_grd(i,j,k)
-         end do
-         call MPI_ALLREDUCE(my_Tgrd,Tgrd,1,MPI_REAL_WP,MPI_MIN,evp%cfg%comm,ierr)
-         if (evp%cfg%amRoot) print*,'Numerical T grad min = ',Tgrd
       end block create_evp
 
 
