@@ -2,14 +2,14 @@
 Partition : 2 4 1
 
 # Mesh definition
-L : 1.2e-3 ! 1.2 ! 1.2e-3
+L : 1.2e-3
 n : 128
 
 # Case parameters
 Drop center         : 0 0 0
-Drop radius         : 1.5e-4 ! 0.15 ! 1.5e-4
-Drop temperature    : 298.15
-Ambient temperature : 323.15
+Drop radius         : 1.5e-4
+Drop temperature    : 353
+Ambient temperature : 373
 Pressure            : 101325
 
 # Mechanism
@@ -17,22 +17,23 @@ Mechanism file : gri30.yaml
 
 # Fluid properties (water)
 Gravity                       : 0 0 0
-Liquid dynamic viscosity      : 2.81e-4
-Gas dynamic viscosity         : 1.26e-6
-Liquid density                : 958
-Gas density                   : 0.59
-Surface tension coefficient   : 0.001
+Liquid dynamic viscosity      : 1.137e-3
+Gas dynamic viscosity         : 1.78e-5
+Liquid density                : 1000
+Gas density                   : 1.226
+Surface tension coefficient   : 0.07
 Liquid thermal conductivity   : 0.6
-Gas thermal conductivity      : 0.026
-Liquid specific heat capacity : 4216
-Gas specific heat capacity    : 2034
+Gas thermal conductivity      : 0.046
+Liquid specific heat capacity : 4180
+Gas specific heat capacity    : 1000
 Saturation temperature        : 373.15
-Latent heat                   : 2.256e6
+Latent heat                   : 2.3e6
+Species diffusivity           : 2e-5
 
 # Species and mole ratios
 Species                        : H2O(L) H2O O2 N2
 Constrained species            : O2 N2
-Air to water vapor mole ratio  : 1
+Water vapor to air mole ratio  : 0
 Nitrogen to oxygen mole ratio  : 3.71
 
 # Newton iterations
@@ -40,16 +41,16 @@ Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-Temperature initial guess : 350
+Temperature initial guess : 360
 T tolerance               : 1e-7
 T max iterations          : 30
 
 # Time integration
-Max timestep size : 7.5e-6 ! 2.2e-1
+Max timestep size : 8.7e-7
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 7.5e-7 ! 2.2e-2
-Max time          : 7.5e-4 ! 1100 ! 220
+Scalar time step  : 8.7e-8
+Max time          : 8.7e-7
 
 # Evaporation
 Max pseudo timestep size : 9e-6
@@ -63,4 +64,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 7.5e-5
+Ensight output period : 8.7e-7
