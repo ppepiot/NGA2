@@ -41,7 +41,7 @@ Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-Temperature initial guess : 360
+#Temperature initial guess : 360
 T tolerance               : 1e-7
 T max iterations          : 30
 
