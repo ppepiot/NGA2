@@ -564,11 +564,13 @@ contains
          ! Cluster cells
          if (clustered(i,j,k)) then
 
-            ! Initialize cluster-aggregated mass*SC and mass*temperature
+            ! Initialize the species mass
             do isc=1,ns
                p=sc%phase(isc)
                Y(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)*sc%SC(i,j,k,isc)
             end do
+
+            ! Initialize the mass-averaged temperatures
             Tl=sc%Prho(Lphase)*sc%PVF(i,j,k,Lphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTl)
             Tg=sc%Prho(Gphase)*sc%PVF(i,j,k,Gphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTg)
 
