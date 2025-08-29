@@ -43,12 +43,14 @@ module pardata_class
       procedure, private :: prep_iomap                                !< IO group/pgrid/map
       procedure, private :: findval                                   !< Function that returns val index if name is found, zero otherwise
       procedure, private :: findvar                                   !< Function that returns var index if name is found, zero otherwise
-      generic :: push=>pushval,pushvar                                !< Generic data push
+      generic :: push=>pushval,pushvar,pushvarint                     !< Generic data push
       procedure, private :: pushval                                   !< Push data to pardata
       procedure, private :: pushvar                                   !< Push data to pardata
-      generic :: pull=>pullval,pullvar                                !< Generic data pull
+      procedure, private :: pushvarint                                !< Push integer data to pardata
+      generic :: pull=>pullval,pullvar,pullvarint                     !< Generic data pull
       procedure, private :: pullval                                   !< Pull data from pardata
       procedure, private :: pullvar                                   !< Pull data from pardata
+      procedure, private :: pullvarint                                !< Pull integer data from pardata
       procedure :: write=>pardata_write                               !< Parallel write a pardata object to disk
       procedure :: print=>pardata_print                               !< Print out debugging info to screen
       procedure :: log  =>pardata_log                                 !< Print out debugging info to log
@@ -103,11 +105,13 @@ contains
       this%wcpl=coupler(src_grp=this%pg%group,dst_grp=iogrp,name='write')
       call this%wcpl%set_src(this%pg); if (this%ingrp_io) call this%wcpl%set_dst(this%pg_io)
       call this%wcpl%initialize()
+      this%wcpl%reuse_buffers=.false.
       
       ! Prepare coupler for reading
       this%rcpl=coupler(src_grp=iogrp,dst_grp=this%pg%group,name='read')
       if (this%ingrp_io) call this%rcpl%set_src(this%pg_io); call this%rcpl%set_dst(this%pg)
       call this%rcpl%initialize()
+      this%rcpl%reuse_buffers=.false.
       
    end subroutine prep_iomap
    
@@ -197,10 +201,10 @@ contains
          if (this%ingrp_io) then
             temp(this%df%pg%imin_:this%df%pg%imax_,this%df%pg%jmin_:this%df%pg%jmax_,this%df%pg%kmin_:this%df%pg%kmax_)=this%df%var(:,:,:,n)
             call this%df%pg%sync(temp)
-            call this%rcpl%push(temp)
+            call this%rcpl%push(temp,loc='c')
          end if
          call this%rcpl%transfer()
-         call this%rcpl%pull(this%var(:,:,:,n))
+         call this%rcpl%pull(this%var(:,:,:,n),loc='c')
          call MPI_BARRIER(this%pg%comm,ierr)
       end do
       
@@ -231,10 +235,10 @@ contains
       
       ! Transfer parallel data using the wcpl
       do n=1,this%nvar
-         call this%wcpl%push(this%var(:,:,:,n))
+         call this%wcpl%push(this%var(:,:,:,n),loc='c')
          call this%wcpl%transfer()
          if (this%ingrp_io) then
-            call this%wcpl%pull(temp)
+            call this%wcpl%pull(temp,loc='c')
             this%df%var(:,:,:,n)=temp(this%df%pg%imin_:this%df%pg%imax_,this%df%pg%jmin_:this%df%pg%jmax_,this%df%pg%kmin_:this%df%pg%kmax_)
          end if
          call MPI_BARRIER(this%pg%comm,ierr)
@@ -368,6 +372,23 @@ contains
       end if
    end subroutine pushvar
    
+
+   !> Push integer data to a var
+   subroutine pushvarint(this,name,var)
+      use messager, only: die
+      implicit none
+      class(pardata), intent(inout) :: this
+      character(len=*), intent(in) :: name
+      integer, dimension(this%pg%imino_:,this%pg%jmino_:,this%pg%kmino_:), intent(in) :: var !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: n
+      n=this%findvar(name)
+      if (n.gt.0) then
+         this%var(:,:,:,n)=real(var,WP)
+      else
+         call die('[pardata pushvar] Var does not exist in the data file: '//name)
+      end if
+   end subroutine pushvarint
+   
    
    !> Pull data from a var and synchronize it
    subroutine pullvar(this,name,var)
@@ -379,12 +400,30 @@ contains
       integer :: n
       n=this%findvar(name)
       if (n.gt.0) then
-         var=this%var(:,:,:,n)
+         var(this%pg%imin_:this%pg%imax_,this%pg%jmin_:this%pg%jmax_,this%pg%kmin_:this%pg%kmax_)=this%var(this%pg%imin_:this%pg%imax_,this%pg%jmin_:this%pg%jmax_,this%pg%kmin_:this%pg%kmax_,n)
          call this%pg%sync(var)
       else
          call die('[pardata pullvar] Var does not exist in the data file: '//name)
       end if
    end subroutine pullvar
+   
+
+   !> Pull integer data from a var and synchronize it
+   subroutine pullvarint(this,name,var)
+      use messager, only: die
+      implicit none
+      class(pardata), intent(in) :: this
+      character(len=*), intent(in) :: name
+      integer, dimension(this%pg%imino_:,this%pg%jmino_:,this%pg%kmino_:), intent(out) :: var !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: n
+      n=this%findvar(name)
+      if (n.gt.0) then
+         var(this%pg%imin_:this%pg%imax_,this%pg%jmin_:this%pg%jmax_,this%pg%kmin_:this%pg%kmax_)=int(this%var(this%pg%imin_:this%pg%imax_,this%pg%jmin_:this%pg%jmax_,this%pg%kmin_:this%pg%kmax_,n))
+         call this%pg%sync(var)
+      else
+         call die('[pardata pullvar] Var does not exist in the data file: '//name)
+      end if
+   end subroutine pullvarint
    
    
 end module pardata_class

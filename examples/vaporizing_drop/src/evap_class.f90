@@ -59,7 +59,7 @@ module evap_class
       integer, dimension(3) :: nCell
       
       ! Monitoring quantities
-      real(WP) :: mflux_int,mflux_tol                                  !< Integral and tolerence of the scaled evap mass flux
+      real(WP) :: mflux_int,mflux_tol                                  !< Integral and tolerance of the scaled evap mass flux
       real(WP) :: mfluxL_int,mfluxL_err,mfluxL_int_err                 !< Liquid side scaled evap mass flux maximum, integral, and error
       real(WP) :: mfluxG_int,mfluxG_err,mfluxG_int_err                 !< Gas side scaled evap mass flux maximum, integral, and error
       
@@ -69,6 +69,7 @@ module evap_class
       procedure :: init_mfluxLG                                        !< Initialize evaporation mass flux on the liquid and gas sides
       procedure :: get_normal                                          !< Get the interface normal vector
       procedure :: get_pseudo_vel                                      !< Get the face-centered normilized gradient of VOF
+      procedure :: get_mflux                                           !< Get the volumetric evaporation mass fllux
       procedure :: get_mflux                                           !< Get the volumetric evaporation mass fllux
       procedure :: get_dmfluxdt                                        !< Get the time derivative of the evaporation mass fllux
       procedure :: shift_mflux                                         !< Shift the evaporation mass flux
@@ -136,6 +137,7 @@ contains
       this%nCell(3)=this%cfg%nz
 
       ! Create a pseudo time
+      this%pseudo_time=timetracker(amRoot=this%cfg%amRoot,name='Pseudo',print_info=.false.)
       this%pseudo_time=timetracker(amRoot=this%cfg%amRoot,name='Pseudo',print_info=.false.)
 
    end subroutine initialize
@@ -709,6 +711,32 @@ contains
       call MPI_ALLREDUCE(my_CFL,cfl,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
       
    end subroutine get_cfl
+
+
+   !> Calculate the maximum of the phase-change velocity
+   subroutine get_max_vel_pc(this)
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(evap), intent(inout) :: this
+      real(WP) :: my_Upcmax,my_Vpcmax,my_Wpcmax
+      integer  :: i,j,k,ierr
+      ! Set all to zero
+      my_Upcmax=0.0_WP; my_Vpcmax=0.0_WP; my_Wpcmax=0.0_WP
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               my_Upcmax=max(my_Upcmax,abs(this%vel_pc(i,j,k,1)))
+               my_Vpcmax=max(my_Vpcmax,abs(this%vel_pc(i,j,k,2)))
+               my_Wpcmax=max(my_Wpcmax,abs(this%vel_pc(i,j,k,3)))
+            end do
+         end do
+      end do
+      ! Get the parallel max
+      call MPI_ALLREDUCE(my_Upcmax,this%Upcmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_Vpcmax,this%Vpcmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_Wpcmax,this%Wpcmax,1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+   end subroutine get_max_vel_pc
 
 
 end module evap_class
