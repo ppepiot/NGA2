@@ -28,7 +28,7 @@ module sgsmodel_class
       
       ! Some model parameters
       real(WP) :: Cs_ref=0.17_WP
-      real(WP) :: Cartif=10.0_WP,Cartif_vort=1.0e2_WP
+      real(WP) :: Cartif=2.0_WP,Cartif_vort=1.0e2_WP
       
       ! LM and MM tensor norms and eddy viscosity
       real(WP), dimension(:,:,:), allocatable :: LM,MM          !< LM and MM tensor norms
@@ -124,7 +124,7 @@ contains
       do k=self%cfg%kmin_  ,self%cfg%kmax_
          do j=self%cfg%jmin_-1,self%cfg%jmax_+1
             do i=self%cfg%imin_-1,self%cfg%imax_+1
-               zfilter(-1,i,j,k)=(-0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k  ))+self%cfg%dzm(k+1)/3.0_WP)/(self%cfg%dxm(k+1)+self%cfg%dzm(k))
+               zfilter(-1,i,j,k)=(-0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k  ))+self%cfg%dzm(k+1)/3.0_WP)/(self%cfg%dzm(k+1)+self%cfg%dzm(k))
                zfilter( 0,i,j,k)=2.0_WP/3.0_WP+(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k+1)*self%cfg%dzm(k))
                zfilter(+1,i,j,k)=(+0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k+1))+self%cfg%dzm(k  )/3.0_WP)/(self%cfg%dzm(k+1)+self%cfg%dzm(k))
                if (self%cfg%VF(i,j,k-1).eq.0.0_WP) then
@@ -194,7 +194,7 @@ contains
       do k=self%cfg%kmin_  ,self%cfg%kmax_
          do j=self%cfg%jmin_-1,self%cfg%jmax_+1
             do i=self%cfg%imin_-1,self%cfg%imax_+1
-               zfilter(-1,i,j,k)=(-0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k  ))+self%cfg%dzm(k+1)/3.0_WP)/(self%cfg%dxm(k+1)+self%cfg%dzm(k))
+               zfilter(-1,i,j,k)=(-0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k  ))+self%cfg%dzm(k+1)/3.0_WP)/(self%cfg%dzm(k+1)+self%cfg%dzm(k))
                zfilter( 0,i,j,k)=2.0_WP/3.0_WP+(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k+1)*self%cfg%dzm(k))
                zfilter(+1,i,j,k)=(+0.5_WP*(self%cfg%dzm(k+1)-self%cfg%dzm(k))-(self%cfg%dzm(k+1)-self%cfg%dzm(k))**2/(6.0_WP*self%cfg%dzm(k+1))+self%cfg%dzm(k  )/3.0_WP)/(self%cfg%dzm(k+1)+self%cfg%dzm(k))
                if (wmask(i,j,k).eq.1) then
@@ -522,7 +522,7 @@ contains
       real(WP), dimension(:,:,:), allocatable :: fvisc
       integer :: i,j,k
       real(WP) :: dila,vort,grad_dila
-      real(WP), parameter :: max_cfl=2.0_WP
+      real(WP), parameter :: max_cfl=1.0_WP
       ! Zero out array
       this%visc=0.0_WP
       ! Compute artificial bulk viscosity based on gradU provided
@@ -535,14 +535,14 @@ contains
                if (dila.ge.0.0_WP) cycle
                ! Compute vorticity
                vort=(gradu(2,3,i,j,k)-gradu(3,2,i,j,k))**2+(gradu(3,1,i,j,k)-gradu(1,3,i,j,k))**2+(gradu(1,2,i,j,k)-gradu(2,1,i,j,k))**2
-               ! Compute grad(dila)
+               ! Compute |grad(dila)|
                grad_dila=max(abs(this%cfg%dxmi(i+1)*((gradu(1,1,i+1,j,k)+gradu(2,2,i+1,j,k)+gradu(3,3,i+1,j,k))-dila)),abs(this%cfg%dxmi(i)*(dila-(gradu(1,1,i-1,j,k)+gradu(2,2,i-1,j,k)+gradu(3,3,i-1,j,k)))))*this%cfg%dx(i)**3&
                &        +max(abs(this%cfg%dymi(j+1)*((gradu(1,1,i,j+1,k)+gradu(2,2,i,j+1,k)+gradu(3,3,i,j+1,k))-dila)),abs(this%cfg%dymi(j)*(dila-(gradu(1,1,i,j-1,k)+gradu(2,2,i,j-1,k)+gradu(3,3,i,j-1,k)))))*this%cfg%dy(j)**3&
                &        +max(abs(this%cfg%dzmi(k+1)*((gradu(1,1,i,j,k+1)+gradu(2,2,i,j,k+1)+gradu(3,3,i,j,k+1))-dila)),abs(this%cfg%dzmi(k)*(dila-(gradu(1,1,i,j,k-1)+gradu(2,2,i,j,k-1)+gradu(3,3,i,j,k-1)))))*this%cfg%dz(k)**3
                ! Estimate artificial kinematic viscosity using grad(dila)
-               this%visc(i,j,k)=this%Cartif*rho(i,j,k)*grad_dila
-               ! Localize to likely shocks
-               this%visc(i,j,k)=this%visc(i,j,k)*dila**2/(dila**2+this%Cartif_vort*vort+1.0e-15_WP)
+               this%visc(i,j,k)=this%Cartif*rho(i,j,k)*grad_dila*dila**2/(dila**2+this%Cartif_vort*vort)
+               ! Clip it so CFL<max_CFL
+               this%visc(i,j,k)=min(this%visc(i,j,k),max_cfl*min(this%cfg%dx(i)**2,this%cfg%dy(j)**2,this%cfg%dz(k)**2)*rho(i,j,k)/(4.0_WP*dt))
             end do
          end do
       end do
@@ -559,33 +559,6 @@ contains
          if (this%cfg%kproc.eq.1)            this%visc(:,:,this%cfg%kmin-1)=this%visc(:,:,this%cfg%kmin)
          if (this%cfg%kproc.eq.this%cfg%npz) this%visc(:,:,this%cfg%kmax+1)=this%visc(:,:,this%cfg%kmax)
       end if
-      ! Finally, filter viscosity
-      allocate(fvisc(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); fvisc=this%visc
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-           do i=this%cfg%imin_,this%cfg%imax_
-               this%visc(i,j,k)=sum(this%filtern(:,:,:,i,j,k)*fvisc(i-1:i+1,j-1:j+1,k-1:k+1))
-            end do
-         end do
-      end do
-      deallocate(fvisc)
-      call this%cfg%sync(this%visc)
-      if (.not.this%cfg%xper) then
-         if (this%cfg%iproc.eq.1)            this%visc(this%cfg%imin-1,:,:)=this%visc(this%cfg%imin,:,:)
-         if (this%cfg%iproc.eq.this%cfg%npx) this%visc(this%cfg%imax+1,:,:)=this%visc(this%cfg%imax,:,:)
-      end if
-      if (.not.this%cfg%yper) then
-         if (this%cfg%jproc.eq.1)            this%visc(:,this%cfg%jmin-1,:)=this%visc(:,this%cfg%jmin,:)
-         if (this%cfg%jproc.eq.this%cfg%npy) this%visc(:,this%cfg%jmax+1,:)=this%visc(:,this%cfg%jmax,:)
-      end if
-      if (.not.this%cfg%zper) then
-         if (this%cfg%kproc.eq.1)            this%visc(:,:,this%cfg%kmin-1)=this%visc(:,:,this%cfg%kmin)
-         if (this%cfg%kproc.eq.this%cfg%npz) this%visc(:,:,this%cfg%kmax+1)=this%visc(:,:,this%cfg%kmax)
-      end if
-      ! Finally, clip to ensure CFL<1
-      do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_,this%cfg%imaxo_
-         this%visc(i,j,k)=min(this%visc(i,j,k),max_cfl*min(this%cfg%dx(i)**2,this%cfg%dy(j)**2,this%cfg%dz(k)**2)*rho(i,j,k)/(4.0_WP*dt))
-      end do; end do; end do
    end subroutine visc_artif
    
    
