@@ -208,277 +208,6 @@ contains
       get_R=sqrt(V_d/(Lz*Pi))
    end function get_R
 
-   
-   !> Impose the interface jump conditions
-   ! subroutine interface_jump()
-   !    implicit none
-   !    real(WP), dimension(:),     allocatable :: vol_new,vol_old,mp,N,phasicHoR,Y
-   !    logical,  dimension(:,:,:), allocatable :: clustered
-   !    integer,  dimension(:,:),   allocatable :: cell_indices
-   !    real(WP) :: Vnew,Vold,dVl,Nsum,vof,itf_area,Tl,Tg
-   !    integer  :: i,j,k,index,isc,p,n_clustered,m
-   !    integer  :: in,jn,kn
-   !    integer  :: stx,sty,stz
-   !    real(WP) :: mdotdp,myVl
-   !    real(WP), parameter :: trsh_lo=0.05_WP,trsh_hi=1.0_WP-trsh_lo
-   !    integer, parameter :: nc_max
-
-   !    ! Debug
-   !    dbg_flg=0.0_WP
-
-   !    ! Allocate arrays
-   !    allocate(vol_new(Lphase:Gphase))
-   !    allocate(vol_old(Lphase:Gphase))
-   !    allocate(mp(Lphase:Gphase))
-   !    allocate(N(ns))
-   !    allocate(phasicHoR(Lphase:Gphase))
-   !    allocate(clustered(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); clustered=.false.
-   !    allocate(Y(ns))
-   !    allocate(cell_indices(3,nc_max)); cell_indices=0
-
-   !    ! Clustering stencil
-   !    if (cfg%nx.gt.1) then
-   !       stx=1
-   !    else
-   !       stx=0
-   !    end if
-   !    if (cfg%ny.gt.1) then
-   !       sty=1
-   !    else
-   !       sty=0
-   !    end if
-   !    if (cfg%nz.gt.1) then
-   !       stz=1
-   !    else
-   !       stz=0
-   !    end if
-      
-   !    ! Loop over the interfacial cells
-   !    do index=1,vf%band_count(0)
-
-   !       ! Get the interfacial cell indices
-   !       i=vf%band_map(1,index)
-   !       j=vf%band_map(2,index)
-   !       k=vf%band_map(3,index)
-
-   !       ! Skip if already clustered
-   !       if (clustered(i,j,k)) cycle
-
-   !       ! Check if low PVF cell
-   !       do p=Lphase,Gphase
-   !          if (sc%PVF(i,j,k,p).lt.trsh_lo) then
-   !             clustered(i,j,k)=.true.
-   !             exit
-   !          end if
-   !       end do
-
-   !       ! Add current cell to the cluster
-   !       n_clustered=1
-   !       cell_indices(:,1)=[i,j,k]
-
-   !       ! Initialize the interfacial area
-   !       itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
-
-   !       ! Initialize the volumes
-   !       vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
-
-   !       ! Cluster cells
-   !       if (clustered(i,j,k)) then
-
-   !          ! Initialize the mass fractions
-   !          do isc=1,ns
-   !             p=sc%phase(isc)
-   !             Y(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)*sc%SC(i,j,k,isc)
-   !          end do
-
-   !          ! Initialize the mass averaged temperature
-   !          Tl=sc%Prho(Lphase)*sc%PVF(i,j,k,Lphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTl)
-   !          Tg=sc%Prho(Gphase)*sc%PVF(i,j,k,Gphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTg)
-
-   !          ! Loop over the cluster stencil skipping the ghost cells
-   !          z_loop: do kn=k-stz,k+stz
-   !             if (kn.lt.cfg%kmin_.or.kn.gt.cfg%kmax_) cycle
-   !             y_loop: do jn=j-sty,j+sty
-   !                if (jn.lt.cfg%jmin_.or.jn.gt.cfg%jmax_) cycle
-   !                x_loop: do in=i-stx,i+stx
-   !                   if (in.lt.cfg%imin_.or.in.gt.cfg%imax_) cycle
-
-   !                   ! Check if the neighbor is interfacial and not already clustered before
-   !                   if (vf%VF(in,jn,kn).gt.0.0_WP.and.vf%VF(in,jn,kn).lt.1.0_WP.and..not.clustered(in,jn,kn)) then
-
-   !                      ! Add the neighbor to the cluster
-   !                      n_clustered=n_clustered+1
-   !                      cell_indices(:,n_clustered)=[in,jn,kn]
-   !                      clustered(in,jn,kn)=.true.
-
-   !                      ! Add the volumes
-   !                      vol_old=vol_old+sc%PVF(in,jn,kn,:)*cfg%vol(in,jn,kn)
-
-   !                      ! Add the mass fractions
-   !                      do isc=1,ns
-   !                         p=sc%phase(isc)
-   !                         Y(isc)=Y(isc)+sc%Prho(p)*sc%PVF(in,jn,kn,p)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,isc)
-   !                      end do
-
-   !                      ! Add the temperatures
-   !                      Tl=Tl+sc%Prho(Lphase)*sc%PVF(in,jn,kn,Lphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTl)
-   !                      Tg=Tg+sc%Prho(Gphase)*sc%PVF(in,jn,kn,Gphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTg)
-
-   !                      ! Add the interface area
-   !                      itf_area=itf_area+cfg%vol(in,jn,kn)*vf%SD(in,jn,kn)
-
-   !                   end if
-
-   !                   ! Check if the clustering is enough
-   !                   vof=vol_old(Lphase)/sum(vol_old)
-   !                   if (vof.ge.trsh_lo.and.vof.le.trsh_hi) exit z_loop
-
-   !                end do x_loop
-   !             end do y_loop
-   !          end do z_loop
-
-   !          ! Get the phase masses
-   !          mp=sc%Prho*vol_old
-
-   !          ! Get the mass fractions
-   !          do isc=1,ns
-   !             Y(isc)=Y(isc)/mp(sc%phase(isc))
-   !          end do
-
-   !          ! Get the temperatures
-   !          Tl=Tl/mp(Lphase)
-   !          Tg=Tg/mp(Gphase)
-
-   !       ! No clustering needed   
-   !       else
-   !          ! Get the phase masses
-   !          mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
-   !          ! Get the mass fractions
-   !          Y=sc%SC(i,j,k,:)
-   !          ! Get the temperatures
-   !          Tl=sc%SC(i,j,k,iTl)
-   !          Tg=sc%SC(i,j,k,iTg)
-   !       end if
-
-   !       ! Store the old volume
-   !       Vold=sum(vol_old)
-
-   !       ! Get the mole numbers
-   !       do isc=1,ns
-   !          N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
-   !       end do
-
-   !       ! Normalize the mole numbers
-   !       Nsum=sum(N)
-   !       N=N/Nsum
-
-   !       ! Get the liquid and gas enthalpies
-   !       call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
-   !       call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
-
-   !       ! Reinitialize the mole numbers
-   !       call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
-
-   !       ! Get the chemical equilibrium
-   !       call state%equilibrate()
-   !       N=state%N*Nsum
-
-   !       ! Update the phase masses
-   !       mp=0.0_WP
-   !       do isc=1,ns
-   !          p=sc%phase(isc)
-   !          mp(p)=mp(p)+N(isc)*MM(isc)
-   !       end do
-
-   !       ! Get the phase volumes
-   !       vol_new=mp/sc%Prho
-   !       Vnew=sum(vol_new)
-
-   !       ! Get the phase change mass flux
-   !       mdotdp=(Vnew-Vold)/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*itf_area)
-
-   !       ! Figure out empty cells (assume vaporization)
-   !       dVl=vol_old(Lphase)-vol_new(Lphase)
-   !       do m=1,n_clustered
-   !          ! Get the cell indices
-   !          i=cell_indices(1,m)
-   !          j=cell_indices(2,m)
-   !          k=cell_indices(3,m)
-   !          ! Empty out the cell if needed
-   !          myVl=cfg%vol(i,j,k)*vf%VF(i,j,k)
-   !          if (myVl.le.dVl) then
-   !             ! Set phase change mass flux
-   !             evp%mdotdp(i,j,k)=0.0_WP
-   !             ! Set the interface temperature (how to set Tg and conserve energy?)
-   !             sc%SC(i,j,k,iTl)=0.0_WP
-   !             ! sc%SC(i,j,k,iTg)=?
-   !             T(i,j,k)=sc%SC(i,j,k,iTg)
-   !             ! Set the interface VOF
-   !             dVl=dVl-myVl
-   !             vf%VF(i,j,k)=0.0_WP
-   !             sc%PVF(i,j,k,Lphase)=0.0_WP
-   !             sc%PVF(i,j,k,Gphase)=1.0_WP
-   !             ! Set the interface composition (how to set gas mass fractions conservatively?)
-   !             do isc=1,ns
-   !                if (sc%phase(isc).eq.Lphase) then
-   !                   sc%SC(i,j,k,isc)=0.0_WP
-   !                else
-   !                   ! sc%SC(i,j,k,isc)=?
-   !                end if
-   !             end do
-   !          end if
-   !       end do
-
-   !       ! Loop over the non-empty clustered cells to asign values (assume vaporization)
-   !       do m=1,n_clustered
-   !          ! Get the cell indices
-   !          i=cell_indices(1,m)
-   !          j=cell_indices(2,m)
-   !          k=cell_indices(3,m)
-   !          ! For non-empty cells
-   !          if (vf%VF(i,j,k).gt.0.0_WP) then
-   !             ! Set phase change mass flux
-   !             evp%mdotdp(i,j,k)=mdotdp
-   !             ! Set the interface temperature
-   !             sc%SC(i,j,k,iTl)=state%T
-   !             sc%SC(i,j,k,iTg)=state%T
-   !             T(i,j,k)=state%T
-   !             ! Set the interface VOF
-   !             vf%VF(i,j,k)=vol_new(Lphase)/Vnew
-   !             sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
-   !             sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
-   !             ! Set the interface composition
-   !             do isc=1,ns
-   !                sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
-   !             end do
-   !          end if
-   !       end do
-   !    end do
-
-   !    ! Need to update the corresponding IRL quantities in vf?
-
-   !    ! Sync fields
-   !    do isc=1,sc%nscalar
-   !       call cfg%sync(sc%SC(:,:,:,isc))
-   !    end do
-   !    call cfg%sync(vf%VF)
-   !    call cfg%sync(sc%PVF(:,:,:,Lphase))
-   !    call cfg%sync(sc%PVF(:,:,:,Gphase))
-   !    call cfg%sync(evp%mdotdp)
-
-   !    ! Apply boundary conditions
-   !    call sc%apply_bcond(time%t,time%dt)
-   !    call vf%apply_bcond(time%t,time%dt)
-
-   !    ! Debug
-   !    where (clustered) dbg_flg=1.0_WP
-   !    call cfg%sync(dbg_flg)
-
-   !    ! Deallocate arrays
-   !    deallocate(vol_new,vol_old,mp,N,phasicHoR,Y,clustered,cell_indices)
-
-   ! end subroutine interface_jump
-
 
    subroutine interface_jump()
       use messager, only: die
@@ -544,25 +273,27 @@ contains
 
          ! Skip if already clustered
          if (clustered(i,j,k)) cycle
-
-         ! Check if low PVF cell
-         do p=Lphase,Gphase
-            if (sc%PVF(i,j,k,p).lt.trsh_lo) then
-               clustered(i,j,k)=.true.
-               exit
-            end if
-         end do
-
-         ! Add current cell to the (potential) cluster
+         
+         ! Add current cell to the potential cluster
          n_clustered=1
          cell_indices(:,1)=[i,j,k]
 
-         ! Initialize the interfacial area and old volumes for the seed
+         ! Initialize the interfacial area and old volumes
          itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
          vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
 
-         ! Cluster cells
-         if (clustered(i,j,k)) then
+         ! Pre-evaluate the equilibrium
+         mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+         Y =sc%SC(i,j,k,1:ns)
+         Tl=sc%SC(i,j,k,iTl)
+         Tg=sc%SC(i,j,k,iTg)
+         call get_equilibrium()
+
+         ! Cluster cells if the equilibrium failed
+         if (.not.state%success) then
+
+            ! Mark it as clustered
+            clustered(i,j,k)=.true.
 
             ! Initialize the species mass
             do isc=1,ns
@@ -583,7 +314,9 @@ contains
                      if (in.lt.cfg%imin_.or.in.gt.cfg%imax_) cycle
 
                      ! Neighbor must be interfacial and not clustered yet
-                     if (vf%VF(in,jn,kn).gt.0.0_WP.and.vf%VF(in,jn,kn).lt.1.0_WP.and..not.clustered(in,jn,kn)) then
+                     if (vf%VF(in,jn,kn).gt.VFlo.and.vf%VF(in,jn,kn).lt.VFhi.and..not.clustered(in,jn,kn)) then
+
+                        ! Mark it as clustered
                         n_clustered=n_clustered+1
                         cell_indices(:,n_clustered)=[in,jn,kn]
                         clustered(in,jn,kn)=.true.
@@ -603,10 +336,6 @@ contains
                         itf_area=itf_area+cfg%vol(in,jn,kn)*vf%SD(in,jn,kn)
                      end if
 
-                     ! Check if clustering is enough based on cluster-averaged VOF
-                     vof=vol_old(Lphase)/sum(vol_old)
-                     if (vof.ge.trsh_lo.and.vof.le.trsh_hi) exit z_loop
-
                   end do x_loop
                end do y_loop
             end do z_loop
@@ -621,36 +350,33 @@ contains
             Tl=Tl/mp(Lphase)
             Tg=Tg/mp(Gphase)
 
-         else
-            ! No clustering needed
-            mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
-            Y=sc%SC(i,j,k,:)
-            Tl=sc%SC(i,j,k,iTl)
-            Tg=sc%SC(i,j,k,iTg)
+            ! Get the equilibrium state of the cluster
+            call get_equilibrium()
+            
          end if
+
+         ! Calculate the cluster VOF
+         vof=vol_old(Lphase)/sum(vol_old)
 
          ! Store the old total volume
          Vold=sum(vol_old)
 
-         ! Calculate and normalize the mole numbers
-         do isc=1,ns
-            N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
-         end do
-         Nsum=sum(N)
-         N=N/Nsum
-
-         ! Get the phasic enthalpies
-         call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
-         call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
-
-         ! Reinitialize the mole numbers
-         call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
-
-         ! Get the chemical equilibrium
-         call state%equilibrate()
-
-         ! Re-scale the mole numbers
-         N=state%N*Nsum
+         if (.not.state%success) then
+            print*,'Cluster VOF = ',vof
+            print*,'N = ',N
+            print*,'N*Nsum = ',N*Nsum
+            print*,'HoR = ',sum(phasicHoR)
+            print*,'T_g = ',T_g
+            print*,'Clustered cells info:'
+            print*,'n_clustered = ',n_clustered
+            do m=1,n_clustered
+               i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+               print*,'i,j,k = ',i,j,k
+               print*,'VOF = ',vf%VF(i,j,k)
+               print*,'SD = ',vf%SD(i,j,k)
+            end do
+            call die('line 378')
+         end if
 
          ! Update the phase masses
          mp=0.0_WP
@@ -732,43 +458,96 @@ contains
 
          end if
 
-         ! Assign per-cell fields
+         ! Assign per-cell fields (Need to treat cells with VOF=0 and 1, differently)
          do m=1,n_clustered
 
             ! Get the cell indices
             i=cell_indices(1,m)
             j=cell_indices(2,m)
             k=cell_indices(3,m)
+            ! if (vf%VF(i,j,k).lt.VFlo) call die('Found zero VOF cell in the cluster')
+            ! if (i.eq.65.and.j.eq.81.and.k.eq.1) print*,'VOF(65,81,1) before assigning = ',vf%VF(65,81,1)
 
-            ! Phase change mass flux
-            evp%mdotdp(i,j,k)=mdotdp
-
-            ! Temperature
-            sc%SC(i,j,k,iTl)=state%T
-            sc%SC(i,j,k,iTg)=state%T
-            T(i,j,k)=state%T
+            ! Assign VOF
+            if (vof_new(m).lt.VFlo) then
+               vf%VF(i,j,k)=0.0_WP
+            else if (vof_new(m).gt.VFhi) then
+               vf%VF(i,j,k)=1.0_WP
+            else
+               vf%VF(i,j,k)=vof_new(m)
+            end if
+            sc%PVF(i,j,k,Lphase)=vof_new(m)
+            sc%PVF(i,j,k,Gphase)=1.0_WP-vof_new(m)
+            ! if (i.eq.65.and.j.eq.81.and.k.eq.1) print*,'VOF(65,81,1) after assigning = ',vf%VF(65,81,1)
 
             ! Composition
             do isc=1,ns
-               sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+               p=sc%phase(isc)
+               if(sc%PVF(i,j,k,p).gt.0.0_WP) then
+                  sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+               else
+                  sc%SC(i,j,k,isc)=0.0_WP
+               end if
             end do
 
-            ! VOF
-            vf%VF(i,j,k)        =vof_new(m)
-            sc%PVF(i,j,k,Lphase)=vof_new(m)
-            sc%PVF(i,j,k,Gphase)=1.0_WP-vof_new(m)
+            ! Temperature and phase change mass flux
+            if (vf%VF(i,j,k).eq.1.0_WP) then
+               sc%SC(i,j,k,iTl) =state%T
+               sc%SC(i,j,k,iTg) =0.0_WP
+               evp%mdotdp(i,j,k)=0.0_WP
+            else if (vf%VF(i,j,k).eq.0.0_WP) then
+               sc%SC(i,j,k,iTl) =0.0_WP
+               sc%SC(i,j,k,iTg) =state%T
+               evp%mdotdp(i,j,k)=0.0_WP
+            else
+               sc%SC(i,j,k,iTl) =state%T
+               sc%SC(i,j,k,iTg) =state%T
+               evp%mdotdp(i,j,k)=mdotdp
+            end if
 
          end do
 
       end do
+
+      ! Update the interface (Do I need it?)
+      call vf%advect_interface(0.0_WP,fs%U,fs%V,fs%W)
+
+      ! Remove flotsams and thin structures if needed
+      call vf%remove_flotsams()
+      call vf%remove_thinstruct()
+      
+      ! Synchronize and clean-up barycenter fields
+      call vf%sync_and_clean_barycenters()
+      
+      ! Update the interface band
+      call vf%update_band()
+      
+      ! Perform interface reconstruction from transported moments
+      call vf%build_interface()
+      
+      ! Create discontinuous polygon mesh from IRL interface
+      call vf%polygonalize_interface()
+      
+      ! Perform interface sensing
+      if (vf%two_planes) call vf%sense_interface()
+      
+      ! Calculate distance from polygons
+      call vf%distance_from_polygon()
+      
+      ! Calculate subcell phasic volumes
+      call vf%subcell_vol()
+      
+      ! Calculate curvature
+      call vf%get_curvature()
+      
+      ! Reset moments to guarantee compatibility with interface reconstruction
+      call vf%reset_moments()
 
       ! Sync fields
       do isc=1,sc%nscalar
          call cfg%sync(sc%SC(:,:,:,isc))
       end do
       call cfg%sync(vf%VF)
-      call cfg%sync(sc%PVF(:,:,:,Lphase))
-      call cfg%sync(sc%PVF(:,:,:,Gphase))
       call cfg%sync(evp%mdotdp)
 
       ! Apply boundary conditions
@@ -782,7 +561,406 @@ contains
       ! Deallocate arrays
       deallocate(vol_new,vol_old,mp,N,phasicHoR,Y,clustered,cell_indices,Vscaled,vof_old,vof_new,w,active)
 
+      contains
+
+      subroutine get_equilibrium()
+         implicit none
+
+         ! Calculate and normalize the mole numbers
+         do isc=1,ns
+            N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
+         end do
+         Nsum=sum(N)
+         if (Nsum.gt.0.0_WP) N=N/Nsum
+
+         ! Get the phasic enthalpies
+         call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
+         call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
+
+         ! Reinitialize the mole numbers
+         call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
+         if (.not.state%success) then
+            print*,'Cluster VOF = ',vof
+            print*,'N = ',N
+            print*,'N*Nsum = ',N*Nsum
+            print*,'HoR = ',sum(phasicHoR)
+            print*,'T_g = ',T_g
+            print*,'Clustered cells info:'
+            print*,'n_clustered = ',n_clustered
+            do m=1,n_clustered
+               i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+               print*,'i,j,k = ',i,j,k
+               print*,'VOF = ',vf%VF(i,j,k)
+               print*,'SD = ',vf%SD(i,j,k)
+            end do
+            call die('line 575')
+         end if
+
+         ! Get the chemical equilibrium
+         call state%equilibrate()
+
+         ! Re-scale the mole numbers
+         N=state%N*Nsum
+
+      end subroutine get_equilibrium
+
    end subroutine interface_jump
+
+
+   ! subroutine interface_jump()
+   !    use messager, only: die
+   !    implicit none
+   !    real(WP), dimension(:),     allocatable :: vol_new,vol_old,mp,N,phasicHoR,Y
+   !    logical,  dimension(:,:,:), allocatable :: clustered
+   !    logical,  dimension(:),     allocatable :: active
+   !    integer,  dimension(:,:),   allocatable :: cell_indices
+   !    real(WP), dimension(:),     allocatable :: Vscaled,vof_old,vof_new,w
+   !    real(WP) :: Vnew,Vold,Nsum,vof,itf_area,Tl,Tg
+   !    integer  :: i,j,k,index,isc,p,n_clustered,m
+   !    integer  :: in,jn,kn
+   !    integer  :: stx,sty,stz
+   !    real(WP) :: mdotdp
+   !    real(WP), parameter :: trsh_lo=0.05_WP,trsh_hi=1.0_WP-trsh_lo,wmin=1.0e-16_WP,dVlmin=1.0e-16_WP
+   !    integer,  parameter :: nc_max=27
+   !    real(WP) :: dVl,dVl_i,dVl_rem,Vref,vof_tmp,interfaceness,wsum
+
+   !    ! Debug
+   !    dbg_flg=0.0_WP
+
+   !    Vref=minval(cfg%vol)
+
+   !    ! Allocate arrays
+   !    allocate(vol_new(Lphase:Gphase))
+   !    allocate(vol_old(Lphase:Gphase))
+   !    allocate(mp(Lphase:Gphase))
+   !    allocate(N(ns))
+   !    allocate(phasicHoR(Lphase:Gphase))
+   !    allocate(Y(ns))
+   !    allocate(clustered(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); clustered=.false.
+   !    allocate(cell_indices(3,nc_max)); cell_indices=0
+   !    allocate(Vscaled(nc_max)); Vscaled=0.0_WP
+   !    allocate(vof_old(nc_max)); vof_old=0.0_WP
+   !    allocate(vof_new(nc_max)); vof_new=0.0_WP
+   !    allocate(w(nc_max)); w=0.0_WP
+   !    allocate(active(nc_max)); active=.false.
+
+   !    ! Clustering stencil
+   !    if (cfg%nx.gt.1) then
+   !       stx=1
+   !    else
+   !       stx=0
+   !    end if
+   !    if (cfg%ny.gt.1) then
+   !       sty=1
+   !    else
+   !       sty=0
+   !    end if
+   !    if (cfg%nz.gt.1) then
+   !       stz=1
+   !    else
+   !       stz=0
+   !    end if
+
+   !    ! Loop over the interfacial cells
+   !    do index=1,vf%band_count(0)
+
+   !       ! Get the interfacial cell indices
+   !       i=vf%band_map(1,index)
+   !       j=vf%band_map(2,index)
+   !       k=vf%band_map(3,index)
+   !       if (i.eq.64.and.j.eq.81.and.k.eq.1) print*,'found it'
+   !       ! Skip if already clustered
+   !       if (clustered(i,j,k)) cycle
+   !       if (i.eq.64.and.j.eq.81.and.k.eq.1) print*,'did not skip it'
+   !       ! Check if low PVF cell
+   !       do p=Lphase,Gphase
+   !          if (sc%PVF(i,j,k,p).lt.trsh_lo) then
+   !             clustered(i,j,k)=.true.
+   !             if (i.eq.64.and.j.eq.81.and.k.eq.1) print*,'marked for cluster'
+   !             exit
+   !          end if
+   !       end do
+
+   !       ! Add current cell to the (potential) cluster
+   !       n_clustered=1
+   !       cell_indices(:,1)=[i,j,k]
+
+   !       ! Initialize the interfacial area and old volumes for the seed
+   !       itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
+   !       vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+
+   !       ! Cluster cells
+   !       if (clustered(i,j,k)) then
+
+   !          ! Initialize the species mass
+   !          do isc=1,ns
+   !             p=sc%phase(isc)
+   !             Y(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)*sc%SC(i,j,k,isc)
+   !          end do
+
+   !          ! Initialize the mass-averaged temperatures
+   !          Tl=sc%Prho(Lphase)*sc%PVF(i,j,k,Lphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTl)
+   !          Tg=sc%Prho(Gphase)*sc%PVF(i,j,k,Gphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTg)
+
+   !          ! Loop over the cluster stencil skipping the ghost cells
+   !          z_loop: do kn=k-stz,k+stz
+   !             if (kn.lt.cfg%kmin_.or.kn.gt.cfg%kmax_) cycle
+   !             y_loop: do jn=j-sty,j+sty
+   !                if (jn.lt.cfg%jmin_.or.jn.gt.cfg%jmax_) cycle
+   !                x_loop: do in=i-stx,i+stx
+   !                   if (in.lt.cfg%imin_.or.in.gt.cfg%imax_) cycle
+
+   !                   ! Neighbor must be interfacial and not clustered yet
+   !                   if (vf%VF(in,jn,kn).gt.VFlo.and.vf%VF(in,jn,kn).lt.VFhi.and..not.clustered(in,jn,kn)) then
+   !                      n_clustered=n_clustered+1
+   !                      if (i.eq.64.and.j.eq.81.and.k.eq.1) print*,'found a neighbour'
+   !                      cell_indices(:,n_clustered)=[in,jn,kn]
+   !                      clustered(in,jn,kn)=.true.
+
+   !                      ! Accumulate old volumes
+   !                      vol_old=vol_old+sc%PVF(in,jn,kn,:)*cfg%vol(in,jn,kn)
+
+   !                      ! Accumulate mass*SC and mass*temperature
+   !                      do isc=1,ns
+   !                         p=sc%phase(isc)
+   !                         Y(isc)=Y(isc)+sc%Prho(p)*sc%PVF(in,jn,kn,p)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,isc)
+   !                      end do
+   !                      Tl=Tl+sc%Prho(Lphase)*sc%PVF(in,jn,kn,Lphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTl)
+   !                      Tg=Tg+sc%Prho(Gphase)*sc%PVF(in,jn,kn,Gphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTg)
+
+   !                      ! Accumulate interface area
+   !                      itf_area=itf_area+cfg%vol(in,jn,kn)*vf%SD(in,jn,kn)
+   !                   end if
+
+   !                   ! Check if clustering is enough based on cluster-averaged VOF
+   !                   vof=vol_old(Lphase)/sum(vol_old)
+   !                   ! if (vof.ge.trsh_lo.and.vof.le.trsh_hi) exit z_loop
+
+   !                end do x_loop
+   !             end do y_loop
+   !          end do z_loop
+
+   !          ! Cluster-level phase masses
+   !          mp=sc%Prho*vol_old
+
+   !          ! Cluster-averaged mass fractions and temperatures
+   !          do isc=1,ns
+   !             Y(isc)=Y(isc)/mp(sc%phase(isc))
+   !          end do
+   !          Tl=Tl/mp(Lphase)
+   !          Tg=Tg/mp(Gphase)
+
+   !       else
+   !          ! No clustering needed
+   !          mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+   !          Y=sc%SC(i,j,k,1:ns)
+   !          Tl=sc%SC(i,j,k,iTl)
+   !          Tg=sc%SC(i,j,k,iTg)
+   !       end if
+
+   !       ! Store the old total volume
+   !       Vold=sum(vol_old)
+
+   !       ! Calculate and normalize the mole numbers
+   !       do isc=1,ns
+   !          N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
+   !       end do
+   !       Nsum=sum(N)
+   !       N=N/Nsum
+
+   !       ! Get the phasic enthalpies
+   !       call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
+   !       call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
+
+   !       ! Reinitialize the mole numbers
+   !       call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
+   !       ! call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T(i,j,k))
+
+   !       ! Get the chemical equilibrium
+   !       call state%equilibrate()
+
+   !       if (.not.state%success) then
+   !          print*,'Cluster VOF = ',vof
+   !          print*,'N = ',N
+   !          print*,'N*Nsum = ',N*Nsum
+   !          print*,'HoR = ',sum(phasicHoR)
+   !          print*,'T_g = ',T_g
+   !          print*,'Clustered cells info:'
+   !          do m=1,n_clustered
+   !             i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+   !             print*,'i,j,k = ',i,j,k
+   !             print*,'VOF = ',vf%VF(i,j,k)
+   !             print*,'SD = ',vf%SD(i,j,k)
+   !          end do
+   !          call die('')
+   !       end if
+
+   !       ! Re-scale the mole numbers
+   !       N=state%N*Nsum
+
+   !       ! Update the phase masses
+   !       mp=0.0_WP
+   !       do isc=1,ns
+   !          p=sc%phase(isc)
+   !          mp(p)=mp(p)+N(isc)*MM(isc)
+   !       end do
+
+   !       ! Get the phase volumes
+   !       vol_new=mp/sc%Prho
+   !       Vnew=sum(vol_new)
+
+   !       ! Get the phase change mass flux
+   !       mdotdp=(Vnew-Vold)/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*itf_area)
+
+   !       ! Gather geometry and current VOF per clustered cell
+   !       do m=1,n_clustered
+   !          i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+   !          active(m)=.true.
+   !          Vscaled(m)=cfg%vol(i,j,k)/Vref ! Scale it for more accurate calculations
+   !          vof_old(m)=vf%VF(i,j,k)
+   !          vof_new(m)=vof_old(m)
+   !       end do
+
+   !       ! Total liquid volume change ( > 0 condensation, < 0 vaporization)
+   !       dVl=(vol_new(Lphase)-vol_old(Lphase))/Vref ! Scale it for more accurate calculations
+   !       dVl_rem=dVl
+
+   !       if (abs(dVl).gt.dVlmin) then
+
+   !          ! Build weights
+   !          do m=1,n_clustered
+   !             i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+   !             itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
+   !             interfaceness=minval(sc%PVF(i,j,k,:))
+   !             w(m)=max(itf_area*interfaceness,wmin)
+   !          end do
+
+   !          ! Iteratively redistribute liquid
+   !          do
+
+   !             ! Update weights sum
+   !             wsum=0.0_WP
+   !             do m=1,n_clustered
+   !                if (active(m)) wsum=wsum+w(m)
+   !             end do
+
+   !             ! Terminate if succssesd
+   !             if (abs(dVl_rem).le.dVlmin.or.wsum.le.0.0_WP) exit
+
+   !             ! Distribute
+   !             dVl=dVl_rem
+   !             do m=1,n_clustered
+   !                if (.not.active(m)) cycle
+
+   !                ! Estimate VOF
+   !                dVl_i =(w(m)/wsum)*dVl
+   !                vof_tmp=vof_new(m)+dVl_i/Vscaled(m)
+
+   !                ! Clip it
+   !                if (vof_tmp.gt.1.0_WP) then
+   !                   dVl_i=(1.0_WP-vof_new(m))*Vscaled(m)
+   !                   vof_new(m)=1.0_WP
+   !                   active(m)=.false.
+   !                else if (vof_tmp.lt.0.0_WP) then
+   !                   dVl_i=(0.0_WP-vof_new(m))*Vscaled(m)
+   !                   vof_new(m)=0.0_WP
+   !                   active(m)=.false.
+   !                else
+   !                   vof_new(m)=vof_tmp
+   !                end if
+
+   !                ! Correct the liquid volume change
+   !                dVl_rem=dVl_rem-dVl_i
+
+   !             end do
+
+   !          end do
+
+   !       end if
+
+   !       ! Assign per-cell fields (Need to treat cells with VOF=0 and 1, differently)
+   !       do m=1,n_clustered
+
+   !          ! Get the cell indices
+   !          i=cell_indices(1,m)
+   !          j=cell_indices(2,m)
+   !          k=cell_indices(3,m)
+   !          ! if (vf%VF(i,j,k).lt.VFlo) call die('Found zero VOF cell in the cluster')
+   !          ! if (i.eq.65.and.j.eq.81.and.k.eq.1) print*,'VOF(65,81,1) before assigning = ',vf%VF(65,81,1)
+   !          ! VOF
+   !          if (vof_new(m).lt.VFlo) then
+   !             vf%VF(i,j,k)=0.0_WP
+   !          else if (vof_new(m).gt.VFhi) then
+   !             vf%VF(i,j,k)=1.0_WP
+   !          else
+   !             vf%VF(i,j,k)=vof_new(m)
+   !          end if
+   !          sc%PVF(i,j,k,Lphase)=vof_new(m)
+   !          sc%PVF(i,j,k,Gphase)=1.0_WP-vof_new(m)
+   !          ! if (i.eq.65.and.j.eq.81.and.k.eq.1) print*,'VOF(65,81,1) after assigning = ',vf%VF(65,81,1)
+
+   !          ! Composition
+   !          do isc=1,ns
+   !             p=sc%phase(isc)
+   !             if(sc%PVF(i,j,k,p).gt.0.0_WP) then
+   !                sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+   !             else
+   !                sc%SC(i,j,k,isc)=0.0_WP
+   !             end if
+   !          end do
+
+   !          ! Temperature and phase change mass flux
+   !          if (vf%VF(i,j,k).eq.1.0_WP) then
+   !             sc%SC(i,j,k,iTl) =state%T
+   !             sc%SC(i,j,k,iTg) =0.0_WP
+   !             evp%mdotdp(i,j,k)=0.0_WP
+   !          else if (vf%VF(i,j,k).eq.0.0_WP) then
+   !             sc%SC(i,j,k,iTl) =0.0_WP
+   !             sc%SC(i,j,k,iTg) =state%T
+   !             evp%mdotdp(i,j,k)=0.0_WP
+   !          else
+   !             sc%SC(i,j,k,iTl) =state%T
+   !             sc%SC(i,j,k,iTg) =state%T
+   !             evp%mdotdp(i,j,k)=mdotdp
+   !          end if
+
+   !       end do
+
+   !    end do
+
+   !    ! Sync fields
+   !    do isc=1,sc%nscalar
+   !       call cfg%sync(sc%SC(:,:,:,isc))
+   !    end do
+   !    call cfg%sync(vf%VF)
+   !    call cfg%sync(evp%mdotdp)
+
+   !    ! Apply boundary conditions
+   !    call sc%apply_bcond(time%t,time%dt)
+   !    call vf%apply_bcond(time%t,time%dt)
+
+   !    ! Update phase interface
+   !    call vf%advect_interface(0.0_WP,fs%U,fs%V,fs%W)
+   !    call vf%remove_flotsams()
+   !    call vf%remove_thinstruct()
+   !    call vf%sync_and_clean_barycenters()
+   !    call vf%update_band()
+   !    call vf%build_interface()
+   !    call vf%polygonalize_interface()
+   !    if (vf%two_planes) call vf%sense_interface()
+   !    call vf%distance_from_polygon()
+   !    call vf%subcell_vol()
+   !    call vf%get_curvature()
+   !    call vf%reset_moments()
+
+   !    ! Debug
+   !    where (clustered) dbg_flg=1.0_WP
+   !    call cfg%sync(dbg_flg)
+
+   !    ! Deallocate arrays
+   !    deallocate(vol_new,vol_old,mp,N,phasicHoR,Y,clustered,cell_indices,Vscaled,vof_old,vof_new,w,active)
+
+   ! end subroutine interface_jump
 
 
    !> Initialization of problem solver
@@ -1324,6 +1502,8 @@ contains
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
          ! Debug
          call ens_out%add_scalar('dbg_flg',dbg_flg)
+         call ens_out%add_scalar('PVFL',sc%PVF(:,:,:,Lphase))
+         call ens_out%add_scalar('PVFG',sc%PVF(:,:,:,Gphase))
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
       end block create_ensight
@@ -1436,6 +1616,8 @@ contains
          call fs%get_olddensity(vf=vf)
 
          ! VOF solver step
+         
+         ! print*,'Before vf advance: VOF(65,81,1) = ',vf%VF(65,81,1)
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
 
@@ -1487,6 +1669,9 @@ contains
                ! Form implicit diffusive residuals
                call sc%solve_implicit_diff(timeSC%dt,resSC)
 
+               ! Correct the liquid water mass fraction
+               where (vf%VF.lt.VFlo) sc%SC(:,:,:,iWl)=0.0_WP
+
                ! Apply the residuals
                sc%SC=sc%SC+resSC
 
@@ -1514,7 +1699,9 @@ contains
          end block advance_scalar
 
          ! Apply the interface jump conditions
+         ! print*,'Before interface_jump: VOF(65,81,1) = ',vf%VF(65,81,1)
          call interface_jump()
+         ! print*,'After interface_jump: VOF(65,81,1) = ',vf%VF(65,81,1)
          
          ! Get the volumetric evaporation mass flux
          call evp%get_mflux()
@@ -1599,6 +1786,7 @@ contains
          end block advance_flow
          
          ! Output to ensight
+         T=vf%VF*sc%SC(:,:,:,iTl)+(1.0_WP-vf%VF)*sc%SC(:,:,:,iTg)
          if (ens_evt%occurs()) then
             call vf%update_surfmesh(smesh)
             call ens_out%write_data(time%t)

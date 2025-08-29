@@ -21,6 +21,7 @@ module chem_state_class
 
    !> Chemical statete object definition
    type :: chem_state
+      logical :: success
 
       ! This is our chemical system
       class(chem_sys), pointer :: sys                          !< This is the chemical system the solver is build for
@@ -208,7 +209,7 @@ module chem_state_class
          real(WP), dimension(this%sys%nsu) :: Nu,Nu0,Nm,Nupper,Ng,gu
          real(WP), dimension(this%sys%nrc) :: cr
          logical :: fail,diag,use_mmg=.true.
-
+         this%success=.true.
          ! Get the neccesary inputs
          select case (this%cond)
             case (fixed_PT)
@@ -281,7 +282,9 @@ module chem_state_class
                   if (this%cond.eq.fixed_PH) call this%hor2T(ns,Neq,this%HoR,this%sys%thermo,this%T)
                endif
                ! SBP end of added
-               call die('[chem_state initialize] All zero composition')
+               this%success=.false.
+               return
+               ! call die('[chem_state initialize] All zero composition')
             endif
 
             ! Use initial guess N_g if provided
@@ -319,12 +322,18 @@ module chem_state_class
                &                 this%sys%pert_tol,this%sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
                if (iret.eq.-1) then 
                   write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
-               elseif(iret.eq.-2) then 
-                  call die('[chem_state initialize] Perturb failed')
+               elseif(iret.eq.-2) then
+                  this%success=.false.
+                  return
+                  ! call die('[chem_state initialize] Perturb failed')
                endif
                ! Determine min_g composition
                call this%get_Nming(nsu,nrc,this%sys%BR,this%cr,gu,Ng,iret)
-               if (iret.lt.0) call die('[chem_state initialize] get_Nming failed')
+               if (iret.lt.0) then
+                  this%success=.false.
+                  return
+                  ! call die('[chem_state initialize] get_Nming failed')
+               end if
                ! Form initial guess Nu0
                Nu0=Ng+frac_Nm*(Nm-Ng)
             else
@@ -996,7 +1005,11 @@ module chem_state_class
          call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
          rhs=log(this%Nu)-matmul(this%sys%P(this%sys%nsd+1:this%sys%ns,:),log(this%Nbar))+this%gu
          call lss(this%sys%nsu,this%sys%nrc,this%sys%BR,rhs,lam,info)
-         if (info.ne.0) call die('[chem_state x_init] Least squares solver for lambda initialization failed.')
+         if (info.ne.0) then
+            this%success=.false.
+            return
+            ! call die('[chem_state x_init] Least squares solver for lambda initialization failed.')
+         end if
          ! Set the initial solution vector
          this%x(1:this%sys%nrc)=lam
          this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np)=log(this%Nbar)
@@ -1040,19 +1053,22 @@ module chem_state_class
          real(WP), dimension(:),   allocatable :: S,work
          real(WP) :: Rnorm,rcond
          integer  :: rank,lwork
+         real(WP), dimension(this%sys%nsu) :: Nu_init
+         Nu_init=this%Nu
          ! Allocate arrays
-         allocate(Jac   (this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np)); Jac=0.0_WP
-         allocate(dx    (this%sys%nrc+this%sys%np));  dx=0.0_WP
-         allocate(BTB   (this%sys%nrc,this%sys%nrc)); BTB=0.0_WP
-         allocate(BTP   (this%sys%nrc,this%sys%np));  BTP=0.0_WP
-         allocate(PTP   (this%sys%np,this%sys%np));   PTP=0.0_WP
-         allocate(y     (this%sys%nsu));              y=0.0_WP
-         allocate(S     (this%sys%nrc+this%sys%np))
+         allocate(Jac(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np)); Jac=0.0_WP
+         allocate(dx (this%sys%nrc+this%sys%np));  dx=0.0_WP
+         allocate(BTB(this%sys%nrc,this%sys%nrc)); BTB=0.0_WP
+         allocate(BTP(this%sys%nrc,this%sys%np));  BTP=0.0_WP
+         allocate(PTP(this%sys%np,this%sys%np));   PTP=0.0_WP
+         allocate(y  (this%sys%nsu));              y=0.0_WP
+         allocate(S  (this%sys%nrc+this%sys%np))
          lwork=10*(this%sys%nrc+this%sys%np)
          allocate(work(lwork))
          rcond=-1.0_WP
          ! Initialize the solution vector
          call this%x_init()
+         if (.not.this%success) return
          ! Newton-Raphson
          this%iter_N=0
          y=this%get_y()
@@ -1062,7 +1078,9 @@ module chem_state_class
             this%iter_N=this%iter_N+1
             if (this%iter_N.gt.this%iter_N_max) then
                this%iter_N=this%iter_N-1
-               call die('[chem_state get_ceq_PT] Newton solver reached maximum number of iterations')
+               this%success=.false.
+               return
+               ! call die('[chem_state get_ceq_PT] Newton solver reached maximum number of iterations')
             end if
             ! Build the Jacobian matrix
             call this%get_BP(y)
@@ -1106,8 +1124,26 @@ module chem_state_class
             ! Solve for dx
             dx=-this%R
             call dgelss(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np,1,Jac,this%sys%nrc+this%sys%np,dx,this%sys%nrc+this%sys%np,S,rcond,rank,work,lwork,info)
-            if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
-            if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
+            ! if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
+            if (rank.ne.this%sys%nrc+this%sys%np) then
+               print*,'iter_N = ',this%iter_N
+               print*,'T = ',this%T
+               print*,'Nu = ',this%Nu
+               print*,'Nd = ',this%Nd
+               print*,'Nu_init for get_ceq_PT was: ',Nu_init
+               this%success=.false.
+               return
+            end if
+            ! if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
+            if (info.ne.0) then
+               print*,'iter_N = ',this%iter_N
+               print*,'T = ',this%T
+               print*,'Nu = ',this%Nu
+               print*,'Nd = ',this%Nd
+               print*,'Nu_init for get_ceq_PT was: ',Nu_init
+               this%success=.false.
+               return
+            end if
             ! Update the solution
             this%x=this%x+dx
             ! Get the species and phase moles
@@ -1133,6 +1169,8 @@ module chem_state_class
          real(WP), dimension(:), allocatable :: hort
          real(WP) :: Tn,Tlo,Thi
          real(WP) :: HoR0,hlo,hhi,Cp_eff
+         real(WP), dimension(this%sys%nsu) :: Nu_init
+         Nu_init=this%Nu
          ! Allocate arrays
          allocate(hort(this%sys%ns))
          ! Initialize
@@ -1147,11 +1185,17 @@ module chem_state_class
             this%iter_T=this%iter_T+1
             if (this%iter_T.gt.this%iter_T_max) then
                this%iter_T=this%iter_T-1
-               call die('[chem_state get_ceq_PH] Temperature solver reached maximum number of iterations')
-               exit
+               this%success=.false.
+               return
+               ! call die('[chem_state get_ceq_PH] Temperature solver reached maximum number of iterations')
             end if
             ! Determine equilibrium composition at current temperature
             call this%get_ceq_PT(Neq)
+            if (.not.this%success) then
+               print*,'iter_T = ',this%iter_T
+               print*,'Nu_init for get_ceq_PH was: ',Nu_init
+               return
+            end if
             ! Get the effective Cp
             call this%get_Cp_eff(Cp_eff)
             ! Obtain species h/(RT)
@@ -1161,8 +1205,16 @@ module chem_state_class
             ! Predict dT
             this%dT=(HoR0-this%HoR)/Cp_eff
             ! Check that T is within limits
-            if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) call die('[chem_state get_ceq_PH] T > T_high')
-            if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) call die('[chem_state get_ceq_PH] T < T_low')
+            if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) then
+               ! call die('[chem_state get_ceq_PH] T > T_high')
+               this%success=.false.
+               return
+            end if
+            if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) then
+               ! call die('[chem_state get_ceq_PH] T < T_low')
+               this%success=.false.
+               return
+            end if
             ! Ensure that Tn is within limits
             Tn=this%T+this%dT
             Tn=max(min(Tn,T_high),T_low)
@@ -1181,7 +1233,7 @@ module chem_state_class
                endif
             endif
             ! Update temperature increment
-            this%dT=Tn-this%T   
+            this%dT=Tn-this%T
             ! Update temperature
             this%T=Tn
          end do
