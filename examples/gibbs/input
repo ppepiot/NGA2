@@ -12,6 +12,7 @@ Pressure    : 101325
 Species             : H2O(L) H2O O2 N2
 Initial moles       : 1      1   1  3.71
 Constrained species : O2 N2
+Scale mole numbers  : .false.
 
 # Constant enthaply inputs
 Temperature initial guess            : 600

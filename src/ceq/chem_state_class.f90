@@ -9,8 +9,8 @@ module chem_state_class
    public :: chem_state
 
    !> List of available equilibrium conditions
-   integer, parameter, public :: fixed_PT=1                     !< Fixed temperature
-   integer, parameter, public :: fixed_PH=2                     !< Fixed enthalpy
+   integer, parameter, public :: fixed_PT=1                     !< Fixed pressure and temperature
+   integer, parameter, public :: fixed_PH=2                     !< Fixed pressure and enthalpy
 
    !> Temperature bounds
    real(WP), parameter :: T_high=5000.0_WP
@@ -46,7 +46,7 @@ module chem_state_class
       real(WP), dimension(:,:), allocatable :: BtildeT,PtildeT !< Coefficient matrices transposed
 
       ! Pointer to the avaiable chemical equilibrium procedures
-      procedure(get_ceq_interface), pointer :: get_ceq=>NULL() !< Map the input to the latent variables
+      procedure(get_ceq_interface), pointer :: get_ceq=>NULL() !< Get the chemical equilibrium
 
       ! Numerical parameters
       real(WP) :: tol_N                                        !< Tolerance for the residual norm
@@ -1053,8 +1053,6 @@ module chem_state_class
          real(WP), dimension(:),   allocatable :: S,work
          real(WP) :: Rnorm,rcond
          integer  :: rank,lwork
-         real(WP), dimension(this%sys%nsu) :: Nu_init
-         Nu_init=this%Nu
          ! Allocate arrays
          allocate(Jac(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np)); Jac=0.0_WP
          allocate(dx (this%sys%nrc+this%sys%np));  dx=0.0_WP
@@ -1126,21 +1124,11 @@ module chem_state_class
             call dgelss(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np,1,Jac,this%sys%nrc+this%sys%np,dx,this%sys%nrc+this%sys%np,S,rcond,rank,work,lwork,info)
             ! if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
             if (rank.ne.this%sys%nrc+this%sys%np) then
-               print*,'iter_N = ',this%iter_N
-               print*,'T = ',this%T
-               print*,'Nu = ',this%Nu
-               print*,'Nd = ',this%Nd
-               print*,'Nu_init for get_ceq_PT was: ',Nu_init
                this%success=.false.
                return
             end if
             ! if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
             if (info.ne.0) then
-               print*,'iter_N = ',this%iter_N
-               print*,'T = ',this%T
-               print*,'Nu = ',this%Nu
-               print*,'Nd = ',this%Nd
-               print*,'Nu_init for get_ceq_PT was: ',Nu_init
                this%success=.false.
                return
             end if
@@ -1169,8 +1157,6 @@ module chem_state_class
          real(WP), dimension(:), allocatable :: hort
          real(WP) :: Tn,Tlo,Thi
          real(WP) :: HoR0,hlo,hhi,Cp_eff
-         real(WP), dimension(this%sys%nsu) :: Nu_init
-         Nu_init=this%Nu
          ! Allocate arrays
          allocate(hort(this%sys%ns))
          ! Initialize
@@ -1187,13 +1173,10 @@ module chem_state_class
                this%iter_T=this%iter_T-1
                this%success=.false.
                return
-               ! call die('[chem_state get_ceq_PH] Temperature solver reached maximum number of iterations')
             end if
             ! Determine equilibrium composition at current temperature
             call this%get_ceq_PT(Neq)
             if (.not.this%success) then
-               print*,'iter_T = ',this%iter_T
-               print*,'Nu_init for get_ceq_PH was: ',Nu_init
                return
             end if
             ! Get the effective Cp

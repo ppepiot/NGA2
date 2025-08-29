@@ -41,7 +41,6 @@ Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-#Temperature initial guess : 360
 T tolerance               : 1e-7
 T max iterations          : 30
 
@@ -50,7 +49,7 @@ Max timestep size : 8.7e-7
 Max cfl number    : 0.9
 Sub-iterations    : 2
 Scalar time step  : 8.7e-8
-Max time          : 3e-2
+Max time          : 1e-1
 
 # Evaporation
 Max pseudo timestep size : 9e-6
@@ -64,4 +63,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 1e-3
+Ensight output period : 5e-3
