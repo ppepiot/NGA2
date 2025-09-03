@@ -22,6 +22,10 @@ module simulation
    type(chem_sys)   :: sys
    type(chem_state) :: state
 
+   !> Problem definition
+   logical  :: scale
+   real(WP) :: Nsum
+
    !> Simulation subroutines
    public :: simulation_init,simulation_run,simulation_final
    
@@ -212,6 +216,7 @@ contains
          call param_read('Temperature',T)
          call param_read('Pressure',p)
          call param_read('Equilibrium condition',eq_cond)
+         call param_read('Scale mole numbers',scale)
          ! Allocate arrays
          allocate(Bg(ns,ng));  Bg=0.0_WP
          allocate(N_h(ns))
@@ -229,6 +234,11 @@ contains
          ! Inizialize the chemical system
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
          ! Initialize the chemical state
+         Nsum=1.0_WP
+         if (scale) then
+            Nsum=sum(N_init)
+            N_init=N_init/Nsum
+         end if
          select case (eq_cond)
             case ('PT')
                call state%initialize(sys=sys,cond=fixed_PT,p=p)
@@ -239,6 +249,7 @@ contains
                call param_read('Composition for enthalpy calculation',N_h)
                N_h_c=N_h
                call reorder_rows(N_h_c,inpt2mch_sp_order,N_h)
+               if (scale) N_h=N_h/Nsum
                if (param_exists('Temperature initial guess')) then
                   call param_read('Temperature initial guess',T_g)
                   call state%N_init(N=N_init,N_h=N_h,T_h=T_h,T_g=T_g)
@@ -248,9 +259,14 @@ contains
             case default
                call die('Equilibrium condition must be either PT or PH')
          end select
+         if (.not.state%success) call die('chem state N_init failed')
          print*,'Equilibrium condition: Constant ',eq_cond
          ! Re-initialization of moles
-         print*,'Re-initialization of moles:'
+         if (scale) then 
+            print*,'Re-initialization of moles (Scaled):'
+         else
+            print*,'Re-initialization of moles:'
+         end if
          do isc=1,sys%ns
             print*,trim(sp_names(isc)),': ',state%N(isc)
          end do
@@ -280,6 +296,7 @@ contains
 
       ! Obtain the chemical equilibrium state
       call state%equilibrate()
+      if (.not.state%success) call die('chem state equilibrate failed')
 
       ! Output
       if (state%cond.eq.fixed_PH) then
@@ -291,6 +308,7 @@ contains
       end if
       print*,'Equilibrium temperature = ',state%T,' (K)'
       print*,'Equilibrium moles:'
+      if (scale) state%N=Nsum*state%N
       do isc=1,sys%ns
          print*,trim(sp_names(isc)),': ',state%N(isc)
       end do

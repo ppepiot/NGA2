@@ -24,6 +24,7 @@ module simulation
    !> Get a couple linear solvers, a two-phase flow solver, a volume fraction solver and corresponding time tracker
    type(hypre_str),   public :: ps
    type(ddadi),       public :: ss,vs
+   ! type(hypre_str),   public :: vs
    type(tpns),        public :: fs
    type(vfs),         public :: vf
    type(tpscalar),    public :: sc
@@ -607,6 +608,54 @@ contains
    end subroutine interface_jump
 
 
+   subroutine apply_dirichlet()
+      use tpns_class, only: bcond
+      use mathtools,  only: Pi
+      type(bcond), pointer :: my_bc
+      real(WP) :: Ub,Ux,Uy,vfr,myR
+      integer  :: i,j,k,n,stag
+      call cfg%integrate(evp%div_src,vfr)
+      my_bc=>fs%first_bc
+      do while (associated(my_bc))
+         if (my_bc%itr%amIn) then
+            select case (my_bc%face)
+            case ('x')
+               stag=min(my_bc%dir,0)
+               do n=1,my_bc%itr%n_
+                  i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                  myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
+                  Ub=vfr/(2.0_WP*myR*Pi*Lz)
+                  Ux=cfg%xm(i)/myR*Ub
+                  Uy=cfg%ym(j)/myR*Ub
+                  fs%U(i     ,j    ,k    )=Ux
+                  fs%V(i+stag,j:j+1,k    )=Uy
+                  fs%W(i+stag,j    ,k:k+1)=0.0_WP
+               end do
+            case ('y')
+               stag=min(my_bc%dir,0)
+               do n=1,my_bc%itr%n_
+                  i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                  myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
+                  Ub=vfr/(2.0_WP*myR*Pi*Lz)
+                  Ux=cfg%xm(i)/myR*Ub
+                  Uy=cfg%ym(j)/myR*Ub
+                  fs%U(i:i+1,j+stag,k    )=Ux
+                  fs%V(i    ,j     ,k    )=Uy
+                  fs%W(i    ,j+stag,k:k+1)=0.0_WP
+               end do
+            ! case ('z')
+            !    stag=min(my_bc%dir,0)
+            !    do n=1,my_bc%itr%n_
+            !       i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+            !       myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
+            !    end do
+            end select
+         end if
+         my_bc=>my_bc%next
+      end do
+   end subroutine apply_dirichlet
+
+
    !> Initialization of problem solver
    subroutine simulation_init
       use param,    only: param_read,param_getsize
@@ -916,7 +965,8 @@ contains
       create_and_initialize_flow_solver: block
          use hypre_str_class, only: gmres_pfmg2
          use mathtools,       only: Pi
-         use tpns_class,      only: clipped_neumann,bcond
+         use tpns_class,      only: clipped_neumann,dirichlet,bcond
+         use hypre_str_class, only: pcg_pfmg
          type(bcond), pointer :: my_bc
          ! Create flow solver
          fs=tpns(cfg=cfg,name='Two-phase NS')
@@ -932,10 +982,16 @@ contains
          ! Assign acceleration of gravity
          call param_read('Gravity',fs%gravity)
          ! Boundary conditions
-         call fs%add_bcond(name='xm',type=clipped_neumann,face='x',dir=-1,canCorrect=.true.,locator=xm_locator)
-         call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
-         call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
-         call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+         ! call fs%add_bcond(name='xm',type=clipped_neumann,face='x',dir=-1,canCorrect=.true.,locator=xm_locator)
+         ! call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
+         ! call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
+         ! call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+
+         call fs%add_bcond(name='xm',type=dirichlet,face='x',dir=-1,canCorrect=.true.,locator=xm_locator)
+         call fs%add_bcond(name='xp',type=dirichlet,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
+         call fs%add_bcond(name='ym',type=dirichlet,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
+         call fs%add_bcond(name='yp',type=dirichlet,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+
          ! call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
          ! call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
@@ -945,12 +1001,15 @@ contains
          call param_read('Max coarsening levels',ps%maxlevel)
          ! Implicit velocity solver
          vs=ddadi(cfg=cfg,name='Velocity',nst=7)
+         ! vs=hypre_str(cfg=cfg,name='Velocity',method=pcg_pfmg,nst=7)
+         ! vs%maxit=50
+         ! vs%rcvg=1e-7
          ! Setup the solver
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
          ! Apply boundary conditions
-         call fs%apply_bcond(time%t,time%dt)
+         ! call fs%apply_bcond(time%t,time%dt)
          ! Calculate cell-centered velocities and divergence
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div()
@@ -1389,6 +1448,7 @@ contains
                
                ! Apply other boundary conditions
                call fs%apply_bcond(time%t,time%dt)
+               call apply_dirichlet()
                
                ! Solve Poisson equation
                call fs%update_laplacian()

@@ -1,20 +1,18 @@
 # Import libraries
-import re
 import numpy as np
 import matplotlib.pyplot as plt
-import math
-
-# Constants
-tI = 0.15216
 
 # Load file
-data = np.loadtxt('./monitor/simulation', skiprows=2)
+data_nga = np.loadtxt('./monitor/simulation', skiprows=2)
+data_tng = np.loadtxt('./R_vs_t_Tanguy')
 
 # Extract data
-t = data[:, 1 ]
-t = tI + t
-R = data[:, 11]
-R_ext = data[:, 12]
+t_nga = data_nga[:, 1 ]
+R_nga = data_nga[:, 11]
+R_nga=R_nga/R_nga[0]
+R_nga=R_nga**2
+t_tng = data_tng[:, 0]
+R_tng = data_tng[:, 1]
 
 # Use latex font
 plt.rcParams['text.usetex'] = True
@@ -23,14 +21,14 @@ plt.rcParams['font.family'] = 'serif'
 # Plot
 
 fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-plt.plot(t, R_ext*1000, ls='-', lw=2, color='k')
-plt.plot(t, R    *1000, ls='-', lw=2, color='b')
+plt.plot(t_tng, R_tng, marker='s', ls='none', color='k')
+plt.plot(t_nga, R_nga, ls='-', lw=2, color='b')
 plt.xlabel(r'$t~(s)$', fontsize=12)
-plt.ylabel(r'$R~(mm)$', fontsize=12)
+plt.ylabel(r'$(R/R_0)^2$', fontsize=12)
 plt.xticks(fontsize=10)
 plt.yticks(fontsize=10)
 plt.grid(which='major', axis='both', color='k', linestyle='--', linewidth=0.6, alpha=0.25)
-legends = ax.legend([r'$Analytical$', r'$Numerical$'], frameon=False, loc='lower right', fontsize=10)
+legends = ax.legend([r'$Tanguy ~ et ~ al ~ 2007$', r'$NGA2$'], frameon=False, loc='lower left', fontsize=10)
 ax.add_artist(legends)
 plt.tight_layout()
 plt.savefig('./R_vs_t.pdf')

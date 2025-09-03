@@ -99,6 +99,7 @@ module chem_state_class
       !> Chemical state initializer
       subroutine initialize(this,sys,cond,p)
          use messager,  only: die
+         use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(inout) :: this
          class(chem_sys), target, intent(in) :: sys
@@ -283,6 +284,7 @@ module chem_state_class
                endif
                ! SBP end of added
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state initialize] All zero composition")')
                return
                ! call die('[chem_state initialize] All zero composition')
             endif
@@ -321,9 +323,10 @@ module chem_state_class
                call this%perturb(ns,nsd,nsu,this%sys%ne,this%sys%ned,this%sys%neu,nrc,Nd,cr,this%sys%BR,this%sys%E,this%sys%diag,this%sys%eps_el,this%sys%eps_sp, &
                &                 this%sys%pert_tol,this%sys%pert_skip,this%Nd,Nm,Nupper,this%cr,npert,max_pert,iret)
                if (iret.eq.-1) then 
-                  write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
+                  ! write(output_unit,'(" >   chem_state perturb: non-realizable constraint = ")')
                elseif(iret.eq.-2) then
                   this%success=.false.
+                  ! write(output_unit,'(" >   [chem_state initialize] Perturb failed")')
                   return
                   ! call die('[chem_state initialize] Perturb failed')
                endif
@@ -331,6 +334,7 @@ module chem_state_class
                call this%get_Nming(nsu,nrc,this%sys%BR,this%cr,gu,Ng,iret)
                if (iret.lt.0) then
                   this%success=.false.
+                  ! write(output_unit,'(" >   [chem_state initialize] get_Nming failed")')
                   return
                   ! call die('[chem_state initialize] get_Nming failed')
                end if
@@ -674,7 +678,7 @@ module chem_state_class
          end do
 
          if (zatoms.le.0.0_WP) then
-            write(output_unit,'(" >   chem_state perturb: no atoms")')
+            ! write(output_unit,'(" >   chem_state perturb: no atoms")')
             iret=-3
             return
          endif
@@ -685,7 +689,7 @@ module chem_state_class
                if (abs(zdp(k))>zdlim ) then ! significantly negative
                      max_pert=max(max_pert,abs(zdp(k))/zatoms)
                      npert=npert+1
-                     if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative determined species")')
+                     ! if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative determined species")')
                endif
                zdp(k)=0.0_WP
             endif
@@ -704,7 +708,7 @@ module chem_state_class
                if (abs(cre(k))>cref) then ! significantly negative
                      max_pert=max(max_pert,abs(cre(k))/zatoms)
                      npert=npert+1
-                     if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative undetermined element")')
+                     ! if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: negative undetermined element")')
                endif
                cre(k)=0.0_WP
             endif
@@ -740,7 +744,7 @@ module chem_state_class
          call this%maxmin_comp(nsu,nrc,BR,crp,zumm,Numin,iret)
 
          if (iret<0) then
-            if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: maxmin_comp failed")')
+            ! if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: maxmin_comp failed")')
             iret=-2 
             return 
          endif
@@ -761,7 +765,7 @@ module chem_state_class
          crp=crp+matmul(zup-zumm,BR)
 
          if (max_pert.gt.pert_tol) then
-            if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: large perturbation made")')
+            ! if (ifop.ge.1) write(output_unit,'(" >   chem_state perturb: large perturbation made")')
             iret=-1 
          endif
 
@@ -994,6 +998,7 @@ module chem_state_class
       subroutine x_init(this)
          use mathtools, only: lss
          use messager,  only: die
+         use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(inout) :: this
          real(WP), dimension(:), allocatable :: rhs,lam
@@ -1007,6 +1012,7 @@ module chem_state_class
          call lss(this%sys%nsu,this%sys%nrc,this%sys%BR,rhs,lam,info)
          if (info.ne.0) then
             this%success=.false.
+            ! write(output_unit,'(" >   [chem_state x_init] Least squares solver for lambda initialization failed")')
             return
             ! call die('[chem_state x_init] Least squares solver for lambda initialization failed.')
          end if
@@ -1043,6 +1049,7 @@ module chem_state_class
       !> Find the chemical equilibium state at constant pressure and temperature
       subroutine get_ceq_PT(this,Neq)
          use messager, only: die
+         use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(inout) :: this
          real(WP), dimension(this%sys%ns), intent(inout) :: Neq
@@ -1077,6 +1084,7 @@ module chem_state_class
             if (this%iter_N.gt.this%iter_N_max) then
                this%iter_N=this%iter_N-1
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PT] Newton solver reached maximum number of iterations")')
                return
                ! call die('[chem_state get_ceq_PT] Newton solver reached maximum number of iterations')
             end if
@@ -1125,11 +1133,13 @@ module chem_state_class
             ! if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
             if (rank.ne.this%sys%nrc+this%sys%np) then
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PT]: Jacobian is not full rank")')
                return
             end if
             ! if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
             if (info.ne.0) then
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PT]: Least-squares solver failed")')
                return
             end if
             ! Update the solution
@@ -1151,6 +1161,7 @@ module chem_state_class
          ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
          ! Ideal Gas Mixtures using Gibbs Function Continuation.
          use messager, only: die
+         use, intrinsic :: iso_fortran_env, only: output_unit
          implicit none
          class(chem_state), intent(inout) :: this
          real(WP), dimension(this%sys%ns), intent(inout) :: Neq
@@ -1172,6 +1183,7 @@ module chem_state_class
             if (this%iter_T.gt.this%iter_T_max) then
                this%iter_T=this%iter_T-1
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH]: Reached max number of temperature iterations")')
                return
             end if
             ! Determine equilibrium composition at current temperature
@@ -1191,11 +1203,13 @@ module chem_state_class
             if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) then
                ! call die('[chem_state get_ceq_PH] T > T_high')
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH] T > T_high")')
                return
             end if
             if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) then
                ! call die('[chem_state get_ceq_PH] T < T_low')
                this%success=.false.
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH] T < T_low")')
                return
             end if
             ! Ensure that Tn is within limits
