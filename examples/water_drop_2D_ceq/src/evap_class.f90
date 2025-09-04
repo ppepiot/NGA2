@@ -315,6 +315,7 @@ contains
    subroutine get_mflux(this)
       implicit none
       class(evap), intent(inout) :: this
+      ! call this%filter(F=this%mdotdp,lvl=2,stc=3)
       this%mflux=this%mdotdp*this%vf%SD
       ! call this%filter(F=this%mflux,lvl=2,stc=3)
    end subroutine get_mflux
