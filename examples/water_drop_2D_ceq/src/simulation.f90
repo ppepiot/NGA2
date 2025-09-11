@@ -1028,12 +1028,13 @@ contains
    subroutine apply_dirichlet()
       use tpns_class, only: bcond
       use mathtools,  only: Pi
-      type(bcond), pointer :: my_bc
+      type(bcond), pointer :: my_bc,dirichlet
       real(WP) :: Ub,Ux,Uy,vfr,myR
       integer  :: i,j,k,n,stag
       call cfg%integrate(evp%div_src,vfr)
       my_bc=>fs%first_bc
       do while (associated(my_bc))
+         if (my_bc%type.ne.dirichlet) cycle
          if (my_bc%itr%amIn) then
             select case (my_bc%face)
             case ('x')
@@ -1439,7 +1440,7 @@ contains
          use tpscalar_class,  only: bcond,neumann,dirichlet
          use mpi_f08,         only: MPI_ALLREDUCE,MPI_MAX
          use parallel,        only: MPI_REAL_WP
-         type(bcond), pointer :: my_bc
+         type(bcond), pointer :: my_bc,dirichlet
          real(WP) :: mp(2),N_init(ns),spDiff,my_Y
          integer  :: n,i,j,k,isc,p,ierr
          integer  :: pos_open,pos_close
@@ -1537,6 +1538,7 @@ contains
          call sc%apply_bcond(time%t,time%dt)
          my_bc=>sc%first_bc
          do while (associated(my_bc))
+            if (my_bc%type.ne.dirichlet) cycle
             if (my_bc%itr%amIn) then
                do n=1,my_bc%itr%no_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
@@ -1742,7 +1744,7 @@ contains
          ! Transport scalars
          advance_scalar: block
             use tpscalar_class, only: bcond
-            type(bcond), pointer :: my_bc
+            type(bcond), pointer :: my_bc,dirichlet
             integer  :: n,isc
             real(WP) :: dt_sc
 
@@ -1791,12 +1793,13 @@ contains
                where (vf%VF.lt.VFlo) sc%SC(:,:,:,iWl)=0.0_WP
 
                ! Apply the residuals
-               sc%SC=sc%SC+resSC
+               sc%SC=sc%SCold+resSC
 
                ! Apply boundary conditions
                call sc%apply_bcond(timeSC%t,timeSC%dt)
                my_bc=>sc%first_bc
                do while (associated(my_bc))
+                  if (my_bc%type.ne.dirichlet) cycle
                   if (my_bc%itr%amIn) then
                      do n=1,my_bc%itr%no_
                         i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)

@@ -28,11 +28,11 @@ Saturation temperature        : 373.15
 Latent heat                   : 2.26e6
 
 # Time integration
-Max timestep size : 4e-3
+Max timestep size : 3.5e-3
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 4e-5
-Max time          : 1
+Scalar time step  : 3.5e-8
+Max time          : 0.5
 
 # Evaporation
 Max pseudo timestep size : 9e-6

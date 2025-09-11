@@ -768,6 +768,7 @@ contains
       ! Work on each scalar
       do nsc=1,this%nscalar
          if (this%skip(nsc)) cycle
+
          ! Get the phase index
          p=this%phase(nsc)
          ! Reset fluxes to zero
@@ -777,11 +778,11 @@ contains
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
                   ! Flux on x-face
-                  FX(i,j,k)=sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SC(i-1:i,j,k,nsc))*this%face_apt_x(i,j,k,p)
+                  FX(i,j,k)=sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SCold(i-1:i,j,k,nsc))*this%face_apt_x(i,j,k,p)
                   ! Flux on y-face
-                  FY(i,j,k)=sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SC(i,j-1:j,k,nsc))*this%face_apt_y(i,j,k,p)
+                  FY(i,j,k)=sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SCold(i,j-1:j,k,nsc))*this%face_apt_y(i,j,k,p)
                   ! Flux on z-face
-                  FZ(i,j,k)=sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SC(i,j,k-1:k,nsc))*this%face_apt_z(i,j,k,p)
+                  FZ(i,j,k)=sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SCold(i,j,k-1:k,nsc))*this%face_apt_z(i,j,k,p)
                end do
             end do
          end do

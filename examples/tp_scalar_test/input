@@ -2,14 +2,14 @@
 Partition : 2 4 1
 
 # Mesh definition
-L : 1.2e-3
+L : 12
 n : 128
 
 # Case parameters
 Drop center         : 0 0 0
-Drop radius         : 1.5e-4
-Drop temperature    : 353
-Ambient temperature : 373
+Drop radius         : 1.5
+Drop temperature    : 0.7
+Ambient temperature : 1
 Pressure            : 101325
 
 # Mechanism
@@ -17,18 +17,17 @@ Mechanism file : gri30.yaml
 
 # Fluid properties (water)
 Gravity                       : 0 0 0
-Liquid dynamic viscosity      : 1.137e-3
-Gas dynamic viscosity         : 1.78e-5
-Liquid density                : 1000
-Gas density                   : 1.226
-Surface tension coefficient   : 0.07
-Liquid thermal conductivity   : 0.6
-Gas thermal conductivity      : 0.046
-Liquid specific heat capacity : 4180
-Gas specific heat capacity    : 1000
-Saturation temperature        : 373.15
-Latent heat                   : 2.3e6
-Species diffusivity           : 2e-6 ! 2e-5
+Liquid dynamic viscosity      : 7e-3
+Gas dynamic viscosity         : 7e-4
+Liquid density                : 2.5
+Gas density                   : 0.25
+Surface tension coefficient   : 0.001
+Liquid thermal conductivity   : 0.07
+Gas thermal conductivity      : 0.007
+Liquid specific heat capacity : 2.5
+Gas specific heat capacity    : 1
+Latent heat                   : 100
+Species diffusivity           : 2e-5
 
 # Species and mole ratios
 Species                        : H2O(L) H2O O2 N2
@@ -45,16 +44,16 @@ T tolerance               : 1e-7
 T max iterations          : 30
 
 # Time integration
-Max timestep size : 8.7e-7
+Max timestep size : 1.5e-3
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 8.7e-9
-Max time          : 1.5
+Scalar time step  : 1e-2 ! 1.5e-4
+Max time          : 0.0256
 
 # Evaporation
-Max pseudo timestep size : 9e-6
+Max pseudo timestep size : 0.09
 Max pseudo cfl number    : 0.9
-Max pseudo time steps    : 10
+Max pseudo time steps    : 20
 Mass flux tolerence      : 1e-15
 
 # Pressure solver
@@ -63,4 +62,4 @@ Pressure iteration    : 50
 Max coarsening levels : 18
 
 # Ensight output
-Ensight output period : 0.01
+Ensight output period : 1.5e-3

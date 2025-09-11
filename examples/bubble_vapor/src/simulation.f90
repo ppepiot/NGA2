@@ -852,7 +852,7 @@ contains
                call sc%solve_implicit_diff(timeSC%dt,resSC)
 
                ! Apply the residuals
-               sc%SC=sc%SC+resSC
+               sc%SC=sc%SCold+resSC
 
                ! Apply boundary conditions
                where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)

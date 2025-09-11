@@ -414,11 +414,12 @@ contains
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
          ! Initialize scalar fields
-         do i=sc%cfg%imino_,sc%cfg%imaxo_
-            do j=sc%cfg%jmino_,sc%cfg%jmaxo_
-               do k=sc%cfg%kmino_,sc%cfg%kmaxo_
+         do i=sc%cfg%imin_,sc%cfg%imax_
+            do j=sc%cfg%jmin_,sc%cfg%jmax_
+               do k=sc%cfg%kmin_,sc%cfg%kmax_
                   if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_sat
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+                  ! if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/x_itf*sc%cfg%xm(i)
                end do
             end do
          end do
@@ -426,12 +427,14 @@ contains
             sc%SC(:,:,:,iTl)=T_sat
             sc%SC(:,:,:,iTg)=T_sat
          end where
+         call sc%cfg%sync(sc%SC(:,:,:,iTl))
+         call sc%cfg%sync(sc%SC(:,:,:,iTg))
          ! Apply boundary conditions
          call sc%get_bcond('xm',mybc)
          do n=1,mybc%itr%no_
             i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
             sc%SC(i,j,k,iTl)=0.0_WP
-            sc%SC(i,j,k,iTg)=T_w
+            sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
          end do
          ! Initialize the phase specific density and VOF
          sc%Prho(Lphase)=fs%rho_l
@@ -680,7 +683,7 @@ contains
          advance_scalar: block
             integer :: nsc
             ! Debug
-            integer :: i,j,k
+            integer :: i,j,k,SCit,SCitmax
 
             ! Update the phas-specific VOF
             sc%PVF(:,:,:,Lphase)=vf%VF
@@ -702,7 +705,11 @@ contains
                sc%SC(:,:,:,iTg)=T_sat
             end where
 
-            do while (timeSC%t.lt.time%t)
+            SCit=0
+            SCitmax=int(5e3)
+            ! do while (timeSC%t.lt.time%t)
+            do while (SCit.lt.SCitmax)
+               SCit=SCit+1
 
                call timeSC%increment()
                sc%SCold=sc%SC
@@ -718,7 +725,7 @@ contains
                call sc%solve_implicit_diff(timeSC%dt,resSC)
 
                ! Advance scalar diffusion
-               sc%SC=sc%SC+resSC
+               sc%SC=sc%SCold+resSC
 
                ! Apply boundary conditions
                where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
