@@ -70,7 +70,7 @@ for time_step in range(num_time_steps):
         # Write to file
         num_points = T_ctr.GetNumberOfTuples()
         with open(res_path + '/NGA2' + str(desired_times[line_ind]) + '.dat', 'w') as file_ctr:
-            for i in range(num_points):
+            for i in range(1, num_points):
                 T_val = T_ctr.GetValue(i)
                 if T_val > 0.0: 
                     file_ctr.write(f"{x_ctr.GetValue(i)}            {T_ctr.GetValue(i)}\n")

@@ -418,8 +418,8 @@ contains
             do j=sc%cfg%jmin_,sc%cfg%jmax_
                do k=sc%cfg%kmin_,sc%cfg%kmax_
                   if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_sat
-                  ! if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/x_itf*sc%cfg%xm(i)
+                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+                  ! if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/x_itf*sc%cfg%xm(i)
                end do
             end do
          end do
@@ -681,7 +681,9 @@ contains
 
          ! Transport scalars
          advance_scalar: block
-            integer :: nsc
+            use tpscalar_class,  only: bcond
+            type(bcond), pointer :: mybc
+            integer :: nsc,n
             ! Debug
             integer :: i,j,k,SCit,SCitmax
 
@@ -733,6 +735,12 @@ contains
                   sc%SC(:,:,:,iTg)=T_sat
                end where
                call sc%apply_bcond(timeSC%t,timeSC%dt)
+               call sc%get_bcond('xm',mybc)
+               do n=1,mybc%itr%no_
+                  i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+                  sc%SC(i,j,k,iTl)=0.0_WP
+                  sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
+               end do
 
                ! One-field temperature
                T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
