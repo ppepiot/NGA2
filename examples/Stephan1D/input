@@ -28,11 +28,11 @@ Saturation temperature        : 373.15
 Latent heat                   : 2.26e6
 
 # Time integration
-Max timestep size : 3.5e-3
+Max timestep size : 3.5e-7
 Max cfl number    : 0.9
 Sub-iterations    : 2
-Scalar time step  : 3.5e-8
-Max time          : 0.5
+# Scalar time step  : 3.5e-3
+Max time          : 0.037
 
 # Evaporation
 Max pseudo timestep size : 9e-6
@@ -46,4 +46,4 @@ Pressure iteration    : 50
 Max coarsening levels : 10 ! 12
 
 # Ensight output
-Ensight output period : 0.1
+Ensight output period : 3.5e-5

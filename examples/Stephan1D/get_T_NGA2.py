@@ -2,7 +2,7 @@
 import os
 from paraview.simple import *
 
-desired_times = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+desired_times = [0.027, 0.1, 0.2, 0.3, 0.4, 0.5]
 tolerance = 0.01
 res_path = '/Users/shayanhbi/Repositories/NGA2/examples/Stephan1D/temperature'
 if not os.path.exists(res_path):
@@ -69,7 +69,8 @@ for time_step in range(num_time_steps):
 
         # Write to file
         num_points = T_ctr.GetNumberOfTuples()
-        with open(res_path + '/NGA2' + str(desired_times[line_ind]) + '.dat', 'w') as file_ctr:
+        with open(res_path + '/num' + str(desired_times[line_ind]) + '.dat', 'w') as file_ctr:
+            file_ctr.write(f"x            Tg\n")
             for i in range(1, num_points):
                 T_val = T_ctr.GetValue(i)
                 if T_val > 0.0: 

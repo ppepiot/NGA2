@@ -1,38 +1,93 @@
 # Import libraries
 import os
+import re
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# Date file reader
+def file_to_data(file, data_names):
+
+    # Read lines
+    with open(file, 'r') as sf:
+        lines = sf.readlines()
+
+    # Store header
+    names = lines[0].split()
+
+    # Remove header line
+    lines.pop(0)
+
+    fdata = []
+    for line in lines:
+        split_line = line.split()
+        fdata.append([float(val) for val in split_line])
+    fdata = np.array(fdata)
+
+    data = {}
+    for name in data_names:
+        data[name] = fdata[:, names.index(name)]
+    
+    return data
+
 # Use latex font
 plt.rcParams['text.usetex'] = True
 plt.rcParams['font.family'] = 'serif'
 
-# Path where your .dat files are located
+# Path where the files are located
 data_dir = "/Users/shayanhbi/Repositories/NGA2/examples/Stephan1D/temperature"
 
-# Get file lists
-ext_files = sorted(glob.glob(os.path.join(data_dir, "ext*.dat")))
-nga_files = sorted(glob.glob(os.path.join(data_dir, "NGA2*.dat")))
+# Get and sort data
+arr_names = np.array(['x', 'Tg'])
+data_ext = []
+data_num = []
+time_num = []
+time_ext = []
 
-def get_timestamp(fname, prefix):
-    base = os.path.basename(fname)
-    return base.replace(prefix, "").replace(".dat", "")
+pattern = r'[-+]?\d*\.\d+|\d+'
+for filename in os.listdir(data_dir):
+    if filename.endswith('.dat'):
+        match = re.search(pattern, filename)
+        time = float(match.group())
+        if 'num' in filename:
+            time_num.append(time)
+            data_num.append(file_to_data(data_dir +'/' + filename, arr_names))
+        elif 'ext' in filename:
+            time_ext.append(time)
+            data_ext.append(file_to_data(data_dir + '/' + filename, arr_names))
+        else:
+            pass
 
-plt.figure(figsize=(8,6))
+sorted_lists = sorted(zip(time_num, data_num))
+time_num, data_num = zip(*sorted_lists)
 
-for extf, ngaf in zip(ext_files, nga_files):
-    t = get_timestamp(os.path.basename(extf), "ext")
+sorted_lists = sorted(zip(time_ext, data_ext))
+time_ext, data_ext = zip(*sorted_lists)
 
-    ext_data = np.loadtxt(extf, comments='#')
-    nga_data = np.loadtxt(ngaf, comments='#')
 
-    plt.plot(1000*ext_data[:, 0], ext_data[:, 1], '-' , color='k')
-    plt.plot(1000*nga_data[:, 0], nga_data[:, 1], '--', color='k')
+# Make colors
+colors = plt.cm.plasma(np.linspace(0, 1, len(time_ext)))
 
-plt.grid(which='major', axis='both', color='gray', linestyle='-', linewidth=0.4, alpha=0.25)
-plt.xlabel(r'$x~(mm)$', fontsize=12)
-plt.ylabel(r'$T_g~(K)$', fontsize=12)
+fig, ax = plt.subplots(1, 1, figsize=(8,6))
+
+# Visualize
+for i, t in enumerate(time_ext):
+    ax.plot(1000*data_ext[i]['x'], data_ext[i]['Tg'], '-',  color=colors[i], label = r'$t = {:.3f}~(s)$'.format(t))
+    ax.plot(1000*data_num[i]['x'], data_num[i]['Tg'], '--', color=colors[i])
+
+# Custom legend
+custom_lines = [
+    Line2D([0], [0], color='k', lw=1.5, ls='-',  label=r'$Exact$'),
+    Line2D([0], [0], color='k', lw=1.5, ls='--', label=r'$Numerical$'),
+]
+first_legend = ax.legend(custom_lines, [r'$Exact$', r'$Numerical$'], frameon=False, loc='upper right', fontsize=14)
+ax.add_artist(first_legend)
+ax.legend(frameon=False, loc='lower right', bbox_to_anchor=(1, 0.5), fontsize=14)
+plt.grid(which='major', axis='both', color='gray', linestyle='-', linewidth=0.5, alpha=0.25)
+plt.xlabel(r'$x~(mm)$', fontsize=14)
+plt.ylabel(r'$T_g~(K)$', fontsize=14)
+for spine in plt.gca().spines.values():
+    spine.set_linewidth(1.2)
 plt.tight_layout()
 plt.savefig('./T_g.pdf')
