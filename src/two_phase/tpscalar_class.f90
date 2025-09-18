@@ -692,7 +692,7 @@ contains
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
-                  if (this%PVF(i,j,k,p).gt.0.0_WP) then
+                  if (this%PVF(i,j,k,p).ge.VFhi) then
                      dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
                      &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
                      &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))+&
@@ -701,6 +701,7 @@ contains
                end do
             end do
          end do
+         ! if (nsc.eq.2) print*,'dSCdt(12:15) = ',dSCdt(12:15,1,1,nsc)
          ! Sync residual
          call this%cfg%sync(dSCdt(:,:,:,nsc))
       end do

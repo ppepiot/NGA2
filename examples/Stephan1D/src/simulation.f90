@@ -182,6 +182,60 @@ contains
    end function
 
    
+   subroutine advance_vof()
+      use mms_geom,  only: cube_refine_vol
+      integer :: i,j,k,n,si,sj,sk,ierr
+      real(WP), dimension(3,8) :: cube_vertex
+      real(WP), dimension(3) :: v_cent,a_cent
+      real(WP) :: vol,area
+      integer, parameter :: amr_ref_lvl=4
+      H0=2.0_WP*beta*sqrt(alpha_g*t0)+(time%t-t0)*0.001_WP/(150.0_WP*3.5e-2)
+      ! H0=2.0_WP*beta*sqrt(alpha_g*time%t)
+      do k=vf%cfg%kmino_,vf%cfg%kmaxo_
+         do j=vf%cfg%jmino_,vf%cfg%jmaxo_
+            do i=vf%cfg%imino_,vf%cfg%imaxo_
+               ! Set cube vertices
+               n=0
+               do sk=0,1
+                  do sj=0,1
+                     do si=0,1
+                        n=n+1; cube_vertex(:,n)=[vf%cfg%x(i+si),vf%cfg%y(j+sj),vf%cfg%z(k+sk)]
+                     end do
+                  end do
+               end do
+               ! Call adaptive refinement code to get volume and barycenters recursively
+               vol=0.0_WP; area=0.0_WP; v_cent=0.0_WP; a_cent=0.0_WP
+               call cube_refine_vol(cube_vertex,vol,area,v_cent,a_cent,levelset_vapor,0.0_WP,amr_ref_lvl)
+               vf%VF(i,j,k)=vol/vf%cfg%vol(i,j,k)
+               if (vf%VF(i,j,k).ge.VFlo.and.vf%VF(i,j,k).le.VFhi) then
+                  vf%Lbary(:,i,j,k)=v_cent
+                  vf%Gbary(:,i,j,k)=([vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]-vf%VF(i,j,k)*vf%Lbary(:,i,j,k))/(1.0_WP-vf%VF(i,j,k))
+               else
+                  vf%Lbary(:,i,j,k)=[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]
+                  vf%Gbary(:,i,j,k)=[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]
+               end if
+            end do
+         end do
+      end do
+      ! Update the band
+      call vf%update_band()
+      ! Perform interface reconstruction from VOF field
+      call vf%build_interface()
+      ! Set interface planes at the boundaries
+      call vf%set_full_bcond()
+      ! Create discontinuous polygon mesh from IRL interface
+      call vf%polygonalize_interface()
+      ! Calculate distance from polygons
+      call vf%distance_from_polygon()
+      ! Calculate subcell phasic volumes
+      call vf%subcell_vol()
+      ! Calculate curvature
+      call vf%get_curvature()
+      ! Reset moments to guarantee compatibility with interface reconstruction
+      call vf%reset_volume_moments()
+   end subroutine advance_vof
+
+
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -263,7 +317,6 @@ contains
       create_and_initialize_vof: block
          use mms_geom,  only: cube_refine_vol
          use vfs_class, only: lvira,VFhi,VFlo,flux_storage,neumann
-         use mathtools, only: Pi
          use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX
          use parallel,  only: MPI_REAL_WP
          real(WP) :: my_x_itf
@@ -642,7 +695,10 @@ contains
    subroutine simulation_run
       use tpns_class, only: static_contact,harmonic_visc
       use mathtools, only: Pi
+      use tpscalar_class,  only: bcond
       implicit none
+      type(bcond), pointer :: mybc
+      integer  :: i,j,k,nsc,n,p
 
       ! Perform time integration
       do while (.not.time%done())
@@ -667,147 +723,175 @@ contains
          fs%Vold=fs%V
          fs%Wold=fs%W
 
-         ! Apply time-varying Dirichlet conditions
-         ! This is where time-dpt Dirichlet would be enforced
-         
-         ! Advance flow
-         advance_flow: block
-            use tpscalar_class,  only: bcond
-            type(bcond), pointer :: mybc
-            integer  :: i,j,k,nsc,n
+         ! VOF solver step
+         call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
+         call vf%apply_bcond(time%t,time%dt)
+         ! call advance_vof()
 
-            ! Perform sub-iterations
-            do while (time%it.le.time%itmax)
+         ! Update the phasic VOF and face apertures
+         sc%PVF(:,:,:,Lphase)=vf%VF
+         sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
+         call sc%get_face_apt()
 
-               ! VOF solver step
-               call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
-               call vf%apply_bcond(time%t,time%dt)
-      
-               ! Update the phasic VOF
-               sc%PVF(:,:,:,Lphase)=vf%VF
-               sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
-      
-               ! Update the phasic face apertures
-               call sc%get_face_apt()
+         ! Perform sub-iterations
+         do while (time%it.le.time%itmax)
+            if (cfg%amRoot) print*,'Sub iteration ',time%it
 
-               ! Build mid-time scalar
-               sc%SC=0.5_WP*(sc%SC+sc%SCold)
-               
-               ! Explicit calculation of dSC/dt from advection and diffusion
-               call sc%get_dSCdt(dSCdt=resSC,U=fs%U,V=fs%V,W=fs%W,divU=evp%div_src_old)
-
-               ! Scale by time step size
-               resSC=time%dt*resSC
-
-               ! Form implicit residual
-               call sc%solve_implicit(dt=time%dt,resSC=resSC,U=fs%U,V=fs%V,W=fs%W,divU=evp%div_src_old)
-
-               ! Apply the residuals
-               sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
-
-               ! One-field temperature
-               T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-
-               ! Apply boundary conditions
-               where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-                  sc%SC(:,:,:,iTl)=T_sat
-                  sc%SC(:,:,:,iTg)=T_sat
-               end where
-               call sc%apply_bcond(time%t,time%dt)
-               call sc%get_bcond('xm',mybc)
-               do n=1,mybc%itr%no_
-                  i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-                  sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
+            ! ================== SCALAR ================== !
+            ! Build mid-time scalar
+            do nsc=1,sc%nscalar
+               p=sc%phase(nsc)
+               do k=cfg%kmino_,cfg%kmaxo_
+                  do j=cfg%jmino_,cfg%jmaxo_
+                     do i=cfg%imino_,cfg%imaxo_
+                        if (sc%PVF(i,j,k,p).eq.1.0_WP) then
+                           sc%SC(i,j,k,nsc)=0.5_WP*(sc%SC(i,j,k,nsc)+sc%SCold(i,j,k,nsc))
+                        else if (sc%PVF(i,j,k,p).gt.0.0_WP) then
+                           sc%SC(i,j,k,nsc)=T_sat
+                        else
+                           sc%SC(i,j,k,nsc)=0.0_WP
+                        end if
+                     end do
+                  end do
                end do
+            end do
+            ! print*,'Tg(12:15) mid = ',sc%SC(12:15,1,1,iTg)
 
-               ! Get temperature gradient
-               call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-               call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-               ! Extrapolate temperature gradient to interface
-               call evp%pure_interfacial_extp(Lphase,Tl_grd)
-               call evp%pure_interfacial_extp(Gphase,Tg_grd)
+            ! Explicit calculation of dSC/dt from advection and diffusion
+            call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old) ! What div_src should I pass here?
 
-               ! Interface jump conditions
-               where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-                  evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
-               else where
-                  evp%mdotdp=0.0_WP
-               end where
-
-               ! Get the volumetric evaporation mass flux
-               call evp%get_mflux()
-
-               ! Shift the evaporation mass flux
-               call evp%shift_mflux()
-               
-               ! Get the phase-change induced divergence
-               call evp%get_div()
-
-               ! Build mid-time velocity
-               fs%U=0.5_WP*(fs%U+fs%Uold)
-               fs%V=0.5_WP*(fs%V+fs%Vold)
-               fs%W=0.5_WP*(fs%W+fs%Wold)
-               
-               ! Prepare new staggered viscosity (at n+1)
-               call fs%get_viscosity(vf=vf,strat=harmonic_visc)
-
-               ! Prepare old staggered density (at n)
-               call fs%get_olddensity(vf=vf)
-
-               ! Preliminary mass and momentum transport step at the interface
-               call fs%prepare_advection_upwind(dt=time%dt)
-               
-               ! Explicit calculation of drho*u/dt from NS
-               call fs%get_dmomdt(resU,resV,resW)
-               
-               ! Add momentum mass fluxes
-               call fs%addsrc_gravity(resU,resV,resW)
-               
-               ! Assemble explicit residual
-               resU=-2.0_WP*fs%rho_U*fs%U+(fs%rho_Uold+fs%rho_U)*fs%Uold+time%dt*resU
-               resV=-2.0_WP*fs%rho_V*fs%V+(fs%rho_Vold+fs%rho_V)*fs%Vold+time%dt*resV
-               resW=-2.0_WP*fs%rho_W*fs%W+(fs%rho_Wold+fs%rho_W)*fs%Wold+time%dt*resW
-               
-               ! Form implicit residuals
-               call fs%solve_implicit(time%dt,resU,resV,resW)
-
-               ! Apply these residuals
-               fs%U=2.0_WP*fs%U-fs%Uold+resU!/fs%rho_U
-               fs%V=2.0_WP*fs%V-fs%Vold+resV!/fs%rho_V
-               fs%W=2.0_WP*fs%W-fs%Wold+resW!/fs%rho_W
-               
-               ! Apply other boundary conditions
-               call fs%apply_bcond(time%t,time%dt)
-               
-               ! Solve Poisson equation
-               call fs%update_laplacian()
-               call fs%correct_mfr(src=evp%div_src)
-               call fs%get_div(src=evp%div_src)
-               ! call fs%add_surface_tension_jump(dt=time%dt,div=fs%div,vf=vf,contact_model=static_contact)
-               call fs%add_surface_tension_jump(dt=time%dt,div=fs%div,vf=vf)
-               fs%psolv%rhs=-fs%cfg%vol*fs%div/time%dt
-               fs%psolv%sol=0.0_WP
-               call fs%psolv%solve()
-               call fs%shift_p(fs%psolv%sol)
-               
-               ! Correct velocity
-               call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
-               call cfg%integrate(fs%psolv%rhs,prhs_int)
-               fs%P=fs%P+fs%psolv%sol
-               fs%U=fs%U-time%dt*resU/fs%rho_U
-               fs%V=fs%V-time%dt*resV/fs%rho_V
-               fs%W=fs%W-time%dt*resW/fs%rho_W
-               
-               ! Increment sub-iteration counter
-               time%it=time%it+1
-               
+            ! Assemble explicit residual
+            do nsc=1,sc%nscalar
+               p=sc%phase(nsc)
+               do k=cfg%kmin_,cfg%kmax_
+                  do j=cfg%jmin_,cfg%jmax_
+                     do i=cfg%imin_,cfg%imax_
+                        if (sc%PVF(i,j,k,p).eq.1.0_WP) then
+                           resSC(i,j,k,nsc)=2.0_WP*(sc%SCold(i,j,k,nsc)-sc%SC(i,j,k,nsc))+time%dt*resSC(i,j,k,nsc)
+                        else
+                           resSC(i,j,k,nsc)=0.0_WP
+                        end if
+                     end do
+                  end do
+               end do
             end do
 
-            ! Recompute interpolated velocity and divergence
-            call fs%interp_vel(Ui,Vi,Wi)
-            call fs%get_div(src=evp%div_src)
+            ! print*,'resSC(12:15) = ',resSC(12:15,1,1,iTg)
 
-         end block advance_flow
+            ! Form implicit residual
+            call sc%solve_implicit(dt=time%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old) ! What div_src should I pass here?
+
+            ! Apply the residuals
+            sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
+
+            do nsc=1,sc%nscalar
+               where (sc%PVF(:,:,:,sc%phase(nsc)).lt.VFlo) sc%SC(:,:,:,nsc)=0.0_WP
+            end do
+
+            ! One-field temperature
+            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+
+            ! Apply boundary conditions
+            where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+               sc%SC(:,:,:,iTl)=T_sat
+               sc%SC(:,:,:,iTg)=T_sat
+            end where
+            call sc%apply_bcond(time%t,time%dt)
+            call sc%get_bcond('xm',mybc)
+            do n=1,mybc%itr%no_
+               i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+               sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
+            end do
+            ! print*,'Tg(12:15) at the end of the sub iteration = ',sc%SC(12:15,1,1,iTg)
+
+            ! Get temperature gradient
+            call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
+            call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
+            ! Extrapolate temperature gradient to interface
+            call evp%pure_interfacial_extp(Lphase,Tl_grd)
+            call evp%pure_interfacial_extp(Gphase,Tg_grd)
+
+            ! Interface jump conditions
+            where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
+               evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+            else where
+               evp%mdotdp=0.0_WP
+            end where
+
+            ! Get the volumetric evaporation mass flux
+            call evp%get_mflux()
+
+            ! Shift the evaporation mass flux
+            call evp%shift_mflux()
+            
+            ! Get the phase-change induced divergence
+            call evp%get_div()
+
+            ! ================== VELOCITY ================== !
+            ! Build mid-time velocity
+            fs%U=0.5_WP*(fs%U+fs%Uold)
+            fs%V=0.5_WP*(fs%V+fs%Vold)
+            fs%W=0.5_WP*(fs%W+fs%Wold)
+            
+            ! Prepare new staggered viscosity (at n+1)
+            call fs%get_viscosity(vf=vf,strat=harmonic_visc)
+
+            ! Prepare old staggered density (at n)
+            call fs%get_olddensity(vf=vf)
+
+            ! Preliminary mass and momentum transport step at the interface
+            call fs%prepare_advection_upwind(dt=time%dt)
+            
+            ! Explicit calculation of drho*u/dt from NS
+            call fs%get_dmomdt(resU,resV,resW)
+            
+            ! Add momentum mass fluxes
+            call fs%addsrc_gravity(resU,resV,resW)
+            
+            ! Assemble explicit residual
+            resU=-2.0_WP*fs%rho_U*fs%U+(fs%rho_Uold+fs%rho_U)*fs%Uold+time%dt*resU
+            resV=-2.0_WP*fs%rho_V*fs%V+(fs%rho_Vold+fs%rho_V)*fs%Vold+time%dt*resV
+            resW=-2.0_WP*fs%rho_W*fs%W+(fs%rho_Wold+fs%rho_W)*fs%Wold+time%dt*resW
+            
+            ! Form implicit residuals
+            call fs%solve_implicit(time%dt,resU,resV,resW)
+
+            ! Apply these residuals
+            fs%U=2.0_WP*fs%U-fs%Uold+resU!/fs%rho_U
+            fs%V=2.0_WP*fs%V-fs%Vold+resV!/fs%rho_V
+            fs%W=2.0_WP*fs%W-fs%Wold+resW!/fs%rho_W
+            
+            ! Apply other boundary conditions
+            call fs%apply_bcond(time%t,time%dt)
+            
+            ! Solve Poisson equation
+            call fs%update_laplacian()
+            call fs%correct_mfr(src=evp%div_src)
+            call fs%get_div(src=evp%div_src)
+            ! call fs%add_surface_tension_jump(dt=time%dt,div=fs%div,vf=vf,contact_model=static_contact)
+            call fs%add_surface_tension_jump(dt=time%dt,div=fs%div,vf=vf)
+            fs%psolv%rhs=-fs%cfg%vol*fs%div/time%dt
+            fs%psolv%sol=0.0_WP
+            call fs%psolv%solve()
+            call fs%shift_p(fs%psolv%sol)
+            
+            ! Correct velocity
+            call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
+            call cfg%integrate(fs%psolv%rhs,prhs_int)
+            fs%P=fs%P+fs%psolv%sol
+            fs%U=fs%U-time%dt*resU/fs%rho_U
+            fs%V=fs%V-time%dt*resV/fs%rho_V
+            fs%W=fs%W-time%dt*resW/fs%rho_W
+            
+            ! Increment sub-iteration counter
+            time%it=time%it+1
+            
+         end do
+
+         ! Recompute interpolated velocity and divergence
+         call fs%interp_vel(Ui,Vi,Wi)
+         call fs%get_div(src=evp%div_src)
+
          
          ! Output to ensight
          if (ens_evt%occurs()) then
@@ -859,6 +943,9 @@ contains
          call evpfile%write()
          
       end do
+
+      call vf%update_surfmesh(smesh)
+      call ens_out%write_data(time%t)
 
    end subroutine simulation_run
    
