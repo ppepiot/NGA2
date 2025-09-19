@@ -47,4 +47,4 @@ Pressure iteration    : 50
 Max coarsening levels : 10 ! 12
 
 # Ensight output
-Ensight output period : 0.05
+Ensight output period : 0.1
