@@ -36,7 +36,7 @@ plt.rcParams['text.usetex'] = True
 plt.rcParams['font.family'] = 'serif'
 
 # Path where the files are located
-data_dir = "/Users/shayanhbi/Repositories/NGA2/examples/Stephan1D/temperature"
+data_dir = "/Users/shayanhbi/Repositories/NGA2/examples/stephan/temperature"
 
 # Get and sort data
 arr_names = np.array(['x', 'Tg'])

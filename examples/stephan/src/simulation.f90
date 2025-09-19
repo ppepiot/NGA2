@@ -13,7 +13,6 @@ module simulation
    use surfmesh_class,    only: surfmesh
    use event_class,       only: event
    use monitor_class,     only: monitor
-   use irl_fortran_interface, only: TagAccVM_SepVM_type
    implicit none
    private
    
@@ -41,7 +40,6 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: resU,resV,resW
    real(WP), dimension(:,:,:),   allocatable :: Ui,Vi,Wi
    real(WP), dimension(:,:,:),   allocatable :: T
-   real(WP), dimension(:,:,:),   allocatable :: Tl_grd,Tg_grd
    
    !> Problem definition
    real(WP) :: H0
@@ -116,6 +114,41 @@ contains
    end function
 
 
+   subroutine get_interface()
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
+      use parallel,  only: MPI_REAL_WP
+      integer :: i,j,ierr
+      real(WP) :: my_x_itf,my_u_itf,vol,my_vol
+      ! Get the interface location
+      my_x_itf=0.0_WP
+      my_u_itf=0.0_WP
+      do i=vf%cfg%imin_,vf%cfg%imax_
+         if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
+            my_x_itf=vf%cfg%xm(i)
+            exit
+         end if
+      end do
+      call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
+      my_vol=0.0_WP
+      ! Get the interface velocity
+      do j=vf%cfg%jmin_,vf%cfg%jmax_
+         do i=vf%cfg%imin_,vf%cfg%imax_
+            if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
+               my_vol=my_vol+fs%cfg%vol(i,j,1)
+               my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
+               exit
+            end if
+         end do
+      end do
+      call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+      call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
+      u_itf=u_itf/vol
+      ! Get the analytical solution
+      x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t))
+      u_itf_ext=beta*sqrt(alpha_g/(time%t))
+   end subroutine get_interface
+
+
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -132,8 +165,6 @@ contains
          allocate(Vi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(T     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
-         allocate(Tl_grd(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); Tl_grd=0.0_WP
-         allocate(Tg_grd(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); Tg_grd=0.0_WP
       end block allocate_work_arrays
       
       
@@ -368,7 +399,7 @@ contains
       create_evp: block
          integer :: index,index_pure,i,j,k
          ! Create the object
-         call evp%initialize(cfg=cfg,vf=vf,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
+         call evp%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     evp%mflux_tol)
          call param_read('Max pseudo timestep size',evp%pseudo_time%dtmax)
          call param_read('Max pseudo cfl number',   evp%pseudo_time%cflmax)
@@ -378,14 +409,10 @@ contains
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
          ! Get temperature gradient
-         call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-         call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-         ! Extrapolate temperature gradient to interface
-         call evp%pure_interfacial_extp(Lphase,Tl_grd)
-         call evp%pure_interfacial_extp(Gphase,Tg_grd)
-         ! Interface jump condition
+         call evp%get_temperature_grad()
+         ! Phase change mass flux
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+            evp%mdotdp=(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
          else where
             evp%mdotdp=0.0_WP
          end where
@@ -394,41 +421,11 @@ contains
          ! Initialize the liquid and gas side mass fluxes
          call evp%init_mfluxLG()
       end block create_evp
-      
 
-      ! Update the interface location and velocity
-      update_interface_location: block
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
-      use parallel,  only: MPI_REAL_WP
-         integer :: i,j,ierr
-         real(WP) :: my_x_itf,my_u_itf,vol,my_vol
-         my_x_itf=0.0_WP
-         my_u_itf=0.0_WP
-         do i=vf%cfg%imin_,vf%cfg%imax_
-            if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-               my_x_itf=vf%cfg%xm(i)
-               exit
-            end if
-         end do
-         call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-         my_vol=0.0_WP
-         do j=vf%cfg%jmin_,vf%cfg%jmax_
-            do i=vf%cfg%imin_,vf%cfg%imax_
-               if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
-                  my_vol=my_vol+fs%cfg%vol(i,j,1)
-                  my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
-                  exit
-               end if
-            end do
-         end do
-         call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-         call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-         u_itf=u_itf/vol
-      end block update_interface_location
 
-      ! Update the analytical solution
-      x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t))
-      u_itf_ext=beta*sqrt(alpha_g/(time%t))
+      ! Initialize the interface location and velocity
+      call get_interface()
+
 
       ! Create surfmesh object for interface polygon output
       create_smesh: block
@@ -441,7 +438,7 @@ contains
       create_ensight: block
          integer :: nsc
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='Stephan1D')
+         ens_out=ensight(cfg=cfg,name='stephan')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -453,16 +450,16 @@ contains
          do nsc=1,sc%nscalar
            call ens_out%add_scalar(trim(sc%SCname(nsc)),sc%SC(:,:,:,nsc))
          end do
-         call ens_out%add_scalar('mflux',evp%mflux)
-         call ens_out%add_scalar('evp_div',evp%div_src)
          call ens_out%add_scalar('mdotdp',evp%mdotdp)
+         call ens_out%add_scalar('mflux',evp%mflux)
          call ens_out%add_scalar('mfluxL',evp%mfluxLG(:,:,:,Lphase))
          call ens_out%add_scalar('mfluxG',evp%mfluxLG(:,:,:,Gphase))
+         call ens_out%add_scalar('evp_div',evp%div_src)
          call ens_out%add_scalar('divergence',fs%div)
          call ens_out%add_scalar('Temperature',T)
          call ens_out%add_vector('normal',evp%normal(:,:,:,1),evp%normal(:,:,:,2),evp%normal(:,:,:,3))
-         call ens_out%add_scalar('Tl_grd',Tl_grd)
-         call ens_out%add_scalar('Tg_grd',Tg_grd)
+         call ens_out%add_scalar('Tl_grd',evp%Tl_grd)
+         call ens_out%add_scalar('Tg_grd',evp%Tg_grd)
          ! Output to ensight
          call ens_out%write_data(time%t)
       end block create_ensight
@@ -512,8 +509,8 @@ contains
          call cflfile%write()
          ! Create scalar monitor
          scfile=monitor(sc%cfg%amRoot,'scalar')
-         call scfile%add_column(time%n,'Timestep number')
-         call scfile%add_column(time%t,'Time')
+         call scfile%add_column(timeSC%n,'Timestep number')
+         call scfile%add_column(timeSC%t,'Time')
          do nsc=1,sc%nscalar
            call scfile%add_column(sc%SCmin(nsc),trim(sc%SCname(nsc))//'_min')
            call scfile%add_column(sc%SCmax(nsc),trim(sc%SCname(nsc))//'_max')
@@ -551,10 +548,10 @@ contains
       integer  :: i,j,k,nsc,n,p
       real(WP) :: dt_sc
 
-      ! Perform time integration
+      ! Perform flow time integration
       do while (.not.time%done())
 
-         ! Increment time
+         ! Increment flow time
          call fs%get_cfl(time%dt,time%cfl)
          call time%adjust_dt()
          call time%increment()
@@ -577,7 +574,6 @@ contains
          ! VOF solver step
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
-         ! call advance_vof()
 
          ! Update the phasic VOF and face apertures
          sc%PVF(:,:,:,Lphase)=vf%VF
@@ -585,6 +581,8 @@ contains
          call sc%get_face_apt()
 
          ! ================== SCALAR ================== !
+   
+         ! Perform scalar time integration
          do while (timeSC%t.lt.time%t)
             
             ! Increment scalar time step
@@ -597,11 +595,13 @@ contains
                call timeSC%increment()
             end if
             
-            ! Remember old SC
+            ! Remember old scalar
             sc%SCold =sc%SC
 
+            ! Perform sub-iterations
             do while (timeSC%it.le.timeSC%itmax)
-               if (cfg%amRoot) print*,'Scalar sub iteration ',timeSC%it
+               if (cfg%amRoot) print*,'Scalar sub-iteration ',timeSC%it
+
                ! Build mid-time scalar
                do nsc=1,sc%nscalar
                   p=sc%phase(nsc)
@@ -620,7 +620,7 @@ contains
                   end do
                end do
 
-               ! Explicit calculation of dSC/dt from advection and diffusion
+               ! Explicit calculation of dSC/dt
                call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old)
 
                ! Assemble explicit residual
@@ -645,6 +645,7 @@ contains
                ! Apply the residuals
                sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
 
+               ! Zero-out the scalar in the opposite phase
                do nsc=1,sc%nscalar
                   where (sc%PVF(:,:,:,sc%phase(nsc)).lt.VFlo) sc%SC(:,:,:,nsc)=0.0_WP
                end do
@@ -664,39 +665,39 @@ contains
                   sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
                end do
          
-               ! Increment sub-iteration counter
+               ! Increment scalar sub-iteration counter
                timeSC%it=timeSC%it+1
 
             end do
 
          end do
 
-         ! ================== PHASE CHANGE ================== !
-         ! Get temperature gradient
-         call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-         call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-         ! Extrapolate temperature gradient to interface
-         call evp%pure_interfacial_extp(Lphase,Tl_grd)
-         call evp%pure_interfacial_extp(Gphase,Tg_grd)
 
-         ! Interface jump conditions
+         ! ================== PHASE CHANGE ================== !
+
+         ! Get temperature gradient
+         call evp%get_temperature_grad()
+
+         ! Phase change mass flux
          where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+            evp%mdotdp=(k_g*evp%Tg_grd-k_l*evp%Tl_grd)/h_lg
          else where
             evp%mdotdp=0.0_WP
          end where
 
-         ! Get the volumetric evaporation mass flux
+         ! Get the volumetric phase change mass flux
          call evp%get_mflux()
 
-         ! Shift the evaporation mass flux
+         ! Shift the phase change mass flux
          call evp%shift_mflux()
          
-         ! Get the phase-change induced divergence
+         ! Get the phase change induced divergence
          call evp%get_div()
 
+
          ! ================== VELOCITY ================== !
-         ! Perform sub-iterations
+
+         ! Perform velocity sub-iterations
          do while (time%it.le.time%itmax)
             if (cfg%amRoot) print*,'Flow sub iteration ',time%it
             
@@ -755,7 +756,7 @@ contains
             fs%V=fs%V-time%dt*resV/fs%rho_V
             fs%W=fs%W-time%dt*resW/fs%rho_W
             
-            ! Increment sub-iteration counter
+            ! Increment velocity sub-iteration counter
             time%it=time%it+1
             
          end do
@@ -764,7 +765,9 @@ contains
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(src=evp%div_src)
 
-         
+
+         ! ================== OUTPUT ================== !
+
          ! Output to ensight
          if (ens_evt%occurs()) then
             call vf%update_surfmesh(smesh)
@@ -772,38 +775,7 @@ contains
          end if
          
          ! Update the interface location and velocity
-         update_interface_location: block
-            use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
-            use parallel,  only: MPI_REAL_WP
-            integer :: i,j,ierr
-            real(WP) :: my_x_itf,my_u_itf,vol,my_vol
-            my_x_itf=0.0_WP
-            my_u_itf=0.0_WP
-            do i=vf%cfg%imin_,vf%cfg%imax_
-               if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-                  my_x_itf=vf%cfg%xm(i)
-                  exit
-               end if
-            end do
-            call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-            my_vol=0.0_WP
-            do j=vf%cfg%jmin_,vf%cfg%jmax_
-               do i=vf%cfg%imin_,vf%cfg%imax_
-                  if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
-                     my_vol=my_vol+fs%cfg%vol(i,j,1)
-                     my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
-                     exit
-                  end if
-               end do
-            end do
-            call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-            call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-            u_itf=u_itf/vol
-         end block update_interface_location
-
-         ! Update the analytical solution
-         x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t))
-         u_itf_ext=beta*sqrt(alpha_g/(time%t))
+         call get_interface()
 
          ! Perform and output monitoring
          call fs%get_max()
@@ -815,9 +787,6 @@ contains
          call evpfile%write()
          
       end do
-
-      call vf%update_surfmesh(smesh)
-      call ens_out%write_data(time%t)
 
    end subroutine simulation_run
    

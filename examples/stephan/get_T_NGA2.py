@@ -4,7 +4,7 @@ from paraview.simple import *
 
 desired_times = [0.027, 0.1, 0.2, 0.3, 0.4, 0.5]
 tolerance = 0.01
-res_path = '/Users/shayanhbi/Repositories/NGA2/examples/Stephan1D/temperature'
+res_path = '/Users/shayanhbi/Repositories/NGA2/examples/stephan/temperature'
 if not os.path.exists(res_path):
     try:
         os.mkdir(res_path)

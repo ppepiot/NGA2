@@ -3,7 +3,7 @@ import os
 import math
 import numpy as np
 
-res_path = '/Users/shayanhbi/Repositories/NGA2/examples/Stephan1D/temperature'
+res_path = '/Users/shayanhbi/Repositories/NGA2/examples/stephan/temperature'
 if not os.path.exists(res_path):
     try:
         os.mkdir(res_path)
