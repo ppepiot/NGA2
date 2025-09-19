@@ -24,7 +24,7 @@ module simulation
    type(vfs),         public :: vf
    type(tpscalar),    public :: sc
    type(evap),        public :: evp
-   type(timetracker), public :: time
+   type(timetracker), public :: time,timeSC
    
    !> Ensight postprocessing
    type(surfmesh) :: smesh
@@ -98,72 +98,6 @@ contains
    end function xp_locator
    
 
-   !> Function that localizes y- boundary
-   function ym_locator(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (j.eq.pg%jmin) isIn=.true.
-   end function ym_locator
-
-
-   !> Function that localizes y- boundary for scalar fields
-   function ym_locator_sc(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (j.eq.pg%jmin-1) isIn=.true.
-   end function ym_locator_sc
-   
-   
-   !> Function that localizes y+ boundary
-   function yp_locator(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (j.eq.pg%jmax+1) isIn=.true.
-   end function yp_locator
-
-
-   !> Function that localizes z- boundary
-   function zm_locator(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (k.eq.pg%kmin) isIn=.true.
-   end function zm_locator
-
-
-   !> Function that localizes z- boundary for scalar fields
-   function zm_locator_sc(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (k.eq.pg%kmin-1) isIn=.true.
-   end function zm_locator_sc
-   
-   
-   !> Function that localizes z+ boundary
-   function zp_locator(pg,i,j,k) result(isIn)
-      use pgrid_class, only: pgrid
-      class(pgrid), intent(in) :: pg
-      integer, intent(in) :: i,j,k
-      logical :: isIn
-      isIn=.false.
-      if (k.eq.pg%kmax+1) isIn=.true.
-   end function zp_locator
-   
-
    !> Function that governs the 1D Stephan beta
    function f_beta(b)
       use mathtools, only: Pi
@@ -180,60 +114,6 @@ contains
       real(WP) :: fp_beta
       fp_beta=(1.0_WP+2.0_WP*b**2)*exp(b**2)*erf(b)+2.0_WP*b/sqrt(Pi)
    end function
-
-   
-   subroutine advance_vof()
-      use mms_geom,  only: cube_refine_vol
-      integer :: i,j,k,n,si,sj,sk,ierr
-      real(WP), dimension(3,8) :: cube_vertex
-      real(WP), dimension(3) :: v_cent,a_cent
-      real(WP) :: vol,area
-      integer, parameter :: amr_ref_lvl=4
-      H0=2.0_WP*beta*sqrt(alpha_g*t0)+(time%t-t0)*0.001_WP/(150.0_WP*3.5e-2)
-      ! H0=2.0_WP*beta*sqrt(alpha_g*time%t)
-      do k=vf%cfg%kmino_,vf%cfg%kmaxo_
-         do j=vf%cfg%jmino_,vf%cfg%jmaxo_
-            do i=vf%cfg%imino_,vf%cfg%imaxo_
-               ! Set cube vertices
-               n=0
-               do sk=0,1
-                  do sj=0,1
-                     do si=0,1
-                        n=n+1; cube_vertex(:,n)=[vf%cfg%x(i+si),vf%cfg%y(j+sj),vf%cfg%z(k+sk)]
-                     end do
-                  end do
-               end do
-               ! Call adaptive refinement code to get volume and barycenters recursively
-               vol=0.0_WP; area=0.0_WP; v_cent=0.0_WP; a_cent=0.0_WP
-               call cube_refine_vol(cube_vertex,vol,area,v_cent,a_cent,levelset_vapor,0.0_WP,amr_ref_lvl)
-               vf%VF(i,j,k)=vol/vf%cfg%vol(i,j,k)
-               if (vf%VF(i,j,k).ge.VFlo.and.vf%VF(i,j,k).le.VFhi) then
-                  vf%Lbary(:,i,j,k)=v_cent
-                  vf%Gbary(:,i,j,k)=([vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]-vf%VF(i,j,k)*vf%Lbary(:,i,j,k))/(1.0_WP-vf%VF(i,j,k))
-               else
-                  vf%Lbary(:,i,j,k)=[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]
-                  vf%Gbary(:,i,j,k)=[vf%cfg%xm(i),vf%cfg%ym(j),vf%cfg%zm(k)]
-               end if
-            end do
-         end do
-      end do
-      ! Update the band
-      call vf%update_band()
-      ! Perform interface reconstruction from VOF field
-      call vf%build_interface()
-      ! Set interface planes at the boundaries
-      call vf%set_full_bcond()
-      ! Create discontinuous polygon mesh from IRL interface
-      call vf%polygonalize_interface()
-      ! Calculate distance from polygons
-      call vf%distance_from_polygon()
-      ! Calculate subcell phasic volumes
-      call vf%subcell_vol()
-      ! Calculate curvature
-      call vf%get_curvature()
-      ! Reset moments to guarantee compatibility with interface reconstruction
-      call vf%reset_volume_moments()
-   end subroutine advance_vof
 
 
    !> Initialization of problem solver
@@ -267,6 +147,11 @@ contains
          call param_read('Sub-iterations',time%itmax)
          time%t=t0
          time%dt=time%dtmax
+         timeSC=timetracker(amRoot=cfg%amRoot,name='SC Time')
+         call param_read('Scalar time step',timeSC%dtmax)
+         call param_read('Scalar sub-iterations',timeSC%itmax)
+         timeSC%tmax=time%tmax
+         timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
 
 
@@ -330,10 +215,6 @@ contains
          ! Boundary conditinos
          call vf%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
-         ! call vf%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
-         ! call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
          H0=2.0_WP*beta*sqrt(alpha_g*t0)
          do k=vf%cfg%kmino_,vf%cfg%kmaxo_
@@ -391,7 +272,7 @@ contains
       
       ! Create a two-phase flow solver without bconds
       create_and_initialize_flow_solver: block
-         use hypre_str_class, only: gmres_pfmg2,pcg_pfmg2
+         use hypre_str_class, only: gmres_pfmg2
          use mathtools,       only: Pi
          use tpns_class,      only: clipped_neumann,bcond
          type(bcond), pointer :: mybc
@@ -410,15 +291,8 @@ contains
          call param_read('Gravity',fs%gravity)
          ! Boundary conditions
          call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
-         ! call fs%add_bcond(name='ym',type=clipped_neumann,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
-         ! call fs%add_bcond(name='yp',type=clipped_neumann,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
-         ! call fs%add_bcond(name='zm',type=clipped_neumann,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
-         ! call fs%add_bcond(name='zp',type=clipped_neumann,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
-         ! ps%maxlevel=16
-         ! ps%maxlevel=12
-         ! ps%maxlevel=9
          call param_read('Pressure iteration',ps%maxit)
          call param_read('Pressure tolerance',ps%rcvg)
          call param_read('Max coarsening levels',ps%maxlevel)
@@ -428,9 +302,6 @@ contains
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
-         ! where (vf%VF.gt.VFlo)
-         !    fs%U=beta*sqrt(alpha_g/t0)
-         ! end where
          ! Apply boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Calculate cell-centered velocities and divergence
@@ -450,10 +321,6 @@ contains
          ! Boundary conditinos
          call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
          call sc%add_bcond(name='xp',type=neumann,  locator=xp_locator   ,dir='+x')
-         ! call sc%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
-         ! call sc%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
-         ! call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
          sc%phase =[Lphase,Gphase]
          sc%diff(:,:,:,iTl)=alpha_l
@@ -510,23 +377,6 @@ contains
          ! Get densities from the flow solver
          evp%rho_l=fs%rho_l
          evp%rho_g=fs%rho_g
-         ! Debug
-         ! Tg_grd=0.0_WP
-         ! Tl_grd=0.0_WP
-         ! do k=sc%cfg%kmin_,sc%cfg%kmax_
-         !    do j=sc%cfg%jmin_,sc%cfg%jmax_
-         !       do i=sc%cfg%imin_,sc%cfg%imax_
-         !          if (vf%VF(i,j,k).gt.VFlo.and.vf%VF(i,j,k).lt.VFhi) then
-         !             ! Tg_grd(i,j,k)=(sc%SC(i-1,j,k,iTg)-sc%SC(i-2,j,k,iTg))*sc%cfg%dxmi(i-1)
-         !             ! Tl_grd(i,j,k)=(sc%SC(i+2,j,k,iTl)-sc%SC(i+1,j,k,iTl))*sc%cfg%dxmi(i+2)
-         !             Tg_grd(i,j,k)=(T_w-T_sat)/sc%cfg%xm(i)
-         !             Tl_grd(i,j,k)=0.0_WP
-         !          end if
-         !       end do
-         !    end do
-         ! end do
-         ! call sc%cfg%sync(Tg_grd)
-         ! call sc%cfg%sync(Tl_grd)
          ! Get temperature gradient
          call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
          call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
@@ -699,6 +549,7 @@ contains
       implicit none
       type(bcond), pointer :: mybc
       integer  :: i,j,k,nsc,n,p
+      real(WP) :: dt_sc
 
       ! Perform time integration
       do while (.not.time%done())
@@ -733,101 +584,122 @@ contains
          sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
          call sc%get_face_apt()
 
+         ! ================== SCALAR ================== !
+         do while (timeSC%t.lt.time%t)
+            
+            ! Increment scalar time step
+            if (timeSC%t+timeSC%dt.gt.time%t) then
+               dt_sc=timeSC%dt
+               timeSC%dt=time%t-timeSC%t
+               call timeSC%increment()
+               timeSC%dt=dt_sc
+            else
+               call timeSC%increment()
+            end if
+            
+            ! Remember old SC
+            sc%SCold =sc%SC
+
+            do while (timeSC%it.le.timeSC%itmax)
+               if (cfg%amRoot) print*,'Scalar sub iteration ',timeSC%it
+               ! Build mid-time scalar
+               do nsc=1,sc%nscalar
+                  p=sc%phase(nsc)
+                  do k=cfg%kmino_,cfg%kmaxo_
+                     do j=cfg%jmino_,cfg%jmaxo_
+                        do i=cfg%imino_,cfg%imaxo_
+                           if (sc%PVF(i,j,k,p).eq.1.0_WP) then
+                              sc%SC(i,j,k,nsc)=0.5_WP*(sc%SC(i,j,k,nsc)+sc%SCold(i,j,k,nsc))
+                           else if (sc%PVF(i,j,k,p).gt.0.0_WP) then
+                              sc%SC(i,j,k,nsc)=T_sat
+                           else
+                              sc%SC(i,j,k,nsc)=0.0_WP
+                           end if
+                        end do
+                     end do
+                  end do
+               end do
+
+               ! Explicit calculation of dSC/dt from advection and diffusion
+               call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old)
+
+               ! Assemble explicit residual
+               do nsc=1,sc%nscalar
+                  p=sc%phase(nsc)
+                  do k=cfg%kmin_,cfg%kmax_
+                     do j=cfg%jmin_,cfg%jmax_
+                        do i=cfg%imin_,cfg%imax_
+                           if (sc%PVF(i,j,k,p).eq.1.0_WP) then
+                              resSC(i,j,k,nsc)=2.0_WP*(sc%SCold(i,j,k,nsc)-sc%SC(i,j,k,nsc))+timeSC%dt*resSC(i,j,k,nsc)
+                           else
+                              resSC(i,j,k,nsc)=0.0_WP
+                           end if
+                        end do
+                     end do
+                  end do
+               end do
+
+               ! Form implicit residual
+               call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old)
+
+               ! Apply the residuals
+               sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
+
+               do nsc=1,sc%nscalar
+                  where (sc%PVF(:,:,:,sc%phase(nsc)).lt.VFlo) sc%SC(:,:,:,nsc)=0.0_WP
+               end do
+
+               ! One-field temperature
+               T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+
+               ! Apply boundary conditions
+               where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+                  sc%SC(:,:,:,iTl)=T_sat
+                  sc%SC(:,:,:,iTg)=T_sat
+               end where
+               call sc%apply_bcond(timeSC%t,timeSC%dt)
+               call sc%get_bcond('xm',mybc)
+               do n=1,mybc%itr%no_
+                  i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
+                  sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
+               end do
+         
+               ! Increment sub-iteration counter
+               timeSC%it=timeSC%it+1
+
+            end do
+
+         end do
+
+         ! ================== PHASE CHANGE ================== !
+         ! Get temperature gradient
+         call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
+         call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
+         ! Extrapolate temperature gradient to interface
+         call evp%pure_interfacial_extp(Lphase,Tl_grd)
+         call evp%pure_interfacial_extp(Gphase,Tg_grd)
+
+         ! Interface jump conditions
+         where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
+            evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
+         else where
+            evp%mdotdp=0.0_WP
+         end where
+
+         ! Get the volumetric evaporation mass flux
+         call evp%get_mflux()
+
+         ! Shift the evaporation mass flux
+         call evp%shift_mflux()
+         
+         ! Get the phase-change induced divergence
+         call evp%get_div()
+
+         ! ================== VELOCITY ================== !
          ! Perform sub-iterations
          do while (time%it.le.time%itmax)
-            if (cfg%amRoot) print*,'Sub iteration ',time%it
-
-            ! ================== SCALAR ================== !
-            ! Build mid-time scalar
-            do nsc=1,sc%nscalar
-               p=sc%phase(nsc)
-               do k=cfg%kmino_,cfg%kmaxo_
-                  do j=cfg%jmino_,cfg%jmaxo_
-                     do i=cfg%imino_,cfg%imaxo_
-                        if (sc%PVF(i,j,k,p).eq.1.0_WP) then
-                           sc%SC(i,j,k,nsc)=0.5_WP*(sc%SC(i,j,k,nsc)+sc%SCold(i,j,k,nsc))
-                        else if (sc%PVF(i,j,k,p).gt.0.0_WP) then
-                           sc%SC(i,j,k,nsc)=T_sat
-                        else
-                           sc%SC(i,j,k,nsc)=0.0_WP
-                        end if
-                     end do
-                  end do
-               end do
-            end do
-            ! print*,'Tg(12:15) mid = ',sc%SC(12:15,1,1,iTg)
-
-            ! Explicit calculation of dSC/dt from advection and diffusion
-            call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old) ! What div_src should I pass here?
-
-            ! Assemble explicit residual
-            do nsc=1,sc%nscalar
-               p=sc%phase(nsc)
-               do k=cfg%kmin_,cfg%kmax_
-                  do j=cfg%jmin_,cfg%jmax_
-                     do i=cfg%imin_,cfg%imax_
-                        if (sc%PVF(i,j,k,p).eq.1.0_WP) then
-                           resSC(i,j,k,nsc)=2.0_WP*(sc%SCold(i,j,k,nsc)-sc%SC(i,j,k,nsc))+time%dt*resSC(i,j,k,nsc)
-                        else
-                           resSC(i,j,k,nsc)=0.0_WP
-                        end if
-                     end do
-                  end do
-               end do
-            end do
-
-            ! print*,'resSC(12:15) = ',resSC(12:15,1,1,iTg)
-
-            ! Form implicit residual
-            call sc%solve_implicit(dt=time%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=evp%div_src_old) ! What div_src should I pass here?
-
-            ! Apply the residuals
-            sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
-
-            do nsc=1,sc%nscalar
-               where (sc%PVF(:,:,:,sc%phase(nsc)).lt.VFlo) sc%SC(:,:,:,nsc)=0.0_WP
-            end do
-
-            ! One-field temperature
-            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-
-            ! Apply boundary conditions
-            where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-               sc%SC(:,:,:,iTl)=T_sat
-               sc%SC(:,:,:,iTg)=T_sat
-            end where
-            call sc%apply_bcond(time%t,time%dt)
-            call sc%get_bcond('xm',mybc)
-            do n=1,mybc%itr%no_
-               i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-               sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
-            end do
-            ! print*,'Tg(12:15) at the end of the sub iteration = ',sc%SC(12:15,1,1,iTg)
-
-            ! Get temperature gradient
-            call evp%get_grad(Lphase,sc%SC(:,:,:,iTl),Tl_grd)
-            call evp%get_grad(Gphase,sc%SC(:,:,:,iTg),Tg_grd)
-            ! Extrapolate temperature gradient to interface
-            call evp%pure_interfacial_extp(Lphase,Tl_grd)
-            call evp%pure_interfacial_extp(Gphase,Tg_grd)
-
-            ! Interface jump conditions
-            where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-               evp%mdotdp=(k_g*Tg_grd-k_l*Tl_grd)/h_lg
-            else where
-               evp%mdotdp=0.0_WP
-            end where
-
-            ! Get the volumetric evaporation mass flux
-            call evp%get_mflux()
-
-            ! Shift the evaporation mass flux
-            call evp%shift_mflux()
+            if (cfg%amRoot) print*,'Flow sub iteration ',time%it
             
-            ! Get the phase-change induced divergence
-            call evp%get_div()
-
-            ! ================== VELOCITY ================== !
             ! Build mid-time velocity
             fs%U=0.5_WP*(fs%U+fs%Uold)
             fs%V=0.5_WP*(fs%V+fs%Vold)

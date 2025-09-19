@@ -701,7 +701,6 @@ contains
                end do
             end do
          end do
-         ! if (nsc.eq.2) print*,'dSCdt(12:15) = ',dSCdt(12:15,1,1,nsc)
          ! Sync residual
          call this%cfg%sync(dSCdt(:,:,:,nsc))
       end do
