@@ -56,8 +56,9 @@ contains
    !> Function that returns a smooth Heaviside representation of exact shock
    function Hshock(x,y,t) result(H)
       real(WP), intent(in)  :: x,y,t
-      real(WP) :: H
-      H=0.5_WP+0.5_WP*tanh((sintheta*y-costheta*(x-Xs0-u2x*t))/delta)
+      real(WP) :: H,val
+      val=(sintheta*y-costheta*(x-Xs0-u2x*t))/delta
+      H=1.0_WP/(1.0_WP+exp(-val))
    end function Hshock
    
    
@@ -106,7 +107,7 @@ contains
          call param_read('Shock Mach',Ms)
          call param_read('Shock angle',theta); theta=theta*Pi/180.0_WP; costheta=cos(theta); sintheta=sin(theta)
          call param_read('Shock position',Xs0)
-         call param_read('Shock thickness',delta,default=1.2_WP*cfg%min_meshsize)
+         call param_read('Shock thickness',delta,default=0.7_WP*cfg%min_meshsize)
          call param_read('Static shock',static_shock)
          ! Generate preshock conditions
          rho1=1.0_WP                                                   ! This is our reference density
@@ -155,11 +156,13 @@ contains
       ! Initialize time tracker with 2 subiterations
       initialize_timetracker: block
          time=timetracker(amRoot=cfg%amRoot)
+         call param_read('Max time',time%tmax)
          call param_read('Max timestep size',time%dtmax)
          call param_read('Max cfl number',time%cflmax)
          time%dt=time%dtmax
          call param_read('Subiterations',time%itmax)
          time%itmin=2
+         call param_read('Relaxation coeff',time%relax,default=1.0_WP)
       end block initialize_timetracker
       
       ! Create a compressible flow solver with bconds
@@ -170,9 +173,11 @@ contains
          call fs%initialize(cfg=cfg,name='Compressible NS')
          ! Add slight backward bias to CN scheme
          fs%theta=fs%theta+1.0e-2_WP
+         !fs%viscb=0.02_WP
          ! Define boundary conditions
-         call fs%add_bcond(name='xm',type=dirichlet      ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
-         call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.false.,locator=xp_locator)
+         !call fs%add_bcond(name='xm',type=dirichlet      ,face='x',dir=-1,canCorrect=.false.,locator=xm_locator)
+         !call fs%add_bcond(name='xp',type=dirichlet      ,face='x',dir=+1,canCorrect=.false.,locator=xp_locator)
+         !call fs%add_bcond(name='xp',type=clipped_neumann,face='x',dir=+1,canCorrect=.false.,locator=xp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=pcg_pfmg2,nst=7)
          ps%maxlevel=18
@@ -191,8 +196,9 @@ contains
          ! Create energy solver
          call sc%initialize(cfg=cfg,name='Energy')
          ! Define boundary conditions
-         call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
-         call sc%add_bcond(name='xp',type=neumann  ,locator=xp_locator   ,dir='+x')
+         !call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
+         !call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
+         !call sc%add_bcond(name='xp',type=neumann  ,locator=xp_locator   ,dir='+x')
          ! Configure implicit scalar solver
          ss=ddadi(cfg=cfg,name='Energy',nst=13)
          ! Setup the solver
@@ -207,10 +213,10 @@ contains
             do j=cfg%jmino_,cfg%jmaxo_
                do i=cfg%imino_,cfg%imaxo_
                   ! Setup normal shock at t=0
-                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
-                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i)-delta,cfg%ym(j),0.0_WP)  ! Seems like u should be shifted a bit?
+                  fs%RHO(i,j,k)=rho1+(rho2-rho1)*Hshock(cfg%xm(i)-0.3_WP*delta,cfg%ym(j),0.0_WP)  ! Shift rho a bit
+                  fs%U  (i,j,k)=        u2x     *Hshock(cfg%x (i)-2.0_WP*delta,cfg%ym(j),0.0_WP)  ! Shift u a bit
                   fs%V  (i,j,k)=        u2y     *Hshock(cfg%xm(i),cfg%y (j),0.0_WP)
+                  fs%P  (i,j,k)=p1  +(p2  -p1  )*Hshock(cfg%xm(i),cfg%ym(j),0.0_WP)
                   ! Corresponding internal energy
                   sc%E(i,j,k)=fs%P(i,j,k)/(fs%RHO(i,j,k)*(Gamma-1.0_WP))
                end do
@@ -220,11 +226,22 @@ contains
          if (static_shock) fs%U=fs%U-us
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
-         ! Get Umid/Vmid/Wmid
-         call fs%update_faceRHO(); fs%sRHOXold=fs%sRHOX; fs%sRHOYold=fs%sRHOY; fs%sRHOZold=fs%sRHOZ
-         call fs%update_faceRHO() !< Call it again because RHO* uses sRHO*old...
+         ! Get face RHO
+         fs%RHOold=fs%RHO
+         call fs%prepare_weno(fs%RHO)
+         call sc%prepare_weno(sc%E)
+         call fs%update_faceRHO()
+         fs%sRHOXold=fs%sRHOX
+         fs%sRHOYold=fs%sRHOY
+         fs%sRHOZold=fs%sRHOZ
          fs%Uold=fs%U
+         fs%Vold=fs%V
+         fs%Wold=fs%W
+         fs%Pold=fs%P
+         call fs%update_faceRHO()
+         ! Get Umid and mass flux
          call fs%get_Umid()
+         call fs%rho_multiply()
          ! Calculate cell-centered velocities and continuity residual
          call fs%interp_vel(Ui,Vi,Wi)
          call fs%get_div(dt=time%dt)
@@ -259,7 +276,7 @@ contains
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('density',fs%rho)
          call ens_out%add_scalar('energy',sc%E)
-         call ens_out%add_scalar('viscb',fs%viscb)
+         call ens_out%add_scalar('viscb',sgs%visc)
          call ens_out%add_scalar('Mach',Ma)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
@@ -373,6 +390,7 @@ contains
          fs%Uold=fs%U
          fs%Vold=fs%V
          fs%Wold=fs%W
+         fs%Pold=fs%P
          
          ! Apply time-varying Dirichlet conditions
          !top_update: block
@@ -420,6 +438,15 @@ contains
          end if
          ! ===================================================
          
+         ! ============= PREPARE WENO SCHEMES ================
+         call fs%prepare_weno(rho=fs%RHO)
+         call sc%prepare_weno(e=sc%E)
+         ! ===================================================
+         
+         ! ============= INITIAL GUESS FOR RHO ===============
+         call fs%predict_rho(dt=time%dt)
+         ! ===================================================
+         
          ! Perform sub-iterations until RHO is sufficiently converged
          RHOcvg=huge(1.0_WP); time%it=0
          do while (RHOcvg.gt.RHOtol.and.time%it.lt.time%itmax.or.time%it.lt.time%itmin)
@@ -441,7 +468,7 @@ contains
             call sc%solve_implicit(time%dt,resE,fs%RHO,fs%rhoU,fs%rhoV,fs%rhoW)
             
             ! Apply this residual
-            sc%E=sc%E+resE
+            sc%E=sc%E+resE*time%relax
             
             ! Apply other boundary conditions on the resulting field
             call sc%apply_bcond(time%t,time%dt)
@@ -454,7 +481,7 @@ contains
             ! Calculate RHO predictor
             call get_rho(); call fs%update_faceRHO()
             
-            ! Compute speed of sound squared
+            ! Compute speed of sound squared at mid time
             call get_c2()
             ! ===================================================
             
@@ -476,10 +503,10 @@ contains
             ! Form implicit residuals
             call fs%solve_implicit(time%dt,resU,resV,resW)
             
-            ! Apply these residuals
-            fs%U=fs%U+resU
-            fs%V=fs%V+resV
-            fs%W=fs%W+resW
+            ! Apply these residuals with under-relaxation
+            fs%U=fs%U+resU*time%relax
+            fs%V=fs%V+resV*time%relax
+            fs%W=fs%W+resW*time%relax
             
             ! Apply other boundary conditions
             call fs%apply_bcond(time%t,time%dt)
@@ -515,9 +542,12 @@ contains
             fs%psolv%rhs=-fs%cfg%vol*fs%div/time%dt
             fs%psolv%sol=0.0_WP
             call fs%psolv%solve()
-            call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
+            ! Correct pressure
             fs%P=fs%P+fs%psolv%sol
+            ! Correct density
             fs%RHO=fs%RHO+fs%psolv%sol/C2; call fs%update_faceRHO()
+            ! Correct mass flux
+            call fs%get_pgrad(fs%psolv%sol,resU,resV,resW)
             fs%rhoU=fs%rhoU-time%dt*resU*((1.0_WP-fs%theta)*fs%sRHOXold**2+fs%theta*fs%sRHOX**2)/((fs%sRHOX+fs%sRHOXold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOX)
             fs%rhoV=fs%rhoV-time%dt*resV*((1.0_WP-fs%theta)*fs%sRHOYold**2+fs%theta*fs%sRHOY**2)/((fs%sRHOY+fs%sRHOYold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOY)
             fs%rhoW=fs%rhoW-time%dt*resW*((1.0_WP-fs%theta)*fs%sRHOZold**2+fs%theta*fs%sRHOZ**2)/((fs%sRHOZ+fs%sRHOZold*(1.0_WP-fs%theta)/fs%theta)*fs%sRHOZ)

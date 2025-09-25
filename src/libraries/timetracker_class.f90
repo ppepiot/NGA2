@@ -27,6 +27,7 @@ module timetracker_class
       real(WP) :: cfl,cflmax                           !< Current and max CFL
       real(WP) ::  wt, wtmax                           !< Current and max wallclock time
       real(WP) :: told,dtold,tmid,dtmid                !< Old/mid time and timestep size
+      real(WP) :: relax                                !< Relaxation coefficient (nominally between 0 and 1, default is 1) to improve convergence of subiterations
       logical  :: print_info=.true.                    !< Should I print time information?
    contains
       procedure :: increment                           !< Default method for incrementing time
@@ -35,6 +36,7 @@ module timetracker_class
       procedure :: print=>timetracker_print            !< Output timetracker info to screen
       procedure :: log  =>timetracker_log              !< Output timetracker info to log
       procedure :: reset                               !< Reset timetracker to zero
+      procedure :: finalize=>timetracker_finalize      !< Finalize timetracker
    end type timetracker
    
    
@@ -67,6 +69,7 @@ contains
       self%tmid =0.0_WP
       self%dtmid=0.0_WP
       self%it   =1;            self%itmax=1; self%itmin=0
+      self%relax=1.0_WP
    end function constructor
    
    
@@ -86,8 +89,8 @@ contains
       this%wt=parallel_time()-wtinit
       ! If verbose run, log and or print info
       if (this%print_info) then
-         if (verbose.gt.0) call this%log
-         if (verbose.gt.1) call this%print
+         if (verbose.ge.0) call this%log
+         if (verbose.ge.1) call this%print
       end if
    end subroutine increment
    
@@ -168,16 +171,16 @@ contains
       use, intrinsic :: iso_fortran_env, only: output_unit
       implicit none
       class(timetracker), intent(in) :: this
-      if (this%amRoot) then
-         write(output_unit,'("Timetracker [",a,"] status")') trim(this%name)
-         write(output_unit,'(" >  it/ itmax = ",i0,"/",i0)')         this%it,this%itmax
-         write(output_unit,'(" >   n/  nmax = ",i0,"/",i0)')         this%n,this%nmax
-         write(output_unit,'(" >   t/  tmax = ",es12.5,"/",es12.5)') this%t,this%tmax
-         write(output_unit,'(" >  dt/ dtmax = ",es12.5,"/",es12.5)') this%dt,this%dtmax
-         write(output_unit,'(" > cfl/cflmax = ",es12.5,"/",es12.5)') this%cfl,this%cflmax
-         write(output_unit,'(" >  wt/ wtmax = ",es12.5,"/",es12.5)') this%wt,this%wtmax
-      end if
+      if (this%amRoot) write(output_unit,'("Timetracker [",a,"]:"," n=",i8," t=",es12.5)') trim(this%name),this%n,this%t
    end subroutine timetracker_print
    
    
+   !> Finalize timetracker
+   subroutine timetracker_finalize(this)
+      implicit none
+      class(timetracker), intent(inout) :: this
+      ! Nothing to deallocate here
+   end subroutine timetracker_finalize
+   
+
 end module timetracker_class

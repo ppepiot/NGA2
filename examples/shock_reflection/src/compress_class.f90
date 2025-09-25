@@ -62,7 +62,6 @@ module compress_class
       real(WP), dimension(:,:,:), allocatable :: RHOX     !< Density field interpolated to x-face with stabilized scheme
       real(WP), dimension(:,:,:), allocatable :: RHOY     !< Density field interpolated to y-face with stabilized scheme
       real(WP), dimension(:,:,:), allocatable :: RHOZ     !< Density field interpolated to z-face with stabilized scheme
-      !real(WP), dimension(:,:,:), allocatable :: rsmooth  !< Density smoothness indicator for stabilization
       
       ! Old square root of face density
       real(WP), dimension(:,:,:), allocatable :: sRHOXold !< Old square root of density field at x-face
@@ -87,6 +86,7 @@ module compress_class
       real(WP), dimension(:,:,:), allocatable :: P        !< Pressure array
       
       ! Old flow variables
+      real(WP), dimension(:,:,:), allocatable :: Pold     !< Old pressure array
       real(WP), dimension(:,:,:), allocatable :: RHOold   !< Old density array
       real(WP), dimension(:,:,:), allocatable :: Uold     !< Old U velocity array
       real(WP), dimension(:,:,:), allocatable :: Vold     !< Old V velocity array
@@ -102,20 +102,22 @@ module compress_class
       class(linsol), pointer :: implicit                  !< Iterative linear solver object for an implicit prediction of the NS residual
       
       ! Metrics
-      real(WP), dimension(:,:,:,:,:), allocatable :: itp_xy,itp_yz,itp_xz !< Interpolation for viscosity
-      real(WP), dimension(:,:,:,:), allocatable :: itpr_x,itpr_y,itpr_z   !< Interpolation for density
-      real(WP), dimension(:,:,:,:), allocatable :: itp_xp,itp_yp,itp_zp   !< QUICK plus  interpolation for density
-      real(WP), dimension(:,:,:,:), allocatable :: itp_xm,itp_ym,itp_zm   !< QUICK minus interpolation for density
-      real(WP), dimension(:,:,:,:), allocatable :: itpu_x,itpu_y,itpu_z   !< Interpolation for U
-      real(WP), dimension(:,:,:,:), allocatable :: itpv_x,itpv_y,itpv_z   !< Interpolation for V
-      real(WP), dimension(:,:,:,:), allocatable :: itpw_x,itpw_y,itpw_z   !< Interpolation for W
-      real(WP), dimension(:,:,:,:), allocatable :: divp_x,divp_y,divp_z   !< Divergence for P-cell
-      real(WP), dimension(:,:,:,:), allocatable :: divu_x,divu_y,divu_z   !< Divergence for U-cell
-      real(WP), dimension(:,:,:,:), allocatable :: divv_x,divv_y,divv_z   !< Divergence for V-cell
-      real(WP), dimension(:,:,:,:), allocatable :: divw_x,divw_y,divw_z   !< Divergence for W-cell
-      real(WP), dimension(:,:,:,:), allocatable :: grdu_x,grdu_y,grdu_z   !< Velocity gradient for U
-      real(WP), dimension(:,:,:,:), allocatable :: grdv_x,grdv_y,grdv_z   !< Velocity gradient for V
-      real(WP), dimension(:,:,:,:), allocatable :: grdw_x,grdw_y,grdw_z   !< Velocity gradient for W
+      real(WP), dimension(:,:,:,:,:), allocatable :: itp_xy,itp_yz,itp_xz    !< Interpolation for viscosity
+      real(WP), dimension(:,:,:,:), allocatable :: itpr_x,itpr_y,itpr_z      !< 2nd order centered interpolation for density
+      real(WP), dimension(:,:,:,:), allocatable :: up2_xp,up2_yp,up2_zp      !< 2nd order upwind interpolation for density (+)
+      real(WP), dimension(:,:,:,:), allocatable :: up2_xm,up2_ym,up2_zm      !< 2nd order upwind interpolation for density (+)
+      real(WP), dimension(:,:,:,:), allocatable :: weno_xp,weno_yp,weno_zp   !< WENO interpolation for density (+)
+      real(WP), dimension(:,:,:,:), allocatable :: weno_xm,weno_ym,weno_zm   !< WENO interpolation for density (-)
+      real(WP), dimension(:,:,:,:), allocatable :: itpu_x,itpu_y,itpu_z      !< Interpolation for U
+      real(WP), dimension(:,:,:,:), allocatable :: itpv_x,itpv_y,itpv_z      !< Interpolation for V
+      real(WP), dimension(:,:,:,:), allocatable :: itpw_x,itpw_y,itpw_z      !< Interpolation for W
+      real(WP), dimension(:,:,:,:), allocatable :: divp_x,divp_y,divp_z      !< Divergence for P-cell
+      real(WP), dimension(:,:,:,:), allocatable :: divu_x,divu_y,divu_z      !< Divergence for U-cell
+      real(WP), dimension(:,:,:,:), allocatable :: divv_x,divv_y,divv_z      !< Divergence for V-cell
+      real(WP), dimension(:,:,:,:), allocatable :: divw_x,divw_y,divw_z      !< Divergence for W-cell
+      real(WP), dimension(:,:,:,:), allocatable :: grdu_x,grdu_y,grdu_z      !< Velocity gradient for U
+      real(WP), dimension(:,:,:,:), allocatable :: grdv_x,grdv_y,grdv_z      !< Velocity gradient for V
+      real(WP), dimension(:,:,:,:), allocatable :: grdw_x,grdw_y,grdw_z      !< Velocity gradient for W
       
       ! Masking info for metric modification
       integer, dimension(:,:,:), allocatable ::  mask                     !< Integer array used for modifying P metrics
@@ -144,6 +146,7 @@ module compress_class
       procedure :: get_dmomdt                             !< Calculate dmom/dt
       procedure :: update_laplacian                       !< Update the pressure Laplacian div( f(rho) grad(.))
       procedure :: get_div                                !< Calculate velocity divergence
+      procedure :: predict_rho                            !< Calculate RHO from the continuity equation
       procedure :: get_pgrad                              !< Calculate pressure gradient
       procedure :: get_pdil                               !< Calculate the pressure dilatation term
       procedure :: get_visc_heating                       !< Calculate the viscous heating term
@@ -159,7 +162,7 @@ module compress_class
       procedure :: correct_mfr                            !< Correct for mfr mismatch to ensure global conservation
       procedure :: shift_p                                !< Shift pressure to have zero average
       procedure :: solve_implicit                         !< Solve for the velocity residuals implicitly
-      !procedure :: get_rsmooth                            !< Compute density smoothness indicator (0 is smooth, 1 is not smooth)
+      procedure :: prepare_weno                           !< Prepare weno interpolation coefficients
       procedure :: update_faceRHO                         !< Calculate face density from density
       procedure :: get_Umid                               !< Calculate Umid from U and Uold
       procedure :: rho_multiply                           !< Calculate rhoU from Umid, sRHOX, and sRHOXold
@@ -217,6 +220,7 @@ contains
       allocate(this%Wmid(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Wmid=0.0_WP
       
       ! Allocate old flow variables
+      allocate(this%Pold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Pold=0.0_WP
       allocate(this%Uold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Uold=0.0_WP
       allocate(this%Vold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Vold=0.0_WP
       allocate(this%Wold   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); this%Wold=0.0_WP
@@ -342,33 +346,37 @@ contains
          end do
       end do
       
-      ! Allocate finite difference density interpolation coefficients
-      allocate(this%itp_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
-      allocate(this%itp_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
-      allocate(this%itp_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
-      allocate(this%itp_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
-      allocate(this%itp_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
-      allocate(this%itp_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
-      ! Create energy interpolation coefficients to cell faces
+      ! Allocate 2nd order upwind density interpolation coefficients
+      allocate(this%up2_xp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%up2_xm( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%up2_yp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%up2_ym( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%up2_zp(-2:-1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      allocate(this%up2_zm( 0:+1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      ! Create 2nd order upwind density interpolation coefficients to cell faces
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
             do i=this%cfg%imin_,this%cfg%imax_+1
                ! Interpolation to x-face
-               call fv_itp_build(n=3,x=this%cfg%x(i-2:i+1),xp=this%cfg%x(i),coeff=this%itp_xp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%x(i-1:i+2),xp=this%cfg%x(i),coeff=this%itp_xm(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%x(i-2:i  ),xp=this%cfg%x(i),coeff=this%up2_xp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%x(i  :i+2),xp=this%cfg%x(i),coeff=this%up2_xm(:,i,j,k))
                ! Interpolation to y-face
-               call fv_itp_build(n=3,x=this%cfg%y(j-2:j+1),xp=this%cfg%y(j),coeff=this%itp_yp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%y(j-1:j+2),xp=this%cfg%y(j),coeff=this%itp_ym(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%y(j-2:j  ),xp=this%cfg%y(j),coeff=this%up2_yp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%y(j  :j+2),xp=this%cfg%y(j),coeff=this%up2_ym(:,i,j,k))
                ! Interpolation to z-face
-               call fv_itp_build(n=3,x=this%cfg%z(k-2:k+1),xp=this%cfg%z(k),coeff=this%itp_zp(:,i,j,k))
-               call fv_itp_build(n=3,x=this%cfg%z(k-1:k+2),xp=this%cfg%z(k),coeff=this%itp_zm(:,i,j,k))
-               ! Replace by pure upwind
-               !this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !his%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-               !this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]; this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+               call fv_itp_build(n=2,x=this%cfg%z(k-2:k  ),xp=this%cfg%z(k),coeff=this%up2_zp(:,i,j,k))
+               call fv_itp_build(n=2,x=this%cfg%z(k  :k+2),xp=this%cfg%z(k),coeff=this%up2_zm(:,i,j,k))
             end do
          end do
       end do
+      
+      ! Allocate WENO3 density interpolation coefficients
+      allocate(this%weno_xp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%weno_xm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< X-face-centered
+      allocate(this%weno_yp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%weno_ym(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Y-face-centered
+      allocate(this%weno_zp(-2:0,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
+      allocate(this%weno_zm(-1:1,this%cfg%imin_:this%cfg%imax_+1,this%cfg%jmin_:this%cfg%jmax_+1,this%cfg%kmin_:this%cfg%kmax_+1)) !< Z-face-centered
       
       ! Allocate finite difference viscosity interpolation coefficients
       allocate(this%itp_xy(-1:0,-1:0,this%cfg%imino_+1:this%cfg%imaxo_,this%cfg%jmino_+1:this%cfg%jmaxo_,this%cfg%kmino_+1:this%cfg%kmaxo_)) !< Edge-centered (xy)
@@ -592,30 +600,30 @@ contains
             do i=this%cfg%imin_,this%cfg%imax_+1
                ! X face
                if (this%mask(i-1,j,k).eq.2) then
-                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm(-1,i,j,k)=1.0_WP
-                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp(-1,i,j,k)=1.0_WP
+                  this%up2_xm(:,i,j,k)=0.0_WP; this%up2_xm(-1,i,j,k)=1.0_WP
+                  this%up2_xp(:,i,j,k)=0.0_WP; this%up2_xp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i  ,j,k).eq.2) then
-                  this%itp_xm(:,i,j,k)=0.0_WP; this%itp_xm( 0,i,j,k)=1.0_WP
-                  this%itp_xp(:,i,j,k)=0.0_WP; this%itp_xp( 0,i,j,k)=1.0_WP
+                  this%up2_xm(:,i,j,k)=0.0_WP; this%up2_xm( 0,i,j,k)=1.0_WP
+                  this%up2_xp(:,i,j,k)=0.0_WP; this%up2_xp( 0,i,j,k)=1.0_WP
                end if
                ! Y face
                if (this%mask(i,j-1,k).eq.2) then
-                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym(-1,i,j,k)=1.0_WP
-                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp(-1,i,j,k)=1.0_WP
+                  this%up2_ym(:,i,j,k)=0.0_WP; this%up2_ym(-1,i,j,k)=1.0_WP
+                  this%up2_yp(:,i,j,k)=0.0_WP; this%up2_yp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i,j  ,k).eq.2) then
-                  this%itp_ym(:,i,j,k)=0.0_WP; this%itp_ym( 0,i,j,k)=1.0_WP
-                  this%itp_yp(:,i,j,k)=0.0_WP; this%itp_yp( 0,i,j,k)=1.0_WP
+                  this%up2_ym(:,i,j,k)=0.0_WP; this%up2_ym( 0,i,j,k)=1.0_WP
+                  this%up2_yp(:,i,j,k)=0.0_WP; this%up2_yp( 0,i,j,k)=1.0_WP
                end if
                ! Z face
                if (this%mask(i,j,k-1).eq.2) then
-                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm(-1,i,j,k)=1.0_WP
-                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp(-1,i,j,k)=1.0_WP
+                  this%up2_zm(:,i,j,k)=0.0_WP; this%up2_zm(-1,i,j,k)=1.0_WP
+                  this%up2_zp(:,i,j,k)=0.0_WP; this%up2_zp(-1,i,j,k)=1.0_WP
                end if
                if (this%mask(i,j,k  ).eq.2) then
-                  this%itp_zm(:,i,j,k)=0.0_WP; this%itp_zm( 0,i,j,k)=1.0_WP
-                  this%itp_zp(:,i,j,k)=0.0_WP; this%itp_zp( 0,i,j,k)=1.0_WP
+                  this%up2_zm(:,i,j,k)=0.0_WP; this%up2_zm( 0,i,j,k)=1.0_WP
+                  this%up2_zp(:,i,j,k)=0.0_WP; this%up2_zp( 0,i,j,k)=1.0_WP
                end if
             end do
          end do
@@ -1358,6 +1366,38 @@ contains
    end subroutine get_div
    
    
+   !> Calculate RHO from the continuity equation
+   subroutine predict_rho(this,dt,src)
+      implicit none
+      class(compress), intent(inout) :: this
+      real(WP), intent(in) :: dt
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), optional :: src    !< Mass source term
+      integer :: i,j,k
+      ! Predict RHO using continuity
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               this%RHO(i,j,k)=this%RHOold(i,j,k)-dt*(sum(this%divp_x(:,i,j,k)*this%rhoU(i:i+1,j,k))+&
+               &                                      sum(this%divp_y(:,i,j,k)*this%rhoV(i,j:j+1,k))+&
+               &                                      sum(this%divp_z(:,i,j,k)*this%rhoW(i,j,k:k+1)))
+            end do
+         end do
+      end do
+      ! If present, account for mass source
+      if (present(src)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  this%RHO(i,j,k)=this%RHO(i,j,k)+src(i,j,k)
+               end do
+            end do
+         end do
+      end if
+      ! Sync it
+      call this%cfg%sync(this%RHO)
+   end subroutine predict_rho
+   
+   
    !> Calculate the pressure gradient based on P
    subroutine get_pgrad(this,P,Pgradx,Pgrady,Pgradz)
       implicit none
@@ -1406,14 +1446,13 @@ contains
    end subroutine get_pdil
    
    
-   !> Calculate the viscous heating term
+   !> Calculate discretely consistent viscous heating term
    subroutine get_visc_heating(this,visc_heating)
       implicit none
       class(compress), intent(inout) :: this
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: visc_heating   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      integer :: i,j,k
-      real(WP) :: dila,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
       real(WP), dimension(:,:,:), allocatable :: U_,V_,W_,XY,YZ,ZX
+      integer :: i,j,k
       ! Zero out viscous heating arrays
       visc_heating=0.0_WP
       ! Allocate and compute mid velocities
@@ -1424,17 +1463,21 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
-               ! Get velocity gradient and dilatation
-               dudx=sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))
-               dvdy=sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))
-               dwdz=sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))
-               dila=dudx+dvdy+dwdz
-               ! Txx*dudx at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dudx*(this%viscs(i,j,k)*(2.0_WP*dudx-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
-               ! Tyy*dvdy at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dvdy*(this%viscs(i,j,k)*(2.0_WP*dvdy-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
-               ! Tzz*dwdz at cell center
-               visc_heating(i,j,k)=visc_heating(i,j,k)+dwdz*(this%viscs(i,j,k)*(2.0_WP*dwdz-2.0_WP/3.0_WP*dila)+this%viscb(i,j,k)*dila)
+               ! Txx*du/dx
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdu_x(:,i,j,k)*this%Umid(i:i+1,j,k))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%grdu_x(:,i,j,k)*U_(i:i+1,j,k)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
+               ! Tyy*dv/dy
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdv_y(:,i,j,k)*this%Vmid(i,j:j+1,k))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%grdv_y(:,i,j,k)*V_(i,j:j+1,k)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
+               ! Tzz*dw/dz
+               visc_heating(i,j,k)=visc_heating(i,j,k)+sum(this%grdw_z(:,i,j,k)*this%Wmid(i,j,k:k+1))*(&
+               &         +this%viscs(i,j,k)*(sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1))+sum(this%grdw_z(:,i,j,k)*W_(i,j,k:k+1)) &
+               &         -2.0_WP/3.0_WP*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1)))) &
+               &         +this%viscb(i,j,k)*(sum(this%divp_x(:,i,j,k)*U_(i:i+1,j,k))+sum(this%divp_y(:,i,j,k)*V_(i,j:j+1,k))+sum(this%divp_z(:,i,j,k)*W_(i,j,k:k+1))))
             end do
          end do
       end do
@@ -1446,19 +1489,12 @@ contains
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
             do i=this%cfg%imin_,this%cfg%imax_+1
-               ! Get velocity gradient
-               dudy=sum(this%grdu_y(:,i,j,k)*U_(i,j-1:j,k))
-               dudz=sum(this%grdu_z(:,i,j,k)*U_(i,j,k-1:k))
-               dvdx=sum(this%grdv_x(:,i,j,k)*V_(i-1:i,j,k))
-               dvdz=sum(this%grdv_z(:,i,j,k)*V_(i,j,k-1:k))
-               dwdx=sum(this%grdw_x(:,i,j,k)*W_(i-1:i,j,k))
-               dwdy=sum(this%grdw_y(:,i,j,k)*W_(i,j-1:j,k))
                ! Txy*(dudy+dvdx) at xy edge
-               XY(i,j,k)=sum(this%itp_xy(:,:,i,j,k)*this%viscs(i-1:i,j-1:j,k))*(dudy+dvdx)**2
+               XY(i,j,k)=sum(this%itp_xy(:,:,i,j,k)*this%viscs(i-1:i,j-1:j,k))*(sum(this%grdu_y(:,i,j,k)*U_(i,j-1:j,k))+sum(this%grdv_x(:,i,j,k)*V_(i-1:i,j,k)))*(sum(this%grdu_y(:,i,j,k)*this%Umid(i,j-1:j,k))+sum(this%grdv_x(:,i,j,k)*this%Vmid(i-1:i,j,k)))
                ! Tyz*(dvdz+dwdy) at yz edge
-               YZ(i,j,k)=sum(this%itp_yz(:,:,i,j,k)*this%viscs(i,j-1:j,k-1:k))*(dvdz+dwdy)**2
+               YZ(i,j,k)=sum(this%itp_yz(:,:,i,j,k)*this%viscs(i,j-1:j,k-1:k))*(sum(this%grdv_z(:,i,j,k)*V_(i,j,k-1:k))+sum(this%grdw_y(:,i,j,k)*W_(i,j-1:j,k)))*(sum(this%grdv_z(:,i,j,k)*this%Vmid(i,j,k-1:k))+sum(this%grdw_y(:,i,j,k)*this%Wmid(i,j-1:j,k)))
                ! Tzx*(dwdx+dudx) at zx edge
-               ZX(i,j,k)=sum(this%itp_xz(:,:,i,j,k)*this%viscs(i-1:i,j,k-1:k))*(dwdx+dudz)**2
+               ZX(i,j,k)=sum(this%itp_xz(:,:,i,j,k)*this%viscs(i-1:i,j,k-1:k))*(sum(this%grdw_x(:,i,j,k)*W_(i-1:i,j,k))+sum(this%grdu_z(:,i,j,k)*U_(i,j,k-1:k)))*(sum(this%grdw_x(:,i,j,k)*this%Wmid(i-1:i,j,k))+sum(this%grdu_z(:,i,j,k)*this%Umid(i,j,k-1:k)))
             end do
          end do
       end do
@@ -2477,57 +2513,51 @@ contains
    end subroutine solve_implicit
    
    
-   !> RHO smoothness measure
-   !subroutine get_rsmooth(this,gradu)
-   !   implicit none
-   !   class(compress), intent(inout) :: this
-   !   real(WP), dimension(1:,1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: gradu !< Velocity gradient tensor
-   !   integer :: i,j,k
-   !   real(WP) :: grad,dila,vort,umagi,rx,ry,rz
-   !   real(WP) :: lambda=0.5_WP
-   !   do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
-   !      do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
-   !         do i=this%cfg%imino_+1,this%cfg%imaxo_-1
-   !            ! Inverse of velocity magnitude
-   !            umagi=1.0_WP/(sqrt(0.5_WP*this%U(i,j,k)**2+0.5_WP*this%U(i+1,j,k)**2&
-   !            &                 +0.5_WP*this%V(i,j,k)**2+0.5_WP*this%V(i,j+1,k)**2&
-   !            &                 +0.5_WP*this%W(i,j,k)**2+0.5_WP*this%W(i,j,k+1)**2)+1.0e-15_WP)
-   !            ! Compute adimensional dilatation
-   !            dila=gradu(1,1,i,j,k)+gradu(2,2,i,j,k)+gradu(3,3,i,j,k)
-   !            dila=dila*this%cfg%meshsize(i,j,k)*umagi
-   !            ! Compute adimensional vorticity
-   !            vort=(gradu(2,3,i,j,k)-gradu(3,2,i,j,k))**2+(gradu(3,1,i,j,k)-gradu(1,3,i,j,k))**2+(gradu(1,2,i,j,k)-gradu(2,1,i,j,k))**2
-   !            vort=vort*this%cfg%meshsize(i,j,k)*umagi
-   !            ! Compute adimensional RHO smoothness
-   !            rx=(abs(this%cfg%dxmi(i+1)*(this%RHO(i+1,j,k)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dxmi(i)*(this%RHO(i,j,k)-this%RHO(i-1,j,k)))+1.0e-40_WP)
-   !            ry=(abs(this%cfg%dymi(j+1)*(this%RHO(i,j+1,k)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dymi(j)*(this%RHO(i,j,k)-this%RHO(i,j-1,k)))+1.0e-40_WP)
-   !            rz=(abs(this%cfg%dzmi(k+1)*(this%RHO(i,j,k+1)-this%RHO(i,j,k)))+1.0e-40_WP)/(abs(this%cfg%dzmi(k)*(this%RHO(i,j,k)-this%RHO(i,j,k-1)))+1.0e-40_WP)
-   !            !if (min(rx,ry,rz).le.lambda.or.max(rx,ry,rz).ge.1.0_WP/lambda) then
-   !            if (max(rx,ry,rz).ge.1.0_WP/lambda) then
-   !            !if (min(rx,ry,rz).le.lambda) then
-   !               ! Small or large ratio indicates unsmooth density, set indicator to 1
-   !               this%rsmooth(i,j,k)=0.0_WP
-   !            else
-   !               ! Otherwise, ratio is within reason, set indicator to 0
-   !               this%rsmooth(i,j,k)=1.0_WP
-   !            end if
-   !         end do
-   !      end do
-   !   end do
-   !   call this%cfg%sync(this%rsmooth)
-   !   if (.not.this%cfg%xper) then
-   !      if (this%cfg%iproc.eq.1)            this%rsmooth(this%cfg%imino,:,:)=this%rsmooth(this%cfg%imino+1,:,:)
-   !      if (this%cfg%iproc.eq.this%cfg%npx) this%rsmooth(this%cfg%imaxo,:,:)=this%rsmooth(this%cfg%imaxo-1,:,:)
-   !   end if
-   !   if (.not.this%cfg%yper) then
-   !      if (this%cfg%jproc.eq.1)            this%rsmooth(:,this%cfg%jmino,:)=this%rsmooth(:,this%cfg%jmino+1,:)
-   !      if (this%cfg%jproc.eq.this%cfg%npy) this%rsmooth(:,this%cfg%jmaxo,:)=this%rsmooth(:,this%cfg%jmaxo-1,:)
-   !   end if
-   !   if (.not.this%cfg%zper) then
-   !      if (this%cfg%kproc.eq.1)            this%rsmooth(:,:,this%cfg%kmino)=this%rsmooth(:,:,this%cfg%kmino+1)
-   !      if (this%cfg%kproc.eq.this%cfg%npz) this%rsmooth(:,:,this%cfg%kmaxo)=this%rsmooth(:,:,this%cfg%kmaxo-1)
-   !   end if
-   !end subroutine get_rsmooth
+   !> Prepare WENO stencil
+   subroutine prepare_weno(this,rho)
+      implicit none
+      class(compress), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: rho !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), parameter :: eps=1.0e-15_WP
+      integer :: i,j,k
+      real(WP) :: w
+      ! Analyze passed rho array and prepare interpolation coefficients
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               ! X-face
+               w=weno_weight((abs(rho(i-1,j,k)-rho(i-2,j,k))+eps)/(abs(rho(i  ,j,k)-rho(i-1,j,k))+eps))
+               this%weno_xp(:,i,j,k)=(       w)*[this%up2_xp(-2,i,j,k),this%up2_xp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpr_x(-1,i,j,k),this%itpr_x( 0,i,j,k)]
+               w=weno_weight((abs(rho(i+1,j,k)-rho(i  ,j,k))+eps)/(abs(rho(i  ,j,k)-rho(i-1,j,k))+eps))
+               this%weno_xm(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_xm( 0,i,j,k),this%up2_xm(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpr_x(-1,i,j,k),this%itpr_x( 0,i,j,k),0.0_WP               ]
+               ! Y-face
+               w=weno_weight((abs(rho(i,j-1,k)-rho(i,j-2,k))+eps)/(abs(rho(i,j  ,k)-rho(i,j-1,k))+eps))
+               this%weno_yp(:,i,j,k)=(       w)*[this%up2_yp(-2,i,j,k),this%up2_yp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpr_y(-1,i,j,k),this%itpr_y( 0,i,j,k)]
+               w=weno_weight((abs(rho(i,j+1,k)-rho(i,j  ,k))+eps)/(abs(rho(i,j  ,k)-rho(i,j-1,k))+eps))
+               this%weno_ym(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_ym( 0,i,j,k),this%up2_ym(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpr_y(-1,i,j,k),this%itpr_y( 0,i,j,k),0.0_WP               ]
+               ! Z-face
+               w=weno_weight((abs(rho(i,j,k-1)-rho(i,j,k-2))+eps)/(abs(rho(i,j,k  )-rho(i,j,k-1))+eps))
+               this%weno_zp(:,i,j,k)=(       w)*[this%up2_zp(-2,i,j,k),this%up2_zp(-1,i,j,k),0.0_WP               ]&
+               &                    +(1.0_WP-w)*[0.0_WP               ,this%itpr_z(-1,i,j,k),this%itpr_z( 0,i,j,k)]
+               w=weno_weight((abs(rho(i,j,k+1)-rho(i,j,k  ))+eps)/(abs(rho(i,j,k  )-rho(i,j,k-1))+eps))
+               this%weno_zm(:,i,j,k)=(       w)*[0.0_WP               ,this%up2_zm( 0,i,j,k),this%up2_zm(+1,i,j,k)]&
+               &                    +(1.0_WP-w)*[this%itpr_z(-1,i,j,k),this%itpr_z( 0,i,j,k),0.0_WP               ]
+            end do
+         end do
+      end do
+   contains
+      real(WP) function weno_weight(ratio)
+         implicit none
+         real(WP), intent(in) :: ratio
+         real(WP), parameter :: lambda=0.13_WP ! Switching parameter
+         real(WP), parameter :: delta=0.01_WP  ! Switching thickness
+         weno_weight=(1.0_WP-tanh((ratio-lambda)/delta))/3.0_WP+(1.0_WP-tanh((ratio-1.0_WP/lambda)/delta))/6.0_WP
+      end function weno_weight
+   end subroutine prepare_weno
    
    
    !> Compute (s)RHOX/Y/Z from this%RHO field
@@ -2535,6 +2565,7 @@ contains
       implicit none
       class(compress), intent(inout) :: this
       integer :: i,j,k
+      
       ! Calculate square root of centered RHO interpolation at faces
       do k=this%cfg%kmino_,this%cfg%kmaxo_; do j=this%cfg%jmino_,this%cfg%jmaxo_; do i=this%cfg%imino_+1,this%cfg%imaxo_
          this%sRHOX(i,j,k)=sqrt(sum(this%itpr_x(:,i,j,k)*this%RHO(i-1:i,j,k)))
@@ -2548,30 +2579,31 @@ contains
       call this%cfg%sync(this%sRHOX); if (.not.this%cfg%xper.and.this%cfg%iproc.eq.1) this%sRHOX(this%cfg%imino,:,:)=sqrt(this%RHO(this%cfg%imino,:,:))
       call this%cfg%sync(this%sRHOY); if (.not.this%cfg%yper.and.this%cfg%jproc.eq.1) this%sRHOY(:,this%cfg%jmino,:)=sqrt(this%RHO(:,this%cfg%jmino,:))
       call this%cfg%sync(this%sRHOZ); if (.not.this%cfg%zper.and.this%cfg%kproc.eq.1) this%sRHOZ(:,:,this%cfg%kmino)=sqrt(this%RHO(:,:,this%cfg%kmino))
+      
       ! Calculate biased RHO interpolation at faces
       this%RHOX=0.5_WP*(this%sRHOX**2+this%sRHOXold**2) ! Initialize values everywhere using
       this%RHOY=0.5_WP*(this%sRHOY**2+this%sRHOYold**2) ! the centered interpolation already
       this%RHOZ=0.5_WP*(this%sRHOZ**2+this%sRHOZold**2) ! performed to get sRHOX/Y/Z arrays
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
                ! X-face
                if (this%Umid(i,j,k).ge.0.0_WP) then
-                  this%RHOX(i,j,k)=sum(this%itp_xp(:,i,j,k)*this%RHO(i-2:i  ,j,k))*this%theta+sum(this%itp_xp(:,i,j,k)*this%RHOold(i-2:i  ,j,k))*(1.0_WP-this%theta)
+                  this%RHOX(i,j,k)=0.5_WP*(sum(this%weno_xp(:,i,j,k)*this%RHO(i-2:i  ,j,k))+sum(this%weno_xp(:,i,j,k)*this%RHOold(i-2:i  ,j,k)))
                else
-                  this%RHOX(i,j,k)=sum(this%itp_xm(:,i,j,k)*this%RHO(i-1:i+1,j,k))*this%theta+sum(this%itp_xm(:,i,j,k)*this%RHOold(i-1:i+1,j,k))*(1.0_WP-this%theta)
+                  this%RHOX(i,j,k)=0.5_WP*(sum(this%weno_xm(:,i,j,k)*this%RHO(i-1:i+1,j,k))+sum(this%weno_xm(:,i,j,k)*this%RHOold(i-1:i+1,j,k)))
                end if
                ! Y-face
                if (this%Vmid(i,j,k).ge.0.0_WP) then
-                  this%RHOY(i,j,k)=sum(this%itp_yp(:,i,j,k)*this%RHO(i,j-2:j  ,k))*this%theta+sum(this%itp_yp(:,i,j,k)*this%RHOold(i,j-2:j  ,k))*(1.0_WP-this%theta)
+                  this%RHOY(i,j,k)=0.5_WP*(sum(this%weno_yp(:,i,j,k)*this%RHO(i,j-2:j  ,k))+sum(this%weno_yp(:,i,j,k)*this%RHOold(i,j-2:j  ,k)))
                else
-                  this%RHOY(i,j,k)=sum(this%itp_ym(:,i,j,k)*this%RHO(i,j-1:j+1,k))*this%theta+sum(this%itp_ym(:,i,j,k)*this%RHOold(i,j-1:j+1,k))*(1.0_WP-this%theta)
+                  this%RHOY(i,j,k)=0.5_WP*(sum(this%weno_ym(:,i,j,k)*this%RHO(i,j-1:j+1,k))+sum(this%weno_ym(:,i,j,k)*this%RHOold(i,j-1:j+1,k)))
                end if
                ! Z-face
                if (this%Wmid(i,j,k).ge.0.0_WP) then
-                  this%RHOZ(i,j,k)=sum(this%itp_zp(:,i,j,k)*this%RHO(i,j,k-2:k  ))*this%theta+sum(this%itp_zp(:,i,j,k)*this%RHOold(i,j,k-2:k  ))*(1.0_WP-this%theta)
+                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%weno_zp(:,i,j,k)*this%RHO(i,j,k-2:k  ))+sum(this%weno_zp(:,i,j,k)*this%RHOold(i,j,k-2:k  )))
                else
-                  this%RHOZ(i,j,k)=sum(this%itp_zm(:,i,j,k)*this%RHO(i,j,k-1:k+1))*this%theta+sum(this%itp_zm(:,i,j,k)*this%RHOold(i,j,k-1:k+1))*(1.0_WP-this%theta)
+                  this%RHOZ(i,j,k)=0.5_WP*(sum(this%weno_zm(:,i,j,k)*this%RHO(i,j,k-1:k+1))+sum(this%weno_zm(:,i,j,k)*this%RHOold(i,j,k-1:k+1)))
                end if
             end do
          end do
@@ -2579,6 +2611,7 @@ contains
       call this%cfg%sync(this%RHOX)
       call this%cfg%sync(this%RHOY)
       call this%cfg%sync(this%RHOZ)
+      
    end subroutine update_faceRHO
    
    
