@@ -7,6 +7,7 @@ module tpscalar_class
    use config_class,   only: config
    use iterator_class, only: iterator
    use linsol_class,   only: linsol
+   use vfs_class,      only: VFlo,VFhi
    implicit none
    private
    
@@ -18,19 +19,19 @@ module tpscalar_class
    integer, parameter, public :: Gphase=1
 
    ! List of known available bcond for this solver
-   integer, parameter, public :: dirichlet=2         !< Dirichlet condition
-   integer, parameter, public :: neumann=3           !< Zero normal gradient
+   integer, parameter, public :: dirichlet=2                             !< Dirichlet condition
+   integer, parameter, public :: neumann=3                               !< Zero normal gradient
    
    ! List of available advection schemes for scalar transport
-   integer, parameter, public :: upwind=0            !< First order upwind scheme
+   integer, parameter, public :: upwind=0                                !< First order upwind scheme
    
    !> Boundary conditions for the incompressible solver
    type :: bcond
-      type(bcond), pointer :: next                        !< Linked list of bconds
-      character(len=str_medium) :: name='UNNAMED_BCOND'   !< Bcond name (default=UNNAMED_BCOND)
-      integer :: type                                     !< Bcond type
-      integer :: dir                                      !< Bcond direction (1 to 6)
-      type(iterator) :: itr                               !< This is the iterator for the bcond
+      type(bcond), pointer :: next                                       !< Linked list of bconds
+      character(len=str_medium) :: name='UNNAMED_BCOND'                  !< Bcond name (default=UNNAMED_BCOND)
+      integer :: type                                                    !< Bcond type
+      integer :: dir                                                     !< Bcond direction (1 to 6)
+      type(iterator) :: itr                                              !< This is the iterator for the bcond
    end type bcond
    
    !> Bcond shift value
@@ -40,57 +41,62 @@ module tpscalar_class
    type :: tpscalar
       
       ! This is our config
-      class(config), pointer :: cfg                       !< This is the config the solver is build for
+      class(config), pointer :: cfg                                      !< This is the config the solver is build for
       
       ! This is the name of the solver
-      character(len=str_medium) :: name='UNNAMED_SCALAR'  !< Solver name (default=UNNAMED_SCALAR)
+      character(len=str_medium) :: name='UNNAMED_SCALAR'                 !< Solver name (default=UNNAMED_SCALAR)
       
       ! Constant property fluid, but diffusivity is still a field due to LES modeling
-      integer, dimension(:), allocatable :: phase         !< This is the phase for each scalar (0=liquid, 1=gas)
-      real(WP), dimension(:,:,:,:), allocatable :: diff   !< These is our constant+SGS dynamic diffusivity for the scalar
+      integer, dimension(:), allocatable :: phase                        !< This is the phase for each scalar (0=liquid, 1=gas)
+      real(WP), dimension(:,:,:,:), allocatable :: diff                  !< These is our constant+SGS dynamic diffusivity for the scalar
       
       ! Boundary condition list
-      integer :: nbc                                      !< Number of bcond for our solver
-      type(bcond), pointer :: first_bc                    !< List of bcond for our solver
+      integer :: nbc                                                     !< Number of bcond for our solver
+      type(bcond), pointer :: first_bc                                   !< List of bcond for our solver
       
       ! Scalar variable
-      integer :: nscalar                                  !< Number of scalars
-      character(len=str_medium), dimension(:), allocatable :: SCname  !< Names of scalars
-      real(WP), dimension(:,:,:,:), allocatable :: SC     !< SC array
-      real(WP), dimension(:,:,:,:), allocatable :: PVF    !< Phase-specific VOF
-      real(WP), dimension(:,:,:,:), allocatable :: PVFold !< Old phase-specific VOF
-      real(WP), dimension(:),       allocatable :: Prho   !< Phase-specific density
-      
-      ! Old scalar variable
-      real(WP), dimension(:,:,:,:), allocatable :: SCold  !< SCold array
+      integer :: nscalar                                                 !< Number of scalars
+      character(len=str_medium), dimension(:), allocatable :: SCname     !< Names of scalars
+      real(WP), dimension(:,:,:,:),            allocatable :: SC         !< SC array
+      real(WP), dimension(:,:,:,:),            allocatable :: SCold      !< SCold array
+      logical, dimension(:),                   allocatable :: skip       !< Skip solving for scalar
+
+      ! Phas-specific quantities
+      real(WP), dimension(:,:,:,:),            allocatable :: PVF        !< Phasic VOF
+      real(WP), dimension(:,:,:,:),            allocatable :: PVFold     !< Old phasic VOF
+      real(WP), dimension(:,:,:,:),            allocatable :: face_apt_x !< X-face aperture
+      real(WP), dimension(:,:,:,:),            allocatable :: face_apt_y !< Y-face aperture
+      real(WP), dimension(:,:,:,:),            allocatable :: face_apt_z !< Z-face aperture
+      real(WP), dimension(:),                  allocatable :: Prho       !< Phasic density
       
       ! Implicit scalar solver
-      class(linsol), pointer :: implicit                  !< Iterative linear solver object for an implicit prediction of the scalar residual
-      integer, dimension(:,:,:), allocatable :: stmap     !< Inverse map from stencil shift to index location
+      class(linsol), pointer :: implicit                                 !< Iterative linear solver object for an implicit prediction of the scalar residual
+      integer, dimension(:,:,:), allocatable :: stmap                    !< Inverse map from stencil shift to index location
       
       ! Metrics
-      real(WP), dimension(:,:,:,:), allocatable :: div_x,div_y,div_z   !< Divergence for SC
-      real(WP), dimension(:,:,:,:), allocatable :: grd_x,grd_y,grd_z   !< Scalar gradient for SC
-      real(WP), dimension(:,:,:,:), allocatable :: itp_x,itp_y,itp_z   !< Second order interpolation for SC diffusivity
+      real(WP), dimension(:,:,:,:), allocatable :: div_x,div_y,div_z     !< Divergence for SC
+      real(WP), dimension(:,:,:,:), allocatable :: grd_x,grd_y,grd_z     !< Scalar gradient for SC
+      real(WP), dimension(:,:,:,:), allocatable :: itp_x,itp_y,itp_z     !< Second order interpolation for SC diffusivity
       
       ! Masking info for metric modification
-      integer, dimension(:,:,:), allocatable :: mask             !< Integer array used for modifying SC metrics
+      integer, dimension(:,:,:), allocatable :: mask                     !< Integer array used for modifying SC metrics
       
       ! Monitoring quantities
-      real(WP), dimension(:), allocatable :: SCmax,SCmin,SCint   !< Maximum and minimum, integral scalar
+      real(WP), dimension(:), allocatable :: SCmax,SCmin,SCint           !< Maximum and minimum, integral scalar
       
    contains
-      procedure :: initialize                             !< Initialization of the scalar solver
-      procedure :: print=>tpscalar_print                  !< Output solver to the screen
-      procedure, private :: init_metrics                  !< Initialize metrics
-      procedure, private :: adjust_metrics                !< Adjust metrics
-      procedure :: setup                                  !< Finish configuring the scalar solver
-      procedure :: add_bcond                              !< Add a boundary condition
-      procedure :: get_bcond                              !< Get a boundary condition
-      procedure :: apply_bcond                            !< Apply all boundary conditions
-      procedure :: get_dSCdt                              !< Calculate drhoSC/dt from advective fluxes
-      procedure :: get_max                                !< Calculate maximum and integral field values
-      procedure :: solve_implicit_diff                    !< Solve for the diffusive scalar residuals implicitly
+      procedure :: initialize                                            !< Initialization of the scalar solver
+      procedure :: print=>tpscalar_print                                 !< Output solver to the screen
+      procedure, private :: init_metrics                                 !< Initialize metrics
+      procedure, private :: adjust_metrics                               !< Adjust metrics
+      procedure :: setup                                                 !< Finish configuring the scalar solver
+      procedure :: add_bcond                                             !< Add a boundary condition
+      procedure :: get_bcond                                             !< Get a boundary condition
+      procedure :: apply_bcond                                           !< Apply all boundary conditions
+      procedure :: get_face_apt                                          !< Calculate the phasic face apertures
+      procedure :: get_dSCdt                                             !< Calculate dSC/dt
+      procedure :: solve_implicit                                        !< Solve for the scalar residuals implicitly
+      procedure :: get_max                                               !< Calculate maximum and integral field values
    end type tpscalar
    
    
@@ -121,6 +127,10 @@ contains
       ! Initialize scalar phase
       allocate(this%phase(1:this%nscalar))
       this%phase=0  ! User will set phase
+
+      ! Initialize skip
+      allocate(this%skip(1:this%nscalar))
+      this%skip=.false. ! User will set them if needed
       
       ! Point to pgrid object
       this%cfg=>cfg
@@ -130,12 +140,15 @@ contains
       this%first_bc=>NULL()
       
       ! Allocate variables
-      allocate(this%SC    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%SC    =0.0_WP
-      allocate(this%SCold (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%SCold =0.0_WP
-      allocate(this%diff  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar)); this%diff  =0.0_WP
-      allocate(this%PVF   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));            this%PVF   =0.0_WP
-      allocate(this%PVFold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,0:1));            this%PVFold=0.0_WP
-      allocate(this%Prho  (0:1));                                                                                                            this%Prho  =0.0_WP
+      allocate(this%SC    (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%SC        =0.0_WP
+      allocate(this%SCold (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%SCold     =0.0_WP
+      allocate(this%diff  (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,1:this%nscalar));    this%diff      =0.0_WP
+      allocate(this%PVF   (this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase));     this%PVF       =0.0_WP
+      allocate(this%PVFold(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase));     this%PVFold    =0.0_WP
+      allocate(this%face_apt_x(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_x=0.0_WP
+      allocate(this%face_apt_y(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_y=0.0_WP
+      allocate(this%face_apt_z(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_,Lphase:Gphase)); this%face_apt_z=0.0_WP
+      allocate(this%Prho  (Lphase:Gphase));                                                                                                     this%Prho      =0.0_WP
       
       ! Check current overlap
 		if (this%cfg%no.lt.1) call die('[tpscalar constructor] Scalar transport scheme requires larger overlap')
@@ -438,6 +451,7 @@ contains
                
                ! Implement based on bcond direction
                do nsc=1,this%nscalar
+                  if (this%skip(nsc)) cycle
                   do n=1,my_bc%itr%n_
                      i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                      this%SC(i,j,k,nsc)=this%SC(i-shift(1,my_bc%dir),j-shift(2,my_bc%dir),k-shift(3,my_bc%dir),nsc)
@@ -457,133 +471,219 @@ contains
       
       ! Sync full fields after all bcond
       do nsc=1,this%nscalar
+         if (this%skip(nsc)) cycle
          call this%cfg%sync(this%SC(:,:,:,nsc))
       end do
       
    end subroutine apply_bcond
-   
-   
-   !> Calculate the explicit SC time derivative from advective term based on U/V/W
-   subroutine get_dSCdt(this,dSCdt,U,V,W,VFold,VF,detailed_face_flux,dt)
-      use irl_fortran_interface
+
+
+   !> Get the face apertures based on the phasic VOF
+   subroutine get_face_apt(this)
       implicit none
       class(tpscalar), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VFold    !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: VF       !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      type(TagAccVM_SepVM_type), dimension(1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:) :: detailed_face_flux !< Needs to be (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), intent(in) :: dt  !< This is the time step size that was used to generate the detailed_face_flux geometric data
-      type(SepVM_type) :: my_SepVM
-      integer :: i,j,k,nsc,n
-      real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
-      real(WP), dimension(:,:,:,:), allocatable :: grad
-      real(WP) :: my_vol,SCm,SCp
-      !real(WP), dimension(3) :: my_bar
-      integer, dimension(3) :: ind
-      ! Zero out dSC/dt array
-      dSCdt=0.0_WP
-      ! Allocate flux arrays
-      allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      ! Allocate scalar gradient
-      allocate(grad(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      ! Work on each scalar
-      do nsc=1,this%nscalar
-         ! Reset fluxes and gradient to zero
-         FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP; grad=0.0_WP
-         ! Calculate minmod-limited gradient of SC everywhere
-         do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
-            do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
-               do i=this%cfg%imino_+1,this%cfg%imaxo_-1
-                  ! No need to calculate gradient inside of wall cell
-                  if (this%mask(i,j,k).eq.1) cycle
-                  ! Get gradient
-                  grad(1,i,j,k)=minmod((this%SC(i+1,j,k,nsc)-this%SC(i,j,k,nsc))*this%cfg%dxmi(i+1),(this%SC(i,j,k,nsc)-this%SC(i-1,j,k,nsc))*this%cfg%dxmi(i))
-                  grad(2,i,j,k)=minmod((this%SC(i,j+1,k,nsc)-this%SC(i,j,k,nsc))*this%cfg%dymi(j+1),(this%SC(i,j,k,nsc)-this%SC(i,j-1,k,nsc))*this%cfg%dymi(j))
-                  grad(3,i,j,k)=minmod((this%SC(i,j,k+1,nsc)-this%SC(i,j,k,nsc))*this%cfg%dzmi(k+1),(this%SC(i,j,k,nsc)-this%SC(i,j,k-1,nsc))*this%cfg%dzmi(k))
+      integer :: i,j,k,p
+
+      ! Loop over the phases
+      do p=Lphase,Gphase
+
+         ! Loop over the cell faces
+         do k=this%cfg%kmin_,this%cfg%kmax_+1
+            do j=this%cfg%jmin_,this%cfg%jmax_+1
+               do i=this%cfg%imin_,this%cfg%imax_+1
+
+                  ! X-face aperture
+                  this%face_apt_x(i,j,k,p)=0.0_WP
+                  if (this%PVF(i-1,j,k,p).gt.VFlo.and.this%PVF(i,j,k,p).gt.VFlo) then
+                     if (this%PVF(i-1,j,k,p).ge.VFhi.or.this%PVF(i,j,k,p).ge.VFhi) then
+                        this%face_apt_x(i,j,k,p)=1.0_WP
+                     else
+                        this%face_apt_x(i,j,k,p)=sum(this%itp_x(:,i,j,k)*this%PVF(i-1:i,j,k,p))
+                     end if
+                  end if
+
+                  ! Y-face aperture
+                  this%face_apt_y(i,j,k,p)=0.0_WP
+                  if (this%PVF(i,j-1,k,p).gt.VFlo.and.this%PVF(i,j,k,p).gt.VFlo) then
+                     if (this%PVF(i,j-1,k,p).ge.VFhi.or.this%PVF(i,j,k,p).ge.VFhi) then
+                        this%face_apt_y(i,j,k,p)=1.0_WP
+                     else
+                        this%face_apt_y(i,j,k,p)=sum(this%itp_y(:,i,j,k)*this%PVF(i,j-1:j,k,p))
+                     end if
+                  end if
+
+                  ! Z-face aperture
+                  this%face_apt_z(i,j,k,p)=0.0_WP
+                  if (this%PVF(i,j,k-1,p).gt.VFlo.and.this%PVF(i,j,k,p).gt.VFlo) then
+                     if (this%PVF(i,j,k-1,p).ge.VFhi.or.this%PVF(i,j,k,p).ge.VFhi) then
+                        this%face_apt_z(i,j,k,p)=1.0_WP
+                     else
+                        this%face_apt_z(i,j,k,p)=sum(this%itp_z(:,i,j,k)*this%PVF(i,j,k-1:k,p))
+                     end if
+                  end if
+
                end do
             end do
          end do
-         call this%cfg%sync(grad)
-         ! Convective flux of SC
+
+      end do
+
+   end subroutine get_face_apt
+
+
+   ! !> Calculate the explicit SC time derivative term
+   ! subroutine get_dSCdt(this,dSCdt,U,V,W,divU)
+   !    implicit none
+   !    class(tpscalar), intent(inout) :: this
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: divU  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    integer :: i,j,k,nsc,p
+   !    real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
+   !    real(WP), dimension(:,:,:,:), allocatable :: grad
+   !    real(WP) :: SCm,SCp
+   !    ! Zero out dSC/dt array
+   !    dSCdt=0.0_WP
+   !    ! Allocate flux arrays
+   !    allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FX=0.0_WP
+   !    allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FY=0.0_WP
+   !    allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FZ=0.0_WP
+   !    ! Allocate scalar gradient
+   !    allocate(grad(1:3,this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+   !    ! Work on each scalar
+   !    do nsc=1,this%nscalar
+   !       if (this%skip(nsc)) cycle
+   !       ! Get the phase index
+   !       p=this%phase(nsc)
+   !       ! Reset fluxes and gradient to zero
+   !       FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP; grad=0.0_WP
+   !       ! Calculate minmod-limited gradient of SC everywhere
+   !       do k=this%cfg%kmino_+1,this%cfg%kmaxo_-1
+   !          do j=this%cfg%jmino_+1,this%cfg%jmaxo_-1
+   !             do i=this%cfg%imino_+1,this%cfg%imaxo_-1
+   !                ! No need to calculate gradient inside of wall cell
+   !                if (this%mask(i,j,k).eq.1) cycle
+   !                ! Get gradient
+   !                grad(1,i,j,k)=minmod((this%SCold(i+1,j,k,nsc)-this%SCold(i,j,k,nsc))*this%cfg%dxmi(i+1),(this%SCold(i,j,k,nsc)-this%SCold(i-1,j,k,nsc))*this%cfg%dxmi(i))
+   !                grad(2,i,j,k)=minmod((this%SCold(i,j+1,k,nsc)-this%SCold(i,j,k,nsc))*this%cfg%dymi(j+1),(this%SCold(i,j,k,nsc)-this%SCold(i,j-1,k,nsc))*this%cfg%dymi(j))
+   !                grad(3,i,j,k)=minmod((this%SCold(i,j,k+1,nsc)-this%SCold(i,j,k,nsc))*this%cfg%dzmi(k+1),(this%SCold(i,j,k,nsc)-this%SCold(i,j,k-1,nsc))*this%cfg%dzmi(k))
+   !             end do
+   !          end do
+   !       end do
+   !       call this%cfg%sync(grad)
+   !       ! Calculate fluxes of SC
+   !       do k=this%cfg%kmin_,this%cfg%kmax_+1
+   !          do j=this%cfg%jmin_,this%cfg%jmax_+1
+   !             do i=this%cfg%imin_,this%cfg%imax_+1
+   !                ! Flux on x-face
+   !                if (this%face_apt_x(i,j,k,p).eq.1.0_WP) then
+   !                   SCm=0.0_WP; if (this%PVFold(i-1,j,k,p).gt.0.0_WP) SCm=this%SCold(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
+   !                   SCp=0.0_WP; if (this%PVFold(i  ,j,k,p).gt.0.0_WP) SCp=this%SCold(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
+   !                   FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp &
+   !                   &         +sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SCold(i-1:i,j,k,nsc))
+   !                end if
+   !                ! Flux on y-face
+   !                if (this%face_apt_y(i,j,k,p).eq.1.0_WP) then
+   !                   SCm=0.0_WP; if (this%PVFold(i,j-1,k,p).gt.0.0_WP) SCm=this%SCold(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
+   !                   SCp=0.0_WP; if (this%PVFold(i,j  ,k,p).gt.0.0_WP) SCp=this%SCold(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
+   !                   FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp &
+   !                   &         +sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SCold(i,j-1:j,k,nsc))
+   !                end if
+   !                ! Flux on z-face
+   !                if (this%face_apt_z(i,j,k,p).eq.1.0_WP) then
+   !                   SCm=0.0_WP; if (this%PVFold(i,j,k-1,p).gt.0.0_WP) SCm=this%SCold(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
+   !                   SCp=0.0_WP; if (this%PVFold(i,j,k  ,p).gt.0.0_WP) SCp=this%SCold(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
+   !                   FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp &
+   !                   &         +sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SCold(i,j,k-1:k,nsc))
+   !                end if
+   !             end do
+   !          end do
+   !       end do
+   !       ! Time derivative of SC
+   !       do k=this%cfg%kmin_,this%cfg%kmax_
+   !          do j=this%cfg%jmin_,this%cfg%jmax_
+   !             do i=this%cfg%imin_,this%cfg%imax_
+   !                if (this%PVFold(i,j,k,p).gt.0.0_WP) then
+   !                   dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
+   !                   &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
+   !                   &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))+&
+   !                   &                divU(i,j,k)*this%SCold(i,j,k,nsc)
+   !                end if
+   !             end do
+   !          end do
+   !       end do
+   !       ! Sync residual
+   !       call this%cfg%sync(dSCdt(:,:,:,nsc))
+   !    end do
+   !    ! Deallocate flux arrays
+   !    deallocate(FX,FY,FZ,grad)
+      
+   ! contains
+      
+   !    !> Minmod gradient
+   !    function minmod(g1,g2) result(g)
+   !       implicit none
+   !       real(WP), intent(in) :: g1,g2
+   !       real(WP) :: g
+   !       if (g1*g2.le.0.0_WP) then
+   !          g=0.0_WP
+   !       else
+   !          if (abs(g1).lt.abs(g2)) then
+   !             g=g1
+   !          else
+   !             g=g2
+   !          end if
+   !       end if
+   !    end function minmod
+      
+   ! end subroutine get_dSCdt
+
+
+   !> Calculate the explicit SC time derivative term
+   subroutine get_dSCdt(this,dSCdt,U,V,W,divU)
+      implicit none
+      class(tpscalar), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(out) :: dSCdt !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: U     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: V     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: W     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)  :: divU  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: i,j,k,nsc,p
+      real(WP), dimension(:,:,:),   allocatable :: FX,FY,FZ
+      real(WP) :: SCm,SCp
+      ! Zero out dSC/dt array
+      dSCdt=0.0_WP
+      ! Allocate flux arrays
+      allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FX=0.0_WP
+      allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FY=0.0_WP
+      allocate(FZ(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_)); FZ=0.0_WP
+      ! Work on each scalar
+      do nsc=1,this%nscalar
+         if (this%skip(nsc)) cycle
+         ! Get the phase index
+         p=this%phase(nsc)
+         ! Reset fluxes and gradient to zero
+         FX=0.0_WP; FY=0.0_WP; FZ=0.0_WP
+         ! Calculate fluxes of SC
          do k=this%cfg%kmin_,this%cfg%kmax_+1
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
                   ! Flux on x-face
-                  if (getSize(detailed_face_flux(1,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(1,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(1,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(1,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FX(i,j,k)=FX(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FX(i,j,k)=FX(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FX(i,j,k)=FX(i,j,k)/(dt*this%cfg%dy(j)*this%cfg%dz(k))
-                  else
-                     ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i-1,j,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i-1,j,k,nsc)+0.5_WP*grad(1,i-1,j,k)*this%cfg%dx(i-1)
-                     SCp=0.0_WP; if (VFold(i  ,j,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i  ,j,k,nsc)-0.5_WP*grad(1,i  ,j,k)*this%cfg%dx(i  )
-                     FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*SCm-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*SCp
+                  if (this%face_apt_x(i,j,k,p).eq.1.0_WP) then
+                     FX(i,j,k)=-0.5_WP*(U(i,j,k)+abs(U(i,j,k)))*this%SC(i-1,j,k,nsc)-0.5_WP*(U(i,j,k)-abs(U(i,j,k)))*this%SC(i,j,k,nsc) &
+                     &         +sum(this%itp_x(:,i,j,k)*this%diff(i-1:i,j,k,nsc))*sum(this%grd_x(:,i,j,k)*this%SC(i-1:i,j,k,nsc))
                   end if
                   ! Flux on y-face
-                  if (getSize(detailed_face_flux(2,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(2,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(2,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(2,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FY(i,j,k)=FY(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FY(i,j,k)=FY(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FY(i,j,k)=FY(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dz(k))
-                  else
-                     ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i,j-1,k).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j-1,k,nsc)+0.5_WP*grad(2,i,j-1,k)*this%cfg%dy(j-1)
-                     SCp=0.0_WP; if (VFold(i,j  ,k).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j  ,k,nsc)-0.5_WP*grad(2,i,j  ,k)*this%cfg%dy(j  )
-                     FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*SCm-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*SCp
+                  if (this%face_apt_y(i,j,k,p).eq.1.0_WP) then
+                     FY(i,j,k)=-0.5_WP*(V(i,j,k)+abs(V(i,j,k)))*this%SC(i,j-1,k,nsc)-0.5_WP*(V(i,j,k)-abs(V(i,j,k)))*this%SC(i,j,k,nsc) &
+                     &         +sum(this%itp_y(:,i,j,k)*this%diff(i,j-1:j,k,nsc))*sum(this%grd_y(:,i,j,k)*this%SC(i,j-1:j,k,nsc))
                   end if
                   ! Flux on z-face
-                  if (getSize(detailed_face_flux(3,i,j,k)).gt.0) then
-                     ! Detailed geometric flux is available, use geometric fluxing
-                     do n=0,getSize(detailed_face_flux(3,i,j,k))-1
-                        ! Get cell index for nth object
-                        ind=this%cfg%get_ijk_from_lexico(getTagForIndex(detailed_face_flux(3,i,j,k),n))
-                        ! Get SepVM for nth object
-                        call getSepVMAtIndex(detailed_face_flux(3,i,j,k),n,my_SepVM)
-                        ! Extract volume for relevant phase
-                        my_vol=getVolume(my_SepVM,this%phase(nsc))
-                        ! Increment flux with first order estimate
-                        FZ(i,j,k)=FZ(i,j,k)-my_vol*this%SCold(ind(1),ind(2),ind(3),nsc)
-                        ! Second order correction
-                        !my_bar=getCentroid(my_SepVM,this%phase(nsc))
-                        !FZ(i,j,k)=FZ(i,j,k)-my_vol*(sum(grad(:,ii,jj,kk)*my_bar(:)-my_barold(:)))
-                     end do
-                     ! Scale by cell face area and time step size
-                     FZ(i,j,k)=FZ(i,j,k)/(dt*this%cfg%dx(i)*this%cfg%dy(j))
-                  else
-                     ! No detailed geometric flux is available, use MUSCL flux
-                     SCm=0.0_WP; if (VFold(i,j,k-1).ne.real(this%phase(nsc),WP)) SCm=this%SC(i,j,k-1,nsc)+0.5_WP*grad(3,i,j,k-1)*this%cfg%dz(k-1)
-                     SCp=0.0_WP; if (VFold(i,j,k  ).ne.real(this%phase(nsc),WP)) SCp=this%SC(i,j,k  ,nsc)-0.5_WP*grad(3,i,j,k  )*this%cfg%dz(k  )
-                     FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*SCm-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*SCp
+                  if (this%face_apt_z(i,j,k,p).eq.1.0_WP) then
+                     FZ(i,j,k)=-0.5_WP*(W(i,j,k)+abs(W(i,j,k)))*this%SC(i,j,k-1,nsc)-0.5_WP*(W(i,j,k)-abs(W(i,j,k)))*this%SC(i,j,k,nsc) &
+                     &         +sum(this%itp_z(:,i,j,k)*this%diff(i,j,k-1:k,nsc))*sum(this%grd_z(:,i,j,k)*this%SC(i,j,k-1:k,nsc))
                   end if
                end do
             end do
@@ -592,9 +692,12 @@ contains
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
-                  dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
-                  &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
-                  &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))
+                  if (this%PVF(i,j,k,p).ge.VFhi) then
+                     dSCdt(i,j,k,nsc)=sum(this%div_x(:,i,j,k)*FX(i:i+1,j,k))+&
+                     &                sum(this%div_y(:,i,j,k)*FY(i,j:j+1,k))+&
+                     &                sum(this%div_z(:,i,j,k)*FZ(i,j,k:k+1))+&
+                     &                divU(i,j,k)*this%SC(i,j,k,nsc)
+                  end if
                end do
             end do
          end do
@@ -602,83 +705,50 @@ contains
          call this%cfg%sync(dSCdt(:,:,:,nsc))
       end do
       ! Deallocate flux arrays
-      deallocate(FX,FY,FZ,grad)
-      
-   contains
-      
-      !> Minmod gradient
-      function minmod(g1,g2) result(g)
-         implicit none
-         real(WP), intent(in) :: g1,g2
-         real(WP) :: g
-         if (g1*g2.le.0.0_WP) then
-            g=0.0_WP
-         else
-            if (abs(g1).lt.abs(g2)) then
-               g=g1
-            else
-               g=g2
-            end if
-         end if
-      end function minmod
+      deallocate(FX,FY,FZ)
       
    end subroutine get_dSCdt
 
-   
-   !> Calculate the min, max, and int of our SC field
-   subroutine get_max(this,VF)
-      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
-      use parallel, only: MPI_REAL_WP
-      implicit none
-      class(tpscalar), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: VF        !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      integer :: ierr,nsc
-      real(WP) :: my_SCmax,my_SCmin
-      real(WP), dimension(:,:,:), allocatable :: tmp
-      allocate(tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
-      do nsc=1,this%nscalar
-         my_SCmax=maxval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmax,this%SCmax(nsc),1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
-         my_SCmin=minval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmin,this%SCmin(nsc),1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
-         if      (this%phase(nsc).eq.Lphase) then ! Liquid scalar
-            tmp=this%SC(:,:,:,nsc)*(       VF(:,:,:))
-         else if (this%phase(nsc).eq.Gphase) then ! Gas scalar
-            tmp=this%SC(:,:,:,nsc)*(1.0_WP-VF(:,:,:))
-         end if
-         call this%cfg%integrate(A=tmp,integral=this%SCint(nsc))
-      end do
-      deallocate(tmp)
-   end subroutine get_max
-   
-   
-   !> Solve for implicit scalar residual (only diffusion)
-   subroutine solve_implicit_diff(this,dt,resSC)
+
+   !> Solve for implicit scalar residual
+   subroutine solve_implicit(this,dt,resSC,U,V,W,divU)
       implicit none
       class(tpscalar), intent(inout) :: this
       real(WP), intent(in) :: dt
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(inout) :: resSC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_,1:nscalar)
-      integer :: i,j,k,nsc
-      
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: U     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: V     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: W     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: divU  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: i,j,k,nsc,p
+
       ! Apply implicit treatment for each scalar
       do nsc=1,this%nscalar
-         
-         ! Prepare diffusive operator
+
+         if (this%skip(nsc)) cycle
+
+         ! Get the phase index
+         p=this%phase(nsc)
+
+         ! Prepare the operators
          this%implicit%opr(1,:,:,:)=1.0_WP; this%implicit%opr(2:,:,:,:)=0.0_WP
          do k=this%cfg%kmin_,this%cfg%kmax_
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
-                  if (this%PVF(i,j,k,this%phase(nsc)).gt.0.0_WP) then
-                     this%implicit%opr(1,i,j,k)=this%implicit%opr(1,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k) *sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k) *sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k) *sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k) *sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1) *sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)+&
-                     &                                                                                         this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  ) *sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP))
-                     this%implicit%opr(2,i,j,k)=this%implicit%opr(2,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x(+1,i,j,k)*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k))*sum(this%itp_x(:,i+1,j,k)*this%PVF(i  :i+1,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i+1,j,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(3,i,j,k)=this%implicit%opr(3,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_x( 0,i,j,k)*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k))*sum(this%itp_x(:,i  ,j,k)*this%PVF(i-1:i  ,j,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i-1,j,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(4,i,j,k)=this%implicit%opr(4,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y(+1,i,j,k)*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k))*sum(this%itp_y(:,i,j+1,k)*this%PVF(i,j  :j+1,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j+1,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(5,i,j,k)=this%implicit%opr(5,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_y( 0,i,j,k)*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k))*sum(this%itp_y(:,i,j  ,k)*this%PVF(i,j-1:j  ,k,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j-1,k,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(6,i,j,k)=this%implicit%opr(6,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z(+1,i,j,k)*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1))*sum(this%itp_z(:,i,j,k+1)*this%PVF(i,j,k  :k+1,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k+1,this%phase(nsc))>0.0_WP)
-                     this%implicit%opr(7,i,j,k)=this%implicit%opr(7,i,j,k)-dt/this%PVF(i,j,k,this%phase(nsc))*(this%div_z( 0,i,j,k)*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  ))*sum(this%itp_z(:,i,j,k  )*this%PVF(i,j,k-1:k  ,this%phase(nsc)))*merge(1.0_WP,0.0_WP,this%PVF(i,j,k-1,this%phase(nsc))>0.0_WP)
+                  if (this%PVF(i,j,k,p).ge.VFhi) then
+                     this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k) -0.5_WP*dt* (this%div_x(+1,i,j,k)*(sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k)-0.5_WP*(U(i+1,j,k)+abs(U(i+1,j,k))))+&
+                     &                                                                                                                    this%div_x( 0,i,j,k)*(sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k)-0.5_WP*(U(i  ,j,k)-abs(U(i  ,j,k))))+&
+                     &                                                                                                                    this%div_y(+1,i,j,k)*(sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k)-0.5_WP*(V(i,j+1,k)+abs(V(i,j+1,k))))+&
+                     &                                                                                                                    this%div_y( 0,i,j,k)*(sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k)-0.5_WP*(V(i,j  ,k)-abs(V(i,j  ,k))))+&
+                     &                                                                                                                    this%div_z(+1,i,j,k)*(sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1)-0.5_WP*(U(i,j,k+1)+abs(U(i,j,k+1))))+&
+                     &                                                                                                                    this%div_z( 0,i,j,k)*(sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  )-0.5_WP*(U(i,j,k  )-abs(U(i,j,k  ))))+&
+                     &                                                                                                                    divU(i,j,k))
+                     this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)-0.5_WP*dt*(this%div_x(+1,i,j,k)*(sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k)-0.5_WP*(U(i+1,j,k)-abs(U(i+1,j,k)))))
+                     this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)-0.5_WP*dt*(this%div_x( 0,i,j,k)*(sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k)-0.5_WP*(U(i  ,j,k)+abs(U(i  ,j,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)-0.5_WP*dt*(this%div_y(+1,i,j,k)*(sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k)-0.5_WP*(U(i,j+1,k)-abs(U(i,j+1,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)-0.5_WP*dt*(this%div_y( 0,i,j,k)*(sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k)-0.5_WP*(U(i,j  ,k)+abs(U(i,j  ,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)-0.5_WP*dt*(this%div_z(+1,i,j,k)*(sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1)-0.5_WP*(U(i,j,k+1)-abs(U(i,j,k+1)))))
+                     this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)-0.5_WP*dt*(this%div_z( 0,i,j,k)*(sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  )-0.5_WP*(U(i,j,k  )+abs(U(i,j,k  )))))
                   end if
                end do
             end do
@@ -690,15 +760,34 @@ contains
          this%implicit%sol=0.0_WP
          call this%implicit%solve()
          resSC(:,:,:,nsc)=this%implicit%sol
-         
-         ! Sync up residual
+         ! Sync it
          call this%cfg%sync(resSC(:,:,:,nsc))
-         
+
       end do
       
-   end subroutine solve_implicit_diff
+   end subroutine solve_implicit
 
-   
+
+   !> Calculate the min, max, and int of our SC field
+   subroutine get_max(this)
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX,MPI_MIN
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(tpscalar), intent(inout) :: this
+      integer :: ierr,nsc
+      real(WP) :: my_SCmax,my_SCmin
+      real(WP), dimension(:,:,:), allocatable :: tmp
+      allocate(tmp(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      do nsc=1,this%nscalar
+         my_SCmax=maxval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmax,this%SCmax(nsc),1,MPI_REAL_WP,MPI_MAX,this%cfg%comm,ierr)
+         my_SCmin=minval(this%SC(:,:,:,nsc)); call MPI_ALLREDUCE(my_SCmin,this%SCmin(nsc),1,MPI_REAL_WP,MPI_MIN,this%cfg%comm,ierr)
+         tmp=this%SC(:,:,:,nsc)*this%PVF(:,:,:,this%phase(nsc))
+         call this%cfg%integrate(A=tmp,integral=this%SCint(nsc))
+      end do
+      deallocate(tmp)
+   end subroutine get_max
+
+
    !> Print out info for tpscalar solver
    subroutine tpscalar_print(this)
       use, intrinsic :: iso_fortran_env, only: output_unit

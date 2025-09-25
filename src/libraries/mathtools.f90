@@ -14,6 +14,9 @@ module mathtools
    public :: eigensolve3
    public :: quadrature_rule
    public :: spherical_harmonic
+   public :: reorder_rows
+   public :: ind_col
+   public :: lss
    
    ! Trigonometric parameters
    real(WP), parameter :: Pi   =3.1415926535897932385_WP
@@ -27,6 +30,18 @@ module mathtools
    !real(WP), dimension(0:9) :: by1=[0.000000000000000_WP,0.329780063306651_WP,0.629765721178679_WP,0.84604458266019_WP,0.95551827831671_WP,0.99154183259084_WP,0.99897290050990_WP,0.9999216098795_WP,0.99999627301467_WP,0.99999989265063_WP]
    !real(WP), dimension(0:9) :: by2=[0.332057384255589_WP,0.323007152241930_WP,0.266751564401387_WP,0.161360240845588_WP,0.06423404047594_WP,0.01590689966410_WP,0.00240199722109_WP,0.00022016340923_WP,0.00001224984692_WP,0.00000041090325_WP]
    
+   !> Re-order rows of input array
+   !> input:
+   !>    x      - array to be re-ordered
+   !>    order  - i-th row of reordered array is row order(i) of x
+   !> output:
+   !>    y      - reordered array
+   interface reorder_rows
+      module procedure reorder_rows_rank1
+      module procedure reorder_rows_rank2
+   end interface
+
+
 contains
    
    
@@ -204,14 +219,14 @@ contains
       real(WP), intent(in) :: dx,dy
       real(WP) :: arctan
       if (abs(dx)+abs(dy).lt.1.0e-9_WP) then
-         arctan = 0.0_WP
+         arctan=0.0_WP
       else
-         arctan = atan(dy/dx)
+         arctan=atan(dy/dx)
       end if
       if (dx.le.0.0_WP) then
-         arctan = Pi+arctan
+         arctan=Pi+arctan
       else if (dy.le.0.0_WP .and. dx.gt.0.0_WP) then
-         arctan = twoPi+arctan
+         arctan=twoPi+arctan
       end if
    end function arctan
    
@@ -278,7 +293,7 @@ contains
                G=C*R-B
                ! Form eigenvectors
                do k=1,3
-                  T       =  Q(k,j+1)
+                  T      = Q(k,j+1)
                   Q(k,j+1)=S*Q(k,j)+C*T
                   Q(k,j)  =C*Q(k,j)-S*T
                end do
@@ -293,7 +308,7 @@ contains
       
       !> Reduces a symmetric 3x3 matrix to real tridiagonal form by applying (unitary) Householder transformations:
       !>           [ D[1]  E[1]       ]
-      !>   A = Q . [ E[1]  D[2]  E[2] ] . Q^T
+      !>   A=Q . [ E[1]  D[2]  E[2] ] . Q^T
       !>           [       E[2]  D[3] ]
       !> The function accesses only the diagonal and upper triangular parts of A
       subroutine householder(A,Q,D,E)
@@ -348,8 +363,116 @@ contains
       end subroutine householder
    
    end subroutine eigensolve3
+
    
+   !> Re-order rows of a rank 1 array
+   subroutine reorder_rows_rank1(x,order,y)
+      use messager, only: die
+      implicit none
+      integer,  intent(in)  :: order(:)
+      real(WP), intent(in)  :: x(:)
+      real(WP), intent(out) :: y(:)
+      integer :: lb1,ub1
+      integer :: i
+      lb1=lbound(x,1); ub1=ubound(x,1)
+      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1))) call die('Array bounds do not match')
+      do i=lb1,ub1
+         y(i)=x(order(i))
+      end do
+   end subroutine reorder_rows_rank1
+
+
+   !> Re-order rows of a rank 2 array
+   subroutine reorder_rows_rank2(x,order,y)
+      use messager, only: die
+      implicit none
+      integer,  intent(in)    :: order(:)
+      real(WP), intent(in)    :: x(:,:)
+      real(WP), intent(inout) :: y(:,:)
+      integer :: lb1,lb2,ub1,ub2
+      integer :: i
+      lb1=lbound(x,1); ub1=ubound(x,1)
+      lb2=lbound(x,2); ub2=ubound(x,2)
+      if ((lb1.ne.lbound(y,1)).or.(ub1.ne.ubound(y,1)).or.(lb2.ne.lbound(y,2)).or.(ub2.ne.ubound(y,2))) call die('Matrix bounds do not match')
+      do i=lb1,ub1
+         y(i,:)=x(order(i),:)
+      end do
+   end subroutine reorder_rows_rank2
+
+
+   !>  Determine independent columns of the matrix B, given that columns 1:nci are independent.
+   subroutine ind_col(nr,nc,nci,B,thresh,indcol,info)
+      ! Extracted from Pope, Stephen. (2003). The Computation of Constrained and Unconstrained Equilibrium Compositions of 
+      ! Ideal Gas Mixtures using Gibbs Function Continuation. 
+      use messager, only: die
+      implicit none
+      integer,  intent(in)  :: nr,nc,nci
+      real(WP), intent(in)  :: B(nr,nc),thresh
+      integer,  intent(out) :: indcol(nc),info
+      ! Input:
+      !	nr	- number of rows of B
+      !	nc	- number of columns of B
+      !   nci - index, such that B(:,1:nci) has full column rank
+      !   B   - matrix
+      !   thresh  - threshold for determining rank
+      ! Output:
+      !   indcol(k)=0 if k-th column is dependent of columns 1:k-1
+      !   indcol(k)=1 if k-th column is independent of columns 1:k-1
+      !   info < 0 indicates failure
+      integer :: lwork,k,jpvt(nc)
+      real(WP) :: R(nr,nc),tau(min(nr,nc)),work(3*(nr+nc))
+      indcol=0
+      lwork=size(work)
+      R=B
+      jpvt=0
+      ! Perform QR with column pivoting:  B P=Q R
+      call dgeqp3(nr,nc,R(1:nr,1:nc),nr,jpvt,tau(1:min(nr,nc)),work(1:lwork),lwork,info)
+      if (info.ne.0) call die('[ind_col] QR decomposition failed')
+      ! Loop over possibly dependent columns
+      do k=1,min(nc,nr)
+         if (abs(R(k,k)).ge.thresh) then
+            indcol(jpvt(k))=1	   
+         else
+            exit
+         endif
+      end do
+      ! Check that the first nci columns are dependent
+      do k=1,nci
+         if (indcol(k).ne.1) then
+            info=-2
+            return
+         endif
+      end do
+   end subroutine ind_col
    
+
+   !> Determine the least-squares/minimum-norm solution x to the linear equation Ax = b.
+   subroutine lss(nb,nx,A,b,x,info)
+      !	S.B. Pope 10/2/02
+      implicit none
+      integer,  intent(in)  :: nb,nx
+      real(WP), intent(in)  :: A(nb,nx),b(nb)
+      real(WP), intent(out) :: x(nx)
+      integer,  intent(out) :: info
+      !  Input:
+      !	nb	- number of rows in b
+      !	nx	- number of rows in A and x
+      !	A	- the nb x nx matrix A
+      !	b	- the nb-vector b
+      !  Output:
+      !	x	- the solution nx-vector
+      !	info=0 for successful solution
+      integer :: lwork,rank
+      real(WP) :: tol=1.d-9,aa(nb,nx),bb(nb+nx),sv(nb+nx),work(4*(nb+nx+1)*(nb+nx+1))
+      lwork= size(work)
+      aa=A
+      bb=0.d0
+      bb(1:nb)=b
+      call dgelss(nb,nx,1,aa(1:nb,1:nx),nb,bb(1:nb+nx),nb+nx,sv(1:nb+nx),tol,rank,work(1:lwork),lwork,info)
+      x=bb(1:nx)
+   end subroutine lss
+
+
    !> Compute a nth order Clenshaw-Curtis quadrature rule on [0,1]
    !> int(f(x)) in [0,1] is approximated by sum(w_i*f(x_i)) for i=1..N
    subroutine quadrature_rule(n,x,w)

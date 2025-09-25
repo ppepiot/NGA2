@@ -1,0 +1,4 @@
+f90EXE_sources += chem_sys_class.f90 chem_state_class.f90
+
+INCLUDE_LOCATIONS += $(NGA_HOME)/src/ceq
+VPATH_LOCATIONS   += $(NGA_HOME)/src/ceq
