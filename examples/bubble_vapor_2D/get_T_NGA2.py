@@ -2,9 +2,9 @@
 import os
 from paraview.simple import *
 
-desired_times = [0.027, 0.1, 0.2, 0.3, 0.4, 0.5]
+desired_times = [0.5, 0.6, 0.7, 0.8]
 tolerance = 0.01
-res_path = '/Users/shayanhbi/Repositories/NGA2/examples/stephan/temperature'
+res_path = '/Users/shayanhbi/Repositories/NGA2/examples/bubble_vapor_2D/temperature'
 if not os.path.exists(res_path):
     try:
         os.mkdir(res_path)
@@ -21,7 +21,7 @@ timeKeeper = GetTimeKeeper()
 num_time_steps = len(timeKeeper.TimestepValues)
 
 # Get the field
-Tg = source.CellData.GetArray('Tg')
+T = source.CellData.GetArray('Temperature')
 
 # Index of the plot over line
 line_ind = -1
@@ -48,7 +48,7 @@ for time_step in range(num_time_steps):
         center_line = PlotOverLine(registrationName=f"{'ctr_'}{line_ind}", Input=source)
         center_line.SamplingPattern = 'Sample At Segment Centers'
         center_line.Point1 = [0.0, 0.0, 0.0]
-        center_line.Point2 = [0.001, 0.0, 0.0]
+        center_line.Point2 = [0.565, 0.0, 0.0]
 
         # Get the VTK object associated with the plot over line
         vtk_object = center_line.GetClientSideObject()
@@ -63,13 +63,13 @@ for time_step in range(num_time_steps):
         point_data = output_data.GetPointData()
         
         # Get the arrays from CellData
-        T_ctr = point_data.GetArray('Tg')
+        T_ctr = point_data.GetArray('Temperature')
         x_ctr = point_data.GetArray('arc_length')
 
         # Write to file
         num_points = T_ctr.GetNumberOfTuples()
         with open(res_path + '/num' + str(desired_times[line_ind]) + '.dat', 'w') as file_ctr:
-            file_ctr.write(f"x            Tg\n")
+            file_ctr.write(f"x            T\n")
             for i in range(1, num_points):
                 T_val = T_ctr.GetValue(i)
                 if T_val > 0.0: 
