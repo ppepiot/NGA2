@@ -3,7 +3,7 @@ Partition : 2 4 1
 
 # Mesh definition
 L  : 1.13
-n  : 256 ! 512 ! 256 ! 128
+n  : 256 ! 512 ! 128
 # Lu : 0.004
 # nu : 350
 # r  : 1.01

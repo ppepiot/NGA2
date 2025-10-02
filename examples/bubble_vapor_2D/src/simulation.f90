@@ -32,7 +32,7 @@ module simulation
    type(event)    :: ens_evt
    
    !> Simulation monitor file
-   type(monitor) :: mfile,cflfile,scfile,evpfile
+   type(monitor) :: mfile,cflfile,scfile,lgfile
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -226,6 +226,32 @@ contains
    end function Simpson
 
 
+   ! Simpson's rule integration
+   function Simpson_adpt(integrand,b,zmin,zmax,tol) result(S2)
+      interface
+      function integrand(x1,x2)
+            use precision, only: WP
+            real(WP), intent(in) :: x1,x2
+            real(WP) :: integrand
+         end function integrand
+      end interface
+      real(WP), intent(in) :: b
+      real(WP), intent(in) :: zmin,zmax
+      real(WP), intent(in) :: tol
+      integer  :: i,n
+      real(WP) :: S1,S2,err
+      n=2
+      S2=Simpson(integrand,b,zmin,zmax,n)
+      err=10.0_WP*tol
+      do while (err.gt.tol)
+         n=2*n
+         S1=S2
+         S2=Simpson(integrand,b,zmin,zmax,n)
+         err=abs((S2-S1)/S1)
+      end do
+   end function Simpson_adpt
+
+
    !> Function that governs beta
    function f_beta(b)
       real(WP), intent(in) :: b
@@ -270,7 +296,7 @@ contains
          if (tlgrd.lt.my_Tlgrd_min) my_Tlgrd_min=tlgrd
          if (tlgrd.gt.my_Tlgrd_max) my_Tlgrd_max=tlgrd
          my_area=my_area+cfg%vol(i,j,k)*vf%SD(i,j,k)
-         my_Tlgrd_avg=my_Tlgrd_avg+cfg%vol(i,j,k)*vf%SD(i,j,k)*tlgrd
+         my_Tlgrd_avg=my_Tlgrd_avg+cfg%vol(i,j,k)*vf%SD(i,j,k)*abs(tlgrd)
       end do
       call MPI_ALLREDUCE(my_Tlgrd_min,Tlgrd_min,1,MPI_REAL_WP,MPI_MIN,cfg%comm,ierr)
       call MPI_ALLREDUCE(my_Tlgrd_max,Tlgrd_max,1,MPI_REAL_WP,MPI_MAX,cfg%comm,ierr)
@@ -328,7 +354,7 @@ contains
          call param_read('Liquid specific heat capacity',Cp_l)
          call param_read('Gas thermal conductivity',k_g)
          call param_read('Gas specific heat capacity',Cp_g)
-         call param_read('Far-field temperature',T_inf)
+         call param_read('Far-field temperature',T_inf);
          alpha_l=k_l/(rho_l*Cp_l)
          alpha_g=k_g/(rho_g*Cp_g)
          f_b_cnst=(rho_l*Cp_l*(T_inf-T_sat))/(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))
@@ -566,7 +592,7 @@ contains
       ! Create and initialize an lg object
       create_lgpc: block
          ! use lgpc_class, only: symmetry
-         integer :: i,j,k,index
+         integer :: i,j,k,index!,ind(3)
          ! Create the object
          call lg%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     lg%mdot3p_tol)
@@ -577,6 +603,12 @@ contains
          ! Get densities from the flow solver
          lg%rho_l=fs%rho_l
          lg%rho_g=fs%rho_g
+         ! 
+         ! ind=cfg%get_ijk_global([0.113_WP,0.001_WP,0.0_WP],[20,32,1])
+         ! print*,'ind = ',ind
+         ! print*,'xm = ',cfg%xm(ind(1))
+         ! print*,'ym = ',cfg%ym(ind(2))
+         ! print*,'zm = ',cfg%zm(ind(3))
          ! Get temperature gradient
          call lg%get_temperature_grad()
          ! Phase change mass flux
@@ -586,6 +618,7 @@ contains
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                      lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                     ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
                   end if
                end do
             end do
@@ -708,20 +741,20 @@ contains
          end do
          call scfile%write()
          ! Create evaporation monitor
-         evpfile=monitor(lg%cfg%amRoot,'lgpc')
-         call evpfile%add_column(time%n,'Timestep number')
-         call evpfile%add_column(time%t,'Time')
-         call evpfile%add_column(lg%pseudo_time%dt,'Pseudo time step')
-         call evpfile%add_column(lg%pseudo_time%cfl,'Maximum pseudo CFL')
-         call evpfile%add_column(lg%pseudo_time%n,'No. pseudo steps')
-         call evpfile%add_column(lg%mdot3p_int,'mdot3p int')
-         call evpfile%add_column(lg%mdot3pL_int,'shifted mdot3pL int')
-         call evpfile%add_column(lg%mdot3pG_int,'shifted mdot3pG int')
-         call evpfile%add_column(lg%mdot3pL_int_err,'mdot3pL int err')
-         call evpfile%add_column(lg%mdot3pG_int_err,'mdot3pG int err')
-         call evpfile%add_column(lg%mdot3pL_err,'max mdot3pL err')
-         call evpfile%add_column(lg%mdot3pG_err,'max mdot3pG err')
-         call evpfile%write()
+         lgfile=monitor(lg%cfg%amRoot,'lgpc')
+         call lgfile%add_column(time%n,'Timestep number')
+         call lgfile%add_column(time%t,'Time')
+         call lgfile%add_column(lg%pseudo_time%dt,'Pseudo time step')
+         call lgfile%add_column(lg%pseudo_time%cfl,'Maximum pseudo CFL')
+         call lgfile%add_column(lg%pseudo_time%n,'No. pseudo steps')
+         call lgfile%add_column(lg%mdot3p_int,'mdot3p int')
+         call lgfile%add_column(lg%mdot3pL_int,'shifted mdot3pL int')
+         call lgfile%add_column(lg%mdot3pG_int,'shifted mdot3pG int')
+         call lgfile%add_column(lg%mdot3pL_int_err,'mdot3pL int err')
+         call lgfile%add_column(lg%mdot3pG_int_err,'mdot3pG int err')
+         call lgfile%add_column(lg%mdot3pL_err,'max mdot3pL err')
+         call lgfile%add_column(lg%mdot3pG_err,'max mdot3pG err')
+         call lgfile%write()
       end block create_monitor
       
       
@@ -881,106 +914,7 @@ contains
          ! end block advance_scalar
 
 
-         ! ! Backward Euler
-         ! advance_scalar: block
-         !    use tpscalar_class,  only: bcond
-         !    type(bcond), pointer :: my_bc
-         !    integer  :: i,j,k,nsc,n,p
-         !    real(WP) :: dt_sc
-
-         !    ! Perform scalar time integration
-         !    do while (timeSC%t.lt.time%t)
-               
-         !       ! Increment scalar time step
-         !       if (timeSC%t+timeSC%dt.gt.time%t) then
-         !          dt_sc=timeSC%dt
-         !          timeSC%dt=time%t-timeSC%t
-         !          call timeSC%increment()
-         !          timeSC%dt=dt_sc
-         !       else
-         !          call timeSC%increment()
-         !       end if
-               
-         !       ! Remember old scalar
-         !       sc%SCold =sc%SC
-
-         !       ! Build mid-time scalar
-         !       do nsc=1,sc%nscalar
-         !          p=sc%phase(nsc)
-         !          do k=cfg%kmino_,cfg%kmaxo_
-         !             do j=cfg%jmino_,cfg%jmaxo_
-         !                do i=cfg%imino_,cfg%imaxo_
-         !                   if (sc%PVF(i,j,k,p).eq.0.0_WP) then
-         !                      sc%SC(i,j,k,nsc)=0.0_WP
-         !                   else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-         !                      sc%SC(i,j,k,nsc)=T_sat
-         !                   else
-         !                   end if
-         !                end do
-         !             end do
-         !          end do
-         !       end do
-
-         !       ! Explicit calculation of dSC/dt
-         !       call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
-
-         !       ! Assemble explicit residual
-         !       resSC=resSC*timeSC%dt
-         !       do nsc=1,sc%nscalar
-         !          p=sc%phase(nsc)
-         !          do k=cfg%kmin_,cfg%kmax_
-         !             do j=cfg%jmin_,cfg%jmax_
-         !                do i=cfg%imin_,cfg%imax_
-         !                   if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-         !                      resSC(i,j,k,nsc)=0.0_WP
-         !                   end if
-         !                end do
-         !             end do
-         !          end do
-         !       end do
-
-         !       ! Form implicit residual
-         !       call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
-
-         !       ! Apply the residuals
-         !       sc%SC=sc%SCold+resSC
-
-         !       ! Apply boundary conditions
-         !       where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-         !          sc%SC(:,:,:,iTl)=T_sat
-         !          sc%SC(:,:,:,iTg)=T_sat
-         !       end where
-         !       call sc%apply_bcond(timeSC%t,timeSC%dt)
-         !       call sc%get_bcond('xm',my_bc)
-         !       do n=1,my_bc%itr%no_
-         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i+1,j,k,iTl)
-         !       end do
-         !       call sc%get_bcond('xp',my_bc)
-         !       do n=1,my_bc%itr%no_
-         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i-1,j,k,iTl)
-         !       end do
-         !       call sc%get_bcond('ym',my_bc)
-         !       do n=1,my_bc%itr%no_
-         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j+1,k,iTl)
-         !       end do
-         !       call sc%get_bcond('yp',my_bc)
-         !       do n=1,my_bc%itr%no_
-         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j-1,k,iTl)
-         !       end do
-         
-         !    end do
-
-         !    ! One-field temperature
-         !    T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-
-         ! end block advance_scalar
-
-
-         ! RK2
+         ! Backward Euler for diffusion and CN for advection
          advance_scalar: block
             use tpscalar_class,  only: bcond
             type(bcond), pointer :: my_bc
@@ -1038,24 +972,8 @@ contains
                   end do
                end do
 
-               sc%SC=sc%SCold+0.5_WP*resSC
-
-               call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
-
-               ! Assemble explicit residual
-               resSC=resSC*timeSC%dt
-               do nsc=1,sc%nscalar
-                  p=sc%phase(nsc)
-                  do k=cfg%kmin_,cfg%kmax_
-                     do j=cfg%jmin_,cfg%jmax_
-                        do i=cfg%imin_,cfg%imax_
-                           if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-                              resSC(i,j,k,nsc)=0.0_WP
-                           end if
-                        end do
-                     end do
-                  end do
-               end do
+               ! Form implicit residual
+               call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old,w_adv=0.5_WP,w_dff=1.0_WP)
 
                ! Apply the residuals
                sc%SC=sc%SCold+resSC
@@ -1095,6 +1013,200 @@ contains
          end block advance_scalar
 
 
+         ! Analytical
+         ! advance_scalar: block
+         !    use tpscalar_class,  only: bcond
+         !    type(bcond), pointer :: my_bc
+         !    integer  :: i,j,k,nsc,n,p
+         !    real(WP) :: dt_sc
+
+         !    ! Perform scalar time integration
+         !    do while (timeSC%t.lt.time%t)
+               
+         !       ! Increment scalar time step
+         !       if (timeSC%t+timeSC%dt.gt.time%t) then
+         !          dt_sc=timeSC%dt
+         !          timeSC%dt=time%t-timeSC%t
+         !          call timeSC%increment()
+         !          timeSC%dt=dt_sc
+         !       else
+         !          call timeSC%increment()
+         !       end if
+               
+         !       ! Remember old scalar
+         !       sc%SCold =sc%SC
+
+         !       ! Analytical temperature solutions
+         !       do k=cfg%kmin_,cfg%kmax_
+         !          do j=cfg%jmin_,cfg%jmax_
+         !             do i=cfg%imin_,cfg%imax_
+         !                if (vf%VF(i,j,k).eq.0.0_WP) then
+         !                   sc%SC(i,j,k,iTl)=0.0_WP
+         !                   sc%SC(i,j,k,iTg)=T_sat
+         !                else if (vf%VF(i,j,k).eq.1.0_WP) then
+         !                   R_ext=get_Rext(time%t)
+         !                   r=sqrt(cfg%xm(i)**2+cfg%ym(j)**2)
+         !                   ! sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson_adpt(integrand,beta,1.0_WP-R_ext/r,1.0_WP,real(1e-7,WP))
+         !                   sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R_ext/r,1.0_WP,20)
+         !                   sc%SC(i,j,k,iTg)=0.0_WP
+         !                else
+         !                   sc%SC(i,j,k,iTl)=T_sat
+         !                   sc%SC(i,j,k,iTg)=T_sat
+         !                end if
+         !             end do
+         !          end do
+         !       end do
+
+         !       ! Apply boundary conditions
+         !       where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+         !          sc%SC(:,:,:,iTl)=T_sat
+         !          sc%SC(:,:,:,iTg)=T_sat
+         !       end where
+         !       call sc%apply_bcond(timeSC%t,timeSC%dt)
+         !       call sc%get_bcond('xm',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i+1,j,k,iTl)
+         !       end do
+         !       call sc%get_bcond('xp',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i-1,j,k,iTl)
+         !       end do
+         !       call sc%get_bcond('ym',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j+1,k,iTl)
+         !       end do
+         !       call sc%get_bcond('yp',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j-1,k,iTl)
+         !       end do
+         
+         !    end do
+
+         !    ! One-field temperature
+         !    T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+
+         ! end block advance_scalar
+
+
+         ! ! RK2
+         ! advance_scalar: block
+         !    use tpscalar_class,  only: bcond
+         !    type(bcond), pointer :: my_bc
+         !    integer  :: i,j,k,nsc,n,p
+         !    real(WP) :: dt_sc
+
+         !    ! Perform scalar time integration
+         !    do while (timeSC%t.lt.time%t)
+               
+         !       ! Increment scalar time step
+         !       if (timeSC%t+timeSC%dt.gt.time%t) then
+         !          dt_sc=timeSC%dt
+         !          timeSC%dt=time%t-timeSC%t
+         !          call timeSC%increment()
+         !          timeSC%dt=dt_sc
+         !       else
+         !          call timeSC%increment()
+         !       end if
+               
+         !       ! Remember old scalar
+         !       sc%SCold =sc%SC
+
+         !       ! Build mid-time scalar
+         !       do nsc=1,sc%nscalar
+         !          p=sc%phase(nsc)
+         !          do k=cfg%kmino_,cfg%kmaxo_
+         !             do j=cfg%jmino_,cfg%jmaxo_
+         !                do i=cfg%imino_,cfg%imaxo_
+         !                   if (sc%PVF(i,j,k,p).eq.0.0_WP) then
+         !                      sc%SC(i,j,k,nsc)=0.0_WP
+         !                   else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
+         !                      sc%SC(i,j,k,nsc)=T_sat
+         !                   else
+         !                   end if
+         !                end do
+         !             end do
+         !          end do
+         !       end do
+
+         !       ! Explicit calculation of dSC/dt
+         !       call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
+
+         !       ! Assemble explicit residual
+         !       resSC=resSC*timeSC%dt
+         !       do nsc=1,sc%nscalar
+         !          p=sc%phase(nsc)
+         !          do k=cfg%kmin_,cfg%kmax_
+         !             do j=cfg%jmin_,cfg%jmax_
+         !                do i=cfg%imin_,cfg%imax_
+         !                   if (sc%PVF(i,j,k,p).lt.1.0_WP) then
+         !                      resSC(i,j,k,nsc)=0.0_WP
+         !                   end if
+         !                end do
+         !             end do
+         !          end do
+         !       end do
+
+         !       sc%SC=sc%SCold+0.5_WP*resSC
+
+         !       call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
+
+         !       ! Assemble explicit residual
+         !       resSC=resSC*timeSC%dt
+         !       do nsc=1,sc%nscalar
+         !          p=sc%phase(nsc)
+         !          do k=cfg%kmin_,cfg%kmax_
+         !             do j=cfg%jmin_,cfg%jmax_
+         !                do i=cfg%imin_,cfg%imax_
+         !                   if (sc%PVF(i,j,k,p).lt.1.0_WP) then
+         !                      resSC(i,j,k,nsc)=0.0_WP
+         !                   end if
+         !                end do
+         !             end do
+         !          end do
+         !       end do
+
+         !       ! Apply the residuals
+         !       sc%SC=sc%SCold+resSC
+
+         !       ! Apply boundary conditions
+         !       where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
+         !          sc%SC(:,:,:,iTl)=T_sat
+         !          sc%SC(:,:,:,iTg)=T_sat
+         !       end where
+         !       call sc%apply_bcond(timeSC%t,timeSC%dt)
+         !       call sc%get_bcond('xm',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i+1,j,k,iTl)
+         !       end do
+         !       call sc%get_bcond('xp',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i-1,j,k,iTl)
+         !       end do
+         !       call sc%get_bcond('ym',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j+1,k,iTl)
+         !       end do
+         !       call sc%get_bcond('yp',my_bc)
+         !       do n=1,my_bc%itr%no_
+         !          i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+         !          sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j-1,k,iTl)
+         !       end do
+         
+         !    end do
+
+         !    ! One-field temperature
+         !    T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+
+         ! end block advance_scalar
+
+
          ! ================== PHASE CHANGE ================== !
 
          advance_lgpc: block
@@ -1108,6 +1220,7 @@ contains
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                         lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                        ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
                      end if
                   end do
                end do
@@ -1223,7 +1336,7 @@ contains
          call mfile%write()
          call cflfile%write()
          call scfile%write()
-         call evpfile%write()
+         call lgfile%write()
          ! Debug
          call get_tlgrd()
          call tlgrd_file%write()

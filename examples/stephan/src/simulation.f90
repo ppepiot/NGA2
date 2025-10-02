@@ -115,34 +115,17 @@ contains
 
 
    subroutine get_interface()
-      use mpi_f08,   only: MPI_ALLREDUCE,MPI_MAX,MPI_SUM
-      use parallel,  only: MPI_REAL_WP
-      integer :: i,j,ierr
-      real(WP) :: my_x_itf,my_u_itf,vol,my_vol
+      use irl_fortran_interface, only: calculateCentroid
+      integer :: i,j,k
+      real(WP), dimension(3) :: posI
       ! Get the interface location
-      my_x_itf=0.0_WP
-      my_u_itf=0.0_WP
-      do i=vf%cfg%imin_,vf%cfg%imax_
-         if (vf%VF(i,1,1).gt.VFlo.and.vf%VF(i,1,1).lt.VFhi) then
-            my_x_itf=vf%cfg%xm(i)
-            exit
-         end if
-      end do
-      call MPI_ALLREDUCE(my_x_itf,x_itf,1,MPI_REAL_WP,MPI_MAX,vf%cfg%comm,ierr)
-      my_vol=0.0_WP
+      i=vf%band_map(1,1)
+      j=vf%band_map(2,1)
+      k=vf%band_map(3,1)
+      posI=calculateCentroid(vf%interface_polygon(1,i,j,k))
+      x_itf=posI(1)
       ! Get the interface velocity
-      do j=vf%cfg%jmin_,vf%cfg%jmax_
-         do i=vf%cfg%imin_,vf%cfg%imax_
-            if (vf%VF(i,j,1).gt.VFlo.and.vf%VF(i,j,1).lt.VFhi) then
-               my_vol=my_vol+fs%cfg%vol(i,j,1)
-               my_u_itf=my_u_itf+fs%cfg%vol(i,j,1)*fs%U(i+1,j,1)
-               exit
-            end if
-         end do
-      end do
-      call MPI_ALLREDUCE(my_u_itf,u_itf,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-      call MPI_ALLREDUCE(my_vol,vol,1,MPI_REAL_WP,MPI_SUM,fs%cfg%comm,ierr)
-      u_itf=u_itf/vol
+      u_itf=fs%U(i+1,j,k)
       ! Get the analytical solution
       x_itf_ext=2.0_WP*beta*sqrt(alpha_g*(time%t))
       u_itf_ext=beta*sqrt(alpha_g/(time%t))
@@ -334,6 +317,7 @@ contains
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
+         where (vf%VF.gt.0.0_WP) fs%U=beta*sqrt(alpha_g/(time%t))
          ! Apply boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Calculate cell-centered velocities and divergence
@@ -361,8 +345,8 @@ contains
          ! Initialize the linear solver
          ! ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ss=hypre_str(cfg=cfg,name='Scalar',method=pcg_smg,nst=7)
-         ! call param_read('Scalar iteration',ss%maxit)
-         ! call param_read('Scalar tolerance',ss%rcvg)
+         call param_read('Scalar iteration',ss%maxit)
+         call param_read('Scalar tolerance',ss%rcvg)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
          ! Initialize scalar fields
@@ -370,8 +354,7 @@ contains
             do j=sc%cfg%jmin_,sc%cfg%jmax_
                do k=sc%cfg%kmin_,sc%cfg%kmax_
                   if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_sat
-                  ! if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/x_itf*sc%cfg%xm(i)
+                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
                end do
             end do
          end do
@@ -681,7 +664,7 @@ contains
 
          ! end block advance_scalar
 
-         ! Backward Euler
+         ! Backward Euler for diffusion and CN for advection
          advance_scalar: block
             use tpscalar_class,  only: bcond
             type(bcond), pointer :: mybc
@@ -740,7 +723,7 @@ contains
                end do
 
                ! Form implicit residual
-               call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
+               call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old,w_adv=0.5_WP,w_dff=1.0_WP)
 
                ! Apply the residuals
                sc%SC=sc%SCold+resSC

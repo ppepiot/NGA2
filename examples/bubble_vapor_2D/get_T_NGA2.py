@@ -4,6 +4,8 @@ from paraview.simple import *
 
 desired_times = [0.5, 0.6, 0.7, 0.8]
 tolerance = 0.01
+# desired_times = [0.5039]
+# tolerance = 0.0000001
 res_path = '/Users/shayanhbi/Repositories/NGA2/examples/bubble_vapor_2D/temperature'
 if not os.path.exists(res_path):
     try:

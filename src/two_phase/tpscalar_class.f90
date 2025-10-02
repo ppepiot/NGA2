@@ -14,7 +14,7 @@ module tpscalar_class
    ! Expose type/constructor/methods
    public :: tpscalar,bcond
    
-   ! List of the phase IDs
+   ! List of the phase IDs (Following IRL convention)
    integer, parameter, public :: Lphase=0
    integer, parameter, public :: Gphase=1
 
@@ -726,8 +726,8 @@ contains
    ! end subroutine solve_implicit
 
 
-   !> Solve for implicit scalar residual (Backward Euler + Upwind advection)
-   subroutine solve_implicit(this,dt,resSC,U,V,W,divU)
+   !> Solve for implicit scalar residual (Upwind advection)
+   subroutine solve_implicit(this,dt,resSC,U,V,W,divU,w_adv,w_dff)
       implicit none
       class(tpscalar), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -736,6 +736,7 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: V     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: W     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:)   , intent(in)    :: divU  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), intent(in) :: w_adv,w_dff
       integer :: i,j,k,nsc,p
 
       ! Apply implicit treatment for each scalar
@@ -752,19 +753,19 @@ contains
             do j=this%cfg%jmin_,this%cfg%jmax_
                do i=this%cfg%imin_,this%cfg%imax_
                   if (this%PVF(i,j,k,p).ge.VFhi) then
-                     this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k) -dt* (this%div_x(+1,i,j,k)*(sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k)-0.5_WP*(U(i+1,j,k)+abs(U(i+1,j,k))))+&
-                     &                                                                                                             this%div_x( 0,i,j,k)*(sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k)-0.5_WP*(U(i  ,j,k)-abs(U(i  ,j,k))))+&
-                     &                                                                                                             this%div_y(+1,i,j,k)*(sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k)-0.5_WP*(V(i,j+1,k)+abs(V(i,j+1,k))))+&
-                     &                                                                                                             this%div_y( 0,i,j,k)*(sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k)-0.5_WP*(V(i,j  ,k)-abs(V(i,j  ,k))))+&
-                     &                                                                                                             this%div_z(+1,i,j,k)*(sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1)-0.5_WP*(U(i,j,k+1)+abs(U(i,j,k+1))))+&
-                     &                                                                                                             this%div_z( 0,i,j,k)*(sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  )-0.5_WP*(U(i,j,k  )-abs(U(i,j,k  ))))+&
-                     &                                                                                                             divU(i,j,k))
-                     this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)-dt*(this%div_x(+1,i,j,k)*(sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k)-0.5_WP*(U(i+1,j,k)-abs(U(i+1,j,k)))))
-                     this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)-dt*(this%div_x( 0,i,j,k)*(sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k)-0.5_WP*(U(i  ,j,k)+abs(U(i  ,j,k)))))
-                     this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)-dt*(this%div_y(+1,i,j,k)*(sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k)-0.5_WP*(U(i,j+1,k)-abs(U(i,j+1,k)))))
-                     this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)-dt*(this%div_y( 0,i,j,k)*(sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k)-0.5_WP*(U(i,j  ,k)+abs(U(i,j  ,k)))))
-                     this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)-dt*(this%div_z(+1,i,j,k)*(sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1)-0.5_WP*(U(i,j,k+1)-abs(U(i,j,k+1)))))
-                     this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)-dt*(this%div_z( 0,i,j,k)*(sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  )-0.5_WP*(U(i,j,k  )+abs(U(i,j,k  )))))
+                     this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,0),i,j,k) -dt* (this%div_x(+1,i,j,k)*(w_dff*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x(-1,i+1,j,k)-w_adv*0.5_WP*(U(i+1,j,k)+abs(U(i+1,j,k))))+&
+                     &                                                                                                             this%div_x( 0,i,j,k)*(w_dff*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x( 0,i  ,j,k)-w_adv*0.5_WP*(U(i  ,j,k)-abs(U(i  ,j,k))))+&
+                     &                                                                                                             this%div_y(+1,i,j,k)*(w_dff*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y(-1,i,j+1,k)-w_adv*0.5_WP*(V(i,j+1,k)+abs(V(i,j+1,k))))+&
+                     &                                                                                                             this%div_y( 0,i,j,k)*(w_dff*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y( 0,i,j  ,k)-w_adv*0.5_WP*(V(i,j  ,k)-abs(V(i,j  ,k))))+&
+                     &                                                                                                             this%div_z(+1,i,j,k)*(w_dff*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z(-1,i,j,k+1)-w_adv*0.5_WP*(U(i,j,k+1)+abs(U(i,j,k+1))))+&
+                     &                                                                                                             this%div_z( 0,i,j,k)*(w_dff*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z( 0,i,j,k  )-w_adv*0.5_WP*(U(i,j,k  )-abs(U(i,j,k  ))))+&
+                     &                                                                                                             w_adv*divU(i,j,k))
+                     this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(+1,0,0),i,j,k)-dt*(this%div_x(+1,i,j,k)*(w_dff*sum(this%itp_x(:,i+1,j,k)*this%diff(i  :i+1,j,k,nsc))*this%grd_x( 0,i+1,j,k)-w_adv*0.5_WP*(U(i+1,j,k)-abs(U(i+1,j,k)))))
+                     this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)=this%implicit%opr(this%implicit%stmap(-1,0,0),i,j,k)-dt*(this%div_x( 0,i,j,k)*(w_dff*sum(this%itp_x(:,i  ,j,k)*this%diff(i-1:i  ,j,k,nsc))*this%grd_x(-1,i  ,j,k)-w_adv*0.5_WP*(U(i  ,j,k)+abs(U(i  ,j,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,+1,0),i,j,k)-dt*(this%div_y(+1,i,j,k)*(w_dff*sum(this%itp_y(:,i,j+1,k)*this%diff(i,j  :j+1,k,nsc))*this%grd_y( 0,i,j+1,k)-w_adv*0.5_WP*(U(i,j+1,k)-abs(U(i,j+1,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)=this%implicit%opr(this%implicit%stmap(0,-1,0),i,j,k)-dt*(this%div_y( 0,i,j,k)*(w_dff*sum(this%itp_y(:,i,j  ,k)*this%diff(i,j-1:j  ,k,nsc))*this%grd_y(-1,i,j  ,k)-w_adv*0.5_WP*(U(i,j  ,k)+abs(U(i,j  ,k)))))
+                     this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,+1),i,j,k)-dt*(this%div_z(+1,i,j,k)*(w_dff*sum(this%itp_z(:,i,j,k+1)*this%diff(i,j,k  :k+1,nsc))*this%grd_z( 0,i,j,k+1)-w_adv*0.5_WP*(U(i,j,k+1)-abs(U(i,j,k+1)))))
+                     this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)=this%implicit%opr(this%implicit%stmap(0,0,-1),i,j,k)-dt*(this%div_z( 0,i,j,k)*(w_dff*sum(this%itp_z(:,i,j,k  )*this%diff(i,j,k-1:k  ,nsc))*this%grd_z(-1,i,j,k  )-w_adv*0.5_WP*(U(i,j,k  )+abs(U(i,j,k  )))))
                   end if
                end do
             end do

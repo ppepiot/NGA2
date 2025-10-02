@@ -35,11 +35,11 @@ beta = 0.69252756051719189
 cnst=2*beta**2*(rhog*(hlg+(Cpl-Cpg)*(Tinf-Tsat)))/(rhol*Cpl)
 
 desired_times = [0.5, 0.6, 0.7, 0.8]
+# desired_times = [0.5039]
 
-nx = 200
+nx = 500
 x  = np.linspace(0, 0.565, nx)
 for t_ind, t in enumerate(desired_times):
-    print(t)
     x_i = 2 * beta * np.sqrt(alphal * (t))
     T  = np.zeros(len(x))
     for i in range(len(x)):
