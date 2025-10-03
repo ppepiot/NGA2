@@ -1,7 +1,7 @@
 !> Various definitions and tools for running an NGA2 simulation
 module simulation
    use precision,         only: WP
-   use geometry,          only: cfg,Lz
+   use geometry,          only: cfg
    use hypre_str_class,   only: hypre_str
    use ddadi_class,       only: ddadi
    use tpns_class,        only: tpns
@@ -134,11 +134,44 @@ contains
    end function yp_locator
 
 
+   !> Function that localizes z- boundary
+   function zm_locator(pg,i,j,k) result(isIn)
+      use pgrid_class, only: pgrid
+      class(pgrid), intent(in) :: pg
+      integer, intent(in) :: i,j,k
+      logical :: isIn
+      isIn=.false.
+      if (k.eq.pg%kmin) isIn=.true.
+   end function zm_locator
+
+
+   !> Function that localizes z- boundary for scalar fields
+   function zm_locator_sc(pg,i,j,k) result(isIn)
+      use pgrid_class, only: pgrid
+      class(pgrid), intent(in) :: pg
+      integer, intent(in) :: i,j,k
+      logical :: isIn
+      isIn=.false.
+      if (k.eq.pg%kmin-1) isIn=.true.
+   end function zm_locator_sc
+   
+   
+   !> Function that localizes z+ boundary
+   function zp_locator(pg,i,j,k) result(isIn)
+      use pgrid_class, only: pgrid
+      class(pgrid), intent(in) :: pg
+      integer, intent(in) :: i,j,k
+      logical :: isIn
+      isIn=.false.
+      if (k.eq.pg%kmax+1) isIn=.true.
+   end function zp_locator
+
+
    subroutine apply_dirichlet()
       use tpns_class, only: bcond,dirichlet
       use mathtools,  only: Pi
       type(bcond), pointer :: my_bc
-      real(WP) :: Ub,Ux,Uy,vfr,myR
+      real(WP) :: Ub,Ux,Uy,Uz,vfr,myR
       integer  :: i,j,k,n,stag
       call cfg%integrate(lg%div_vel,vfr)
       my_bc=>fs%first_bc
@@ -151,31 +184,40 @@ contains
                do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
-                  Ub=vfr/(2.0_WP*myR*Pi*Lz)
+                  Ub=vfr/(4.0_WP*Pi*myR**2)
                   Ux=cfg%xm(i)/myR*Ub
                   Uy=cfg%ym(j)/myR*Ub
+                  Uz=cfg%zm(j)/myR*Ub
                   fs%U(i     ,j    ,k    )=Ux
                   fs%V(i+stag,j:j+1,k    )=Uy
-                  fs%W(i+stag,j    ,k:k+1)=0.0_WP
+                  fs%W(i+stag,j    ,k:k+1)=Uz
                end do
             case ('y')
                stag=min(my_bc%dir,0)
                do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
-                  Ub=vfr/(2.0_WP*myR*Pi*Lz)
+                  Ub=vfr/(4.0_WP*Pi*myR**2)
                   Ux=cfg%xm(i)/myR*Ub
                   Uy=cfg%ym(j)/myR*Ub
+                  Uz=cfg%zm(j)/myR*Ub
                   fs%U(i:i+1,j+stag,k    )=Ux
                   fs%V(i    ,j     ,k    )=Uy
-                  fs%W(i    ,j+stag,k:k+1)=0.0_WP
+                  fs%W(i    ,j+stag,k:k+1)=Uz
                end do
-            ! case ('z')
-            !    stag=min(my_bc%dir,0)
-            !    do n=1,my_bc%itr%n_
-            !       i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-            !       myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
-            !    end do
+            case ('z')
+               stag=min(my_bc%dir,0)
+               do n=1,my_bc%itr%n_
+                  i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                  myR=sqrt(cfg%xm(i)**2+cfg%ym(j)**2+cfg%zm(k)**2)
+                  Ub=vfr/(4.0_WP*Pi*myR**2)
+                  Ux=cfg%xm(i)/myR*Ub
+                  Uy=cfg%ym(j)/myR*Ub
+                  Uz=cfg%zm(j)/myR*Ub
+                  fs%U(i:i+1,j    ,k+stag)=Ux
+                  fs%V(i    ,j:j+1,k+stag)=Uy
+                  fs%W(i    ,j    ,k     )=Uz
+               end do
             end select
          end if
          my_bc=>my_bc%next
@@ -262,7 +304,7 @@ contains
       use mathtools, only: Pi
       real(WP) :: get_R
       call sc%cfg%integrate(sc%PVF(:,:,:,Gphase),V_b)
-      get_R=sqrt(V_b/(Pi*Lz))
+      get_R=(0.75_WP*V_b/Pi)**(1.0_WP/3.0_WP)
    end function get_R
 
 
@@ -411,6 +453,8 @@ contains
          call vf%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
          call vf%add_bcond(name='ym',type=neumann,locator=ym_locator_sc,dir='-y')
          call vf%add_bcond(name='yp',type=neumann,locator=yp_locator   ,dir='+y')
+         call vf%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
+         call vf%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Initialize the VOF field
          call param_read('Bubble center',center)
          R0=get_Rext(t0)
@@ -485,6 +529,8 @@ contains
          call fs%add_bcond(name='xp',type=dirichlet,face='x',dir=+1,canCorrect=.true.,locator=xp_locator)
          call fs%add_bcond(name='ym',type=dirichlet,face='y',dir=-1,canCorrect=.true.,locator=ym_locator)
          call fs%add_bcond(name='yp',type=dirichlet,face='y',dir=+1,canCorrect=.true.,locator=yp_locator)
+         call fs%add_bcond(name='zm',type=dirichlet,face='z',dir=-1,canCorrect=.true.,locator=zm_locator)
+         call fs%add_bcond(name='zp',type=dirichlet,face='z',dir=+1,canCorrect=.true.,locator=zp_locator)
          ! Configure pressure solver
          ps=hypre_str(cfg=cfg,name='Pressure',method=gmres_pfmg2,nst=7)
          call param_read('Pressure iteration',ps%maxit)
@@ -519,6 +565,8 @@ contains
          call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
          call sc%add_bcond(name='ym',type=dirichlet,locator=ym_locator_sc,dir='-y')
          call sc%add_bcond(name='yp',type=dirichlet,locator=yp_locator   ,dir='+y')
+         call sc%add_bcond(name='zm',type=dirichlet,locator=ym_locator_sc,dir='-z')
+         call sc%add_bcond(name='zp',type=dirichlet,locator=yp_locator   ,dir='+z')
          sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
          sc%phase =[Lphase,Gphase]
          sc%diff(:,:,:,iTl)=alpha_l
@@ -540,10 +588,10 @@ contains
                end do
             end do
          end do
-         radius=R0+0.001_WP
-         print*,'T = ',T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
-         print*,'T grad = ',((T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20))-T_sat)/0.001_WP
-         print*,'dx = ',cfg%dx(1)
+         ! radius=R0+0.001_WP
+         ! print*,'T = ',T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+         ! print*,'T grad = ',((T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20))-T_sat)/0.001_WP
+         ! print*,'dx = ',cfg%dx(1)
          ! Apply boundary conditions
          where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
             sc%SC(:,:,:,iTl)=T_sat
@@ -569,6 +617,16 @@ contains
          do n=1,my_bc%itr%no_
             i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
             sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j-1,k,iTl)
+         end do
+         call sc%get_bcond('zm',my_bc)
+         do n=1,my_bc%itr%no_
+            i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+            sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j,k+1,iTl)
+         end do
+         call sc%get_bcond('zp',my_bc)
+         do n=1,my_bc%itr%no_
+            i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+            sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j,k-1,iTl)
          end do
          ! Initialize the phasic density and VOF
          sc%Prho(Lphase)=fs%rho_l
@@ -642,7 +700,7 @@ contains
       create_ensight: block
          integer :: nsc
          ! Create Ensight output from cfg
-         ens_out=ensight(cfg=cfg,name='bubble_vapor_2D')
+         ens_out=ensight(cfg=cfg,name='bubble_vapor_3D')
          ! Create event for Ensight output
          ens_evt=event(time=time,name='Ensight output')
          call param_read('Ensight output period',ens_evt%tper)
@@ -996,6 +1054,16 @@ contains
                do n=1,my_bc%itr%no_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j-1,k,iTl)
+               end do
+               call sc%get_bcond('zm',my_bc)
+               do n=1,my_bc%itr%no_
+                  i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                  sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j,k+1,iTl)
+               end do
+               call sc%get_bcond('zp',my_bc)
+               do n=1,my_bc%itr%no_
+                  i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                  sc%SC(i,j,k,iTl)=2.0_WP*T_inf-sc%SC(i,j,k-1,iTl)
                end do
          
             end do
