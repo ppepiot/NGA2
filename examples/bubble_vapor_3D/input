@@ -4,8 +4,8 @@ Partition : 2 2 2
 # Mesh definition
 L  : 1.13
 n  : 256 ! 128
-# Lu : 0.004
-# nu : 350
+# Lu : 0.4
+# nu : 100
 # r  : 1.01
 
 # Case parameters
@@ -33,7 +33,7 @@ Max cfl number        : 0.9
 Sub-iterations        : 2
 Scalar time step      : 3.8e-3 ! 1.1e-2
 Scalar sub-iterations : 2
-Max time              : 0.6
+Max time              : 0.5
 
 # Evaporation
 Max pseudo timestep size : 4e-3 ! 9e-3
@@ -51,4 +51,7 @@ Scalar tolerance    : 1e-7
 Scalar iteration    : 50
 
 # Ensight output
-Ensight output period : 0.01
+Ensight output period : 0.1
+
+# Temperature file output
+Temperature file output period : 0.1

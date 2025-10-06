@@ -96,6 +96,7 @@ module pgrid_class
       procedure :: get_ijk_local                                                !< Function that returns closest mesh indices to a provided position - local to processor subdomain
       procedure :: get_ijk_global                                               !< Function that returns closest mesh indices to a provided position - global over full pgrid
       procedure :: get_ijk_from_lexico,get_lexico_from_ijk                      !< Functions that convert a lexicographic index to (i,j,k) and vice-versa
+      procedure :: is_in_subdomain                                              !< Function that tells if a point is insied the MPI subdomain
       procedure :: finalize=>pgrid_finalize                                     !< Finalize pgrid object
    end type pgrid
    
@@ -1259,6 +1260,23 @@ contains
    end function get_lexico_from_ijk
    
    
+   !> Function that checks if an input point is inside the local domain
+   function is_in_subdomain(this,pos)
+      implicit none
+      class(pgrid), intent(in) :: this
+      real(WP), dimension(3), intent(in) :: pos
+      logical :: is_in_subdomain
+      is_in_subdomain=.false.
+      if ((pos(3).ge.this%z(this%kmin_)).and.(pos(3).lt.this%z(this%kmax_+1))) then
+         if ((pos(2).ge.this%y(this%jmin_)).and.(pos(2).lt.this%y(this%jmax_+1))) then
+            if ((pos(1).ge.this%x(this%imin_)).and.(pos(1).lt.this%x(this%imax_+1))) then
+               is_in_subdomain=.true.
+            end if
+         end if
+      end if
+   end function is_in_subdomain
+
+
    !> Finalize pgrid object
    subroutine pgrid_finalize(this)
       implicit none

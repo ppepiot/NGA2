@@ -29,7 +29,7 @@ module simulation
    !> Ensight postprocessing
    type(surfmesh) :: smesh
    type(ensight)  :: ens_out
-   type(event)    :: ens_evt
+   type(event)    :: ens_evt,T_evt
    
    !> Simulation monitor file
    type(monitor) :: mfile,cflfile,scfile,lgfile
@@ -337,6 +337,126 @@ contains
    end subroutine get_tlgrd
 
    
+   !> Calculate the asimuthally averaged liquid temperature and print it along with the analytical values
+   subroutine get_Tl()
+      use messager, only: die
+      use mathtools, only: Pi
+      use string,    only: str_medium
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM,MPI_INT
+      use parallel,  only: MPI_REAL_WP
+      type(monitor) :: Tlfile
+      real(WP) :: theta_s,theta_e,dtheta,theta
+      real(WP) :: nx,ny
+      real(WP) :: l,dR,R_e,x,y,z,vof,rad_num,rad_ext,Tl_num,Tl_ext
+      real(WP), dimension(:), allocatable :: r_num,r_extt,T_l,T_l_avg
+      integer  :: ntheta,itheta,nT_num,nT_ext,ind(3),i,j,k,T_ind,ierr
+      character(len=str_medium) :: tstr
+      integer :: found_local,found_global
+      ! Create the monitors
+      write(tstr,'(F6.3)') time%t
+      Tlfile=monitor(fs%cfg%amRoot,'Tl_'//trim(adjustl(tstr)))
+      call Tlfile%add_column(rad_num,'r_num')
+      call Tlfile%add_column(Tl_num,'Tl_num')
+      call Tlfile%add_column(rad_ext,'r_ext')
+      call Tlfile%add_column(Tl_ext,'Tl_ext')
+      ! Initialize
+      theta_s=0.0_WP
+      theta_e=2.0_WP*Pi
+      ntheta=20
+      dtheta=(theta_e-theta_s)/real(ntheta-1,WP)
+      R_e=0.45_WP
+      dR=cfg%dx(1)
+      ! Create the radial grid
+      nT_num=int((R_e-R)/dR)+1
+      nT_ext=int((R_e-R_ext)/dR)+1
+      allocate(r_num(nT_num))
+      allocate(r_extt(nT_ext))
+      allocate(T_l(nT_num)); T_l=0.0_WP
+      allocate(T_l_avg(nT_num)); T_l_avg=0.0_WP
+      r_num(1)=R
+      do T_ind=2,nT_num
+         r_num(T_ind)=r_num(T_ind-1)+dR
+      end do
+      r_extt(1)=R_ext
+      do T_ind=2,nT_ext
+         r_extt(T_ind)=r_extt(T_ind-1)+dR
+      end do
+      ! Loop over lines
+      do itheta=1,ntheta
+         ! Reset the flags
+         found_local =0
+         found_global=0
+         ! Advance theta
+         theta=theta_s+real(itheta-1,WP)*dtheta
+         ! Get the normal vector
+         nx=cos(theta)
+         ny=sin(theta)
+         ! Initilize the line marcher
+         l=0.0_WP
+         vof=0.0_WP
+         i=(cfg%imax_+cfg%imin_)/2
+         j=(cfg%jmax_+cfg%jmin_)/2
+         k=(cfg%kmax_+cfg%kmin_)/2
+         ! March the line until hit interfacial cell
+         do while (found_global.eq.0)
+            ! Advance the line segment
+            l=l+dR
+            x=l*nx
+            y=l*ny
+            z=0.0_WP
+            if (cfg%is_in_subdomain([x,y,z])) then
+               ! Get the corresponding indices of the cell containing the line segment point
+               ind=cfg%get_ijk_local(pos=[x,y,z],ind_guess=[i,j,k])
+               i=ind(1)
+               j=ind(2)
+               k=ind(3)
+               ! Get the VOF
+               vof=vf%VF(i,j,k)
+            else
+               vof=0.0_WP
+            end if
+            if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) found_local=1
+            ! Check if any process has found it
+            call MPI_ALLREDUCE(found_local,found_global,1,MPI_INT,MPI_SUM,cfg%comm,ierr)
+         end do
+         if (found_global.eq.0) then
+            if (cfg%amRoot) print*,'Warning: Line marcher could not find any interfacial cell'
+            cycle
+         end if
+         ! Get the first temperature exactly at the interface
+         if (found_local.eq.1) T_l(1)=T_l(1)+sc%SC(i,j,k,iTl)
+         ! March the line from the interface to the end of the line
+         do T_ind=2,nT_num
+            ! Get the point coordinates
+            x=r_num(T_ind)*nx
+            y=r_num(T_ind)*ny
+            z=0.0_WP
+            if (cfg%is_in_subdomain([x,y,z])) then
+               ! Get the corresponding indices of the cell containing the line segment point
+               ind=cfg%get_ijk_local(pos=[x,y,z],ind_guess=[i,j,k])
+               i=ind(1)
+               j=ind(2)
+               k=ind(3)
+               ! Get temperature
+               T_l(T_ind)=T_l(T_ind)+cfg%get_scalar([x,y,z],i,j,k,sc%SC(:,:,:,iTl),'N')
+            end if
+         end do
+      end do
+      ! Calculate the mean temperature
+      call MPI_ALLREDUCE(T_l,T_l_avg,nT_num,MPI_REAL_WP,MPI_SUM,cfg%comm,ierr)
+      T_l_avg=T_l_avg/real(ntheta,WP)
+      do T_ind=1,min(nT_num,nT_ext)
+         rad_num=r_num(T_ind)
+         Tl_num=T_l_avg(T_ind)
+         rad_ext=r_extt(T_ind)
+         Tl_ext=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R_ext/rad_ext,1.0_WP,20)
+         call Tlfile%write()
+      end do
+      ! Deallocate the arrays
+      deallocate(r_num,T_l,T_l_avg)
+   end subroutine get_Tl
+
+
    !> Initialization of problem solver
    subroutine simulation_init
       use param, only: param_read
@@ -724,6 +844,9 @@ contains
          call ens_out%add_scalar('Tg_grd',lg%Tg_grd)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
+         ! Create an event for temperature output
+         T_evt=event(time=time,name='Temperature output')
+         call param_read('Temperature file output period',T_evt%tper)
       end block create_ensight
       
       
@@ -807,6 +930,9 @@ contains
          call lgfile%add_column(lg%mdot3pG_err,'max mdot3pG err')
          call lgfile%write()
       end block create_monitor
+
+      ! Output temperature profile
+      call get_Tl()
       
       
    end subroutine simulation_init
@@ -1389,6 +1515,9 @@ contains
          ! Update bubble radius
          R=get_R()
          R_ext=get_Rext(time%t)
+
+         ! Temperature profile
+         if (T_evt%occurs()) call get_Tl()
 
          ! Perform and output monitoring
          call fs%get_max()
