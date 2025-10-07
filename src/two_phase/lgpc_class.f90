@@ -101,6 +101,8 @@ module lgpc_class
       procedure :: get_bcond                                             !< Get a boundary condition
       procedure :: apply_bcond                                           !< Apply all boundary conditions
       procedure :: get_temperature_grad                                  !< Get the temperature gradient
+      procedure :: get_one_sided_grad                                    !<
+      procedure :: itp_ccplane                                           !<
       procedure :: filter                                                !< Conservatively volume filter a filed that is defined at the interface
       procedure :: filterG                                               !< Conservatively volume filter a filed that is defined in the gas
       procedure :: filterL                                               !< Conservatively volume filter a filed that is defined in the liquid
@@ -118,7 +120,7 @@ contains
       class(lgpc), intent(inout) :: this
       class(config), target, intent(in) :: cfg
       class(vfs), target, intent(in) :: vf
-      real(WP), target, dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:,1:), intent(in) :: SC
+      real(WP), target, dimension(cfg%imino_:,cfg%jmino_:,cfg%kmino_:,1:), intent(in) :: SC
       integer, intent(in) :: iTl,iTg
       real(WP), target, dimension(-1: 0,cfg%imino_+1:cfg%imaxo_,cfg%jmino_  :cfg%jmaxo_,cfg%kmino_  :cfg%kmaxo_), intent(in) :: itp_x
       real(WP), target, dimension(-1: 0,cfg%imino_  :cfg%imaxo_,cfg%jmino_+1:cfg%jmaxo_,cfg%kmino_  :cfg%kmaxo_), intent(in) :: itp_y
@@ -142,30 +144,30 @@ contains
       this%vf=>vf
 
       ! Allocate variables
-      allocate(this%mdot2p     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%mdot2p      =0.0_WP
-      allocate(this%mdot3p      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));              this%mdot3p      =0.0_WP
-      allocate(this%mdot3pLG    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase));this%mdot3pLG    =0.0_WP
-      allocate(this%mdot3pLG_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase));this%mdot3pLG_old=0.0_WP
-      allocate(this%div_vel    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%div_vel     =0.0_WP
-      allocate(this%div_vel_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%div_vel_old =0.0_WP
-      allocate(this%normal     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));           this%normal      =0.0_WP
-      allocate(this%pseudo_vel (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));           this%pseudo_vel  =0.0_WP
-      allocate(this%Tl_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%Tl_grd      =0.0_WP
-      allocate(this%Tg_grd     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%Tg_grd      =0.0_WP
+      allocate(this%mdot2p      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%mdot2p      =0.0_WP
+      allocate(this%mdot3p      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%mdot3p      =0.0_WP
+      allocate(this%mdot3pLG    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase)); this%mdot3pLG    =0.0_WP
+      allocate(this%mdot3pLG_old(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,Lphase:Gphase)); this%mdot3pLG_old=0.0_WP
+      allocate(this%div_vel     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%div_vel     =0.0_WP
+      allocate(this%div_vel_old (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%div_vel_old =0.0_WP
+      allocate(this%normal      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));           this%normal      =0.0_WP
+      allocate(this%pseudo_vel  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:3));           this%pseudo_vel  =0.0_WP
+      allocate(this%Tl_grd      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%Tl_grd      =0.0_WP
+      allocate(this%Tg_grd      (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_));               this%Tg_grd      =0.0_WP
       allocate(this%itp(3))
       allocate(this%div(3))
 
       ! Point to the temperature fields
-      this%Tl=>SC(:,:,:,iTl)
-      this%Tg=>SC(:,:,:,iTg)
+      this%Tl(cfg%imino_:,cfg%jmino_:,cfg%kmino_:)=>SC(:,:,:,iTl)
+      this%Tg(cfg%imino_:,cfg%jmino_:,cfg%kmino_:)=>SC(:,:,:,iTg)
 
       ! Set metrics
-      this%itp(1)%arr=>itp_x
-      this%itp(2)%arr=>itp_y
-      this%itp(3)%arr=>itp_z
-      this%div(1)%arr=>div_x
-      this%div(2)%arr=>div_y
-      this%div(3)%arr=>div_z
+      this%itp(1)%arr(-1:,this%cfg%imino_+1:,this%cfg%jmino_  :,this%cfg%kmino_  :)=>itp_x
+      this%itp(2)%arr(-1:,this%cfg%imino_  :,this%cfg%jmino_+1:,this%cfg%kmino_  :)=>itp_y
+      this%itp(3)%arr(-1:,this%cfg%imino_  :,this%cfg%jmino_  :,this%cfg%kmino_+1:)=>itp_z
+      this%div(1)%arr( 0:,this%cfg%imino_  :,this%cfg%jmino_  :,this%cfg%kmino_  :)=>div_x
+      this%div(2)%arr( 0:,this%cfg%imino_  :,this%cfg%jmino_  :,this%cfg%kmino_  :)=>div_y
+      this%div(3)%arr( 0:,this%cfg%imino_  :,this%cfg%jmino_  :,this%cfg%kmino_  :)=>div_z
 
       ! Number of cells in each direction
       this%nCell(1)=this%cfg%nx
@@ -310,7 +312,7 @@ contains
    subroutine get_mdot3p(this)
       implicit none
       class(lgpc), intent(inout) :: this
-      ! call this%filter(F=this%mdot2p,lvl=2,stc=3)
+      call this%filter(F=this%mdot2p,lvl=2,stc=3)
       this%mdot3p=this%mdot2p*this%vf%SD
       ! call this%filter(F=this%mdot3p,lvl=2,stc=3)
    end subroutine get_mdot3p
@@ -367,7 +369,7 @@ contains
             j=this%vf%band_map(2,index)
             k=this%vf%band_map(3,index)
             ! Get the residual
-            dmdot3pdt(i,j,k)=dmdot3pdt(i,j,k)                                                                            &
+            dmdot3pdt(i,j,k)=dmdot3pdt(i,j,k)                                                                          &
             &              +this%div(dir)%arr(0,i,j,k)*F(i,j,k,dir)                                                    &
             &              +this%div(dir)%arr(1,i,j,k)*F(i+ind_shift(1,dir),j+ind_shift(2,dir),k+ind_shift(3,dir),dir)
          end do
@@ -522,6 +524,9 @@ contains
       ! Get the interface normal
       call this%get_normal()
 
+      ! Apply boundary conditions
+      call this%apply_bcond()
+
       ! Loop over the interfacial cells
       do index=1,this%vf%band_count(0)
          ! Get the interfacial cell indices
@@ -578,6 +583,7 @@ contains
 
    !> Get the gradient of a scalar field
    subroutine get_grad(this,phase,A,A_grd)
+      use irl_fortran_interface, only: calculateCentroid
       implicit none
       class(lgpc), intent(in) :: this
       integer, intent(in) :: phase
@@ -586,6 +592,8 @@ contains
       integer :: index,index_pure,i,j,k
       real(WP) :: grdX,grdY,grdZ
       real(WP) :: grdm,grdp
+      real(WP) :: Am,Ap,lm,lp,vof
+      real(WP), dimension(3) :: posI
       ! Initialize with zeros
       A_grd=0.0_WP
       ! Loop over the pure cells within the stencil
@@ -598,9 +606,72 @@ contains
          k=this%vf%band_map(3,index_pure)
          ! Calculate the Gauss gradient
          if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
+            ! ! X grad
+            ! vof=this%vf%VF(i-1,j,k)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+            !    lm=0.5_WP*this%cfg%dx(i)
+            !    ! lp=this%cfg%dx(i-1)*abs(real(phase,WP)-vof)
+            !    lp=abs(this%cfg%x(i)-posI(1))
+            !    Am=(lm*A(i-1,j,k)+lp*A(i,j,k))/(lm+lp)
+            ! else
+            !    Am=this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k)
+            ! end if
+            ! vof=this%vf%VF(i+1,j,k)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    ! lm=this%cfg%dx(i+1)*abs(real(phase,WP)-vof)
+            !    lm=abs(posI(1)-this%cfg%x(i+1))
+            !    lp=0.5_WP*this%cfg%dx(i)
+            !    Ap=(lm*A(i,j,k)+lp*A(i+1,j,k))/(lm+lp)
+            ! else
+            !    Ap=this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)
+            ! end if
+            ! grdX=this%div(1)%arr(0,i,j,k)*Am+this%div(1)%arr(1,i,j,k)*Ap
+            ! ! Y grad
+            ! vof=this%vf%VF(i,j-1,k)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    lm=0.5_WP*this%cfg%dy(j)
+            !    ! lp=this%cfg%dy(j-1)*abs(real(phase,WP)-vof)
+            !    lp=abs(this%cfg%y(j)-posI(2))
+            !    Am=(lm*A(i,j-1,k)+lp*A(i,j,k))/(lm+lp)
+            ! else
+            !    Am=this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k)
+            ! end if
+            ! vof=this%vf%VF(i,j+1,k)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    ! lm=this%cfg%dy(j+1)*abs(real(phase,WP)-vof)
+            !    lm=abs(posI(2)-this%cfg%y(j+1))
+            !    lp=0.5_WP*this%cfg%dy(j)
+            !    Ap=(lm*A(i,j,k)+lp*A(i,j+1,k))/(lm+lp)
+            ! else
+            !    Ap=this%itp(2)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)
+            ! end if
+            ! grdY=this%div(2)%arr(0,i,j,k)*Am+this%div(2)%arr(1,i,j,k)*Ap
+            ! ! Z grad
+            ! vof=this%vf%VF(i,j,k-1)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    lm=0.5_WP*this%cfg%dz(k)
+            !    ! lp=this%cfg%dz(k-1)*abs(real(phase,WP)-vof)
+            !    lp=abs(this%cfg%z(k)-posI(3))
+            !    Am=(lm*A(i,j,k-1)+lp*A(i,j,k))/(lm+lp)
+            ! else
+            !    Am=this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k)
+            ! end if
+            ! vof=this%vf%VF(i,j,k+1)
+            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+            !    ! lm=this%cfg%dz(k+1)*abs(real(phase,WP)-vof)
+            !    lm=abs(posI(3)-this%cfg%z(k+1))
+            !    lp=0.5_WP*this%cfg%dz(k)
+            !    Ap=(lm*A(i,j,k)+lp*A(i,j,k+1))/(lm+lp)
+            ! else
+            !    Ap=this%itp(3)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)
+            ! end if
+            ! grdZ=this%div(3)%arr(0,i,j,k)*Am+this%div(3)%arr(1,i,j,k)*Ap
+
             A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
             &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
             &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
+
             ! grdm=this%cfg%dxmi(i  )*(A(i  ,j,k)-A(i-1,j,k))
             ! grdp=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i  ,j,k))
             ! grdX=minmod(grdm,grdp)
@@ -610,6 +681,7 @@ contains
             ! grdm=this%cfg%dzmi(k  )*(A(i,j,k  )-A(i,j,k-1))
             ! grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
             ! grdZ=minmod(grdm,grdp)
+
             ! A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
          end if
       end do
@@ -645,173 +717,8 @@ contains
    end subroutine get_div
 
 
-   !> Add a boundary condition
-   subroutine add_bcond(this,name,type,locator,face,dir)
-      use string,         only: lowercase
-      use messager,       only: die
-      use iterator_class, only: locator_ftype
-      implicit none
-      class(lgpc), intent(inout) :: this
-      character(len=*), intent(in) :: name
-      integer,  intent(in) :: type
-      procedure(locator_ftype) :: locator
-      character(len=1), intent(in) :: face
-      integer, intent(in) :: dir
-      type(bcond), pointer :: new_bc
-      integer :: i,j,k,n
-      
-      ! Prepare new bcond
-      allocate(new_bc)
-      new_bc%name=trim(adjustl(name))
-      new_bc%type=type
-      select case (new_bc%type)
-         case (symmetry)
-         case default
-            call die('[lgpc add_bcond] Unknown bcond type')
-      end select
-      select case (lowercase(face))
-         case ('x'); new_bc%face='x'
-         case ('y'); new_bc%face='y'
-         case ('z'); new_bc%face='z'
-         case default; call die('[lgpc add_bcond] Unknown bcond face - expecting x, y, or z')
-      end select
-      select case (dir) ! Outward-oriented
-         case (+1); new_bc%dir=+1
-         case (-1); new_bc%dir=-1
-         case ( 0); new_bc%dir= 0
-         case default; call die('[lgpc add_bcond] Unknown bcond dir - expecting -1, +1, or 0')
-      end select
-      new_bc%itr=iterator(this%cfg,new_bc%name,locator,'c')
-      
-      ! Insert it up front
-      new_bc%next=>this%first_bc
-      this%first_bc=>new_bc
-      
-      ! Increment bcond counter
-      this%nbc=this%nbc+1
-   
-   end subroutine add_bcond
-   
-   
-   !> Get a boundary condition
-   subroutine get_bcond(this,name,my_bc)
-      use messager, only: die
-      implicit none
-      class(lgpc), intent(inout) :: this
-      character(len=*), intent(in) :: name
-      type(bcond), pointer, intent(out) :: my_bc
-      my_bc=>this%first_bc
-      search: do while (associated(my_bc))
-         if (trim(my_bc%name).eq.trim(name)) exit search
-         my_bc=>my_bc%next
-      end do search
-      if (.not.associated(my_bc)) call die('[lgpc get_bcond] Boundary condition was not found')
-   end subroutine get_bcond
-   
-   
-   !> Enforce boundary conditions
-   subroutine apply_bcond(this)
-      use messager, only: die
-      use mpi_f08,  only: MPI_MAX
-      use parallel, only: MPI_REAL_WP
-      implicit none
-      class(lgpc), intent(inout) :: this
-      integer :: i,j,k,dir,n
-      integer :: ii,jj,kk
-      integer :: i_out,j_out,k_out
-      integer :: i_in,j_in,k_in
-      type(bcond), pointer :: my_bc
-      
-      ! Traverse bcond list
-      my_bc=>this%first_bc
-      do while (associated(my_bc))
-         
-         ! Only processes inside the bcond work here
-         if (my_bc%itr%amIn) then
-            
-            ! Select appropriate action based on the bcond type
-            select case (my_bc%type)
-               
-               case (symmetry)             ! Apply symmetry conditions
-                  
-                  select case (my_bc%face)
-                     case ('x')
-                        do n=1,my_bc%itr%n_
-                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           do ii=1,extp_stc
-                              i_out=i+my_bc%dir*(ii-1)
-                              i_in =i-my_bc%dir*ii
-                              this%vf%VF  (i_out,j,k)        = this%vf%VF  (i_in,j,k)
-                              this%normal (i_out,j,k,1)      =-this%normal (i_in,j,k,1)
-                              this%normal (i_out,j,k,2)      = this%normal (i_in,j,k,2)
-                              this%normal (i_out,j,k,3)      = this%normal (i_in,j,k,3)
-                              this%mdot3pLG(i_out,j,k,Lphase)= this%mdot3pLG(i_in,j,k,Lphase)
-                              this%mdot3pLG(i_out,j,k,Gphase)= this%mdot3pLG(i_in,j,k,Gphase)
-                              this%Tl     (i_out,j,k)        = this%Tl     (i_in,j,k)
-                              this%Tg     (i_out,j,k)        = this%Tg     (i_in,j,k)
-                           end do
-                        end do
-                     case ('y')
-                        do n=1,my_bc%itr%n_
-                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           do jj=1,extp_stc
-                              j_out=j+my_bc%dir*(jj-1)
-                              j_in =j-my_bc%dir*jj
-                              this%vf%VF  (i,j_out,k)        = this%vf%VF  (i,j_in,k)
-                              this%normal (i,j_out,k,1)      = this%normal (i,j_in,k,1)
-                              this%normal (i,j_out,k,2)      =-this%normal (i,j_in,k,2)
-                              this%normal (i,j_out,k,3)      = this%normal (i,j_in,k,3)
-                              this%mdot3pLG(i,j_out,k,Lphase)= this%mdot3pLG(i,j_in,k,Lphase)
-                              this%mdot3pLG(i,j_out,k,Gphase)= this%mdot3pLG(i,j_in,k,Gphase)
-                              this%Tl     (i,j_out,k)        = this%Tl     (i,j_in,k)
-                              this%Tg     (i,j_out,k)        = this%Tg     (i,j_in,k)
-                           end do
-                        end do
-                     case ('z')
-                        do n=1,my_bc%itr%n_
-                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
-                           do kk=1,extp_stc
-                              k_out=k+my_bc%dir*(kk-1)
-                              k_in =k-my_bc%dir*kk
-                              this%vf%VF  (i,j,k_out)        = this%vf%VF  (i,j,k_in)
-                              this%normal (i,j,k_out,1)      = this%normal (i,j,k_in,1)
-                              this%normal (i,j,k_out,2)      = this%normal (i,j,k_in,2)
-                              this%normal (i,j,k_out,3)      =-this%normal (i,j,k_in,3)
-                              this%mdot3pLG(i,j,k_out,Lphase)= this%mdot3pLG(i,j,k_in,Lphase)
-                              this%mdot3pLG(i,j,k_out,Gphase)= this%mdot3pLG(i,j,k_in,Gphase)
-                              this%Tl     (i,j,k_out)        = this%Tl     (i,j,k_in)
-                              this%Tg     (i,j,k_out)        = this%Tg     (i,j,k_in)
-                           end do
-                        end do
-                  end select
-                  
-               case default
-                  call die('[lgpc apply_bcond] Unknown bcond type')
-            end select
-            
-         end if
-         
-         ! Move on to the next bcond
-         my_bc=>my_bc%next
-         
-      end do
-      
-      ! Sync full fields after all bcond
-      call this%cfg%sync(this%vf%VF)
-      do dir=1,3
-         call this%cfg%sync(this%normal(:,:,:,dir))
-      end do
-      call this%cfg%sync(this%mdot3pLG(:,:,:,Lphase))
-      call this%cfg%sync(this%mdot3pLG(:,:,:,Gphase))
-      call this%cfg%sync(this%Tl)
-      call this%cfg%sync(this%Tg)
-      
-   end subroutine apply_bcond
-
-
-   !> Calculate temperature gradients on the liquid and gas sides
+   !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
    subroutine get_temperature_grad(this)
-      use messager, only: die
       use mpi_f08,  only: MPI_MAX
       use parallel, only: MPI_REAL_WP
       implicit none
@@ -825,6 +732,175 @@ contains
       call this%pure_interfacial_extp(Lphase,this%Tl_grd)
       call this%pure_interfacial_extp(Gphase,this%Tg_grd)
    end subroutine get_temperature_grad
+
+
+   ! !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   ! !> Assumes 2D in z direction
+   ! subroutine get_temperature_grad(this)
+   !    use irl_fortran_interface, only: calculateCentroid
+   !    implicit none
+   !    class(lgpc), intent(inout) :: this
+   !    real(WP), dimension(3) :: posI
+   !    integer  :: i,j,k,index
+   !    ! Get the interface normal
+   !    call this%get_normal()
+   !    ! Apply boundary conditions
+   !    call this%apply_bcond()
+   !    ! Zero out the gradients
+   !    this%Tl_grd=0.0_WP
+   !    this%Tg_grd=0.0_WP
+   !    ! Loop over the interfacial cells
+   !    do index=1,this%vf%band_count(0)
+   !       ! Get the interfacial cell indices
+   !       i=this%vf%band_map(1,index)
+   !       j=this%vf%band_map(2,index)
+   !       k=this%vf%band_map(3,index)
+   !       ! Get the interface center
+   !       posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+   !       ! Get the liquid side gradient
+   !       call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=this%normal(i,j,k,:),Fgrd=this%Tl_grd(i,j,k))
+   !       ! Get the gas side gradient
+   !       call this%get_one_sided_grad(phase=Gphase,F=this%TG,posI=posI,i=i,j=j,k=k,normal=this%normal(i,j,k,:),Fgrd=this%Tg_grd(i,j,k))
+   !    end do
+   ! end subroutine get_temperature_grad
+
+
+   !> Interpolates the input scalar field (F) at the intersection between the input line (defined by a point and a normal vector)
+   !> and the closest plane that goes through the cell centers of the grid
+   subroutine itp_ccplane(this,F,x0,y0,i,j,k,nx,ny,Fitp,xitp,yitp)
+      implicit none
+      class(lgpc), intent(in) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: F
+      real(WP), intent(in)  :: x0,y0
+      integer,  intent(in)  :: i,j,k
+      real(WP), intent(inout)  :: nx,ny
+      real(WP), intent(out) :: Fitp
+      real(WP), optional, intent(out) :: xitp,yitp
+      real(WP) :: dx,dy
+      real(WP) :: Sx,Sy
+      real(WP) :: w_m,w_p,wsum
+      integer  :: ip,jp
+      ! Get the distances to the coordinate aligned planes
+      if (abs(nx).lt.1e-6) then
+         nx=0.0_WP
+         Sx=0.0_WP
+         ip=i+Sx
+         dx=huge(1.0_WP)
+      else
+         Sx=sign(1.0_WP,nx)
+         ip=i+Sx
+         dx=(this%cfg%xm(ip)-x0)/nx
+      end if
+      if (abs(ny).lt.1e-6) then
+         ny=0.0_WP
+         Sy=0.0_WP
+         jp=j+Sy
+         dy=huge(1.0_WP)
+      else
+         Sy=sign(1.0_WP,ny)
+         jp=j+Sy
+         dy=(this%cfg%ym(jp)-y0)/ny
+      end if
+      ! Identify the closest plane
+      if (abs(dx).lt.abs(dy)) then
+         ! Interpolate at the intersection between the interface normal and the x plane
+         if (ny.eq.0.0_WP) then
+            xitp=this%cfg%xm(ip)
+            yitp=y0
+            Fitp=F(ip,j,k)
+         else
+            xitp=this%cfg%xm(ip)
+            yitp=ny/nx*(xitp-x0)+y0
+            w_m=abs(this%cfg%ym(jp)-yitp)
+            w_p=abs(this%cfg%ym(j )-yitp)
+            wsum=w_p+w_m
+            w_p=w_p/(wsum)
+            w_m=w_m/(wsum)
+            Fitp=w_p*F(ip,jp,k)+w_m*F(ip,j,k)
+         end if
+      else
+         ! Interpolate at the intersection between the interface normal and the y plane
+         if (nx.eq.0.0_WP) then
+            yitp=this%cfg%ym(jp)
+            xitp=x0
+            Fitp=F(i,jp,k)
+         else
+            ! Interpolate at the intersection
+            yitp=this%cfg%ym(jp)
+            xitp=nx/ny*(yitp-y0)+x0
+            w_m=abs(this%cfg%xm(ip)-xitp)
+            w_p=abs(this%cfg%xm(i )-xitp)
+            wsum=w_p+w_m
+            w_p=w_p/(wsum)
+            w_m=w_m/(wsum)
+            Fitp=w_p*F(ip,jp,k)+w_m*F(i,jp,k)
+         end if
+      end if
+   end subroutine itp_ccplane
+
+
+   subroutine get_one_sided_grad(this,phase,F,posI,i,j,k,normal,Fgrd)
+      use messager, only: die
+      implicit none
+      class(lgpc), intent(in) :: this
+      integer, intent(in) :: phase
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: F
+      real(WP), dimension(3), intent(in) :: posI
+      integer, intent(in) :: i,j,k
+      real(WP), dimension(3), intent(in) :: normal
+      real(WP), intent(out) :: Fgrd
+      integer, dimension(3) :: ind
+      real(WP) :: nx,ny,FI,F1,F2,mult,p
+      real(WP) :: x1,y1,x2,y2,d1,d2,vof
+      ! Get the phase multiplier (Follows IRL convention)
+      p=real(phase,WP)     ! ( 0 for liquid, 1 for gas)
+      mult=2.0_WP*p-1.0_WP ! (-1 for liquid, 1 for gas)
+      ! Adjust the normal vecor
+      nx=mult*normal(1)
+      ny=mult*normal(2)
+      ! Interpolate at the first plane
+      x1=posI(1)
+      y1=posI(2)
+      vof=this%vf%VF(i,j,k)
+      ind=[i,j,k]
+      ! Get the cell indices containing the interpolated point (skip the interfacial cells)
+      do while ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP))
+         call this%itp_ccplane(F=F,x0=x1,y0=y1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,Fitp=F1,xitp=x2,yitp=y2)
+         x1=x2
+         y1=y2
+         ind=this%cfg%get_ijk_global(pos=[x1,y1,this%cfg%zm(1)],ind_guess=[i,j,k])
+         vof=this%vf%VF(ind(1),ind(2),ind(3))
+      end do
+      ! Interpolate at the second plane
+      call this%itp_ccplane(F=F,x0=x1,y0=y1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,Fitp=F2,xitp=x2,yitp=y2)
+      ! Calculate the one-sided gradient
+      FI=F(i,j,k)
+      d1=norm2([posI(1)-x1,posI(2)-y1,0.0_WP])
+      d2=norm2([posI(1)-x2,posI(2)-y2,0.0_WP])
+      Fgrd=(p-this%vf%VF(i,j,k))*(F1-FI)/d1+(this%vf%VF(i,j,k)+mult-p)*(F2-FI)/d2
+      ! if ((i.eq.154).and.(j.eq.129).and.(k.eq.1)) then
+      !    print*,'----------------------------------------------------'
+      !    print*,'i,j,k = ',i,j,k
+      !    print*,'VOF = ',this%vf%VF(i,j,k)
+      !    print*,'normal = ',nx,ny
+      !    print*,'FI = ',FI
+      !    print*,'----------------------------------------------------'
+      !    print*,'x1 = ',x1
+      !    print*,'y1 = ',y1
+      !    print*,'F1 = ',F1
+      !    print*,'d1 = ',d1
+      !    print*,'grd1 = ',(F1-FI)/d1
+      !    print*,'----------------------------------------------------'
+      !    print*,'x2 = ',x2
+      !    print*,'y2 = ',y2
+      !    print*,'F2 = ',F2
+      !    print*,'d2 = ',d2
+      !    print*,'grd2 = ',(F2-FI)/d2
+      !    print*,'----------------------------------------------------'
+      !    print*,'Fgrd = ',Fgrd
+      !    call die('')
+      ! end if
+   end subroutine get_one_sided_grad
 
 
    !> Filter an interfacial field in a conservative way
@@ -1126,6 +1202,178 @@ contains
       deallocate(w,F_c)
 
    end subroutine filterL
+
+
+   !> Add a boundary condition
+   subroutine add_bcond(this,name,type,locator,face,dir)
+      use string,         only: lowercase
+      use messager,       only: die
+      use iterator_class, only: locator_ftype
+      implicit none
+      class(lgpc), intent(inout) :: this
+      character(len=*), intent(in) :: name
+      integer,  intent(in) :: type
+      procedure(locator_ftype) :: locator
+      character(len=1), intent(in) :: face
+      integer, intent(in) :: dir
+      type(bcond), pointer :: new_bc
+      integer :: i,j,k,n
+      
+      ! Prepare new bcond
+      allocate(new_bc)
+      new_bc%name=trim(adjustl(name))
+      new_bc%type=type
+      select case (new_bc%type)
+         case (symmetry)
+         case default
+            call die('[lgpc add_bcond] Unknown bcond type')
+      end select
+      select case (lowercase(face))
+         case ('x'); new_bc%face='x'
+         case ('y'); new_bc%face='y'
+         case ('z'); new_bc%face='z'
+         case default; call die('[lgpc add_bcond] Unknown bcond face - expecting x, y, or z')
+      end select
+      select case (dir) ! Outward-oriented
+         case (+1); new_bc%dir=+1
+         case (-1); new_bc%dir=-1
+         case ( 0); new_bc%dir= 0
+         case default; call die('[lgpc add_bcond] Unknown bcond dir - expecting -1, +1, or 0')
+      end select
+      new_bc%itr=iterator(this%cfg,new_bc%name,locator,'c')
+      
+      ! Insert it up front
+      new_bc%next=>this%first_bc
+      this%first_bc=>new_bc
+      
+      ! Increment bcond counter
+      this%nbc=this%nbc+1
+   
+   end subroutine add_bcond
+   
+   
+   !> Get a boundary condition
+   subroutine get_bcond(this,name,my_bc)
+      use messager, only: die
+      implicit none
+      class(lgpc), intent(inout) :: this
+      character(len=*), intent(in) :: name
+      type(bcond), pointer, intent(out) :: my_bc
+      my_bc=>this%first_bc
+      search: do while (associated(my_bc))
+         if (trim(my_bc%name).eq.trim(name)) exit search
+         my_bc=>my_bc%next
+      end do search
+      if (.not.associated(my_bc)) call die('[lgpc get_bcond] Boundary condition was not found')
+   end subroutine get_bcond
+   
+   
+   !> Enforce boundary conditions
+   subroutine apply_bcond(this)
+      use messager, only: die
+      use mpi_f08,  only: MPI_MAX
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(lgpc), intent(inout) :: this
+      integer :: i,j,k,dir,n
+      integer :: ii,jj,kk
+      integer :: i_out,j_out,k_out
+      integer :: i_in,j_in,k_in
+      type(bcond), pointer :: my_bc
+      
+      ! Traverse bcond list
+      my_bc=>this%first_bc
+      do while (associated(my_bc))
+         
+         ! Only processes inside the bcond work here
+         if (my_bc%itr%amIn) then
+            
+            ! Select appropriate action based on the bcond type
+            select case (my_bc%type)
+               
+               case (symmetry)             ! Apply symmetry conditions
+                  
+                  select case (my_bc%face)
+                     case ('x')
+                        do n=1,my_bc%itr%n_
+                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                           do ii=1,this%cfg%no
+                              i_out=i+my_bc%dir*(ii-1)
+                              i_in =i-my_bc%dir*ii
+                              this%vf%VF  (i_out,j,k)        = this%vf%VF  (i_in,j,k)
+                              this%normal (i_out,j,k,1)      =-this%normal (i_in,j,k,1)
+                              this%normal (i_out,j,k,2)      = this%normal (i_in,j,k,2)
+                              this%normal (i_out,j,k,3)      = this%normal (i_in,j,k,3)
+                              this%mdot3pLG(i_out,j,k,Lphase)= this%mdot3pLG(i_in,j,k,Lphase)
+                              this%mdot3pLG(i_out,j,k,Gphase)= this%mdot3pLG(i_in,j,k,Gphase)
+                              this%Tl     (i_out,j,k)        = this%Tl     (i_in,j,k)
+                              this%Tg     (i_out,j,k)        = this%Tg     (i_in,j,k)
+                              this%Tl_grd (i_out,j,k)        = this%Tl_grd (i_in,j,k)
+                              this%Tg_grd (i_out,j,k)        = this%Tg_grd (i_in,j,k)
+                           end do
+                        end do
+                     case ('y')
+                        do n=1,my_bc%itr%n_
+                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                           do jj=1,this%cfg%no
+                              j_out=j+my_bc%dir*(jj-1)
+                              j_in =j-my_bc%dir*jj
+                              this%vf%VF  (i,j_out,k)        = this%vf%VF  (i,j_in,k)
+                              this%normal (i,j_out,k,1)      = this%normal (i,j_in,k,1)
+                              this%normal (i,j_out,k,2)      =-this%normal (i,j_in,k,2)
+                              this%normal (i,j_out,k,3)      = this%normal (i,j_in,k,3)
+                              this%mdot3pLG(i,j_out,k,Lphase)= this%mdot3pLG(i,j_in,k,Lphase)
+                              this%mdot3pLG(i,j_out,k,Gphase)= this%mdot3pLG(i,j_in,k,Gphase)
+                              this%Tl     (i,j_out,k)        = this%Tl     (i,j_in,k)
+                              this%Tg     (i,j_out,k)        = this%Tg     (i,j_in,k)
+                              this%Tl_grd (i,j_out,k)        = this%Tl_grd (i,j_in,k)
+                              this%Tg_grd (i,j_out,k)        = this%Tg_grd (i,j_in,k)
+                           end do
+                        end do
+                     case ('z')
+                        do n=1,my_bc%itr%n_
+                           i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                           do kk=1,this%cfg%no
+                              k_out=k+my_bc%dir*(kk-1)
+                              k_in =k-my_bc%dir*kk
+                              this%vf%VF  (i,j,k_out)        = this%vf%VF  (i,j,k_in)
+                              this%normal (i,j,k_out,1)      = this%normal (i,j,k_in,1)
+                              this%normal (i,j,k_out,2)      = this%normal (i,j,k_in,2)
+                              this%normal (i,j,k_out,3)      =-this%normal (i,j,k_in,3)
+                              this%mdot3pLG(i,j,k_out,Lphase)= this%mdot3pLG(i,j,k_in,Lphase)
+                              this%mdot3pLG(i,j,k_out,Gphase)= this%mdot3pLG(i,j,k_in,Gphase)
+                              this%Tl     (i,j,k_out)        = this%Tl     (i,j,k_in)
+                              this%Tg     (i,j,k_out)        = this%Tg     (i,j,k_in)
+                              this%Tl_grd (i,j,k_out)        = this%Tl_grd (i,j,k_in)
+                              this%Tg_grd (i,j,k_out)        = this%Tg_grd (i,j,k_in)
+                           end do
+                        end do
+                  end select
+                  
+               case default
+                  call die('[lgpc apply_bcond] Unknown bcond type')
+            end select
+            
+         end if
+         
+         ! Move on to the next bcond
+         my_bc=>my_bc%next
+         
+      end do
+      
+      ! Sync full fields after all bcond
+      call this%cfg%sync(this%vf%VF)
+      do dir=1,3
+         call this%cfg%sync(this%normal(:,:,:,dir))
+      end do
+      call this%cfg%sync(this%mdot3pLG(:,:,:,Lphase))
+      call this%cfg%sync(this%mdot3pLG(:,:,:,Gphase))
+      call this%cfg%sync(this%Tl)
+      call this%cfg%sync(this%Tg)
+      call this%cfg%sync(this%Tl_grd)
+      call this%cfg%sync(this%Tg_grd)
+      
+   end subroutine apply_bcond
 
 
    !> Calculate the CFL

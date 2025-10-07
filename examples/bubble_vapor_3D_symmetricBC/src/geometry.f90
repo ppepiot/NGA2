@@ -10,14 +10,13 @@ module geometry
    
    public :: geometry_init
 
-
 contains
    
    
    !> Initialization of problem geometry
    subroutine geometry_init
       use sgrid_class, only: sgrid
-      use param,       only: param_read
+      use param,       only: param_read,param_exists
       implicit none
       type(sgrid) :: grid
       
@@ -25,32 +24,27 @@ contains
       ! Create a grid from input params
       create_grid: block
          use sgrid_class, only: cartesian
-         integer :: i,j,k,nx,ny,nz
-         real(WP) :: Lx,Ly,Lz
-         real(WP), dimension(:), allocatable :: x,y,z
+         integer :: i,ir,il,k,nx,ny,nz,nu,nn
+         real(WP) :: Lx,Lu,r,xL,dx,my_x
+         real(WP), dimension(:), allocatable :: x,y,z,xu
          
          ! Read in grid definition
-         call param_read('Lx',Lx); call param_read('nx',nx); allocate(x(nx+1))
-         call param_read('Ly',Ly); call param_read('ny',ny); allocate(y(ny+1))
-         call param_read('Lz',Lz); call param_read('nz',nz); allocate(z(nz+1))
-
-         ! Handle 1D/2D
-         if (ny.eq.1) Ly=Lx/nx
-         if (nz.eq.1) Lz=Lx/nx
+         call param_read('L',Lx)
          
          ! Create simple rectilinear grid
-         do i=1,nx+1
-            x(i)=real(i-1,WP)/real(nx,WP)*Lx
-         end do
-         do j=1,ny+1
-            y(j)=real(j-1,WP)/real(ny,WP)*Ly-0.5_WP*Ly
-         end do
-         do k=1,nz+1
-            z(k)=real(k-1,WP)/real(nz,WP)*Lz-0.5_WP*Lz
-         end do
-         
+         if (param_exists('n')) then
+            call param_read('n',nx)
+            allocate(x(nx+1))
+            do i=1,nx+1
+               x(i)=real(i-1,WP)/real(nx,WP)*Lx
+            end do
+         end if
+         ny=nx; nz=nx
+         allocate(y(ny+1)); allocate(z(nz+1))
+         y=x; z=x
+
          ! General serial grid object
-         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.true.,zper=.true.,name='Stephan1D')
+         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.false.,zper=.false.,name='bubble_vapor_3D_sym')
          
       end block create_grid
       
@@ -71,15 +65,6 @@ contains
          use mathtools, only: twoPi
          integer :: i,j,k
          cfg%VF=1.0_WP
-         do k=cfg%kmino_,cfg%kmaxo_
-            do j=cfg%jmino_,cfg%jmaxo_
-               do i=cfg%imino_,cfg%imaxo_
-                  if (cfg%xm(i).lt.0.0_WP) then
-                     cfg%VF(i,j,k)=0.0_WP
-                  end if
-               end do
-            end do
-         end do
       end block create_walls
       
       
