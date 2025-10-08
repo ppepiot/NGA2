@@ -1306,6 +1306,7 @@ contains
          time%dt=time%dtmax
          timeSC=timetracker(amRoot=cfg%amRoot,name='SC Time')
          call param_read('Scalar time step',timeSC%dtmax)
+         timeSC%t=t0
          timeSC%tmax=time%tmax
          timeSC%dt=timeSC%dtmax
       end block initialize_timetracker

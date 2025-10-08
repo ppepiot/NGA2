@@ -181,11 +181,14 @@ contains
    
 
    ! Integrand function for beta equation
-   function integrand(z,b)
+   function beta_int(z,b)
       real(WP), intent(in) :: z,b
-      real(WP) :: integrand
-      integrand=exp(-b**2*((1.0_WP-z)**(-2)-2.0_WP*(1.0_WP-rho_g/rho_l)*z-1.0_WP))
-   end function integrand
+      real(WP) :: beta_int
+      real(WP), parameter :: eps = 1.0e-12_WP
+      real(WP) :: denom
+      denom=max(1.0_WP-z,eps)
+      beta_int=exp(-b**2*(denom**(-2)-2.0_WP*(1.0_WP-rho_g/rho_l)*z-1.0_WP))
+   end function beta_int
 
 
    ! Simpson's rule integration
@@ -216,7 +219,7 @@ contains
    function f_beta(b)
       real(WP), intent(in) :: b
       real(WP) :: f_beta
-      f_beta=2.0_WP*b**2*Simpson(integrand,b,0.0_WP,1.0_WP,20)-f_b_cnst
+      f_beta=2.0_WP*b**2*Simpson(beta_int,b,0.0_WP,1.0_WP,20)-f_b_cnst
    end function f_beta
 
 
@@ -508,7 +511,7 @@ contains
             print*,'Absolute error =',err
             print*,'Bi-section iterations =',it
             ! Debug
-            print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
+            print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*beta_int(0.0_WP,beta)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -751,7 +754,7 @@ contains
                do k=sc%cfg%kmino_,sc%cfg%kmaxo_
                   radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
                   if (vf%VF(i,j,k).gt.VFlo) then
-                     sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+                     sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20)
                   end if
                   if (vf%VF(i,j,k).lt.VFhi) then
                      sc%SC(i,j,k,iTg)=T_sat

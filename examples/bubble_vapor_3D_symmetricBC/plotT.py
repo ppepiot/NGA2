@@ -89,4 +89,4 @@ plt.ylabel(r'$T$', fontsize=14)
 for spine in plt.gca().spines.values():
     spine.set_linewidth(1.2)
 plt.tight_layout()
-plt.savefig('./Tl.pdf')
+plt.savefig('./Tl_3D_sym.pdf')

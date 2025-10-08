@@ -226,11 +226,14 @@ contains
    
 
    ! Integrand function for beta equation
-   function integrand(z,b)
+   function beta_int(z,b)
       real(WP), intent(in) :: z,b
-      real(WP) :: integrand
-      integrand=exp(-b**2*((1.0_WP-z)**(-2)-2.0_WP*(1.0_WP-rho_g/rho_l)*z-1.0_WP))
-   end function integrand
+      real(WP) :: beta_int
+      real(WP), parameter :: eps = 1.0e-12_WP
+      real(WP) :: denom
+      denom=max(1.0_WP-z,eps)
+      beta_int=exp(-b**2*(denom**(-2)-2.0_WP*(1.0_WP-rho_g/rho_l)*z-1.0_WP))
+   end function beta_int
 
 
    ! Simpson's rule integration
@@ -287,7 +290,7 @@ contains
    function f_beta(b)
       real(WP), intent(in) :: b
       real(WP) :: f_beta
-      f_beta=2.0_WP*b**2*Simpson(integrand,b,0.0_WP,1.0_WP,20)-f_b_cnst
+      f_beta=2.0_WP*b**2*Simpson(beta_int,b,0.0_WP,1.0_WP,20)-f_b_cnst
    end function f_beta
 
 
@@ -314,7 +317,7 @@ contains
       use parallel,  only: MPI_REAL_WP
       integer :: index,i,j,k,ierr
       real(WP) :: my_area,area,my_Tlgrd_min,my_Tlgrd_max,my_Tlgrd_avg,tlgrd
-      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)
+      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)
       my_Tlgrd_min=1e6
       my_Tlgrd_max=0.0_WP
       my_Tlgrd_avg=0.0_WP
@@ -449,7 +452,7 @@ contains
          rad_num=r_num(T_ind)
          Tl_num=T_l_avg(T_ind)
          rad_ext=r_extt(T_ind)
-         Tl_ext=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R_ext/rad_ext,1.0_WP,20)
+         Tl_ext=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R_ext/rad_ext,1.0_WP,20)
          call Tlfile%write()
       end do
       ! Deallocate the arrays
@@ -550,8 +553,8 @@ contains
             print*,'Bi-section iterations =',it
             if (.not.convergence) call die('[simulation_init] Bi-section failed')
             ! Debug
-            ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*integrand(0.0_WP,beta)
-            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*integrand(0.0_WP,beta)
+            ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*beta_int(0.0_WP,beta)
+            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*beta_int(0.0_WP,beta)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -685,8 +688,8 @@ contains
          call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
          call sc%add_bcond(name='ym',type=dirichlet,locator=ym_locator_sc,dir='-y')
          call sc%add_bcond(name='yp',type=dirichlet,locator=yp_locator   ,dir='+y')
-         call sc%add_bcond(name='zm',type=dirichlet,locator=ym_locator_sc,dir='-z')
-         call sc%add_bcond(name='zp',type=dirichlet,locator=yp_locator   ,dir='+z')
+         call sc%add_bcond(name='zm',type=dirichlet,locator=zm_locator_sc,dir='-z')
+         call sc%add_bcond(name='zp',type=dirichlet,locator=zp_locator   ,dir='+z')
          sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
          sc%phase =[Lphase,Gphase]
          sc%diff(:,:,:,iTl)=alpha_l
@@ -703,14 +706,14 @@ contains
             do j=sc%cfg%jmino_,sc%cfg%jmaxo_
                do k=sc%cfg%kmino_,sc%cfg%kmaxo_
                   radius=norm2([sc%cfg%xm(i),sc%cfg%ym(j),sc%cfg%zm(k)])
-                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
+                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20)
                   if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_sat
                end do
             end do
          end do
          ! radius=R0+0.001_WP
-         ! print*,'T = ',T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20)
-         ! print*,'T grad = ',((T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R0/radius,1.0_WP,20))-T_sat)/0.001_WP
+         ! print*,'T = ',T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20)
+         ! print*,'T grad = ',((T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20))-T_sat)/0.001_WP
          ! print*,'dx = ',cfg%dx(1)
          ! Apply boundary conditions
          where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
@@ -789,7 +792,7 @@ contains
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                      lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
-                     ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
+                     ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                   end if
                end do
             end do
@@ -1233,8 +1236,8 @@ contains
          !                else if (vf%VF(i,j,k).eq.1.0_WP) then
          !                   R_ext=get_Rext(time%t)
          !                   r=sqrt(cfg%xm(i)**2+cfg%ym(j)**2)
-         !                   ! sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson_adpt(integrand,beta,1.0_WP-R_ext/r,1.0_WP,real(1e-7,WP))
-         !                   sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(integrand,beta,1.0_WP-R_ext/r,1.0_WP,20)
+         !                   ! sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson_adpt(beta_int,beta,1.0_WP-R_ext/r,1.0_WP,real(1e-7,WP))
+         !                   sc%SC(i,j,k,iTl)=T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R_ext/r,1.0_WP,20)
          !                   sc%SC(i,j,k,iTg)=0.0_WP
          !                else
          !                   sc%SC(i,j,k,iTl)=T_sat
@@ -1407,7 +1410,7 @@ contains
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                         lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
-                        ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
+                        ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                      end if
                   end do
                end do

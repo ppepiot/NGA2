@@ -31,4 +31,4 @@ plt.grid(which='major', axis='both', color='k', linestyle='--', linewidth=0.6, a
 legends = ax.legend([r'$Analytical$', r'$Numerical$'], frameon=False, loc='lower right', fontsize=10)
 ax.add_artist(legends)
 plt.tight_layout()
-plt.savefig('./R_vs_t.pdf')
+plt.savefig('./R_vs_t_3D_sym.pdf')
