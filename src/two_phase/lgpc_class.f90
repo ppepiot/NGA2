@@ -248,11 +248,8 @@ contains
                   index_pure=this%vf%band_count(0)+index
                   ! Get the cell indices
                   i=this%vf%band_map(1,index_pure)
-                  if ((i.lt.this%cfg%imin_).or.(i.gt.this%cfg%imax_)) cycle
                   j=this%vf%band_map(2,index_pure)
-                  if ((j.lt.this%cfg%jmin_).or.(j.gt.this%cfg%jmax_)) cycle
                   k=this%vf%band_map(3,index_pure)
-                  if ((k.lt.this%cfg%kmin_).or.(k.gt.this%cfg%kmax_)) cycle
                   ! Initialize with zero
                   vol=0.0_WP
                   this%normal(i,j,k,dir)=0.0_WP
@@ -341,11 +338,8 @@ contains
       do index=1,sum(this%vf%band_count(0:ext_lvl+1))
          ! Get the cell indices
          ic=this%vf%band_map(1,index)
-         if ((ic.lt.this%cfg%imin_).or.(ic.gt.this%cfg%imax_)) cycle
          jc=this%vf%band_map(2,index)
-         if ((jc.lt.this%cfg%jmin_).or.(jc.gt.this%cfg%jmax_)) cycle
          kc=this%vf%band_map(3,index)
-         if ((kc.lt.this%cfg%kmin_).or.(kc.gt.this%cfg%kmax_)) cycle
          ! Loop over directions
          do dir=1,3
             ! Loop over the plus and minus faces
@@ -372,11 +366,8 @@ contains
          do index=1,sum(this%vf%band_count(0:ext_lvl+1))
             ! Get the cell indices
             i=this%vf%band_map(1,index)
-            if ((i.lt.this%cfg%imin_).or.(i.gt.this%cfg%imax_)) cycle
             j=this%vf%band_map(2,index)
-            if ((j.lt.this%cfg%jmin_).or.(j.gt.this%cfg%jmax_)) cycle
             k=this%vf%band_map(3,index)
-            if ((k.lt.this%cfg%kmin_).or.(k.gt.this%cfg%kmax_)) cycle
             ! Get the residual
             dmdot3pdt(i,j,k)=dmdot3pdt(i,j,k)                                                                          &
             &              +this%div(dir)%arr(0,i,j,k)*F(i,j,k,dir)                                                    &
@@ -540,11 +531,8 @@ contains
       do index=1,this%vf%band_count(0)
          ! Get the interfacial cell indices
          ihat=this%vf%band_map(1,index)
-         if ((ihat.lt.this%cfg%imin_).or.(ihat.gt.this%cfg%imax_)) cycle
          jhat=this%vf%band_map(2,index)
-         if ((jhat.lt.this%cfg%jmin_).or.(jhat.gt.this%cfg%jmax_)) cycle
          khat=this%vf%band_map(3,index)
-         if ((khat.lt.this%cfg%kmin_).or.(khat.gt.this%cfg%kmax_)) cycle
          ! Initialize weights
          w=0.0_WP
          ! Loop over the stencil
@@ -614,11 +602,8 @@ contains
          index_pure=this%vf%band_count(0)+index
          ! Get the interfacial cell indices
          i=this%vf%band_map(1,index_pure)
-         if ((i.lt.this%cfg%imin_).or.(i.gt.this%cfg%imax_)) cycle
          j=this%vf%band_map(2,index_pure)
-         if ((j.lt.this%cfg%jmin_).or.(j.gt.this%cfg%jmax_)) cycle
          k=this%vf%band_map(3,index_pure)
-         if ((k.lt.this%cfg%kmin_).or.(k.gt.this%cfg%kmax_)) cycle
          ! Calculate the Gauss gradient
          if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
             ! ! X grad
@@ -732,57 +717,54 @@ contains
    end subroutine get_div
 
 
-   ! !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
-   ! subroutine get_temperature_grad(this)
-   !    use mpi_f08,  only: MPI_MAX
-   !    use parallel, only: MPI_REAL_WP
-   !    implicit none
-   !    class(lgpc), intent(inout) :: this
-   !    ! Apply boundary conditions
-   !    call this%apply_bcond()
-   !    ! Get the temperature gradients
-   !    call this%get_grad(Lphase,this%Tl,this%Tl_grd)
-   !    call this%get_grad(Gphase,this%Tg,this%Tg_grd)
-   !    ! Extrapolate the gradients to interface
-   !    call this%pure_interfacial_extp(Lphase,this%Tl_grd)
-   !    call this%pure_interfacial_extp(Gphase,this%Tg_grd)
-   ! end subroutine get_temperature_grad
-
-
-   !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
    subroutine get_temperature_grad(this)
-      use irl_fortran_interface, only: calculateCentroid
+      use mpi_f08,  only: MPI_MAX
+      use parallel, only: MPI_REAL_WP
       implicit none
       class(lgpc), intent(inout) :: this
-      real(WP), dimension(3) :: posI,nI
-      integer  :: i,j,k,index
-      ! Get the interface normal
-      call this%get_normal()
       ! Apply boundary conditions
       call this%apply_bcond()
-      ! Zero out the gradients
-      this%Tl_grd=0.0_WP
-      this%Tg_grd=0.0_WP
-      ! Loop over the interfacial cells
-      do index=1,this%vf%band_count(0)
-         ! Get the interfacial cell indices
-         i=this%vf%band_map(1,index)
-         if ((i.lt.this%cfg%imin_).or.(i.gt.this%cfg%imax_)) cycle
-         j=this%vf%band_map(2,index)
-         if ((j.lt.this%cfg%jmin_).or.(j.gt.this%cfg%jmax_)) cycle
-         k=this%vf%band_map(3,index)
-         if ((k.lt.this%cfg%kmin_).or.(k.gt.this%cfg%kmax_)) cycle
-         ! Get the interface center and normal
-         posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
-         nI(1)=this%normal(i,j,k,1)
-         nI(2)=this%normal(i,j,k,2)
-         nI(3)=this%normal(i,j,k,3)
-         ! Get the liquid side gradient
-         call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
-         ! Get the gas side gradient
-         call this%get_one_sided_grad(phase=Gphase,F=this%TG,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
-      end do
+      ! Get the temperature gradients
+      call this%get_grad(Lphase,this%Tl,this%Tl_grd)
+      call this%get_grad(Gphase,this%Tg,this%Tg_grd)
+      ! Extrapolate the gradients to interface
+      call this%pure_interfacial_extp(Lphase,this%Tl_grd)
+      call this%pure_interfacial_extp(Gphase,this%Tg_grd)
    end subroutine get_temperature_grad
+
+
+   ! !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   ! subroutine get_temperature_grad(this)
+   !    use irl_fortran_interface, only: calculateCentroid
+   !    implicit none
+   !    class(lgpc), intent(inout) :: this
+   !    real(WP), dimension(3) :: posI,nI
+   !    integer  :: i,j,k,index
+   !    ! Get the interface normal
+   !    call this%get_normal()
+   !    ! Apply boundary conditions
+   !    call this%apply_bcond()
+   !    ! Zero out the gradients
+   !    this%Tl_grd=0.0_WP
+   !    this%Tg_grd=0.0_WP
+   !    ! Loop over the interfacial cells
+   !    do index=1,this%vf%band_count(0)
+   !       ! Get the interfacial cell indices
+   !       i=this%vf%band_map(1,index)
+   !       j=this%vf%band_map(2,index)
+   !       k=this%vf%band_map(3,index)
+   !       ! Get the interface center and normal
+   !       posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+   !       nI(1)=this%normal(i,j,k,1)
+   !       nI(2)=this%normal(i,j,k,2)
+   !       nI(3)=this%normal(i,j,k,3)
+   !       ! Get the liquid side gradient
+   !       call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
+   !       ! Get the gas side gradient
+   !       call this%get_one_sided_grad(phase=Gphase,F=this%Tg,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
+   !    end do
+   ! end subroutine get_temperature_grad
 
 
    !> Calculate the one-sided gradient dot producted by the interface normal at a given phase
@@ -790,7 +772,7 @@ contains
       implicit none
       class(lgpc), intent(in) :: this
       integer, intent(in) :: phase
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: F
       real(WP), dimension(3), intent(in) :: posI
       integer, intent(in) :: i,j,k
       real(WP), dimension(3), intent(in) :: normal
@@ -805,13 +787,13 @@ contains
       nx=mult*normal(1)
       ny=mult*normal(2)
       nz=mult*normal(3)
-      ! Interpolate at the first plane
+      ! Interface info
       x1=posI(1)
       y1=posI(2)
       z1=posI(3)
       vof=this%vf%VF(i,j,k)
       ind=[i,j,k]
-      ! Get the cell indices containing the interpolated point (skip the interfacial cells)
+      ! Interpolate at the first plane (skip the interfacial cells)
       do while ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP))
          call this%itp_ccplane(F=F,x0=x1,y0=y1,z0=z1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,nz=nz,Fitp=F1,xitp=x2,yitp=y2,zitp=z2)
          x1=x2
@@ -835,7 +817,7 @@ contains
    subroutine itp_ccplane(this,F,x0,y0,z0,i,j,k,nx,ny,nz,Fitp,xitp,yitp,zitp)
       implicit none
       class(lgpc), intent(in) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: F
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: F
       real(WP), intent(in)  :: x0,y0,z0
       integer,  intent(in)  :: i,j,k
       real(WP), intent(inout)  :: nx,ny,nz
@@ -843,38 +825,45 @@ contains
       real(WP), optional, intent(out) :: xitp,yitp,zitp
       real(WP) :: dx,dy,dz,delta(1:3)
       real(WP) :: Sx,Sy,Sz
-      real(WP) :: w_m,w_p,wsum
-      integer  :: ip,jp,kp,ind_min
+      real(WP) :: wxm,wxp
+      real(WP) :: wym,wyp
+      real(WP) :: wzm,wzp
+      integer  :: ip,jp,kp,im,jm,km,ind_min
+      real(WP) :: x_min,x_max
+      real(WP) :: y_min,y_max
+      real(WP) :: z_min,z_max
       real(WP), parameter :: ntol=1e-6
+      ! Store the current indices
+      im=i; jm=j; km=k
       ! Get the distances to the coordinate aligned planes
       if (abs(nx).lt.ntol) then
          nx=0.0_WP
          Sx=0.0_WP
-         ip=i+int(Sx)
+         ip=im+int(Sx)
          dx=huge(1.0_WP)
       else
          Sx=sign(1.0_WP,nx)
-         ip=i+int(Sx)
+         ip=im+int(Sx)
          dx=(this%cfg%xm(ip)-x0)/nx
       end if
       if (abs(ny).lt.ntol) then
          ny=0.0_WP
          Sy=0.0_WP
-         jp=j+int(Sy)
+         jp=jm+int(Sy)
          dy=huge(1.0_WP)
       else
          Sy=sign(1.0_WP,ny)
-         jp=j+int(Sy)
+         jp=jm+int(Sy)
          dy=(this%cfg%ym(jp)-y0)/ny
       end if
       if (abs(nz).lt.ntol) then
          nz=0.0_WP
          Sz=0.0_WP
-         kp=k+int(Sz)
+         kp=km+int(Sz)
          dz=huge(1.0_WP)
       else
          Sz=sign(1.0_WP,nz)
-         kp=k+int(Sz)
+         kp=km+int(Sz)
          dz=(this%cfg%zm(kp)-z0)/nz
       end if
       ! Identify the closest plane
@@ -882,23 +871,117 @@ contains
       ind_min=minloc(delta,1)
       select case (ind_min)
       case (1)
-         ! Interpolate at the intersection between the interface normal and the x plane
+         ! Find the intersection between the interface normal and the x plane
          xitp=this%cfg%xm(ip)
          yitp=ny/nx*dx+y0
          zitp=nz/nx*dx+z0
+         ! Correct the stencil in y
+         y_max=max(this%cfg%ym(jm),this%cfg%ym(jp))
+         do while (yitp.gt.y_max)
+            jm=jm+1
+            jp=jp+1
+            y_max=max(this%cfg%ym(jm),this%cfg%ym(jp))
+         end do
+         y_min=min(this%cfg%ym(jm),this%cfg%ym(jp))
+         do while (yitp.lt.y_min)
+            jm=jm-1
+            jp=jp-1
+            y_min=min(this%cfg%ym(jm),this%cfg%ym(jp))
+         end do
+         ! Correct the stencil in z
+         z_max=max(this%cfg%zm(km),this%cfg%zm(kp))
+         do while (zitp.gt.z_max)
+            km=km+1
+            kp=kp+1
+            z_max=max(this%cfg%zm(km),this%cfg%zm(kp))
+         end do
+         z_min=min(this%cfg%zm(km),this%cfg%zm(kp))
+         do while (zitp.lt.z_min)
+            km=km-1
+            kp=kp-1
+            z_min=min(this%cfg%zm(km),this%cfg%zm(kp))
+         end do
+         ! Perform a bi-linear interpolation
+         wym=abs(this%cfg%ym(jp)-yitp)*this%cfg%dymi(jp)
+         wyp=1.0_WP-wym
+         wzm=abs(this%cfg%zm(kp)-zitp)*this%cfg%dzmi(kp)
+         wzp=1.0_WP-wzm
+         Fitp=wzm*(wym*F(ip,jm,km)+wyp*F(ip,jp,km))+wzp*(wym*F(ip,jm,kp)+wyp*F(ip,jp,kp))
       case (2)
-         ! Interpolate at the intersection between the interface normal and the y plane
+         ! Find the intersection between the interface normal and the y plane
          yitp=this%cfg%ym(jp)
          zitp=nz/ny*dy+z0
          xitp=nx/ny*dy+x0
+         ! Correct the stencil in z
+         z_max=max(this%cfg%zm(km),this%cfg%zm(kp))
+         do while (zitp.gt.z_max)
+            km=km+1
+            kp=kp+1
+            z_max=max(this%cfg%zm(km),this%cfg%zm(kp))
+         end do
+         z_min=min(this%cfg%zm(km),this%cfg%zm(kp))
+         do while (zitp.lt.z_min)
+            km=km-1
+            kp=kp-1
+            z_min=min(this%cfg%zm(km),this%cfg%zm(kp))
+         end do
+         ! Correct the stencil in x
+         x_max=max(this%cfg%xm(im),this%cfg%xm(ip))
+         do while (xitp.gt.x_max)
+            im=im+1
+            ip=ip+1
+            x_max=max(this%cfg%xm(im),this%cfg%xm(ip))
+         end do
+         x_min=min(this%cfg%xm(im),this%cfg%xm(ip))
+         do while (xitp.lt.x_min)
+            im=im-1
+            ip=ip-1
+            x_min=min(this%cfg%xm(im),this%cfg%xm(ip))
+         end do
+         ! Perform a bi-linear interpolation
+         wzm=abs(this%cfg%zm(kp)-zitp)*this%cfg%dzmi(kp)
+         wzp=1.0_WP-wzm
+         wxm=abs(this%cfg%xm(ip)-xitp)*this%cfg%dxmi(ip)
+         wxp=1.0_WP-wxm
+         Fitp=wxm*(wzm*F(im,jp,km)+wzp*F(im,jp,kp))+wxp*(wzm*F(ip,jp,km)+wzp*F(ip,jp,kp))
       case (3)
-         ! Interpolate at the intersection between the interface normal and the z plane
+         ! Find the intersection between the interface normal and the z plane
          zitp=this%cfg%zm(kp)
          xitp=nx/nz*dz+x0
          yitp=ny/nz*dz+y0
+         ! Correct the stencil in x
+         x_max=max(this%cfg%xm(im),this%cfg%xm(ip))
+         do while (xitp.gt.x_max)
+            im=im+1
+            ip=ip+1
+            x_max=max(this%cfg%xm(im),this%cfg%xm(ip))
+         end do
+         x_min=min(this%cfg%xm(im),this%cfg%xm(ip))
+         do while (xitp.lt.x_min)
+            im=im-1
+            ip=ip-1
+            x_min=min(this%cfg%xm(im),this%cfg%xm(ip))
+         end do
+         ! Correct the stencil in y
+         y_max=max(this%cfg%ym(jm),this%cfg%ym(jp))
+         do while (yitp.gt.y_max)
+            jm=jm+1
+            jp=jp+1
+            y_max=max(this%cfg%ym(jm),this%cfg%ym(jp))
+         end do
+         y_min=min(this%cfg%ym(jm),this%cfg%ym(jp))
+         do while (yitp.lt.y_min)
+            jm=jm-1
+            jp=jp-1
+            y_min=min(this%cfg%ym(jm),this%cfg%ym(jp))
+         end do
+         ! Perform a bi-linear interpolation
+         wxm=abs(this%cfg%xm(ip)-xitp)*this%cfg%dxmi(ip)
+         wxp=1.0_WP-wxm
+         wym=abs(this%cfg%ym(jp)-yitp)*this%cfg%dymi(jp)
+         wyp=1.0_WP-wym
+         Fitp=wym*(wxm*F(im,jm,kp)+wxp*F(ip,jm,kp))+wyp*(wxm*F(im,jp,kp)+wxp*F(ip,jp,kp))
       end select
-      ! Perform a tri-linear interpolation
-      Fitp=this%cfg%get_scalar(pos=[xitp,yitp,zitp],i0=ip,j0=jp,k0=kp,S=F,bc='N')
    end subroutine itp_ccplane
 
 
@@ -952,11 +1035,8 @@ contains
          do index=1,this%vf%band_count(0)
             ! Get the interfacial cell indices
             ihat=this%vf%band_map(1,index)
-            if ((ihat.lt.this%cfg%imin_).or.(ihat.gt.this%cfg%imax_)) cycle
             jhat=this%vf%band_map(2,index)
-            if ((jhat.lt.this%cfg%jmin_).or.(jhat.gt.this%cfg%jmax_)) cycle
             khat=this%vf%band_map(3,index)
-            if ((khat.lt.this%cfg%kmin_).or.(khat.gt.this%cfg%kmax_)) cycle
             ! Initialize weights
             w=0.0_WP
             ! Loop over the stencil

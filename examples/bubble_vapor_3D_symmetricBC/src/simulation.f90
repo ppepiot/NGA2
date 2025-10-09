@@ -677,6 +677,61 @@ contains
                end do
             end do
          end do
+         ! Correct mask outside physical domain
+         if (cfg%iproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imin_-1
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%iproc.eq.cfg%npx) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imax_+1,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%jproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmin_-1
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%jproc.eq.cfg%npy) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmax_+1,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%kproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmin_-1
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%kproc.eq.cfg%npz) then
+            do k=cfg%kmax_+1,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
          ! Apply boundary conditions
          call vf%apply_bcond(time%t,time%dt)
          ! Update the band
@@ -755,7 +810,7 @@ contains
          integer  :: i,j,k,n
          ! Create scalar solver
          call sc%initialize(cfg=cfg,nscalar=2,name='tpscalar')
-         ! Boundary conditinos
+         ! Boundary conditions
          call sc%add_bcond(name='xm',type=neumann  ,locator=xm_locator_sc,dir='-x')
          call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
          call sc%add_bcond(name='ym',type=neumann  ,locator=ym_locator_sc,dir='-y')
@@ -847,7 +902,7 @@ contains
             do j=lg%cfg%jmin_,lg%cfg%jmax_
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     lg%mdot2p(i,j,k)=(k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
+                     lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                      ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
                   end if
                end do
@@ -1160,7 +1215,7 @@ contains
                do j=lg%cfg%jmin_,lg%cfg%jmax_
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                        lg%mdot2p(i,j,k)=(k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
+                        lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                         ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                      end if
                   end do

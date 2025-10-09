@@ -733,7 +733,7 @@ contains
             do j=lg%cfg%jmin_,lg%cfg%jmax_
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                     lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                      ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                   end if
                end do
@@ -1342,7 +1342,7 @@ contains
                do j=lg%cfg%jmin_,lg%cfg%jmax_
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                        lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                        lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                         ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                      end if
                   end do

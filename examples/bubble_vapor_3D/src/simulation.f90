@@ -765,8 +765,7 @@ contains
 
       ! Create and initialize an lg object
       create_lgpc: block
-         ! use lgpc_class, only: symmetry
-         integer :: i,j,k,index!,ind(3)
+         integer :: i,j,k,index
          ! Create the object
          call lg%initialize(cfg=cfg,vf=vf,sc=sc%SC,iTl=iTl,iTg=iTg,itp_x=fs%itpr_x,itp_y=fs%itpr_y,itp_z=fs%itpr_z,div_x=fs%divp_x,div_y=fs%divp_y,div_z=fs%divp_z,name='liquid gas pc')
          call param_read('Mass flux tolerence',     lg%mdot3p_tol)
@@ -777,12 +776,6 @@ contains
          ! Get densities from the flow solver
          lg%rho_l=fs%rho_l
          lg%rho_g=fs%rho_g
-         ! 
-         ! ind=cfg%get_ijk_global([0.113_WP,0.001_WP,0.0_WP],[20,32,1])
-         ! print*,'ind = ',ind
-         ! print*,'xm = ',cfg%xm(ind(1))
-         ! print*,'ym = ',cfg%ym(ind(2))
-         ! print*,'zm = ',cfg%zm(ind(3))
          ! Get temperature gradient
          call lg%get_temperature_grad()
          ! Phase change mass flux
@@ -791,7 +784,7 @@ contains
             do j=lg%cfg%jmin_,lg%cfg%jmax_
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                     lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                      ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                   end if
                end do
@@ -1409,7 +1402,7 @@ contains
                do j=lg%cfg%jmin_,lg%cfg%jmax_
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                        lg%mdot2p(i,j,k)=-(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
+                        lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
                         ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                      end if
                   end do
