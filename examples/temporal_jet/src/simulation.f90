@@ -13,6 +13,7 @@ module simulation
    use surfmesh_class,    only: surfmesh
    use event_class,       only: event
    use monitor_class,     only: monitor
+   use resource_tracker,  only: getRSS
    implicit none
    private
    
@@ -41,7 +42,7 @@ module simulation
    type(event)    :: ens_evt
    
    !> Simulation monitor file
-   type(monitor) :: mfile,cflfile
+   type(monitor) :: mfile,cflfile,memfile
    
    public :: simulation_init,simulation_run,simulation_final
    
@@ -55,11 +56,8 @@ contains
    
    !> Initialization of problem solver
    subroutine simulation_init
-      use param, only: param_read,param_exists
+      use param, only: param_read
       implicit none
-      integer :: nwaveX,nwaveT
-      real(WP) :: wamp
-      real(WP), dimension(:), allocatable :: wnumbX,wshiftX,wnumbT,wshiftT
       
       ! Allocate work arrays
       allocate_work_arrays: block
@@ -167,22 +165,22 @@ contains
          use random,    only: random_uniform
          use mathtools, only: Pi
          integer :: i,j,k
-         real(WP) :: rad,amp
-         ! Read in perturbation characteristics
-         call param_read('Perturbation amplitude',amp,default=0.05_WP)
-         ! Provide initial velocity profile
+         real(WP) :: amp
+         ! Initialize with powerlaw profile in the liquid jet normalized to Ubulk=1.0
          do k=fs%cfg%kmino_,fs%cfg%kmaxo_; do j=fs%cfg%jmino_,fs%cfg%jmaxo_; do i=fs%cfg%imino_,fs%cfg%imaxo_
-            ! Get radial position
-            rad=sqrt(fs%cfg%ym(j)**2+fs%cfg%zm(k)**2)
-            if (rad.lt.0.5_WP) then
-               ! Set powerlaw profile in the liquid
-               fs%U(i,j,k)=(1.0_WP-rad/0.5_WP)**(1.0_WP/7.0_WP)
-               ! Add disturbances
+            fs%U(i,j,k)=max(0.0_WP,(1.0_WP-sqrt(fs%cfg%ym(j)**2+fs%cfg%zm(k)**2)/0.5_WP)**(1.0_WP/7.0_WP))
+         end do; end do; end do
+         resU=vf%VF*fs%U; call cfg%integrate(A=resU,integral=amp); fs%U=0.25_WP*fs%U*cfg%xL*Pi/amp
+         ! Add random disturbances
+         call param_read('Perturbation amplitude',amp,default=0.05_WP)
+         do k=fs%cfg%kmin_,fs%cfg%kmax_; do j=fs%cfg%jmin_,fs%cfg%jmax_; do i=fs%cfg%imin_,fs%cfg%imax_
+            if (sqrt(fs%cfg%ym(j)**2+fs%cfg%zm(k)**2).lt.0.5_WP) then
                fs%U(i,j,k)=fs%U(i,j,k)+random_uniform(lo=-amp,hi=+amp)
+               fs%V(i,j,k)=            random_uniform(lo=-amp,hi=+amp)
+               fs%W(i,j,k)=            random_uniform(lo=-amp,hi=+amp)
             end if
          end do; end do; end do
-         ! Rescale to ensure unity flow rate
-         resU=vf%VF*fs%U; call cfg%integrate(A=resU,integral=amp); fs%U=0.25_WP*fs%U*cfg%xL*Pi/amp
+         call cfg%sync(fs%U); call cfg%sync(fs%V); call cfg%sync(fs%W)
          ! Apply all other boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Compute MFR through all boundary conditions
@@ -220,7 +218,6 @@ contains
          ! Add variables to output
          call ens_out%add_vector('velocity',Ui,Vi,Wi)
          call ens_out%add_scalar('VOF',vf%VF)
-         call ens_out%add_scalar('curvature',vf%curv)
          call ens_out%add_surface('plic',smesh)
          ! Output to ensight
          if (ens_evt%occurs()) call ens_out%write_data(time%t)
@@ -265,6 +262,20 @@ contains
          call cflfile%add_column(fs%CFLv_z,'Viscous zCFL')
          call cflfile%write()
       end block create_monitor
+      
+      
+      ! Track memory usage
+      create_memory_monitor: block
+         use resource_tracker, only: maxRSS,minRSS,avgRSS
+         call getRSS()
+         memfile=monitor(cfg%amRoot,'memory')
+         call memfile%add_column(time%n,'Timestep number')
+         call memfile%add_column(time%t,'Time')
+         call memfile%add_column(maxRSS,'Maximum RSS')
+         call memfile%add_column(minRSS,'Minimum RSS')
+         call memfile%add_column(avgRSS,'Average RSS')
+         call memfile%write()
+      end block create_memory_monitor
       
       
    contains
@@ -475,6 +486,9 @@ contains
          call vf%get_max()
          call mfile%write()
          call cflfile%write()
+         
+         ! Monitor memory usage
+         call getRSS(); call memfile%write()
          
       end do
       
