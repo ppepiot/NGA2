@@ -390,7 +390,7 @@ contains
             sgs_modeling: block
                use sgsmodel_class, only: vreman
                integer :: i,j,k
-               resU=fs%visc_l*vf%VF+fs%visc_g*(1.0_WP-vf%VF)
+               resU=fs%rho_l*vf%VF+fs%rho_g*(1.0_WP-vf%VF)
                call fs%get_gradu(gradU)
                call sgs%get_visc(type=vreman,dt=time%dtold,rho=resU,gradu=gradU)
                do k=fs%cfg%kmino_+1,fs%cfg%kmaxo_; do j=fs%cfg%jmino_+1,fs%cfg%jmaxo_; do i=fs%cfg%imino_+1,fs%cfg%imaxo_
