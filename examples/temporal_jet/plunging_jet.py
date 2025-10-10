@@ -52,7 +52,7 @@ plt.figure(figsize=(8, 6))
 for value, (marker, label) in marker_map.items():
     subset = df[df['Aerated'] == value]
     plt.scatter(
-        subset['Re'], subset['Oh'],
+        subset['Re'], subset['We'],
         label=label,
         marker=marker,
         s=80,
@@ -65,8 +65,8 @@ Fr_value = 10  # Change this value as needed
 D_vals = np.logspace(np.log10(df['D'].min()*0.5),
                      np.log10(df['D'].max()*2), 300)
 Re_line = rho * D_vals * Fr_value * np.sqrt(g * D_vals) / mu
-Oh_line = mu / np.sqrt(rho * sigma * D_vals)
-plt.plot(Re_line, Oh_line, 'k--', label=f'Fr = {Fr_value}')
+We_line = rho * (Fr_value**2) * g * D_vals**2 / sigma
+plt.plot(Re_line, We_line, 'k--', label=f'Fr = {Fr_value}')
 
 # --- Log scales ---
 plt.xscale('log')
@@ -75,15 +75,15 @@ plt.yscale('log')
 # --- Tight axis limits ---
 x_min = df['Re'].min() * 0.7
 x_max = df['Re'].max() * 1.3
-y_min = df['Oh'].min() * 0.7
-y_max = df['Oh'].max() * 1.3
+y_min = df['We'].min() * 0.7
+y_max = df['We'].max() * 1.3
 plt.xlim(x_min, x_max)
 plt.ylim(y_min, y_max)
 
 # --- Labels and legend ---
 plt.xlabel('Reynolds number (Re)')
-plt.ylabel('Ohnesorge number (Oh)')
-plt.title(f'Ohnesorge vs Reynolds (log-log) with Fr = {Fr_value} line')
+plt.ylabel('Weber number (We)')
+plt.title(f'Weber vs Reynolds (log-log) with Fr = {Fr_value} line')
 plt.legend()
 plt.grid(True, which='both', linestyle='--', alpha=0.5)
 plt.tight_layout()
