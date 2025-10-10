@@ -275,7 +275,7 @@ contains
       use parallel,  only: MPI_REAL_WP
       integer :: index,i,j,k,ierr
       real(WP) :: my_area,area,my_Tlgrd_min,my_Tlgrd_max,my_Tlgrd_avg,tlgrd
-      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)
+      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)
       my_Tlgrd_min=1e6
       my_Tlgrd_max=0.0_WP
       my_Tlgrd_avg=0.0_WP
@@ -511,8 +511,7 @@ contains
             print*,'Bi-section iterations =',it
             if (.not.convergence) call die('[simulation_init] Bi-section failed')
             ! Debug
-            ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*beta_int(0.0_WP,beta)
-            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*beta_int(0.0_WP,beta)
+            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -734,7 +733,6 @@ contains
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                      lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
-                     ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                   end if
                end do
             end do
@@ -1343,7 +1341,6 @@ contains
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
                         lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
-                        ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
                      end if
                   end do
                end do

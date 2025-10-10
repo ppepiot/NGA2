@@ -380,7 +380,7 @@ contains
       use parallel,  only: MPI_REAL_WP
       integer :: index,i,j,k,ierr
       real(WP) :: my_area,area,my_Tlgrd_min,my_Tlgrd_max,my_Tlgrd_avg,tlgrd
-      Tlgrd_ext=2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)
+      Tlgrd_ext=abs(2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t))
       my_Tlgrd_min=1e6
       my_Tlgrd_max=0.0_WP
       my_Tlgrd_avg=0.0_WP
@@ -388,12 +388,9 @@ contains
       do index=1,vf%band_count(0)
          ! Get the interfacial cell indices
          i=vf%band_map(1,index)
-         if ((i.lt.cfg%imin_).or.(i.gt.cfg%imax_)) cycle
          j=vf%band_map(2,index)
-         if ((j.lt.cfg%jmin_).or.(j.gt.cfg%jmax_)) cycle
          k=vf%band_map(3,index)
-         if ((k.lt.cfg%kmin_).or.(k.gt.cfg%kmax_)) cycle
-         tlgrd=lg%Tl_grd(i,j,k)
+         tlgrd=abs(lg%Tl_grd(i,j,k))
          if (tlgrd.lt.my_Tlgrd_min) my_Tlgrd_min=tlgrd
          if (tlgrd.gt.my_Tlgrd_max) my_Tlgrd_max=tlgrd
          my_area=my_area+cfg%vol(i,j,k)*vf%SD(i,j,k)
@@ -623,8 +620,7 @@ contains
             print*,'Bi-section iterations =',it
             if (.not.convergence) call die('[simulation_init] Bi-section failed')
             ! Debug
-            ! print*,'Analytical mass flux = ',2.0_WP*k_l*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/(get_Rext(t0)*h_lg)*beta_int(0.0_WP,beta)
-            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)*beta_int(0.0_WP,beta)
+            print*,'Analytical T grad = ',2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(t0)
          end if
          call MPI_BCAST(beta,1,MPI_REAL_WP,0,cfg%comm,ierr)
       end block analytical_solution
@@ -838,10 +834,6 @@ contains
                end do
             end do
          end do
-         ! radius=R0+0.001_WP
-         ! print*,'T = ',T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20)
-         ! print*,'T grad = ',((T_inf-2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)*Simpson(beta_int,beta,1.0_WP-R0/radius,1.0_WP,20))-T_sat)/0.001_WP
-         ! print*,'dx = ',cfg%dx(1)
          ! Apply boundary conditions
          where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
             sc%SC(:,:,:,iTl)=T_sat
@@ -902,8 +894,7 @@ contains
             do j=lg%cfg%jmin_,lg%cfg%jmax_
                do i=lg%cfg%imin_,lg%cfg%imax_
                   if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                     lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
-                     ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*integrand(0.0_WP,beta)/h_lg
+                     lg%mdot2p(i,j,k)=(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
                   end if
                end do
             end do
@@ -1215,8 +1206,7 @@ contains
                do j=lg%cfg%jmin_,lg%cfg%jmax_
                   do i=lg%cfg%imin_,lg%cfg%imax_
                      if ((vf%VF(i,j,k).gt.VFlo).and.(vf%VF(i,j,k).lt.VFhi)) then
-                        lg%mdot2p(i,j,k)=(-k_g*lg%Tg_grd(i,j,k)+k_l*lg%Tl_grd(i,j,k))/h_lg
-                        ! lg%mdot2p(i,j,k)=k_l*2.0_WP*beta**2*(rho_g*(h_lg+(Cp_l-Cp_g)*(T_inf-T_sat)))/(rho_l*Cp_l)/get_Rext(time%t)*beta_int(0.0_WP,beta)/h_lg
+                        lg%mdot2p(i,j,k)=(k_g*lg%Tg_grd(i,j,k)-k_l*lg%Tl_grd(i,j,k))/h_lg
                      end if
                   end do
                end do

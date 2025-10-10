@@ -717,54 +717,52 @@ contains
    end subroutine get_div
 
 
-   !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
-   subroutine get_temperature_grad(this)
-      use mpi_f08,  only: MPI_MAX
-      use parallel, only: MPI_REAL_WP
-      implicit none
-      class(lgpc), intent(inout) :: this
-      ! Apply boundary conditions
-      call this%apply_bcond()
-      ! Get the temperature gradients
-      call this%get_grad(Lphase,this%Tl,this%Tl_grd)
-      call this%get_grad(Gphase,this%Tg,this%Tg_grd)
-      ! Extrapolate the gradients to interface
-      call this%pure_interfacial_extp(Lphase,this%Tl_grd)
-      call this%pure_interfacial_extp(Gphase,this%Tg_grd)
-   end subroutine get_temperature_grad
-
-
-   ! !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   ! !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
    ! subroutine get_temperature_grad(this)
-   !    use irl_fortran_interface, only: calculateCentroid
    !    implicit none
    !    class(lgpc), intent(inout) :: this
-   !    real(WP), dimension(3) :: posI,nI
-   !    integer  :: i,j,k,index
-   !    ! Get the interface normal
-   !    call this%get_normal()
    !    ! Apply boundary conditions
    !    call this%apply_bcond()
-   !    ! Zero out the gradients
-   !    this%Tl_grd=0.0_WP
-   !    this%Tg_grd=0.0_WP
-   !    ! Loop over the interfacial cells
-   !    do index=1,this%vf%band_count(0)
-   !       ! Get the interfacial cell indices
-   !       i=this%vf%band_map(1,index)
-   !       j=this%vf%band_map(2,index)
-   !       k=this%vf%band_map(3,index)
-   !       ! Get the interface center and normal
-   !       posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
-   !       nI(1)=this%normal(i,j,k,1)
-   !       nI(2)=this%normal(i,j,k,2)
-   !       nI(3)=this%normal(i,j,k,3)
-   !       ! Get the liquid side gradient
-   !       call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
-   !       ! Get the gas side gradient
-   !       call this%get_one_sided_grad(phase=Gphase,F=this%Tg,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
-   !    end do
+   !    ! Get the temperature gradients
+   !    call this%get_grad(Lphase,this%Tl,this%Tl_grd)
+   !    call this%get_grad(Gphase,this%Tg,this%Tg_grd)
+   !    ! Extrapolate the gradients to interface
+   !    call this%pure_interfacial_extp(Lphase,this%Tl_grd)
+   !    call this%pure_interfacial_extp(Gphase,this%Tg_grd)
    ! end subroutine get_temperature_grad
+
+
+   !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   subroutine get_temperature_grad(this)
+      use irl_fortran_interface, only: calculateCentroid
+      implicit none
+      class(lgpc), intent(inout) :: this
+      real(WP), dimension(3) :: posI,nI
+      integer  :: i,j,k,index
+      ! Get the interface normal
+      call this%get_normal()
+      ! Apply boundary conditions
+      call this%apply_bcond()
+      ! Zero out the gradients
+      this%Tl_grd=0.0_WP
+      this%Tg_grd=0.0_WP
+      ! Loop over the interfacial cells
+      do index=1,this%vf%band_count(0)
+         ! Get the interfacial cell indices
+         i=this%vf%band_map(1,index)
+         j=this%vf%band_map(2,index)
+         k=this%vf%band_map(3,index)
+         ! Get the interface center and normal
+         posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+         nI(1)=this%normal(i,j,k,1)
+         nI(2)=this%normal(i,j,k,2)
+         nI(3)=this%normal(i,j,k,3)
+         ! Get the liquid side gradient
+         call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
+         ! Get the gas side gradient
+         call this%get_one_sided_grad(phase=Gphase,F=this%Tg,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
+      end do
+   end subroutine get_temperature_grad
 
 
    !> Calculate the one-sided gradient dot producted by the interface normal at a given phase
@@ -778,8 +776,10 @@ contains
       real(WP), dimension(3), intent(in) :: normal
       real(WP), intent(out) :: Fgrd
       integer, dimension(3) :: ind
-      real(WP) :: nx,ny,nz,FI,F1,F2,mult,p
-      real(WP) :: x1,y1,z1,x2,y2,z2,d1,d2,vof
+      real(WP) :: nx,ny,nz,FI,F1,F2,mult,p,g1,g2
+      real(WP) :: x1,y1,z1,x2,y2,z2,d1,d2
+      logical :: ci
+      integer :: plane
       ! Get the phase multiplier (Follows IRL convention)
       p=real(phase,WP)     ! ( 0 for liquid, 1 for gas)
       mult=2.0_WP*p-1.0_WP ! (-1 for liquid, 1 for gas)
@@ -791,48 +791,59 @@ contains
       x1=posI(1)
       y1=posI(2)
       z1=posI(3)
-      vof=this%vf%VF(i,j,k)
       ind=[i,j,k]
       ! Interpolate at the first plane (skip the interfacial cells)
-      do while ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP))
-         call this%itp_ccplane(F=F,x0=x1,y0=y1,z0=z1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,nz=nz,Fitp=F1,xitp=x2,yitp=y2,zitp=z2)
+      ci=.true.
+      do while (ci)
+         call this%itp_ccplane(F=F,x0=x1,y0=y1,z0=z1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,nz=nz,Fitp=F1,xitp=x2,yitp=y2,zitp=z2,plane_out=plane,contains_interface=ci)
          x1=x2
          y1=y2
          z1=z2
          ind=this%cfg%get_ijk_global(pos=[x1,y1,z1],ind_guess=[i,j,k])
-         vof=this%vf%VF(ind(1),ind(2),ind(3))
       end do
       ! Interpolate at the second plane
-      call this%itp_ccplane(F=F,x0=x1,y0=y1,z0=z1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,nz=nz,Fitp=F2,xitp=x2,yitp=y2,zitp=z2)
+      call this%itp_ccplane(F=F,x0=x1,y0=y1,z0=z1,i=ind(1),j=ind(2),k=ind(3),nx=nx,ny=ny,nz=nz,plane_in=plane,Fitp=F2,xitp=x2,yitp=y2,zitp=z2,contains_interface=ci)
       ! Calculate the one-sided gradient
       FI=F(i,j,k)
       d1=norm2([posI(1)-x1,posI(2)-y1,posI(3)-z1])
       d2=norm2([posI(1)-x2,posI(2)-y2,posI(3)-z2])
-      Fgrd=mult*((p-this%vf%VF(i,j,k))*(F1-FI)/d1+(this%vf%VF(i,j,k)+mult-p)*(F2-FI)/d2)
+      g1=(F1-FI)/d1
+      g2=(F2-FI)/d2
+      if (abs(g1).gt.abs(g2)) then
+         Fgrd=mult*g1
+      else
+         Fgrd=mult*g2
+      end if
+      ! Fgrd=(p-this%vf%VF(i,j,k))*g1+(this%vf%VF(i,j,k)-(1.0_WP-p))*g2
    end subroutine get_one_sided_grad
 
 
    !> Interpolates the input scalar field (F) at the intersection between the input line (defined by a point and a normal vector)
    !> and the closest plane that goes through the cell centers of the grid
-   subroutine itp_ccplane(this,F,x0,y0,z0,i,j,k,nx,ny,nz,Fitp,xitp,yitp,zitp)
+   subroutine itp_ccplane(this,F,x0,y0,z0,i,j,k,nx,ny,nz,plane_in,Fitp,xitp,yitp,zitp,plane_out,contains_interface)
+      use messager, only: die
       implicit none
       class(lgpc), intent(in) :: this
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: F
       real(WP), intent(in)  :: x0,y0,z0
       integer,  intent(in)  :: i,j,k
       real(WP), intent(inout)  :: nx,ny,nz
+      integer, optional, intent(in) :: plane_in
       real(WP), intent(out) :: Fitp
       real(WP), optional, intent(out) :: xitp,yitp,zitp
+      integer, optional, intent(out) :: plane_out
+      logical, intent(out) :: contains_interface
       real(WP) :: dx,dy,dz,delta(1:3)
       real(WP) :: Sx,Sy,Sz
       real(WP) :: wxm,wxp
       real(WP) :: wym,wyp
       real(WP) :: wzm,wzp
-      integer  :: ip,jp,kp,im,jm,km,ind_min
+      integer  :: ip,jp,kp,im,jm,km,plane
       real(WP) :: x_min,x_max
       real(WP) :: y_min,y_max
       real(WP) :: z_min,z_max
       real(WP), parameter :: ntol=1e-6
+      contains_interface=.false.
       ! Store the current indices
       im=i; jm=j; km=k
       ! Get the distances to the coordinate aligned planes
@@ -867,14 +878,30 @@ contains
          dz=(this%cfg%zm(kp)-z0)/nz
       end if
       ! Identify the closest plane
-      delta=[abs(dx),abs(dy),abs(dz)]
-      ind_min=minloc(delta,1)
-      select case (ind_min)
+      if (present(plane_in)) then
+         plane=plane_in
+         select case (plane)
+         case (1)
+            ip=im+int(Sx)
+            if (nx.ne.0.0_WP) dx=(this%cfg%xm(ip)-this%cfg%xm(im))/nx
+         case (2)
+            jp=jm+int(Sy)
+            if (ny.ne.0.0_WP) dy=(this%cfg%ym(jp)-this%cfg%ym(jm))/ny
+         case (3)
+            kp=km+int(Sz)
+            if (nz.ne.0.0_WP) dz=(this%cfg%zm(kp)-this%cfg%zm(km))/nz
+         end select
+      else
+         delta=[abs(dx),abs(dy),abs(dz)]
+         plane=minloc(delta,1)
+      end if
+      if (present(plane_out)) plane_out=plane
+      select case (plane)
       case (1)
          ! Find the intersection between the interface normal and the x plane
          xitp=this%cfg%xm(ip)
-         yitp=ny/nx*dx+y0
-         zitp=nz/nx*dx+z0
+         yitp=ny*dx+y0
+         zitp=nz*dx+z0
          ! Correct the stencil in y
          y_max=max(this%cfg%ym(jm),this%cfg%ym(jp))
          do while (yitp.gt.y_max)
@@ -901,6 +928,11 @@ contains
             kp=kp-1
             z_min=min(this%cfg%zm(km),this%cfg%zm(kp))
          end do
+         contains_interface=(this%vf%VF(ip,jm,km).gt.0.0_WP .and. this%vf%VF(ip,jm,km).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jp,km).gt.0.0_WP .and. this%vf%VF(ip,jp,km).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jm,kp).gt.0.0_WP .and. this%vf%VF(ip,jm,kp).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jp,kp).gt.0.0_WP .and. this%vf%VF(ip,jp,kp).lt.1.0_WP)
+         if (contains_interface) return
          ! Perform a bi-linear interpolation
          wym=abs(this%cfg%ym(jp)-yitp)*this%cfg%dymi(jp)
          wyp=1.0_WP-wym
@@ -910,8 +942,8 @@ contains
       case (2)
          ! Find the intersection between the interface normal and the y plane
          yitp=this%cfg%ym(jp)
-         zitp=nz/ny*dy+z0
-         xitp=nx/ny*dy+x0
+         zitp=nz*dy+z0
+         xitp=nx*dy+x0
          ! Correct the stencil in z
          z_max=max(this%cfg%zm(km),this%cfg%zm(kp))
          do while (zitp.gt.z_max)
@@ -938,6 +970,11 @@ contains
             ip=ip-1
             x_min=min(this%cfg%xm(im),this%cfg%xm(ip))
          end do
+         contains_interface=(this%vf%VF(im,jp,km).gt.0.0_WP .and. this%vf%VF(im,jp,km).lt.1.0_WP).or.&
+                            (this%vf%VF(im,jp,kp).gt.0.0_WP .and. this%vf%VF(im,jp,kp).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jp,km).gt.0.0_WP .and. this%vf%VF(ip,jp,km).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jp,kp).gt.0.0_WP .and. this%vf%VF(ip,jp,kp).lt.1.0_WP)
+         if (contains_interface) return
          ! Perform a bi-linear interpolation
          wzm=abs(this%cfg%zm(kp)-zitp)*this%cfg%dzmi(kp)
          wzp=1.0_WP-wzm
@@ -947,8 +984,8 @@ contains
       case (3)
          ! Find the intersection between the interface normal and the z plane
          zitp=this%cfg%zm(kp)
-         xitp=nx/nz*dz+x0
-         yitp=ny/nz*dz+y0
+         xitp=nx*dz+x0
+         yitp=ny*dz+y0
          ! Correct the stencil in x
          x_max=max(this%cfg%xm(im),this%cfg%xm(ip))
          do while (xitp.gt.x_max)
@@ -975,6 +1012,11 @@ contains
             jp=jp-1
             y_min=min(this%cfg%ym(jm),this%cfg%ym(jp))
          end do
+         contains_interface=(this%vf%VF(im,jm,kp).gt.0.0_WP .and. this%vf%VF(im,jm,kp).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jm,kp).gt.0.0_WP .and. this%vf%VF(ip,jm,kp).lt.1.0_WP).or.&
+                            (this%vf%VF(im,jp,kp).gt.0.0_WP .and. this%vf%VF(im,jp,kp).lt.1.0_WP).or.&
+                            (this%vf%VF(ip,jp,kp).gt.0.0_WP .and. this%vf%VF(ip,jp,kp).lt.1.0_WP)
+         if (contains_interface) return
          ! Perform a bi-linear interpolation
          wxm=abs(this%cfg%xm(ip)-xitp)*this%cfg%dxmi(ip)
          wxp=1.0_WP-wxm
