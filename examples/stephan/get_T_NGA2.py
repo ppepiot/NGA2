@@ -36,11 +36,10 @@ for time_step in range(num_time_steps):
 
     # Get the current time
     time = animationScene.AnimationTime
+    print('')
 
     # Check if the current time is one of the specified times
     if any(abs(time - desired_time) <= tolerance for desired_time in desired_times):
-
-        print(time)
 
         # Increment the index
         line_ind = line_ind + 1
@@ -76,3 +75,10 @@ for time_step in range(num_time_steps):
                 if T_val > 0.0: 
                     file_ctr.write(f"{x_ctr.GetValue(i)}            {T_ctr.GetValue(i)}\n")
         file_ctr.close()
+
+        # Print message
+        print('Extracted data for t = '+str(time))
+
+    # Delet the line
+    Delete(center_line)
+    del center_line

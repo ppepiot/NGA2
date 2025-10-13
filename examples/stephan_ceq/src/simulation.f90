@@ -8,6 +8,10 @@ module simulation
    use vfs_class,         only: vfs,VFlo,VFhi
    use tpscalar_class,    only: tpscalar,Lphase,Gphase
    use lgpc_class,        only: lgpc
+   use string,            only: str_short,str_medium
+   use YAMLRead,          only: YAMLElement
+   use chem_sys_class,    only: chem_sys
+   use chem_state_class,  only: chem_state,fixed_PH
    use timetracker_class, only: timetracker
    use ensight_class,     only: ensight
    use surfmesh_class,    only: surfmesh
@@ -24,6 +28,16 @@ module simulation
    type(tpscalar),    public :: sc
    type(lgpc),        public :: lg
    type(timetracker), public :: time,timeSC
+
+   !> The array of the species. Eeach stored as a YAMLElement object
+   type(YAMLElement), dimension(:), allocatable :: species
+
+   !> Species names
+   character(len=str_medium), dimension(:), allocatable :: sp_names
+
+   !> Chemical system and state
+   type(chem_sys)   :: sys
+   type(chem_state) :: state
    
    !> Ensight postprocessing
    type(surfmesh) :: smesh
@@ -40,14 +54,19 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: resU,resV,resW
    real(WP), dimension(:,:,:),   allocatable :: Ui,Vi,Wi
    real(WP), dimension(:,:,:),   allocatable :: T
+   real(WP), dimension(:),       allocatable :: MM
+   ! Debug
+   real(WP), dimension(:,:,:),   allocatable :: dbg_flg
    
    !> Problem definition
    real(WP) :: H0
    integer  :: iTl,iTg,iYv
-   real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat
+   real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat,T_g
    real(WP) :: T_w,beta,t0
    real(WP) :: x_itf,u_itf,x_itf_ext,u_itf_ext
-   real(WP) :: mdot2p,prhs_int
+   real(WP) :: prhs_int
+   real(WP) :: pressure,wv2air_rat,N2O_rat,YO2,YN2
+   integer  :: ns,np=2
    
 contains
 
@@ -132,12 +151,579 @@ contains
    end subroutine get_interface
 
 
+   subroutine interface_jump()
+      use messager, only: die
+      implicit none
+      real(WP), dimension(:),     allocatable :: vol_new,vol_old,mp,N,phasicHoR,Y
+      logical,  dimension(:,:,:), allocatable :: clustered
+      logical,  dimension(:),     allocatable :: active
+      integer,  dimension(:,:),   allocatable :: cell_indices
+      real(WP), dimension(:),     allocatable :: Vscaled,vof_old,vof_new,w
+      real(WP) :: Vnew,Vold,Nsum,vof,itf_area,Tl,Tg
+      integer  :: i,j,k,index,isc,p,n_clustered,m
+      integer  :: in,jn,kn
+      integer  :: stx,sty,stz
+      real(WP) :: mdot2p
+      real(WP), parameter :: trsh_lo=0.05_WP,trsh_hi=1.0_WP-trsh_lo,wmin=1.0e-16_WP,dVlmin=1.0e-16_WP
+      integer,  parameter :: nc_max=27
+      real(WP) :: dVl,dVl_i,dVl_rem,Vref,vof_tmp,interfaceness,wsum
+
+      ! Debug
+      dbg_flg=0.0_WP
+
+      Vref=minval(cfg%vol)
+
+      ! Allocate arrays
+      allocate(vol_new(Lphase:Gphase))
+      allocate(vol_old(Lphase:Gphase))
+      allocate(mp(Lphase:Gphase))
+      allocate(N(ns))
+      allocate(phasicHoR(Lphase:Gphase))
+      allocate(Y(ns))
+      allocate(clustered(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); clustered=.false.
+      allocate(cell_indices(3,nc_max)); cell_indices=0
+      allocate(Vscaled(nc_max)); Vscaled=0.0_WP
+      allocate(vof_old(nc_max)); vof_old=0.0_WP
+      allocate(vof_new(nc_max)); vof_new=0.0_WP
+      allocate(w(nc_max)); w=0.0_WP
+      allocate(active(nc_max)); active=.false.
+
+      ! Clustering stencil
+      if (cfg%nx.gt.1) then
+         stx=1
+      else
+         stx=0
+      end if
+      if (cfg%ny.gt.1) then
+         sty=1
+      else
+         sty=0
+      end if
+      if (cfg%nz.gt.1) then
+         stz=1
+      else
+         stz=0
+      end if
+
+      ! Loop over the interfacial cells
+      do index=1,vf%band_count(0)
+
+         ! Get the interfacial cell indices
+         i=vf%band_map(1,index)
+         j=vf%band_map(2,index)
+         k=vf%band_map(3,index)
+
+         ! Skip if already clustered
+         if (clustered(i,j,k)) cycle
+         
+         ! Add current cell to the potential cluster
+         n_clustered=1
+         cell_indices(:,1)=[i,j,k]
+
+         ! Initialize the interfacial area and old volumes
+         itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
+         vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+
+         ! Pre-evaluate the equilibrium
+         mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+         Y =sc%SC(i,j,k,1:ns)
+         Tl=sc%SC(i,j,k,iTl)
+         Tg=sc%SC(i,j,k,iTg)
+         call get_equilibrium()
+
+         ! Cluster cells if the equilibrium failed
+         if (.not.state%success) then
+
+            ! Mark it as clustered
+            clustered(i,j,k)=.true.
+
+            ! Initialize the species mass
+            do isc=1,ns
+               p=sc%phase(isc)
+               Y(isc)=sc%Prho(p)*sc%PVF(i,j,k,p)*cfg%vol(i,j,k)*sc%SC(i,j,k,isc)
+            end do
+
+            ! Initialize the mass-averaged temperatures
+            Tl=sc%Prho(Lphase)*sc%PVF(i,j,k,Lphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTl)
+            Tg=sc%Prho(Gphase)*sc%PVF(i,j,k,Gphase)*cfg%vol(i,j,k)*sc%SC(i,j,k,iTg)
+
+            ! Loop over the cluster stencil skipping the ghost cells
+            z_loop: do kn=k-stz,k+stz
+               if (kn.lt.cfg%kmin_.or.kn.gt.cfg%kmax_) cycle
+               y_loop: do jn=j-sty,j+sty
+                  if (jn.lt.cfg%jmin_.or.jn.gt.cfg%jmax_) cycle
+                  x_loop: do in=i-stx,i+stx
+                     if (in.lt.cfg%imin_.or.in.gt.cfg%imax_) cycle
+
+                     ! Neighbor must be interfacial and not clustered yet
+                     if (vf%VF(in,jn,kn).gt.VFlo.and.vf%VF(in,jn,kn).lt.VFhi.and..not.clustered(in,jn,kn)) then
+
+                        ! Mark it as clustered
+                        n_clustered=n_clustered+1
+                        cell_indices(:,n_clustered)=[in,jn,kn]
+                        clustered(in,jn,kn)=.true.
+
+                        ! Accumulate old volumes
+                        vol_old=vol_old+sc%PVF(in,jn,kn,:)*cfg%vol(in,jn,kn)
+
+                        ! Accumulate mass*SC and mass*temperature
+                        do isc=1,ns
+                           p=sc%phase(isc)
+                           Y(isc)=Y(isc)+sc%Prho(p)*sc%PVF(in,jn,kn,p)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,isc)
+                        end do
+                        Tl=Tl+sc%Prho(Lphase)*sc%PVF(in,jn,kn,Lphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTl)
+                        Tg=Tg+sc%Prho(Gphase)*sc%PVF(in,jn,kn,Gphase)*cfg%vol(in,jn,kn)*sc%SC(in,jn,kn,iTg)
+
+                        ! Accumulate interface area
+                        itf_area=itf_area+cfg%vol(in,jn,kn)*vf%SD(in,jn,kn)
+                     end if
+
+                  end do x_loop
+               end do y_loop
+            end do z_loop
+
+            ! Cluster-level phase masses
+            mp=sc%Prho*vol_old
+
+            ! Cluster-averaged mass fractions and temperatures
+            do isc=1,ns
+               Y(isc)=Y(isc)/mp(sc%phase(isc))
+            end do
+            Tl=Tl/mp(Lphase)
+            Tg=Tg/mp(Gphase)
+
+            ! Get the equilibrium state of the cluster
+            call get_equilibrium()
+            
+         end if
+
+         ! Calculate the cluster VOF
+         vof=vol_old(Lphase)/sum(vol_old)
+
+         ! Store the old total volume
+         Vold=sum(vol_old)
+
+         ! Debug
+         if (.not.state%success) then
+            print*,'Cluster VOF = ',vof
+            print*,'N initial scaled and fed into ceq = ',N
+            print*,'N initial actual = ',N*Nsum
+            print*,'HoR = ',sum(phasicHoR)
+            print*,'T_g = ',T_g
+            print*,'Clustered cells info:'
+            print*,'n_clustered = ',n_clustered
+            do m=1,n_clustered
+               i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+               print*,'i,j,k = ',i,j,k
+               print*,'VOF = ',vf%VF(i,j,k)
+               print*,'SD = ',vf%SD(i,j,k)
+            end do
+            call die('line 302')
+         end if
+
+         ! Update the phase masses
+         mp=0.0_WP
+         do isc=1,ns
+            p=sc%phase(isc)
+            mp(p)=mp(p)+N(isc)*MM(isc)
+         end do
+
+         ! Get the phase volumes
+         vol_new=mp/sc%Prho
+         Vnew=sum(vol_new)
+
+         ! Get the phase change mass flux
+         mdot2p=(Vnew-Vold)/(time%dt*(1.0_WP/sc%Prho(Gphase)-1.0_WP/sc%Prho(Lphase))*itf_area)
+
+         ! Gather geometry and current VOF per clustered cell
+         do m=1,n_clustered
+            i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+            active(m)=.true.
+            Vscaled(m)=cfg%vol(i,j,k)/Vref ! Scale it for more accurate calculations
+            vof_old(m)=vf%VF(i,j,k)
+            vof_new(m)=vof_old(m)
+         end do
+
+         ! Total liquid volume change ( > 0 condensation, < 0 vaporization)
+         dVl=(vol_new(Lphase)-vol_old(Lphase))/Vref ! Scale it for more accurate calculations
+         dVl_rem=dVl
+
+         if (abs(dVl).gt.dVlmin) then
+
+            ! Build weights
+            do m=1,n_clustered
+               i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+               itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
+               interfaceness=minval(sc%PVF(i,j,k,:))
+               w(m)=max(itf_area*interfaceness,wmin)
+            end do
+
+            ! Iteratively redistribute liquid
+            do
+
+               ! Update weights sum
+               wsum=0.0_WP
+               do m=1,n_clustered
+                  if (active(m)) wsum=wsum+w(m)
+               end do
+
+               ! Terminate if succssesd
+               if (abs(dVl_rem).le.dVlmin.or.wsum.le.0.0_WP) exit
+
+               ! Distribute
+               dVl=dVl_rem
+               do m=1,n_clustered
+                  if (.not.active(m)) cycle
+
+                  ! Estimate VOF
+                  dVl_i =(w(m)/wsum)*dVl
+                  vof_tmp=vof_new(m)+dVl_i/Vscaled(m)
+
+                  ! Clip it
+                  if (vof_tmp.gt.1.0_WP) then
+                     dVl_i=(1.0_WP-vof_new(m))*Vscaled(m)
+                     vof_new(m)=1.0_WP
+                     active(m)=.false.
+                  else if (vof_tmp.lt.0.0_WP) then
+                     dVl_i=(0.0_WP-vof_new(m))*Vscaled(m)
+                     vof_new(m)=0.0_WP
+                     active(m)=.false.
+                  else
+                     vof_new(m)=vof_tmp
+                  end if
+
+                  ! Correct the liquid volume change
+                  dVl_rem=dVl_rem-dVl_i
+
+               end do
+
+            end do
+
+         end if
+
+         ! Assign per-cell fields (Need to treat cells with VOF=0 and 1, differently)
+         do m=1,n_clustered
+
+            ! Get the cell indices
+            i=cell_indices(1,m)
+            j=cell_indices(2,m)
+            k=cell_indices(3,m)
+
+            ! Assign VOF
+            if (vof_new(m).lt.VFlo) then
+               vf%VF(i,j,k)=0.0_WP
+            else if (vof_new(m).gt.VFhi) then
+               vf%VF(i,j,k)=1.0_WP
+            else
+               vf%VF(i,j,k)=vof_new(m)
+            end if
+            sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
+            sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
+
+            ! Composition (Assuming the same mass fraction for all non-empty the cells in the cluster)
+            do isc=1,ns
+               p=sc%phase(isc)
+               if(sc%PVF(i,j,k,p).gt.0.0_WP) then
+                  sc%SC(i,j,k,isc)=MM(isc)*N(isc)/mp(sc%phase(isc))
+               else
+                  sc%SC(i,j,k,isc)=0.0_WP
+               end if
+            end do
+
+            ! Temperature and phase change mass flux
+            if (vf%VF(i,j,k).eq.1.0_WP) then
+               sc%SC(i,j,k,iTl) =state%T ! Not sure if this is good enough.
+               sc%SC(i,j,k,iTg) =0.0_WP
+               lg%mdot2p(i,j,k)=0.0_WP
+            else if (vf%VF(i,j,k).eq.0.0_WP) then
+               sc%SC(i,j,k,iTl) =0.0_WP
+               sc%SC(i,j,k,iTg) =state%T ! Not sure if this is good enough.
+               lg%mdot2p(i,j,k)=0.0_WP
+            else
+               sc%SC(i,j,k,iTl) =state%T
+               sc%SC(i,j,k,iTg) =state%T
+               lg%mdot2p(i,j,k)=mdot2p
+            end if
+
+         end do
+
+      end do
+
+      ! Update the interface (Do I need it? I don't think so)
+      ! call vf%advect_interface(0.0_WP,fs%U,fs%V,fs%W)
+
+      ! Remove flotsams and thin structures if needed
+      call vf%remove_flotsams()
+      call vf%remove_thinstruct()
+      
+      ! Synchronize and clean-up barycenter fields
+      call vf%sync_and_clean_barycenters()
+      
+      ! Update the interface band
+      call vf%update_band()
+      
+      ! Perform interface reconstruction from transported moments
+      call vf%build_interface()
+      
+      ! Create discontinuous polygon mesh from IRL interface
+      call vf%polygonalize_interface()
+      
+      ! Perform interface sensing (Do I need it?)
+      ! if (vf%two_planes) call vf%sense_interface()
+      
+      ! Calculate distance from polygons (I don't think it's needed anywhere)
+      ! call vf%distance_from_polygon()
+      
+      ! Calculate subcell phasic volumes (I don't think it's needed anywhere)
+      ! call vf%subcell_vol()
+      
+      ! Calculate curvature
+      call vf%get_curvature()
+      
+      ! Reset moments to guarantee compatibility with interface reconstruction
+      call vf%reset_moments()
+
+      ! Sync fields
+      do isc=1,sc%nscalar
+         call cfg%sync(sc%SC(:,:,:,isc))
+      end do
+      call cfg%sync(vf%VF)
+      call cfg%sync(lg%mdot2p)
+
+      ! Apply boundary conditions
+      call sc%apply_bcond(time%t,time%dt)
+      call vf%apply_bcond(time%t,time%dt)
+
+      ! Debug
+      where (clustered) dbg_flg=1.0_WP
+      call cfg%sync(dbg_flg)
+
+      ! Deallocate arrays
+      deallocate(vol_new,vol_old,mp,N,phasicHoR,Y,clustered,cell_indices,Vscaled,vof_old,vof_new,w,active)
+
+      contains
+
+      subroutine get_equilibrium()
+         implicit none
+
+         ! Calculate and normalize the mole numbers
+         do isc=1,ns
+            N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
+         end do
+         Nsum=sum(N)
+         if (Nsum.gt.0.0_WP) N=N/Nsum
+
+         ! Get the phasic enthalpies
+         call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
+         call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
+
+         ! Reinitialize the mole numbers
+         call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
+         if (.not.state%success) then
+            print*,'Cluster VOF = ',vof
+            print*,'N = ',N
+            print*,'N*Nsum = ',N*Nsum
+            print*,'HoR = ',sum(phasicHoR)
+            print*,'T_g = ',T_g
+            print*,'Clustered cells info:'
+            print*,'n_clustered = ',n_clustered
+            do m=1,n_clustered
+               i=cell_indices(1,m); j=cell_indices(2,m); k=cell_indices(3,m)
+               print*,'i,j,k = ',i,j,k
+               print*,'VOF = ',vf%VF(i,j,k)
+               print*,'SD = ',vf%SD(i,j,k)
+            end do
+            call die('line 517')
+         end if
+
+         ! Get the chemical equilibrium
+         call state%equilibrate()
+
+         ! Re-scale the mole numbers
+         ! N=state%N*Nsum
+         ! Debug: If not successful, don't assign N so I know what initial moles caused this
+         if (state%success) N=state%N*Nsum
+
+      end subroutine get_equilibrium
+
+   end subroutine interface_jump
+
+
    !> Initialization of problem solver
    subroutine simulation_init
-      use param, only: param_read
+      use param,    only: param_read,param_getsize
+      use messager, only: die
       implicit none
+      integer :: ne,ncs
+      character(len=str_short), dimension(:), allocatable :: e_names
+      real(WP), dimension(:,:), allocatable :: elem_mat
+      real(WP), dimension(:,:), allocatable :: phse_mat
+      real(WP), allocatable :: nasa_coef(:,:)
+      character(len=str_medium), dimension(:), allocatable :: const_sp
+      integer,  dimension(:), allocatable :: CS
       
       
+      ! Read problem inputs
+      read_inputs: block
+         call param_read('Liquid density',rho_l)
+         call param_read('Gas density',rho_g)
+         call param_read('Saturation temperature',T_sat)
+         call param_read('Latent heat',h_lg)
+         call param_read('Liquid thermal conductivity',k_l)
+         call param_read('Liquid specific heat capacity',Cp_l)
+         call param_read('Gas thermal conductivity',k_g)
+         call param_read('Gas specific heat capacity',Cp_g)
+         call param_read('Wall temperature',T_w)
+         call param_read('Pressure',Pressure)
+         alpha_l=k_l/(rho_l*Cp_l)
+         alpha_g=k_g/(rho_g*Cp_g)
+      end block read_inputs
+
+
+      ! Parse the mechanism file
+      parse_mech: block
+         use chem_sys_class, only: ncof
+         use YAMLRead,       only: YAMLHandler,YAMLSequence,YAMLMap,yaml_open_file,yaml_start_from_sequence,yaml_close_file
+         character(len=str_medium) :: mch_file
+         character(len=str_short), dimension(:), allocatable :: sp_names_copy,const_sp_copy
+         type(YAMLHandler)  :: domain
+         type(YAMLSequence) :: sp_list,phases,elements
+         type(YAMLElement)  :: sp,gas
+         type(YAMLMap)      :: thermo,comp
+         integer :: isc,nn,i,j,k,e,code
+         character(len=:), allocatable :: name_arr(:)
+         character(len=:), allocatable :: name
+         real(WP), allocatable :: T_range(:)
+         real(WP), dimension(:,:), allocatable :: a
+         logical :: new_elem
+         ! Get the target species from input
+         ns=param_getsize('Species')
+         ncs=param_getsize('Constrained species')
+         allocate(sp_names(1:ns))
+         allocate(sp_names_copy(1:ns))
+         allocate(const_sp(1:ncs))
+         allocate(const_sp_copy(1:ncs))
+         allocate(CS(ncs))
+         call param_read('Species',sp_names)
+         call param_read('Constrained species',const_sp)
+         sp_names_copy=sp_names
+         const_sp_copy=const_sp
+         ! Read the mechanism file path
+         call param_read('Mechanism file',mch_file)
+         ! Open the mechanism
+         domain=yaml_open_file(trim(mch_file))
+         ! Get the list of all species
+         sp_list=yaml_start_from_sequence(domain,'species')
+         ! Extract the target species from the mechanism
+         allocate(species(1:ns))
+         nn=0
+         k=0
+         do isc=0,sp_list%size-1 ! Index in YAMLSequence starts from 0
+            sp=sp_list%element(isc)
+            name_arr=sp%value_str('name',code)
+            name=''
+            do i=1,size(name_arr)
+               name=trim(name//name_arr(i))
+            end do
+            do i=1,ns
+               if (sp_names_copy(i).eq.name) then
+                  nn=nn+1
+                  species(nn)=sp
+                  sp_names(nn)=name
+                  do j=1,ncs
+                     if (const_sp_copy(j).eq.name) then
+                        k=k+1
+                        const_sp(k)=name
+                        CS(k)=nn
+                     end if
+                  end do
+               end if
+            end do
+            call sp%destroy()
+         end do
+         if(nn.ne.ns) call die('Some species are missing in the mechanism file.')
+         ! Get the elements that exist in the target species
+         phases=yaml_start_from_sequence(domain,'phases')
+         gas=phases%element(0)
+         elements=gas%value_sequence('elements',code) ! For some reason I couldn't directly get the element names using yaml-fortran
+         allocate(e_names(elements%size)); e_names=''
+         ne=0
+         do isc=1,ns
+            sp=species(isc)
+            comp=sp%value_map('composition')
+            do e=1,size(comp%labels)
+               name=''
+               do i=1,size(comp%labels(e)%str)
+                  name=name//trim(comp%labels(e)%str(i))
+               end do
+               new_elem=.true.
+               do i=1,ne
+                  if (trim(e_names(i)).eq.trim(name)) then
+                     new_elem=.false.
+                     exit
+                  end if
+               end do
+               if (new_elem) then
+                  ne=ne+1
+                  e_names(ne)=trim(name)
+               end if
+            end do
+         end do
+         e_names=e_names(1:ne)
+         ! Form the element matrix
+         allocate(elem_mat(ns,ne)); elem_mat=0.0_WP
+         do isc=1,ns
+            sp=species(isc)
+            comp=sp%value_map('composition')
+            do i=1,size(comp%labels)
+               name=''
+               do nn=1,size(comp%labels(i)%str)
+                  name=name//trim(comp%labels(i)%str(nn))
+               end do
+               do e=1,ne
+                  if (trim(e_names(e)).eq.trim(name)) elem_mat(isc,e)=real(comp%value_int(name,code),WP)
+               end do
+            end do
+         end do
+         ! Read the NASA-7 polynomials
+         allocate(nasa_coef(1:ns,2*ncof+1)); nasa_coef=0.0_WP
+         allocate(a(1:2,1:ncof)); a=0.0_WP
+         do isc=1,ns
+            sp=species(isc)
+            thermo=sp%value_map('thermo')
+            T_range=thermo%value_double_1d('temperature-ranges',code)
+            select case (size(T_range))
+            case (3)
+               a=thermo%value_double_2d('data',code)
+            case (2)
+               a(1,:)=thermo%value_double_1d('data',code)
+            case default
+               call die('Invalid temperature range')
+            end select
+            nasa_coef(isc,1)=T_range(2)
+            nasa_coef(isc,2:  ncof+1)=a(1,:)
+            nasa_coef(isc,9:2*ncof+1)=a(2,:)
+         end do
+         ! Form the phase summation matrix
+         allocate(phse_mat(ns,Lphase+1:Gphase+1)); phse_mat(:,Lphase+1)=0.0_WP; phse_mat(:,Gphase+1)=1.0_WP
+         do isc=1,ns
+            if (len_trim(sp_names(isc)).ge.3) then
+               if (sp_names(isc)(len_trim(sp_names(isc))-2:len_trim(sp_names(isc))).eq.'(L)') then
+                  phse_mat(isc,Lphase+1)=1.0_WP
+                  phse_mat(isc,Gphase+1)=0.0_WP
+               end if
+            end if
+         end do
+         ! Close the mechanism file and clean up
+         call yaml_close_file(domain)
+         call sp_list%destroy()
+         call sp%destroy()
+         call comp%destroy()
+         call thermo%destroy()
+         deallocate(sp_names_copy,const_sp_copy)
+      end block parse_mech
+
+
       ! Allocate work arrays
       allocate_work_arrays: block
          allocate(resSC (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:2))
@@ -148,9 +734,43 @@ contains
          allocate(Vi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(Wi    (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(T     (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
+         allocate(MM(ns)); MM=[32.0_WP,18.0_WP,18.0_WP,28.0_WP]; MM=0.001_WP*MM
+         ! Debug
+         allocate(dbg_flg(cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_)); dbg_flg=0.0_WP
       end block allocate_work_arrays
       
       
+      ! Initialize the chemical equilibrium framework
+      ceq_init: block
+         use messager, only: die
+         integer :: ng=1
+         real(WP), dimension(:,:), allocatable :: Bg
+         character(len=2) :: eq_cond
+         integer :: isc
+         ! Allocate arrays
+         allocate(Bg(ns,ng));  Bg=0.0_WP
+         ! Create the general constraints
+         do isc=1,ns
+            if (sp_names(isc).eq.'H2O')    Bg(isc,1)=1.0_WP
+            if (sp_names(isc).eq.'H2O(L)') Bg(isc,1)=1.0_WP
+         end do
+         ! Chemical system object
+         call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
+         ! Initialize the chemical state
+         call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
+         call param_read('Newton tolerance',state%tol_N)
+         call param_read('Newton max iterations',state%iter_N_max)
+         if (state%cond.eq.fixed_PH) then
+            call param_read('T tolerance',state%tol_T)
+            call param_read('T max iterations',state%iter_T_max)
+            ! call param_read('Temperature initial guess',T_g)
+            T_g=0.5_WP*(T_w+T_sat)
+         end if
+         ! Deallocate arrays
+         deallocate(Bg)
+      end block ceq_init
+
+
       ! Initialize time tracker
       initialize_timetracker: block
          time=timetracker(amRoot=cfg%amRoot,name='Main time')
@@ -168,22 +788,6 @@ contains
          timeSC%tmax=time%tmax
          timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
-
-
-      ! Read problem inputs
-      read_inputs: block
-         call param_read('Liquid density',rho_l)
-         call param_read('Gas density',rho_g)
-         call param_read('Saturation temperature',T_sat)
-         call param_read('Latent heat',h_lg)
-         call param_read('Liquid thermal conductivity',k_l)
-         call param_read('Liquid specific heat capacity',Cp_l)
-         call param_read('Gas thermal conductivity',k_g)
-         call param_read('Gas specific heat capacity',Cp_g)
-         call param_read('Wall temperature',T_w)
-         alpha_l=k_l/(rho_l*Cp_l)
-         alpha_g=k_g/(rho_g*Cp_g)
-      end block read_inputs
 
 
       ! Analytical solution
@@ -388,18 +992,14 @@ contains
          ! Get densities from the flow solver
          lg%rho_l=fs%rho_l
          lg%rho_g=fs%rho_g
-         ! Get temperature gradient
-         call lg%get_temperature_grad()
-         ! Phase change mass flux
-         where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            lg%mdot2p=(k_g*lg%Tg_grd-k_l*lg%Tl_grd)/h_lg
-         else where
-            lg%mdot2p=0.0_WP
-         end where
+         ! Apply the interface jump conditions
+         ! call interface_jump()
          ! Get the volumetric pahse change mass flux
          call lg%get_mdot3p()
          ! Initialize the liquid and gas side mass fluxes
          call lg%init_mdot3pLG()
+         ! Get the interface normal
+         call lg%get_normal()
       end block create_lgpc
 
 
@@ -555,107 +1155,6 @@ contains
 
          ! ================== SCALAR ================== !
 
-         ! CN
-         ! advance_scalar: block
-         !    use tpscalar_class,  only: bcond
-         !    type(bcond), pointer :: mybc
-         !    integer  :: i,j,k,nsc,n,p
-         !    real(WP) :: dt_sc
-
-         !    ! Perform scalar time integration
-         !    do while (timeSC%t.lt.time%t)
-               
-         !       ! Increment scalar time step
-         !       if (timeSC%t+timeSC%dt.gt.time%t) then
-         !          dt_sc=timeSC%dt
-         !          timeSC%dt=time%t-timeSC%t
-         !          call timeSC%increment()
-         !          timeSC%dt=dt_sc
-         !       else
-         !          call timeSC%increment()
-         !       end if
-               
-         !       ! Remember old scalar
-         !       sc%SCold =sc%SC
-
-         !       ! Perform sub-iterations
-         !       do while (timeSC%it.le.timeSC%itmax)
-         !          if (cfg%amRoot) print*,'Scalar sub-iteration ',timeSC%it
-
-         !          ! Build mid-time scalar
-         !          do nsc=1,sc%nscalar
-         !             p=sc%phase(nsc)
-         !             do k=cfg%kmino_,cfg%kmaxo_
-         !                do j=cfg%jmino_,cfg%jmaxo_
-         !                   do i=cfg%imino_,cfg%imaxo_
-         !                      if (sc%PVF(i,j,k,p).eq.1.0_WP) then
-         !                         sc%SC(i,j,k,nsc)=0.5_WP*(sc%SC(i,j,k,nsc)+sc%SCold(i,j,k,nsc))
-         !                      else if (sc%PVF(i,j,k,p).gt.0.0_WP) then
-         !                         sc%SC(i,j,k,nsc)=T_sat
-         !                      else
-         !                         sc%SC(i,j,k,nsc)=0.0_WP
-         !                      end if
-         !                   end do
-         !                end do
-         !             end do
-         !          end do
-
-         !          ! Explicit calculation of dSC/dt
-         !          call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
-
-         !          ! Assemble explicit residual
-         !          do nsc=1,sc%nscalar
-         !             p=sc%phase(nsc)
-         !             do k=cfg%kmin_,cfg%kmax_
-         !                do j=cfg%jmin_,cfg%jmax_
-         !                   do i=cfg%imin_,cfg%imax_
-         !                      if (sc%PVF(i,j,k,p).eq.1.0_WP) then
-         !                         resSC(i,j,k,nsc)=2.0_WP*(sc%SCold(i,j,k,nsc)-sc%SC(i,j,k,nsc))+timeSC%dt*resSC(i,j,k,nsc)
-         !                      else
-         !                         resSC(i,j,k,nsc)=0.0_WP
-         !                      end if
-         !                   end do
-         !                end do
-         !             end do
-         !          end do
-
-         !          ! Form implicit residual
-         !          call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
-
-         !          ! Apply the residuals
-         !          sc%SC=2.0_WP*sc%SC-sc%SCold+resSC
-
-         !          ! Zero-out the scalar in the opposite phase
-         !          do nsc=1,sc%nscalar
-         !             where (sc%PVF(:,:,:,sc%phase(nsc)).lt.VFlo) sc%SC(:,:,:,nsc)=0.0_WP
-         !          end do
-
-         !          ! Apply boundary conditions
-         !          where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-         !             sc%SC(:,:,:,iTl)=T_sat
-         !             sc%SC(:,:,:,iTg)=T_sat
-         !          end where
-         !          call sc%apply_bcond(timeSC%t,timeSC%dt)
-         !          call sc%get_bcond('xm',mybc)
-         !          do n=1,mybc%itr%no_
-         !             i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
-         !             sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
-         !          end do
-            
-         !          ! Increment scalar sub-iteration counter
-         !          timeSC%it=timeSC%it+1
-
-         !       end do
-
-         !       print*,'sc-scold = ',sc%SC(1:14,1,1,iTg)-sc%SCold(1:14,1,1,iTg)
-
-         !    end do
-
-         !    ! One-field temperature
-         !    T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-
-         ! end block advance_scalar
-
          ! Backward Euler for diffusion and CN for advection
          advance_scalar: block
             use tpscalar_class,  only: bcond
@@ -742,15 +1241,8 @@ contains
 
          ! ================== PHASE CHANGE ================== !
 
-         ! Get temperature gradient
-         call lg%get_temperature_grad()
-
-         ! Phase change mass flux
-         where ((vf%VF.gt.VFlo).and.(vf%VF.lt.VFhi))
-            lg%mdot2p=(k_g*lg%Tg_grd-k_l*lg%Tl_grd)/h_lg
-         else where
-            lg%mdot2p=0.0_WP
-         end where
+         ! Apply the interface jump conditions
+         call interface_jump()
 
          ! Get the volumetric phase change mass flux
          call lg%get_mdot3p()

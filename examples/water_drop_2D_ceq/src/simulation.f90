@@ -1026,9 +1026,9 @@ contains
 
 
    subroutine apply_dirichlet()
-      use tpns_class, only: bcond
+      use tpns_class, only: bcond,dirichlet
       use mathtools,  only: Pi
-      type(bcond), pointer :: my_bc,dirichlet
+      type(bcond), pointer :: my_bc
       real(WP) :: Ub,Ux,Uy,vfr,myR
       integer  :: i,j,k,n,stag
       call cfg%integrate(evp%div_src,vfr)
@@ -1306,6 +1306,7 @@ contains
          time%dt=time%dtmax
          timeSC=timetracker(amRoot=cfg%amRoot,name='SC Time')
          call param_read('Scalar time step',timeSC%dtmax)
+         timeSC%t=t0
          timeSC%tmax=time%tmax
          timeSC%dt=timeSC%dtmax
       end block initialize_timetracker
@@ -1437,10 +1438,10 @@ contains
       ! Create a one-sided scalar solver
       create_scalar: block
          use param,           only: param_read
-         use tpscalar_class,  only: bcond,neumann,dirichlet
+         use tpscalar_class,  only: bcond,dirichlet
          use mpi_f08,         only: MPI_ALLREDUCE,MPI_MAX
          use parallel,        only: MPI_REAL_WP
-         type(bcond), pointer :: my_bc,dirichlet
+         type(bcond), pointer :: my_bc
          real(WP) :: mp(2),N_init(ns),spDiff,my_Y
          integer  :: n,i,j,k,isc,p,ierr
          integer  :: pos_open,pos_close
@@ -1456,8 +1457,6 @@ contains
          call sc%add_bcond(name='xp',type=dirichlet,locator=xp_locator   ,dir='+x')
          call sc%add_bcond(name='ym',type=dirichlet,locator=ym_locator_sc,dir='-y')
          call sc%add_bcond(name='yp',type=dirichlet,locator=yp_locator   ,dir='+y')
-         ! call sc%add_bcond(name='zm',type=neumann,locator=zm_locator_sc,dir='-z')
-         ! call sc%add_bcond(name='zp',type=neumann,locator=zp_locator   ,dir='+z')
          ! Assign scalar names and phases
          sc%SCname=[sp_names,'Tl','Tg']; iTl=ns+1; iTg=ns+2
          do isc=1,ns
@@ -1867,7 +1866,7 @@ contains
                fs%V=2.0_WP*fs%V-fs%Vold+resV!/fs%rho_V
                fs%W=2.0_WP*fs%W-fs%Wold+resW!/fs%rho_W
                
-               ! Apply other boundary conditions
+               ! Apply boundary conditions
                call fs%apply_bcond(time%t,time%dt)
                call apply_dirichlet()
                

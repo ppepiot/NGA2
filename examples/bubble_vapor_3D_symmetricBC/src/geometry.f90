@@ -8,9 +8,7 @@ module geometry
    !> Single config
    type(config), public :: cfg
    
-   public :: geometry_init,Lz
-
-   real(WP) :: Lz
+   public :: geometry_init
 
 contains
    
@@ -36,49 +34,17 @@ contains
          ! Create simple rectilinear grid
          if (param_exists('n')) then
             call param_read('n',nx)
-            Lz=Lx/nx
             allocate(x(nx+1))
             do i=1,nx+1
-               x(i)=real(i-1,WP)/real(nx,WP)*Lx-0.5_WP*Lx
-            end do
-         else
-            call param_read('Lu',Lu); call param_read('nu',nu); call param_read('r',r)
-            allocate(xu(nu+1))
-            do i=1,nu+1
-               xu(i)=real(i-1,WP)/real(nu,WP)*Lu-0.5_WP*Lu
-            end do
-            xL=xu(nu+1)
-            dx=xL-xu(nu)
-            nn=0
-            do while (xL.le.0.5_WP*Lx)
-               nn=nn+1
-               dx=r*dx
-               xL=xL+dx
-            end do
-            Lx=2.0_WP*xL
-            Lz=Lu/nu
-            nx=nu+2*nn
-            allocate(x(nx+1))
-            x=0.0_WP
-            x(nn+1:nn+nu+1)=xu
-            dx=xu(nu+1)-xu(nu)
-            do i=1,nn
-               ir=nn+nu+1+i
-               il=nn+1-i
-               dx=r*dx
-               x(ir)=x(ir-1)+dx
-               x(il)=x(il+1)-dx
+               x(i)=real(i-1,WP)/real(nx,WP)*Lx
             end do
          end if
-         ny=nx; nz=1
+         ny=nx; nz=nx
          allocate(y(ny+1)); allocate(z(nz+1))
-         y=x
-         do k=1,nz+1
-            z(k)=real(k-1,WP)/real(nz,WP)*Lz-0.5_WP*Lz
-         end do
+         y=x; z=x
 
          ! General serial grid object
-         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.false.,zper=.true.,name='bubble_vapor_2D')
+         grid=sgrid(coord=cartesian,no=3,x=x,y=y,z=z,xper=.false.,yper=.false.,zper=.false.,name='bubble_vapor_3D_sym')
          
       end block create_grid
       

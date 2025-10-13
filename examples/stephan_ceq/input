@@ -12,6 +12,10 @@ nz : 1
 # Case parameters
 Wall temperature   : 383.15
 Initial time       : 0.027
+Pressure           : 101325
+
+# Mechanism
+Mechanism file : gri30.yaml
 
 # Fluid properties
 Gravity                       : 0 0 0
@@ -27,15 +31,29 @@ Gas specific heat capacity    : 2030
 Saturation temperature        : 373.15
 Latent heat                   : 2.26e6
 
+# Species and mole ratios
+Species                        : H2O(L) H2O O2 N2
+Constrained species            : O2 N2
+Water vapor to air mole ratio  : 0
+Nitrogen to oxygen mole ratio  : 3.71
+
+# Newton iterations
+Newton tolerance      : 1e-7
+Newton max iterations : 30
+
+# Temperature iterations
+T tolerance               : 1e-7
+T max iterations          : 30
+
 # Time integration
 Max timestep size     : 3.5e-3
 Max cfl number        : 0.9
 Sub-iterations        : 2
 Scalar time step      : 3.5e-3
 Scalar sub-iterations : 2
-Max time              : 0.5
+Max time              : 0.0305 ! 0.5
 
-# Evaporation
+# Phase change
 Max pseudo timestep size : 9e-6
 Max pseudo cfl number    : 0.9
 Max pseudo time steps    : 10
@@ -51,4 +69,4 @@ Scalar tolerance    : 1e-7
 Scalar iteration    : 50
 
 # Ensight output
-Ensight output period : 0.1
+Ensight output period : 3.5e-3
