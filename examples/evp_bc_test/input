@@ -1,0 +1,50 @@
+# Parallelization
+Partition : 1 1 1
+
+# Mesh definition
+Lx : 1
+Ly : 0.05
+Lz : 0.05
+nx : 20
+ny : 1
+nz : 1
+
+# Case parameters
+Bubble center         : 0.15 0 0
+Far-field temperature : 3
+Initial time          : 20
+
+# Fluid properties
+Gravity                       : 0 0 0
+Liquid dynamic viscosity      : 7e-3
+Gas dynamic viscosity         : 7e-4
+Liquid density                : 2.5
+Gas density                   : 0.25
+Surface tension coefficient   : 0
+Liquid thermal conductivity   : 0.07
+Gas thermal conductivity      : 0.007
+Liquid specific heat capacity : 2.5
+Gas specific heat capacity    : 1
+Saturation temperature        : 1
+Latent heat                   : 100
+
+# Time integration
+Max timestep size : 1.2 ! 3 ! 1.5
+Max cfl number    : 0.9
+Sub-iterations    : 2
+Scalar time step  : 1.2 ! 3 ! 1.5
+Max time          : 6 ! 100
+
+# Evaporation
+Max pseudo timestep size : 2.5e-2 ! 0.9 ! 4e-2
+Max pseudo cfl number    : 0.9
+Max pseudo time steps    : 10
+Mass flux tolerence      : 1e-22
+
+# Pressure solver
+Pressure tolerance    : 1e-6
+Pressure iteration    : 50
+Max coarsening levels : 18 ! 21
+
+# Ensight output
+Ensight output period : 1.2 ! 10

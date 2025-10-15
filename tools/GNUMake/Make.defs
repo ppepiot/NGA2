@@ -277,6 +277,10 @@ ifeq ($(USE_FFTW),TRUE)
   $(info Loading $(NGA_HOME)/tools/GNUMake/packages/Make.fftw...)
   include        $(NGA_HOME)/tools/GNUMake/packages/Make.fftw
 endif
+ifeq ($(USE_YAML),TRUE)
+  $(info Loading $(NGA_HOME)/tools/GNUMake/packages/Make.yaml...)
+  include        $(NGA_HOME)/tools/GNUMake/packages/Make.yaml
+endif
 ifeq ($(USE_AMREX),TRUE)
   $(info Loading $(NGA_HOME)/tools/GNUMake/packages/Make.amrex...)
   include        $(NGA_HOME)/tools/GNUMake/packages/Make.amrex

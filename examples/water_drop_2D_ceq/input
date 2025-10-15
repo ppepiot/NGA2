@@ -1,0 +1,66 @@
+# Parallelization
+Partition : 2 4 1
+
+# Mesh definition
+L : 1.2e-3
+n : 128
+
+# Case parameters
+Drop center         : 0 0 0
+Drop radius         : 1.5e-4
+Drop temperature    : 353
+Ambient temperature : 373
+Pressure            : 101325
+
+# Mechanism
+Mechanism file : gri30.yaml
+
+# Fluid properties (water)
+Gravity                       : 0 0 0
+Liquid dynamic viscosity      : 1.137e-3
+Gas dynamic viscosity         : 1.78e-5
+Liquid density                : 1000
+Gas density                   : 1.226
+Surface tension coefficient   : 0.07
+Liquid thermal conductivity   : 0.6
+Gas thermal conductivity      : 0.046
+Liquid specific heat capacity : 4180
+Gas specific heat capacity    : 1000
+Saturation temperature        : 373.15
+Latent heat                   : 2.3e6
+Species diffusivity           : 2e-6 ! 2e-5
+
+# Species and mole ratios
+Species                        : H2O(L) H2O O2 N2
+Constrained species            : O2 N2
+Water vapor to air mole ratio  : 0
+Nitrogen to oxygen mole ratio  : 3.71
+
+# Newton iterations
+Newton tolerance      : 1e-7
+Newton max iterations : 30
+
+# Temperature iterations
+T tolerance               : 1e-7
+T max iterations          : 30
+
+# Time integration
+Max timestep size : 8.7e-7
+Max cfl number    : 0.9
+Sub-iterations    : 2
+Scalar time step  : 8.7e-9
+Max time          : 1.5
+
+# Phase change
+Max pseudo timestep size : 9e-6
+Max pseudo cfl number    : 0.9
+Max pseudo time steps    : 10
+Mass flux tolerence      : 1e-15
+
+# Pressure solver
+Pressure tolerance    : 1e-6
+Pressure iteration    : 50
+Max coarsening levels : 18
+
+# Ensight output
+Ensight output period : 0.01
