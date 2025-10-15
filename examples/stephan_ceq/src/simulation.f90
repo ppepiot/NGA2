@@ -54,13 +54,14 @@ module simulation
    real(WP), dimension(:,:,:),   allocatable :: resU,resV,resW
    real(WP), dimension(:,:,:),   allocatable :: Ui,Vi,Wi
    real(WP), dimension(:,:,:),   allocatable :: T
-   real(WP), dimension(:),       allocatable :: MM
+   real(WP), dimension(:),       allocatable :: MM,sc_itf
    ! Debug
    real(WP), dimension(:,:,:),   allocatable :: dbg_flg
+   integer :: i_itf
    
    !> Problem definition
    real(WP) :: H0
-   integer  :: iTl,iTg,iYv
+   integer  :: iWv,iWl,iO2,iN2,iTl,iTg
    real(WP) :: rho_l,rho_g,k_l,k_g,Cp_l,Cp_g,alpha_l,alpha_g,h_lg,T_sat,T_g
    real(WP) :: T_w,beta,t0
    real(WP) :: x_itf,u_itf,x_itf_ext,u_itf_ext
@@ -151,6 +152,22 @@ contains
    end subroutine get_interface
 
 
+   !> Function that returns the index of an input species name
+   function get_sp_ind(name)
+      use messager, only: die
+      implicit none
+      character(len=*), intent(in) :: name
+      integer :: isc,get_sp_ind
+      do isc=1,ns
+         if (trim(name).eq.trim(sp_names(isc))) then
+            get_sp_ind=isc
+            return
+         end if
+      end do
+      call die('[water_drop_2D_ceq get_sp_ind] Unknown species')
+   end function get_sp_ind
+
+
    subroutine interface_jump()
       use messager, only: die
       implicit none
@@ -204,7 +221,6 @@ contains
       else
          stz=0
       end if
-
       ! Loop over the interfacial cells
       do index=1,vf%band_count(0)
 
@@ -223,14 +239,28 @@ contains
          ! Initialize the interfacial area and old volumes
          itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
          vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'before jumping'
+            print*,'Index of liquid and gas = ',Lphase,Gphase
+            print*,'Density of liquid and gas = ',sc%Prho
+            print*,'VOF(i_itf) = ',vf%VF(i,j,k)
+            print*,'Volume of liquid and gase = ',vol_old
+         end if
 
          ! Pre-evaluate the equilibrium
          mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
          Y =sc%SC(i,j,k,1:ns)
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'Initial mass = ',mp
+            print*,'Y = ',Y
+         end if
          Tl=sc%SC(i,j,k,iTl)
          Tg=sc%SC(i,j,k,iTg)
          call get_equilibrium()
-
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'state%success = ',state%success
+            ! call die('')
+         end if
          ! Cluster cells if the equilibrium failed
          if (.not.state%success) then
 
@@ -299,6 +329,10 @@ contains
 
          ! Calculate the cluster VOF
          vof=vol_old(Lphase)/sum(vol_old)
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'cluster VOF = ',vof
+            print*,'Initial volume = ',vol_old
+         end if
 
          ! Store the old total volume
          Vold=sum(vol_old)
@@ -327,6 +361,7 @@ contains
             p=sc%phase(isc)
             mp(p)=mp(p)+N(isc)*MM(isc)
          end do
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'After mass = ',mp
 
          ! Get the phase volumes
          vol_new=mp/sc%Prho
@@ -505,20 +540,31 @@ contains
 
       subroutine get_equilibrium()
          implicit none
-
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Inside get_equilibrium'
          ! Calculate and normalize the mole numbers
+
          do isc=1,ns
             N(isc)=Y(isc)*mp(sc%phase(isc))/MM(isc)
          end do
          Nsum=sum(N)
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'Y = ',Y
+            print*,'N before scaling up = ',N
+         end if
          if (Nsum.gt.0.0_WP) N=N/Nsum
-
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'N after scaling up = ',N
          ! Get the phasic enthalpies
          call state%get_phasic_HoR(Lphase,N,Tl,phasicHoR(Lphase))
          call state%get_phasic_HoR(Gphase,N,Tg,phasicHoR(Gphase))
-
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'Tl = ',Tl
+            print*,'Tg = ',Tg
+            print*,'phasicHoR = ',phasicHoR
+            print*,'sum(phasicHoR) = ',sum(phasicHoR)
+         end if
          ! Reinitialize the mole numbers
          call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
+         ! call state%N_init(N=N,HoR=sum(phasicHoR))
          if (.not.state%success) then
             print*,'Cluster VOF = ',vof
             print*,'N = ',N
@@ -535,9 +581,10 @@ contains
             end do
             call die('line 517')
          end if
-
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Reinitialization of N = ',state%N
          ! Get the chemical equilibrium
          call state%equilibrate()
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Equilibrium N = ',state%N
 
          ! Re-scale the mole numbers
          ! N=state%N*Nsum
@@ -721,6 +768,7 @@ contains
          call comp%destroy()
          call thermo%destroy()
          deallocate(sp_names_copy,const_sp_copy)
+         print*,'sp_names = ',sp_names
       end block parse_mech
 
 
@@ -764,7 +812,8 @@ contains
             call param_read('T tolerance',state%tol_T)
             call param_read('T max iterations',state%iter_T_max)
             ! call param_read('Temperature initial guess',T_g)
-            T_g=0.5_WP*(T_w+T_sat)
+            ! T_g=0.5_WP*(T_w+T_sat)
+            T_g=T_sat
          end if
          ! Deallocate arrays
          deallocate(Bg)
@@ -878,6 +927,10 @@ contains
          call vf%get_curvature()
          ! Reset moments to guarantee compatibility with interface reconstruction
          call vf%reset_volume_moments()
+         ! Initialize interface index
+         do i_itf=cfg%imin_,cfg%imax_
+            if ((vf%VF(i_itf,1,1).gt.0.0_WP).and.(vf%VF(i_itf,1,1).lt.1.0_WP)) exit
+         end do
       end block create_and_initialize_vof
       
       
@@ -926,16 +979,45 @@ contains
       create_scalar: block
          use param,           only: param_read
          use tpscalar_class,  only: bcond,neumann,dirichlet
-         use hypre_str_class, only: pcg_smg,DDADIk
+         use hypre_str_class, only: pcg_smg
          type(bcond), pointer :: mybc
-         integer :: i,j,k,n
+         real(WP) :: N_init(ns),spDiff
+         real(WP), dimension(:), allocatable :: mp
+         integer :: i,j,k,n,isc,p
+         integer  :: pos_open,pos_close
+         allocate(mp(Lphase:Gphase)); mp=0.0_WP
+         ! Read-in inputs
+         call param_read('Water vapor to air mole ratio',wv2air_rat)
+         call param_read('Nitrogen to oxygen mole ratio',N2O_rat)
+         call param_read('Species diffusivity',spDiff)
          ! Create scalar solver
-         call sc%initialize(cfg=cfg,nscalar=2,name='tpscalar')
+         call sc%initialize(cfg=cfg,nscalar=ns+2,name='tpscalar')
+         sc%skip(get_sp_ind('H2O(L)'))=.true.
          ! Boundary conditinos
-         call sc%add_bcond(name='xm',type=dirichlet,locator=xm_locator_sc,dir='-x')
+         call sc%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
          call sc%add_bcond(name='xp',type=neumann,  locator=xp_locator   ,dir='+x')
-         sc%SCname=[  'Tl',  'Tg']; iTl=1; iTg=2
-         sc%phase =[Lphase,Gphase]
+         ! Assign scalar names and phases
+         sc%SCname=[sp_names,'Tl','Tg']; iTl=ns+1; iTg=ns+2
+         do isc=1,ns
+            pos_open =index(sc%SCname(isc),'(')
+            pos_close=index(sc%SCname(isc),')')
+            if (pos_open.gt.0.and.pos_close.gt.pos_open) then
+               sc%SCname(isc)(pos_open:pos_open)  ='_'
+               sc%SCname(isc)(pos_close:pos_close)=' '
+               sc%SCname(isc)=adjustl(trim(sc%SCname(isc)))
+            end if
+            sc%phase(isc)=sys%get_pind(isc)
+         end do
+         sc%SCname(get_sp_ind('H2O'))='H2O_g'
+         sc%phase(iTl)=Lphase
+         sc%phase(iTg)=Gphase
+         ! Initialize the phasic density and VOF
+         sc%Prho(Lphase)=fs%rho_l
+         sc%Prho(Gphase)=fs%rho_g
+         sc%PVF(:,:,:,Lphase)=vf%VF
+         sc%PVF(:,:,:,Gphase)=1.0_WP-vf%VF
+         ! Assign diffusivities
+         sc%diff(:,:,:,1:ns)=spDiff
          sc%diff(:,:,:,iTl)=alpha_l
          sc%diff(:,:,:,iTg)=alpha_g
          ! Initialize the linear solver
@@ -945,21 +1027,71 @@ contains
          call param_read('Scalar tolerance',ss%rcvg)
          ! Setup the solver
          call sc%setup(implicit_solver=ss)
+         ! Initialize mole numbers
+         iWv=get_sp_ind('H2O')
+         iWl=get_sp_ind('H2O(L)')
+         iO2=get_sp_ind('O2')
+         iN2=get_sp_ind('N2')
+         print*,'iWv = ',iWv
+         print*,'iWl = ',iWl
+         print*,'iO2 = ',iO2
+         print*,'iN2 = ',iN2
+         N_init(iWl)=1.0_WP
+         N_init(iO2)=1.0_WP
+         N_init(iN2)=N2O_rat*N_init(iO2)
+         N_init(iWv)=wv2air_rat*sum(N_init(iO2:iN2))
+         ! Get the phase mass
+         mp=0.0_WP
+         do isc=1,ns
+            p=sc%phase(isc)
+            mp(p)=mp(p)+N_init(isc)*MM(isc)
+         end do
+         ! Interfacial scalar values
+         allocate(sc_itf(sc%nscalar))
+         do isc=1,ns
+            p=sc%phase(isc)
+            sc_itf(isc)=MM(isc)*N_init(isc)/mp(p)
+         end do
+         sc_itf(iTl:iTg)=T_sat
+         print*,'sc_itf = ',sc_itf
          ! Initialize scalar fields
-         do i=sc%cfg%imin_,sc%cfg%imax_
-            do j=sc%cfg%jmin_,sc%cfg%jmax_
-               do k=sc%cfg%kmin_,sc%cfg%kmax_
-                  if (vf%VF(i,j,k).gt.VFlo) sc%SC(i,j,k,iTl)=T_sat
-                  if (vf%VF(i,j,k).lt.VFhi) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+         do isc=1,sc%nscalar
+            p=sc%phase(isc)
+            do k=sc%cfg%kmin_,sc%cfg%kmax_
+               do j=sc%cfg%jmin_,sc%cfg%jmax_
+                  do i=sc%cfg%imin_,sc%cfg%imax_
+                     if (sc%PVF(i,j,k,p).gt.0.0_WP) then
+                        sc%SC(i,j,k,isc)=sc_itf(isc)
+                     else
+                        sc%SC(i,j,k,isc)=0.0_WP
+                     end if
+                  end do
                end do
             end do
          end do
-         where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-            sc%SC(:,:,:,iTl)=T_sat
-            sc%SC(:,:,:,iTg)=T_sat
-         end where
-         call sc%cfg%sync(sc%SC(:,:,:,iTl))
-         call sc%cfg%sync(sc%SC(:,:,:,iTg))
+         ! Correct for the gas temperature
+         do k=sc%cfg%kmin_,sc%cfg%kmax_
+            do j=sc%cfg%jmin_,sc%cfg%jmax_
+               do i=sc%cfg%imin_,sc%cfg%imax_
+                  if (vf%VF(i,j,k).lt.1.0_WP) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+               end do
+            end do
+         end do
+         ! Apply boundary conditions at the interface
+         do isc=1,sc%nscalar
+            p=sc%phase(isc)
+            do k=sc%cfg%kmin_,sc%cfg%kmax_
+               do j=sc%cfg%jmin_,sc%cfg%jmax_
+                  do i=sc%cfg%imin_,sc%cfg%imax_
+                     if ((sc%PVF(i,j,k,p).gt.0.0_WP).and.(sc%PVF(i,j,k,p).lt.1.0_WP)) sc%SC(i,j,k,isc)=sc_itf(isc)
+                  end do
+               end do
+            end do
+         end do
+         ! Sync scalar fields
+         do isc=1,sc%nscalar
+            call sc%cfg%sync(sc%SC(:,:,:,isc))
+         end do
          ! Apply boundary conditions
          call sc%apply_bcond(time%t,time%dt)
          call sc%get_bcond('xm',mybc)
@@ -1016,7 +1148,7 @@ contains
 
       ! Add Ensight output
       create_ensight: block
-         integer :: nsc
+         integer :: isc
          ! Create Ensight output from cfg
          ens_out=ensight(cfg=cfg,name='stephan')
          ! Create event for Ensight output
@@ -1027,8 +1159,8 @@ contains
          call ens_out%add_scalar('VOF',vf%VF)
          call ens_out%add_scalar('pressure',fs%P)
          call ens_out%add_surface('plic',smesh)
-         do nsc=1,sc%nscalar
-           call ens_out%add_scalar(trim(sc%SCname(nsc)),sc%SC(:,:,:,nsc))
+         do isc=1,sc%nscalar
+           call ens_out%add_scalar(trim(sc%SCname(isc)),sc%SC(:,:,:,isc))
          end do
          call ens_out%add_scalar('mdot2p',lg%mdot2p)
          call ens_out%add_scalar('mdot3p',lg%mdot3p)
@@ -1047,7 +1179,7 @@ contains
       
       ! Create a monitor file
       create_monitor: block
-         integer :: nsc
+         integer :: isc
          ! Prepare some info about fields
          call fs%get_cfl(time%dt,time%cfl)
          call fs%get_max()
@@ -1091,10 +1223,10 @@ contains
          scfile=monitor(sc%cfg%amRoot,'scalar')
          call scfile%add_column(timeSC%n,'Timestep number')
          call scfile%add_column(timeSC%t,'Time')
-         do nsc=1,sc%nscalar
-           call scfile%add_column(sc%SCmin(nsc),trim(sc%SCname(nsc))//'_min')
-           call scfile%add_column(sc%SCmax(nsc),trim(sc%SCname(nsc))//'_max')
-           call scfile%add_column(sc%SCint(nsc),trim(sc%SCname(nsc))//'_int')
+         do isc=1,sc%nscalar
+           call scfile%add_column(sc%SCmin(isc),trim(sc%SCname(isc))//'_min')
+           call scfile%add_column(sc%SCmax(isc),trim(sc%SCname(isc))//'_max')
+           call scfile%add_column(sc%SCint(isc),trim(sc%SCname(isc))//'_int')
          end do
          call scfile%write()
          ! Create lgpc monitor
@@ -1120,6 +1252,7 @@ contains
    
    !> Perform an NGA2 simulation - this mimicks NGA's old time integration for multiphase
    subroutine simulation_run
+      integer :: isc
 
       ! Perform flow time integration
       do while (.not.time%done())
@@ -1138,6 +1271,12 @@ contains
          ! Remember old scalar
          sc%SCold =sc%SC
          sc%PVFold=sc%PVF
+
+         ! Remember old interfacial scalars
+         do isc=1,sc%nscalar
+            sc_itf(isc)=sc%SC(i_itf,1,1,isc)
+         end do
+         print*,'sc_itf = ',sc_itf
          
          ! Remember old velocity
          fs%Uold=fs%U
@@ -1147,6 +1286,12 @@ contains
          ! VOF solver step
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
+         
+         ! Update interface index
+         do i_itf=cfg%imin_,cfg%imax_
+            if ((vf%VF(i_itf,1,1).gt.0.0_WP).and.(vf%VF(i_itf,1,1).lt.1.0_WP)) exit
+         end do
+         print*,'i_itf = ',i_itf
 
          ! Update the phasic VOF and face apertures
          sc%PVF(:,:,:,Lphase)=vf%VF
@@ -1159,7 +1304,7 @@ contains
          advance_scalar: block
             use tpscalar_class,  only: bcond
             type(bcond), pointer :: mybc
-            integer  :: i,j,k,nsc,n,p
+            integer  :: i,j,k,n,p
             real(WP) :: dt_sc
 
             ! Perform scalar time integration
@@ -1179,15 +1324,16 @@ contains
                sc%SCold =sc%SC
 
                ! Build mid-time scalar
-               do nsc=1,sc%nscalar
-                  p=sc%phase(nsc)
+               print*,'sc_itf = ',sc_itf
+               do isc=1,sc%nscalar
+                  p=sc%phase(isc)
                   do k=cfg%kmino_,cfg%kmaxo_
                      do j=cfg%jmino_,cfg%jmaxo_
                         do i=cfg%imino_,cfg%imaxo_
                            if (sc%PVF(i,j,k,p).eq.0.0_WP) then
-                              sc%SC(i,j,k,nsc)=0.0_WP
+                              sc%SC(i,j,k,isc)=0.0_WP
                            else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-                              sc%SC(i,j,k,nsc)=T_sat
+                              sc%SC(i,j,k,isc)=sc_itf(isc)
                            else
                            end if
                         end do
@@ -1200,13 +1346,13 @@ contains
 
                ! Assemble explicit residual
                resSC=resSC*timeSC%dt
-               do nsc=1,sc%nscalar
-                  p=sc%phase(nsc)
+               do isc=1,sc%nscalar
+                  p=sc%phase(isc)
                   do k=cfg%kmin_,cfg%kmax_
                      do j=cfg%jmin_,cfg%jmax_
                         do i=cfg%imin_,cfg%imax_
                            if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-                              resSC(i,j,k,nsc)=0.0_WP
+                              resSC(i,j,k,isc)=0.0_WP
                            end if
                         end do
                      end do
@@ -1220,10 +1366,16 @@ contains
                sc%SC=sc%SCold+resSC
 
                ! Apply boundary conditions
-               where (vf%VF.gt.VFlo.and.vf%VF.lt.VFhi)
-                  sc%SC(:,:,:,iTl)=T_sat
-                  sc%SC(:,:,:,iTg)=T_sat
-               end where
+               do isc=1,sc%nscalar
+                  p=sc%phase(isc)
+                  do k=sc%cfg%kmin_,sc%cfg%kmax_
+                     do j=sc%cfg%jmin_,sc%cfg%jmax_
+                        do i=sc%cfg%imin_,sc%cfg%imax_
+                           if ((sc%PVF(i,j,k,p).gt.0.0_WP).and.(sc%PVF(i,j,k,p).lt.1.0_WP)) sc%SC(:,:,:,isc)=sc_itf(isc)
+                        end do
+                     end do
+                  end do
+               end do
                call sc%apply_bcond(timeSC%t,timeSC%dt)
                call sc%get_bcond('xm',mybc)
                do n=1,mybc%itr%no_
@@ -1235,6 +1387,7 @@ contains
 
             ! One-field temperature
             T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
+            print*,'SC(itf,1,1,:) = ',sc%SC(i_itf,1,1,:)
 
          end block advance_scalar
 
@@ -1243,6 +1396,7 @@ contains
 
          ! Apply the interface jump conditions
          call interface_jump()
+         print*,'after jump VOF(i_itf) = ',vf%VF(i_itf,1,1)
 
          ! Get the volumetric phase change mass flux
          call lg%get_mdot3p()

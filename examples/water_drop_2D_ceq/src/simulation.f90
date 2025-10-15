@@ -1549,6 +1549,8 @@ contains
             end if
             my_bc=>my_bc%next
          end do
+         ! Get the phasic face apertures
+         call sc%get_face_apt()
          ! Post process
          T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
       end block create_scalar

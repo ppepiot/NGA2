@@ -28,7 +28,7 @@ Liquid specific heat capacity : 4180
 Gas specific heat capacity    : 1000
 Saturation temperature        : 373.15
 Latent heat                   : 2.3e6
-Species diffusivity           : 2e-6 ! 2e-5
+Species diffusivity           : 2e-5
 
 # Species and mole ratios
 Species                        : H2O(L) H2O O2 N2

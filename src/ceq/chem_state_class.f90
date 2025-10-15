@@ -227,6 +227,10 @@ module chem_state_class
                   call reorder_rows(N_h,this%sys%sp_order,N0)
                   call this%get_hort(this%sys%ns,T_h,this%sys%thermo,h)
                   this%HoR=sum(N0*h)*T_h
+                  print*,'hoR = ',h*T_h
+                  print*,'N0*h = ',N0*h*T_h
+                  print*,'HoR from N0 = ',this%HoR
+                  print*,'With N0 (reordered N_h) = ',N0
                else
                   call die('[chem_state initialize] Both N_h and T_h are required for the fixed enthalpy case')
                end if
@@ -1088,6 +1092,8 @@ module chem_state_class
                return
                ! call die('[chem_state get_ceq_PT] Newton solver reached maximum number of iterations')
             end if
+            print*,'iter_N = ',this%iter_N
+            print*,'T = ',this%T
             ! Build the Jacobian matrix
             call this%get_BP(y)
             BTB=matmul(this%BtildeT,this%Btilde)
@@ -1127,6 +1133,7 @@ module chem_state_class
             ! Get the residual error
             call this%get_res(y)
             Rnorm=norm2(this%R)
+            print*,'Rnorm = ',Rnorm
             ! Solve for dx
             dx=-this%R
             call dgelss(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np,1,Jac,this%sys%nrc+this%sys%np,dx,this%sys%nrc+this%sys%np,S,rcond,rank,work,lwork,info)
@@ -1172,6 +1179,8 @@ module chem_state_class
          allocate(hort(this%sys%ns))
          ! Initialize
          HoR0=this%HoR
+         print*,'HoR0 = ',HoR0
+         print*,'Nu = ',this%Nu
          this%dT=1e5*this%tol_T*this%T
          this%iter_T=0
          Tlo=-1e30 ! Lowest temperature at which h has been evaluated
@@ -1186,6 +1195,7 @@ module chem_state_class
                ! write(output_unit,'(" >   [chem_state get_ceq_PH]: Reached max number of temperature iterations")')
                return
             end if
+            print*,'iter_T = ',this%iter_T
             ! Determine equilibrium composition at current temperature
             call this%get_ceq_PT(Neq)
             if (.not.this%success) then
@@ -1193,22 +1203,29 @@ module chem_state_class
             end if
             ! Get the effective Cp
             call this%get_Cp_eff(Cp_eff)
+            print*,'Cp_eff = ',Cp_eff
             ! Obtain species h/(RT)
             call this%get_hort(this%sys%ns,this%T,this%sys%thermo,hort)
             ! Mixture H/R
             this%HoR=this%T*sum(Neq*hort)
+            print*,'T*Neq*hort = ',this%T*Neq*hort
             ! Predict dT
             this%dT=(HoR0-this%HoR)/Cp_eff
+            print*,'Neq = ',Neq
+            print*,'HoR = ',this%HoR
+            print*,'dT = ',this%dT
             ! Check that T is within limits
             if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) then
                ! call die('[chem_state get_ceq_PH] T > T_high')
                this%success=.false.
+               print*,'T higher than T_max'
                ! write(output_unit,'(" >   [chem_state get_ceq_PH] T > T_high")')
                return
             end if
             if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) then
                ! call die('[chem_state get_ceq_PH] T < T_low')
                this%success=.false.
+               print*,'T higher than T_min'
                ! write(output_unit,'(" >   [chem_state get_ceq_PH] T < T_low")')
                return
             end if
@@ -1233,6 +1250,7 @@ module chem_state_class
             this%dT=Tn-this%T
             ! Update temperature
             this%T=Tn
+            print*,'T = ',this%T
          end do
          ! Assemble the composition
          Neq=[this%Nd,this%Nu]
@@ -1268,8 +1286,17 @@ module chem_state_class
          dNddT=0.0_WP
          dNudT=this%Nu*(-dgudT+matmul(this%sys%BR,dxdT(1:this%sys%nrc))+dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np))
          dNdT=[dNddT,dNudT]
+         print*,'dNdT = ',dNdT
          Cp_eff=sum(cpor*N)+this%T*sum(hort*dNdT)
-         Cp_eff=sum(cpor*N)
+         print*,'cpor*N = ',cpor*N
+         print*,'T*hort*dNdT = ',this%T*hort*dNdT
+         ! Cp_eff=sum(cpor*N)
+         print*,'cpor = ',cpor
+         print*,'sum(cpor*N) = ',sum(cpor*N)
+         print*,'this%T*sum(hort*dNdT) = ',this%T*sum(hort*dNdT)
+         print*,'hort = ',hort
+         print*,'dNdT = ',dNdT
+         print*,'hort*dNdT = ',hort*dNdT
          ! Deallocate arrays
          deallocate(dgudT,dxdT,cpor,hort,N,dNddT,dNudT,dNdT)
       end subroutine get_Cp_eff

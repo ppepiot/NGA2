@@ -1,5 +1,5 @@
 # Parallelization
-Partition : 2 2 1
+Partition : 1 1 1 ! 2 2 1
 
 # Mesh definition
 Lx : 0.001
@@ -30,11 +30,12 @@ Liquid specific heat capacity : 4216
 Gas specific heat capacity    : 2030
 Saturation temperature        : 373.15
 Latent heat                   : 2.26e6
+Species diffusivity           : 2e-5
 
 # Species and mole ratios
 Species                        : H2O(L) H2O O2 N2
 Constrained species            : O2 N2
-Water vapor to air mole ratio  : 0
+Water vapor to air mole ratio  : 1
 Nitrogen to oxygen mole ratio  : 3.71
 
 # Newton iterations
@@ -51,7 +52,7 @@ Max cfl number        : 0.9
 Sub-iterations        : 2
 Scalar time step      : 3.5e-3
 Scalar sub-iterations : 2
-Max time              : 0.0305 ! 0.5
+Max time              : 3.05000E-02
 
 # Phase change
 Max pseudo timestep size : 9e-6

@@ -253,6 +253,7 @@ contains
                if (param_exists('Temperature initial guess')) then
                   call param_read('Temperature initial guess',T_g)
                   call state%N_init(N=N_init,N_h=N_h,T_h=T_h,T_g=T_g)
+                  ! call state%N_init(N=N_init,HoR=-33682.372351796781_WP,T_g=T_g)
                else
                   call state%N_init(N=N_init,N_h=N_h,T_h=T_h)
                end if
