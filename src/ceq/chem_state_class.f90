@@ -33,10 +33,10 @@ module chem_state_class
       real(WP) :: p                                            !< Pressure
       real(WP) :: T                                            !< Temperature
       real(WP) :: HoR                                          !< Enthalpy
-      real(WP), dimension(:),   allocatable :: N               !< Moles of species (ns)
+      real(WP), dimension(:),   allocatable :: N,N0            !< Moles of species (ns)
       real(WP), dimension(:),   allocatable :: Nbar            !< Moles of phases (np)
       real(WP), dimension(:),   allocatable :: Nd              !< Moles of determined species (nsd)
-      real(WP), dimension(:),   allocatable :: Nu              !< Moles of undetermined species (nsu)
+      real(WP), dimension(:),   allocatable :: Nu,Nuold              !< Moles of undetermined species (nsu)
       real(WP), dimension(:),   allocatable :: lam             !< Lagrange multipliers (nrc)
       real(WP), dimension(:),   allocatable :: cr              !< Reduced constraint vector
       real(WP), dimension(:),   allocatable :: gu              !< Gibbs functions of undetermined species (nsu)
@@ -78,7 +78,7 @@ module chem_state_class
       procedure :: get_Cp_eff                                  !< Get the effective Cp
       procedure :: get_dxdT                                    !< Get the temperature derivative of the solution vector
       procedure :: get_BP                                      !< Get the coefficient matrices for constraints and phase summation
-      procedure, private :: get_ceq_PT                         !< Get the chemical equilibrium state at constant pressure and temperature
+      procedure :: get_ceq_PT                         !< Get the chemical equilibrium state at constant pressure and temperature
       procedure, private :: get_ceq_PH                         !< Get the chemical equilibrium state at constant pressure and emthalpy
    end type chem_state
 
@@ -136,9 +136,11 @@ module chem_state_class
 
          ! Allocate arrays
          allocate(this%N   (ns));           this%N      =0.0_WP
+         allocate(this%N0  (ns));           this%N0     =0.0_WP
          allocate(this%Nbar(np));           this%Nbar   =0.0_WP
          allocate(this%Nd  (nsd));          this%Nd     =0.0_WP
          allocate(this%Nu  (nsu));          this%Nu     =0.0_WP
+         allocate(this%Nuold  (nsu));          this%Nuold     =0.0_WP
          allocate(this%lam (nrc));          this%lam    =0.0_WP
          allocate(this%cr  (nrc));          this%cr     =0.0_WP
          allocate(this%gu  (nsu));          this%gu     =0.0_WP
@@ -227,10 +229,6 @@ module chem_state_class
                   call reorder_rows(N_h,this%sys%sp_order,N0)
                   call this%get_hort(this%sys%ns,T_h,this%sys%thermo,h)
                   this%HoR=sum(N0*h)*T_h
-                  print*,'hoR = ',h*T_h
-                  print*,'N0*h = ',N0*h*T_h
-                  print*,'HoR from N0 = ',this%HoR
-                  print*,'With N0 (reordered N_h) = ',N0
                else
                   call die('[chem_state initialize] Both N_h and T_h are required for the fixed enthalpy case')
                end if
@@ -259,6 +257,7 @@ module chem_state_class
          if (present(c)) then
             cb(1:nc)=c
          elseif(present(N)) then
+            this%N0=N
             cb(1:nc)=matmul(N,this%sys%B)
          else
             call die('[chem_state initialize] Neither c nor N specified')
@@ -985,7 +984,12 @@ module chem_state_class
       function get_y(this) result(y)
          class(chem_state), intent(inout) :: this
          real(WP), dimension(this%sys%nsu) :: y
+         ! print*,'inside get_y:'
+         ! print*,'gu = ',this%gu
+         ! print*,'BR = ',this%sys%BR
+         ! print*,'x = ',this%x
          y=exp(0.5_WP*(-this%gu+matmul(this%sys%BR,this%x(1:this%sys%nrc))+matmul(this%sys%P(this%sys%nsd+1:this%sys%ns,:),this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np))))
+         ! print*,'y = ',y
       end function get_y
 
 
@@ -993,6 +997,11 @@ module chem_state_class
       subroutine get_res(this,y)
          class(chem_state), intent(inout) :: this
          real(WP), dimension(this%sys%nsu), intent(in) :: y
+         ! print*,'inside get_res:'
+         ! print*,'y = ',y
+         ! print*,'cr = ',this%cr
+         ! print*,'Nbar = ',this%Nbar
+         ! print*,'Rd = ',this%Rd
          this%R(1:this%sys%nrc)=matmul(this%BtildeT,y)-this%cr
          this%R(this%sys%nrc+1:this%sys%nrc+this%sys%np)=matmul(this%PtildeT,y)-this%Nbar+this%Rd
       end subroutine get_res
@@ -1007,19 +1016,26 @@ module chem_state_class
          class(chem_state), intent(inout) :: this
          real(WP), dimension(:), allocatable :: rhs,lam
          integer :: info
+         this%success=.true.
          ! Allocate intermediate arrays
          allocate(rhs(this%sys%nrc))
          allocate(lam(this%sys%nrc))
          ! Calculate the Lagrange multipliers
          call this%get_gort(this%sys%nsu,this%T,this%p,this%sys%thermo(this%sys%nsd+1:this%sys%ns,:),this%sys%P(this%sys%nsd+1:this%sys%ns,Gphase),this%gu)
          rhs=log(this%Nu)-matmul(this%sys%P(this%sys%nsd+1:this%sys%ns,:),log(this%Nbar))+this%gu
+         print*,'rhs = ',rhs
+         print*,'this%sys%BR = ',this%sys%BR
+         print*,'this%Nbar = ',this%Nbar
          call lss(this%sys%nsu,this%sys%nrc,this%sys%BR,rhs,lam,info)
+         print*,'lam = ',lam
          if (info.ne.0) then
+            print*,'info not zero'
             this%success=.false.
-            ! write(output_unit,'(" >   [chem_state x_init] Least squares solver for lambda initialization failed")')
+            write(output_unit,'(" >   [chem_state x_init] Least squares solver for lambda initialization failed")')
             return
             ! call die('[chem_state x_init] Least squares solver for lambda initialization failed.')
          end if
+         print*,'info is zero'
          ! Set the initial solution vector
          this%x(1:this%sys%nrc)=lam
          this%x(this%sys%nrc+1:this%sys%nrc+this%sys%np)=log(this%Nbar)
@@ -1076,11 +1092,18 @@ module chem_state_class
          allocate(work(lwork))
          rcond=-1.0_WP
          ! Initialize the solution vector
+         print*,'T = ',this%T
+         print*,'this%N = ',this%N
+         print*,'this%Nu = ',this%Nu
          call this%x_init()
+         print*,'x = ',this%x
+         print*,'this%success = ',this%success
          if (.not.this%success) return
+         print*,'debug'
          ! Newton-Raphson
          this%iter_N=0
          y=this%get_y()
+         print*,'y = ',y
          Rnorm=10.0_WP*this%tol_N
          do while(Rnorm.ge.this%tol_N)
             ! Increment iteration number
@@ -1092,8 +1115,6 @@ module chem_state_class
                return
                ! call die('[chem_state get_ceq_PT] Newton solver reached maximum number of iterations')
             end if
-            print*,'iter_N = ',this%iter_N
-            print*,'T = ',this%T
             ! Build the Jacobian matrix
             call this%get_BP(y)
             BTB=matmul(this%BtildeT,this%Btilde)
@@ -1131,26 +1152,29 @@ module chem_state_class
                Jac(iJ,jJ)=Jac(iJ,jJ)-this%Nbar(i)
             end do
             ! Get the residual error
+            ! print*,'y = ',y
             call this%get_res(y)
             Rnorm=norm2(this%R)
+            print*,'iter_N = ',this%iter_N
             print*,'Rnorm = ',Rnorm
             ! Solve for dx
             dx=-this%R
             call dgelss(this%sys%nrc+this%sys%np,this%sys%nrc+this%sys%np,1,Jac,this%sys%nrc+this%sys%np,dx,this%sys%nrc+this%sys%np,S,rcond,rank,work,lwork,info)
-            ! if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
+            if (rank.ne.this%sys%nrc+this%sys%np) call die('[chem_state get_ceq_PT]: Jacobian is not full rank')
             if (rank.ne.this%sys%nrc+this%sys%np) then
                this%success=.false.
-               ! write(output_unit,'(" >   [chem_state get_ceq_PT]: Jacobian is not full rank")')
+               write(output_unit,'(" >   [chem_state get_ceq_PT]: Jacobian is not full rank")')
                return
             end if
-            ! if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
+            if (info.ne.0) call die('[chem_state get_ceq_PT]: Least-squares solver failed')
             if (info.ne.0) then
                this%success=.false.
-               ! write(output_unit,'(" >   [chem_state get_ceq_PT]: Least-squares solver failed")')
+               write(output_unit,'(" >   [chem_state get_ceq_PT]: Least-squares solver failed")')
                return
             end if
             ! Update the solution
             this%x=this%x+dx
+            ! print*,'this%x = ',this%x
             ! Get the species and phase moles
             y=this%get_y()
             this%Nu=y*y
@@ -1158,6 +1182,7 @@ module chem_state_class
          end do
          ! Assemble the composition
          Neq=[this%Nd,this%Nu]
+         print*,'Neq = ',Neq
          ! Deallocate arrays
          deallocate(Jac,dx,BTB,BTP,PTP,y,S,work)
       end subroutine get_ceq_PT
@@ -1181,6 +1206,8 @@ module chem_state_class
          HoR0=this%HoR
          print*,'HoR0 = ',HoR0
          print*,'Nu = ',this%Nu
+         print*,'N = ',this%N
+         print*,'Nbar = ',this%Nbar
          this%dT=1e5*this%tol_T*this%T
          this%iter_T=0
          Tlo=-1e30 ! Lowest temperature at which h has been evaluated
@@ -1196,6 +1223,13 @@ module chem_state_class
                return
             end if
             print*,'iter_T = ',this%iter_T
+            this%Nuold=this%Nu
+            ! Reset Nu and Nbar using N_init
+            print*,'this%N0 = ',this%N0
+            call this%N_init(N=this%N0,HoR=HoR0,T_g=this%T)
+            print*,'Nu = ',this%Nu
+            print*,'N = ',this%N
+            print*,'Nbar = ',this%Nbar
             ! Determine equilibrium composition at current temperature
             call this%get_ceq_PT(Neq)
             if (.not.this%success) then
@@ -1213,6 +1247,7 @@ module chem_state_class
             this%dT=(HoR0-this%HoR)/Cp_eff
             print*,'Neq = ',Neq
             print*,'HoR = ',this%HoR
+            print*,'RH = ',this%HoR-HoR0
             print*,'dT = ',this%dT
             ! Check that T is within limits
             if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) then
@@ -1284,7 +1319,9 @@ module chem_state_class
          ! Rates of change of moles
          N=[this%Nd,this%Nu]
          dNddT=0.0_WP
-         dNudT=this%Nu*(-dgudT+matmul(this%sys%BR,dxdT(1:this%sys%nrc))+dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np))
+         ! dNudT=this%Nu*(-dgudT+matmul(this%sys%BR,dxdT(1:this%sys%nrc))+dxdT(this%sys%nrc+1:this%sys%nrc+this%sys%np))
+         dNudT=0.0_WP
+         if (this%iter_T.gt.1) dNudT=(this%Nu-this%Nuold)/this%dT
          dNdT=[dNddT,dNudT]
          print*,'dNdT = ',dNdT
          Cp_eff=sum(cpor*N)+this%T*sum(hort*dNdT)

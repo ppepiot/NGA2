@@ -17,6 +17,7 @@ module simulation
 
    !> Thermodynamic quantities
    real(WP) :: T,p
+   real(WP), dimension(:), allocatable :: N_init
 
    !> Chemical system and state
    type(chem_sys)   :: sys
@@ -45,7 +46,6 @@ contains
       real(WP), allocatable :: nasa_coef(:,:)
       character(len=str_medium), dimension(:), allocatable :: const_sp
       integer,  dimension(:), allocatable :: CS
-      real(WP), dimension(:), allocatable :: N_init
 
       ! Parse the mechanism file
       parse_mech: block
@@ -284,7 +284,7 @@ contains
       end if
 
       ! Deallocate arrays
-      deallocate(nasa_coef,const_sp,CS,N_init,e_names,elem_mat,phse_mat)
+      deallocate(nasa_coef,const_sp,CS,e_names,elem_mat,phse_mat)
       
    end subroutine simulation_init
 
@@ -294,6 +294,65 @@ contains
       use messager, only: die
       implicit none
       integer :: isc
+
+      ! plot_g: block
+      !    use monitor_class, only: monitor
+      !    type(monitor) :: mfile
+      !    real(WP) :: Tw,dT,Th
+      !    real(WP), dimension(:), allocatable :: gw
+      !    integer :: io
+      !    allocate(gw(1:2)); gw=0.0_WP
+      !    open(newunit=io,file='./g_vs_T',status='replace',action='write')
+      !    write(io,'(a)') 'T             goR_l         goR_g'
+      !    Tw=250.0_WP
+      !    dT=5.0_WP
+      !    Th=400.0_WP
+      !    do while (Tw.le.Th)
+      !       call state%get_gort(2,Tw,1.0_WP,state%sys%thermo(3:4,:),state%sys%P(3:4,Gphase),gw)
+      !       gw=Tw*gw
+      !       write(io,*) Tw, gw(2), gw(1)
+      !       Tw=Tw+dT
+      !    end do
+      !    close(io)
+      !    deallocate(gw)
+      ! end block plot_g
+
+      ! plot_H: block
+      !    use monitor_class, only: monitor
+      !    type(monitor) :: mfile
+      !    real(WP) :: dT,Th,RH,HoR,HoR0
+      !    real(WP), dimension(:), allocatable :: hort,Neq
+      !    integer :: io
+      !    allocate(hort(state%sys%ns))
+      !    allocate(Neq(state%sys%ns))
+      !    open(newunit=io,file='./RH_vs_T',status='replace',action='write')
+      !    write(io,'(a)') 'T             RH'
+      !    state%T=370.0_WP
+      !    dT=0.001_WP
+      !    Th=376.0_WP
+      !    HoR0=-31764.252928818278_WP
+      !    print*,'HoR0 = ',HoR0
+      !    state%Rd=matmul(transpose(state%sys%P(1:state%sys%nsd,:)),state%Nd)
+      !    do while (state%T.le.Th)
+      !       ! print*,'Solving for T = ',state%T
+      !       call state%N_init(T=state%T,N=N_init)
+      !       call state%get_ceq_PT(Neq)
+      !       ! print*,'success = ',state%success
+      !       ! print*,'Neq = ',Neq
+      !       call state%get_hort(state%sys%ns,state%T,state%sys%thermo,hort)
+      !       HoR=state%T*sum(Neq*hort)
+      !       ! print*,'HoR = ',HoR
+      !       RH=HoR-HoR0
+      !       if (abs(RH).lt.1e-6) then
+      !          print*,'Neq = ',Neq
+      !          print*,'HoR = ',HoR
+      !       end if
+      !       write(io,*) state%T,RH
+      !       state%T=state%T+dT
+      !    end do
+      !    close(io)
+      !    deallocate(hort,Neq)
+      ! end block plot_H
 
       ! Obtain the chemical equilibrium state
       call state%equilibrate()
