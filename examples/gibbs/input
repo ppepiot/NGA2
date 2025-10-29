@@ -5,24 +5,31 @@ Mechanism file : gri30.yaml
 Equilibrium condition : PH
 
 # Temperature (used for PT case) and pressure
-Temperature : 380
-Pressure    : 101325
+Temperature : 373.15
+#Pressure    : 101325
+Pressure    : 100000
 
 # Species
-Species             : H2O(L) H2O O2 N2
-Initial moles       : 0.99922443314053788 4.2499873008916577E-004 7.4430600716141114E-005 2.7613752865688354E-004
-Constrained species : O2 N2
+#Species             : H2O(L) H2O O2 N2
+Species             : H2O(L) H2O
+#Initial moles       : 0.99773683616348496 2.2620983881742585E-003 2.2620983881742587E-007 8.3923850201264997E-007
+Initial moles       : 4.9999999999999989E-002 0.94999999999999973
+#Constrained species : O2 N2
 Scale mole numbers  : .false.
 
 # Constant enthaply inputs
-Temperature initial guess            : 380
 Temperature for enthalpy calculation : 373.15
-Composition for enthalpy calculation : 0.60908347738499302 0.39056595448563575 7.4430600716373323E-005 2.7613752865688344E-004
+#Composition for enthalpy calculation : 0.60908347738499302 0.39056595448563575 7.4430600716373323E-005 2.7613752865688344E-004
+Composition for enthalpy calculation : 0 1
+Temperature initial guess            : 378.14999999999998
 
 # Newton iterations
 Newton tolerance      : 1e-7
 Newton max iterations : 30
 
 # Temperature iterations
-T tolerance      : 1e-7
-T max iterations : 30
+PH algorithm       : NR
+dNdT algorithm     : LS
+T tolerance        : 1e-7
+H tolerance        : 1e-7
+T max iterations   : 50

@@ -58,6 +58,7 @@ module simulation
    ! Debug
    real(WP), dimension(:,:,:),   allocatable :: dbg_flg
    integer :: i_itf
+   real(WP) :: mfr_err
    
    !> Problem definition
    real(WP) :: H0
@@ -66,7 +67,7 @@ module simulation
    real(WP) :: T_w,beta,t0
    real(WP) :: x_itf,u_itf,x_itf_ext,u_itf_ext
    real(WP) :: prhs_int
-   real(WP) :: pressure,wv2air_rat,N2O_rat,YO2,YN2
+   real(WP) :: pressure,air2wv_rat,N2O_rat,YO2,YN2
    integer  :: ns,np=2
    
 contains
@@ -144,6 +145,7 @@ contains
       k=vf%band_map(3,1)
       posI=calculateCentroid(vf%interface_polygon(1,i,j,k))
       x_itf=posI(1)
+      i_itf=i
       ! Get the interface velocity
       u_itf=fs%U(i+1,j,k)
       ! Get the analytical solution
@@ -190,6 +192,9 @@ contains
 
       Vref=minval(cfg%vol)
 
+      ! Zero out the phase change mass flux
+      lg%mdot2p=0.0_WP
+
       ! Allocate arrays
       allocate(vol_new(Lphase:Gphase))
       allocate(vol_old(Lphase:Gphase))
@@ -221,6 +226,7 @@ contains
       else
          stz=0
       end if
+
       ! Loop over the interfacial cells
       do index=1,vf%band_count(0)
 
@@ -240,22 +246,25 @@ contains
          itf_area=cfg%vol(i,j,k)*vf%SD(i,j,k)
          vol_old=sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
          if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
-            print*,'before jumping'
+            print*,'before jump:'
             print*,'Index of liquid and gas = ',Lphase,Gphase
             print*,'Density of liquid and gas = ',sc%Prho
             print*,'VOF(i_itf) = ',vf%VF(i,j,k)
             print*,'Volume of liquid and gase = ',vol_old
+            print*,'sc_itf = ',sc_itf
          end if
 
          ! Pre-evaluate the equilibrium
          mp=sc%Prho*sc%PVF(i,j,k,:)*cfg%vol(i,j,k)
          Y =sc%SC(i,j,k,1:ns)
+         Tl=sc%SC(i,j,k,iTl)
+         Tg=sc%SC(i,j,k,iTg)
          if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
             print*,'Initial mass = ',mp
             print*,'Y = ',Y
+            print*,'Tl = ',Tl
+            print*,'Tg = ',Tg
          end if
-         Tl=sc%SC(i,j,k,iTl)
-         Tg=sc%SC(i,j,k,iTg)
          call get_equilibrium()
          if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
             print*,'state%success = ',state%success
@@ -361,7 +370,7 @@ contains
             p=sc%phase(isc)
             mp(p)=mp(p)+N(isc)*MM(isc)
          end do
-         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'After mass = ',mp
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Equilibrium phase masses = ',mp
 
          ! Get the phase volumes
          vol_new=mp/sc%Prho
@@ -455,7 +464,7 @@ contains
             sc%PVF(i,j,k,Lphase)=vf%VF(i,j,k)
             sc%PVF(i,j,k,Gphase)=1.0_WP-vf%VF(i,j,k)
 
-            ! Composition (Assuming the same mass fraction for all non-empty the cells in the cluster)
+            ! Composition (Assuming the same mass fraction for all non-empty cells in the cluster)
             do isc=1,ns
                p=sc%phase(isc)
                if(sc%PVF(i,j,k,p).gt.0.0_WP) then
@@ -467,16 +476,16 @@ contains
 
             ! Temperature and phase change mass flux
             if (vf%VF(i,j,k).eq.1.0_WP) then
-               sc%SC(i,j,k,iTl) =state%T ! Not sure if this is good enough.
-               sc%SC(i,j,k,iTg) =0.0_WP
+               sc%SC(i,j,k,iTl)=state%T ! Not sure if this is good enough. Should I do linear interpolation instead?
+               sc%SC(i,j,k,iTg)=0.0_WP
                lg%mdot2p(i,j,k)=0.0_WP
             else if (vf%VF(i,j,k).eq.0.0_WP) then
-               sc%SC(i,j,k,iTl) =0.0_WP
-               sc%SC(i,j,k,iTg) =state%T ! Not sure if this is good enough.
+               sc%SC(i,j,k,iTl)=0.0_WP
+               sc%SC(i,j,k,iTg)=state%T ! Not sure if this is good enough. Should I do linear interpolation instead?
                lg%mdot2p(i,j,k)=0.0_WP
             else
-               sc%SC(i,j,k,iTl) =state%T
-               sc%SC(i,j,k,iTg) =state%T
+               sc%SC(i,j,k,iTl)=state%T
+               sc%SC(i,j,k,iTg)=state%T
                lg%mdot2p(i,j,k)=mdot2p
             end if
 
@@ -564,7 +573,12 @@ contains
          end if
          ! Reinitialize the mole numbers
          call state%N_init(N=N,HoR=sum(phasicHoR),T_g=T_g)
-         ! call state%N_init(N=N,HoR=sum(phasicHoR))
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'The computed enthalpy of the mixture cell = ',sum(phasicHoR)
+            ! print*,'The enthalpy that corresponds to 373.15 K = ',-31764
+         end if
+         ! call state%N_init(N=N,HoR=-31764.252928818278_WP,T_g=T_g)
+         ! call state%N_init(T=T_sat,N=N)
          if (.not.state%success) then
             print*,'Cluster VOF = ',vof
             print*,'N = ',N
@@ -581,10 +595,16 @@ contains
             end do
             call die('line 517')
          end if
-         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Reinitialization of N = ',state%N
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'Initialized N = ',state%N
+            print*,'Initialized Ndu = ',state%Ndu
+         end if
          ! Get the chemical equilibrium
          call state%equilibrate()
-         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) print*,'Equilibrium N = ',state%N
+         if (i.eq.i_itf.and.j.eq.1.and.k.eq.1) then
+            print*,'Equilibrium N = ',state%N
+            print*,'Equilibrium T = ',state%T
+         end if
 
          ! Re-scale the mole numbers
          ! N=state%N*Nsum
@@ -596,9 +616,47 @@ contains
    end subroutine interface_jump
 
 
+   ! Linear interpolation of the scalar at the interfacial cell center using the interfacial value and the adjacent cells
+   ! Right now only works for this stephan case (1D + Interface goes from left to right)
+   ! Requires the most recent interfacial values
+   subroutine apply_itf_bcond()
+      integer :: isc,p,i,j,k,ishift,in
+      real    :: w_n,w_i,w_sum
+      ! Update the interface location
+      call get_interface()
+      ! Loop over the scalars
+      do isc=1,sc%nscalar
+         p=sc%phase(isc)
+         ishift=1-2*p
+         in=i_itf+ishift
+         ! Prepare the interpolation weights
+         w_n=x_itf-cfg%xm(i_itf)
+         w_i=cfg%xm(i_itf)-cfg%xm(in)
+         w_sum=x_itf-cfg%xm(in)
+         w_n=w_n/w_sum
+         w_i=w_i/w_sum
+         ! Loop over the cells
+         do k=sc%cfg%kmin_,sc%cfg%kmax_
+            do j=sc%cfg%jmin_,sc%cfg%jmax_
+               do i=sc%cfg%imin_,sc%cfg%imax_
+                  if (sc%PVF(i,j,k,p).eq.0.0_WP) then
+                     sc%SC(i,j,k,isc)=0.0_WP
+                  else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
+                     sc%SC(i,j,k,isc)=w_n*sc%SC(in,j,k,isc)+w_i*sc_itf(isc)
+                  else
+                  end if
+               end do
+            end do
+         end do
+         ! Sync it
+         call cfg%sync(sc%SC(:,:,:,isc))
+      end do
+   end subroutine apply_itf_bcond
+
+
    !> Initialization of problem solver
    subroutine simulation_init
-      use param,    only: param_read,param_getsize
+      use param,    only: param_exists,param_read,param_getsize
       use messager, only: die
       implicit none
       integer :: ne,ncs
@@ -645,16 +703,20 @@ contains
          logical :: new_elem
          ! Get the target species from input
          ns=param_getsize('Species')
-         ncs=param_getsize('Constrained species')
+         if (param_exists('Constrained species')) then
+            ncs=param_getsize('Constrained species')
+            allocate(const_sp(1:ncs))
+            allocate(const_sp_copy(1:ncs))
+            call param_read('Constrained species',const_sp)
+            const_sp_copy=const_sp
+         else
+            ncs=0
+         end if
          allocate(sp_names(1:ns))
          allocate(sp_names_copy(1:ns))
-         allocate(const_sp(1:ncs))
-         allocate(const_sp_copy(1:ncs))
          allocate(CS(ncs))
          call param_read('Species',sp_names)
-         call param_read('Constrained species',const_sp)
          sp_names_copy=sp_names
-         const_sp_copy=const_sp
          ! Read the mechanism file path
          call param_read('Mechanism file',mch_file)
          ! Open the mechanism
@@ -767,14 +829,15 @@ contains
          call sp%destroy()
          call comp%destroy()
          call thermo%destroy()
-         deallocate(sp_names_copy,const_sp_copy)
+         deallocate(sp_names_copy)
+         if (allocated(const_sp_copy)) deallocate(const_sp_copy)
          print*,'sp_names = ',sp_names
       end block parse_mech
 
 
       ! Allocate work arrays
       allocate_work_arrays: block
-         allocate(resSC (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:2))
+         allocate(resSC (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_,1:ns+2))
          allocate(resU  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resV  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
          allocate(resW  (cfg%imino_:cfg%imaxo_,cfg%jmino_:cfg%jmaxo_,cfg%kmino_:cfg%kmaxo_))
@@ -803,6 +866,7 @@ contains
             if (sp_names(isc).eq.'H2O(L)') Bg(isc,1)=1.0_WP
          end do
          ! Chemical system object
+         print*,'CS = ',CS
          call sys%initialize(np=np,ns=ns,ne=ne,ncs=ncs,ng=ng,P=phse_mat,Ein=elem_mat,CS=CS,Bg=Bg,thermo_in=nasa_coef,diag=5)
          ! Initialize the chemical state
          call state%initialize(sys=sys,cond=fixed_PH,p=pressure)
@@ -812,8 +876,8 @@ contains
             call param_read('T tolerance',state%tol_T)
             call param_read('T max iterations',state%iter_T_max)
             ! call param_read('Temperature initial guess',T_g)
-            ! T_g=0.5_WP*(T_w+T_sat)
-            T_g=T_sat
+            T_g=0.5_WP*(T_w+T_sat)
+            ! T_g=T_sat
          end if
          ! Deallocate arrays
          deallocate(Bg)
@@ -911,6 +975,61 @@ contains
                end do
             end do
          end do
+         ! Correct mask outside physical domain
+         if (cfg%iproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imin_-1
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%iproc.eq.cfg%npx) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imax_+1,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%jproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmin_-1
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%jproc.eq.cfg%npy) then
+            do k=cfg%kmino_,cfg%kmaxo_
+               do j=cfg%jmax_+1,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%kproc.eq.1) then
+            do k=cfg%kmino_,cfg%kmin_-1
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
+         if (cfg%kproc.eq.cfg%npz) then
+            do k=cfg%kmax_+1,cfg%kmaxo_
+               do j=cfg%jmino_,cfg%jmaxo_
+                  do i=cfg%imino_,cfg%imaxo_
+                     vf%mask(i,j,k)=1
+                  end do
+               end do
+            end do
+         end if
          ! Update the band
          call vf%update_band()
          ! Perform interface reconstruction from VOF field
@@ -927,19 +1046,14 @@ contains
          call vf%get_curvature()
          ! Reset moments to guarantee compatibility with interface reconstruction
          call vf%reset_volume_moments()
-         ! Initialize interface index
-         do i_itf=cfg%imin_,cfg%imax_
-            if ((vf%VF(i_itf,1,1).gt.0.0_WP).and.(vf%VF(i_itf,1,1).lt.1.0_WP)) exit
-         end do
       end block create_and_initialize_vof
-      
+
       
       ! Create a two-phase flow solver without bconds
       create_and_initialize_flow_solver: block
-         use hypre_str_class, only: gmres_pfmg2
+         use hypre_str_class, only: pcg_smg,gmres_smg,pcg_pfmg2,gmres_pfmg2
          use mathtools,       only: Pi
-         use tpns_class,      only: clipped_neumann,bcond
-         type(bcond), pointer :: mybc
+         use tpns_class,      only: clipped_neumann
          ! Create flow solver
          fs=tpns(cfg=cfg,name='Two-phase NS')
          ! Assign constant viscosity to each phase
@@ -966,7 +1080,7 @@ contains
          call fs%setup(pressure_solver=ps,implicit_solver=vs)
          ! Initial field
          fs%U=0.0_WP; fs%V=0.0_WP; fs%W=0.0_WP
-         where (vf%VF.gt.0.0_WP) fs%U=beta*sqrt(alpha_g/(time%t))
+         ! where (vf%VF.gt.0.0_WP) fs%U=beta*sqrt(alpha_g/(time%t))
          ! Apply boundary conditions
          call fs%apply_bcond(time%t,time%dt)
          ! Calculate cell-centered velocities and divergence
@@ -974,11 +1088,15 @@ contains
          call fs%get_div()
       end block create_and_initialize_flow_solver
       
+
+      ! Initialize the interface location and velocity
+      call get_interface()
+
       
       ! Create a one-sided scalar solver
       create_scalar: block
          use param,           only: param_read
-         use tpscalar_class,  only: bcond,neumann,dirichlet
+         use tpscalar_class,  only: bcond,neumann
          use hypre_str_class, only: pcg_smg
          type(bcond), pointer :: mybc
          real(WP) :: N_init(ns),spDiff
@@ -987,7 +1105,7 @@ contains
          integer  :: pos_open,pos_close
          allocate(mp(Lphase:Gphase)); mp=0.0_WP
          ! Read-in inputs
-         call param_read('Water vapor to air mole ratio',wv2air_rat)
+         call param_read('Air to water vapor mole ratio',air2wv_rat)
          call param_read('Nitrogen to oxygen mole ratio',N2O_rat)
          call param_read('Species diffusivity',spDiff)
          ! Create scalar solver
@@ -995,7 +1113,7 @@ contains
          sc%skip(get_sp_ind('H2O(L)'))=.true.
          ! Boundary conditinos
          call sc%add_bcond(name='xm',type=neumann,locator=xm_locator_sc,dir='-x')
-         call sc%add_bcond(name='xp',type=neumann,  locator=xp_locator   ,dir='+x')
+         call sc%add_bcond(name='xp',type=neumann,locator=xp_locator   ,dir='+x')
          ! Assign scalar names and phases
          sc%SCname=[sp_names,'Tl','Tg']; iTl=ns+1; iTg=ns+2
          do isc=1,ns
@@ -1021,7 +1139,6 @@ contains
          sc%diff(:,:,:,iTl)=alpha_l
          sc%diff(:,:,:,iTg)=alpha_g
          ! Initialize the linear solver
-         ! ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ss=hypre_str(cfg=cfg,name='Scalar',method=pcg_smg,nst=7)
          call param_read('Scalar iteration',ss%maxit)
          call param_read('Scalar tolerance',ss%rcvg)
@@ -1030,30 +1147,30 @@ contains
          ! Initialize mole numbers
          iWv=get_sp_ind('H2O')
          iWl=get_sp_ind('H2O(L)')
-         iO2=get_sp_ind('O2')
-         iN2=get_sp_ind('N2')
+         ! iO2=get_sp_ind('O2')
+         ! iN2=get_sp_ind('N2')
          print*,'iWv = ',iWv
          print*,'iWl = ',iWl
-         print*,'iO2 = ',iO2
-         print*,'iN2 = ',iN2
+         ! print*,'iO2 = ',iO2
+         ! print*,'iN2 = ',iN2
          N_init(iWl)=1.0_WP
-         N_init(iO2)=1.0_WP
-         N_init(iN2)=N2O_rat*N_init(iO2)
-         N_init(iWv)=wv2air_rat*sum(N_init(iO2:iN2))
+         N_init(iWv)=1.0_WP
+         ! N_init(iO2)=air2wv_rat*N_init(iWv)
+         ! N_init(iN2)=N2O_rat*N_init(iO2)
          ! Get the phase mass
          mp=0.0_WP
          do isc=1,ns
             p=sc%phase(isc)
             mp(p)=mp(p)+N_init(isc)*MM(isc)
          end do
-         ! Interfacial scalar values
+         ! Initialize interfacial scalar values
          allocate(sc_itf(sc%nscalar))
          do isc=1,ns
             p=sc%phase(isc)
             sc_itf(isc)=MM(isc)*N_init(isc)/mp(p)
          end do
          sc_itf(iTl:iTg)=T_sat
-         print*,'sc_itf = ',sc_itf
+         print*,'Initial sc_itf = ',sc_itf
          ! Initialize scalar fields
          do isc=1,sc%nscalar
             p=sc%phase(isc)
@@ -1073,25 +1190,12 @@ contains
          do k=sc%cfg%kmin_,sc%cfg%kmax_
             do j=sc%cfg%jmin_,sc%cfg%jmax_
                do i=sc%cfg%imin_,sc%cfg%imax_
-                  if (vf%VF(i,j,k).lt.1.0_WP) sc%SC(i,j,k,iTg)=T_w+(T_sat-T_w)/erf(beta)*erf(sc%cfg%xm(i)/(2.0_WP*sqrt(k_g/(fs%rho_g*Cp_g)*t0)))
+                  if (vf%VF(i,j,k).lt.1.0_WP) sc%SC(i,j,k,iTg)=T_w-(sc%cfg%xm(i)-cfg%x(cfg%imin))*(T_w-T_sat)/x_itf
                end do
             end do
          end do
          ! Apply boundary conditions at the interface
-         do isc=1,sc%nscalar
-            p=sc%phase(isc)
-            do k=sc%cfg%kmin_,sc%cfg%kmax_
-               do j=sc%cfg%jmin_,sc%cfg%jmax_
-                  do i=sc%cfg%imin_,sc%cfg%imax_
-                     if ((sc%PVF(i,j,k,p).gt.0.0_WP).and.(sc%PVF(i,j,k,p).lt.1.0_WP)) sc%SC(i,j,k,isc)=sc_itf(isc)
-                  end do
-               end do
-            end do
-         end do
-         ! Sync scalar fields
-         do isc=1,sc%nscalar
-            call sc%cfg%sync(sc%SC(:,:,:,isc))
-         end do
+         call apply_itf_bcond()
          ! Apply boundary conditions
          call sc%apply_bcond(time%t,time%dt)
          call sc%get_bcond('xm',mybc)
@@ -1125,7 +1229,8 @@ contains
          lg%rho_l=fs%rho_l
          lg%rho_g=fs%rho_g
          ! Apply the interface jump conditions
-         ! call interface_jump()
+         call interface_jump()
+         call apply_itf_bcond()
          ! Get the volumetric pahse change mass flux
          call lg%get_mdot3p()
          ! Initialize the liquid and gas side mass fluxes
@@ -1133,10 +1238,6 @@ contains
          ! Get the interface normal
          call lg%get_normal()
       end block create_lgpc
-
-
-      ! Initialize the interface location and velocity
-      call get_interface()
 
 
       ! Create surfmesh object for interface polygon output
@@ -1206,6 +1307,11 @@ contains
          call mfile%add_column(fs%psolv%it,'Pressure iteration')
          call mfile%add_column(fs%psolv%rerr,'Pressure error')
          call mfile%add_column(prhs_int,'prhs_int')
+         ! Debug
+         call fs%get_mfr()
+         call cfg%integrate(lg%div_vel,mfr_err)
+         mfr_err=abs(mfr_err-sum(fs%mfr))
+         call mfile%add_column(mfr_err,'mfr_err')
          call mfile%write()
          ! Create CFL monitor
          cflfile=monitor(fs%cfg%amRoot,'cfl')
@@ -1271,12 +1377,6 @@ contains
          ! Remember old scalar
          sc%SCold =sc%SC
          sc%PVFold=sc%PVF
-
-         ! Remember old interfacial scalars
-         do isc=1,sc%nscalar
-            sc_itf(isc)=sc%SC(i_itf,1,1,isc)
-         end do
-         print*,'sc_itf = ',sc_itf
          
          ! Remember old velocity
          fs%Uold=fs%U
@@ -1287,10 +1387,8 @@ contains
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
          
-         ! Update interface index
-         do i_itf=cfg%imin_,cfg%imax_
-            if ((vf%VF(i_itf,1,1).gt.0.0_WP).and.(vf%VF(i_itf,1,1).lt.1.0_WP)) exit
-         end do
+         ! Update interface location
+         call get_interface()
          print*,'i_itf = ',i_itf
 
          ! Update the phasic VOF and face apertures
@@ -1322,72 +1420,39 @@ contains
                
                ! Remember old scalar
                sc%SCold =sc%SC
+               print*,'Old Tg = ',sc%SC(0:i_itf,1,1,iTg)
 
-               ! Build mid-time scalar
-               print*,'sc_itf = ',sc_itf
-               do isc=1,sc%nscalar
-                  p=sc%phase(isc)
-                  do k=cfg%kmino_,cfg%kmaxo_
-                     do j=cfg%jmino_,cfg%jmaxo_
-                        do i=cfg%imino_,cfg%imaxo_
-                           if (sc%PVF(i,j,k,p).eq.0.0_WP) then
-                              sc%SC(i,j,k,isc)=0.0_WP
-                           else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-                              sc%SC(i,j,k,isc)=sc_itf(isc)
-                           else
-                           end if
-                        end do
-                     end do
-                  end do
-               end do
+               ! Re-apply interface boundary conditions and zero out emptied cells
+               call apply_itf_bcond()
+               print*,'Old Tg after itf bcond = ',sc%SC(0:i_itf,1,1,iTg)
 
                ! Explicit calculation of dSC/dt
                call sc%get_dSCdt(dSCdt=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old)
 
                ! Assemble explicit residual
                resSC=resSC*timeSC%dt
-               do isc=1,sc%nscalar
-                  p=sc%phase(isc)
-                  do k=cfg%kmin_,cfg%kmax_
-                     do j=cfg%jmin_,cfg%jmax_
-                        do i=cfg%imin_,cfg%imax_
-                           if (sc%PVF(i,j,k,p).lt.1.0_WP) then
-                              resSC(i,j,k,isc)=0.0_WP
-                           end if
-                        end do
-                     end do
-                  end do
-               end do
+               print*,'RHS Tg = ',resSC(0:i_itf,1,1,iTg)
 
                ! Form implicit residual
                call sc%solve_implicit(dt=timeSC%dt,resSC=resSC,U=fs%Uold,V=fs%Vold,W=fs%Wold,divU=lg%div_vel_old,w_adv=0.5_WP,w_dff=1.0_WP)
+               print*,'sol Tg = ',resSC(0:i_itf,1,1,iTg)
 
                ! Apply the residuals
-               sc%SC=sc%SCold+resSC
-
-               ! Apply boundary conditions
                do isc=1,sc%nscalar
                   p=sc%phase(isc)
-                  do k=sc%cfg%kmin_,sc%cfg%kmax_
-                     do j=sc%cfg%jmin_,sc%cfg%jmax_
-                        do i=sc%cfg%imin_,sc%cfg%imax_
-                           if ((sc%PVF(i,j,k,p).gt.0.0_WP).and.(sc%PVF(i,j,k,p).lt.1.0_WP)) sc%SC(:,:,:,isc)=sc_itf(isc)
-                        end do
-                     end do
-                  end do
+                  where (sc%PVF(:,:,:,p).eq.1.0_WP) sc%SC(:,:,:,isc)=sc%SCold(:,:,:,isc)+resSC(:,:,:,isc)
                end do
+               print*,'new Tg before bcond = ',sc%SC(0:i_itf,1,1,iTg)
+
+               ! Apply boundary conditions
                call sc%apply_bcond(timeSC%t,timeSC%dt)
                call sc%get_bcond('xm',mybc)
                do n=1,mybc%itr%no_
                   i=mybc%itr%map(1,n); j=mybc%itr%map(2,n); k=mybc%itr%map(3,n)
                   sc%SC(i,j,k,iTg)=2.0_WP*T_w-sc%SC(i+1,j,k,iTg)
                end do
-         
+               print*,'new Tg after bcond = ',sc%SC(0:i_itf,1,1,iTg)
             end do
-
-            ! One-field temperature
-            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
-            print*,'SC(itf,1,1,:) = ',sc%SC(i_itf,1,1,:)
 
          end block advance_scalar
 
@@ -1396,7 +1461,18 @@ contains
 
          ! Apply the interface jump conditions
          call interface_jump()
-         print*,'after jump VOF(i_itf) = ',vf%VF(i_itf,1,1)
+
+         ! Get the interface location
+         call get_interface()
+         print*,'after jump:'
+         print*,'i_itf = ',i_itf
+         print*,'VOF(i_itf) = ',vf%VF(i_itf,1,1)
+
+         ! Update the interface scalars
+         do isc=1,sc%nscalar
+            sc_itf(isc)=sc%SC(i_itf,1,1,isc)
+         end do
+         print*,'sc_itf = ',sc_itf
 
          ! Get the volumetric phase change mass flux
          call lg%get_mdot3p()
@@ -1480,6 +1556,10 @@ contains
             ! Recompute interpolated velocity and divergence
             call fs%interp_vel(Ui,Vi,Wi)
             call fs%get_div(src=lg%div_vel)
+            ! Debug
+            call fs%get_mfr()
+            call cfg%integrate(lg%div_vel,mfr_err)
+            mfr_err=abs(mfr_err-sum(fs%mfr))
 
          end block advance_flow
 
@@ -1488,6 +1568,8 @@ contains
 
          ! Output to ensight
          if (ens_evt%occurs()) then
+            ! One-field temperature
+            T=sc%PVF(:,:,:,Lphase)*sc%SC(:,:,:,iTl)+sc%PVF(:,:,:,Gphase)*sc%SC(:,:,:,iTg)
             call vf%update_surfmesh(smesh)
             call ens_out%write_data(time%t)
          end if

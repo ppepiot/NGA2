@@ -249,7 +249,7 @@ contains
       
       ! Sync up masks
       call this%cfg%sync(this%mask)
-      
+
       ! Adjust interpolation coefficients to cell faces
       do k=this%cfg%kmin_,this%cfg%kmax_+1
          do j=this%cfg%jmin_,this%cfg%jmax_+1
@@ -280,16 +280,17 @@ contains
          end do
       end do
       
-      ! Adjust gradient coefficients to cell faces for walls (assume Neumann at wall)
-      do k=this%cfg%kmin_,this%cfg%kmax_+1
-         do j=this%cfg%jmin_,this%cfg%jmax_+1
-            do i=this%cfg%imin_,this%cfg%imax_+1
-               if (this%mask(i,j,k).eq.1.or.this%mask(i-1,j,k).eq.1) this%grd_x(:,i,j,k)=0.0_WP     !< FD gradient in x of SC
-               if (this%mask(i,j,k).eq.1.or.this%mask(i,j-1,k).eq.1) this%grd_y(:,i,j,k)=0.0_WP     !< FD gradient in y of SC
-               if (this%mask(i,j,k).eq.1.or.this%mask(i,j,k-1).eq.1) this%grd_z(:,i,j,k)=0.0_WP     !< FD gradient in z of SC
-            end do
-         end do
-      end do
+      ! Commented out
+      ! ! Adjust gradient coefficients to cell faces for walls (assume Neumann at wall)
+      ! do k=this%cfg%kmin_,this%cfg%kmax_+1
+      !    do j=this%cfg%jmin_,this%cfg%jmax_+1
+      !       do i=this%cfg%imin_,this%cfg%imax_+1
+      !          if (this%mask(i,j,k).eq.1.or.this%mask(i-1,j,k).eq.1) this%grd_x(:,i,j,k)=0.0_WP     !< FD gradient in x of SC
+      !          if (this%mask(i,j,k).eq.1.or.this%mask(i,j-1,k).eq.1) this%grd_y(:,i,j,k)=0.0_WP     !< FD gradient in y of SC
+      !          if (this%mask(i,j,k).eq.1.or.this%mask(i,j,k-1).eq.1) this%grd_z(:,i,j,k)=0.0_WP     !< FD gradient in z of SC
+      !       end do
+      !    end do
+      ! end do
       
       ! Adjust metrics to account for lower dimensionality
       if (this%cfg%nx.eq.1) then

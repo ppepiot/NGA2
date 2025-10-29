@@ -12,7 +12,8 @@ nz : 1
 # Case parameters
 Wall temperature   : 383.15
 Initial time       : 0.027
-Pressure           : 101325
+#Pressure           : 101325
+Pressure           : 100000
 
 # Mechanism
 Mechanism file : gri30.yaml
@@ -33,13 +34,14 @@ Latent heat                   : 2.26e6
 Species diffusivity           : 2e-5
 
 # Species and mole ratios
-Species                        : H2O(L) H2O O2 N2
-Constrained species            : O2 N2
-Water vapor to air mole ratio  : 1
+#Species                        : H2O(L) H2O O2 N2
+Species                        : H2O(L) H2O
+#Constrained species            : O2 N2
+Air to water vapor mole ratio  : 1e-2
 Nitrogen to oxygen mole ratio  : 3.71
 
 # Newton iterations
-Newton tolerance      : 1e-7
+Newton tolerance      : 1e-12
 Newton max iterations : 30
 
 # Temperature iterations
@@ -52,7 +54,7 @@ Max cfl number        : 0.9
 Sub-iterations        : 2
 Scalar time step      : 3.5e-3
 Scalar sub-iterations : 2
-Max time              : 3.05000E-02
+Max time              : 0.0305
 
 # Phase change
 Max pseudo timestep size : 9e-6
