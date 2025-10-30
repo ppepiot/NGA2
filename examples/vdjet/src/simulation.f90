@@ -153,6 +153,7 @@ contains
          time=timetracker(amRoot=fs%cfg%amRoot)
          call param_read('Max timestep size',time%dtmax)
          call param_read('Max cfl number',time%cflmax)
+         call param_read('Max simulation time',time%tmax)
          time%dt=time%dtmax
          call param_read('Subiterations',time%itmax,default=2)
       end block initialize_timetracker

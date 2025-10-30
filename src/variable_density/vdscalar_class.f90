@@ -215,15 +215,22 @@ contains
          do k=this%cfg%kmin_,this%cfg%kmax_+1
             do j=this%cfg%jmin_,this%cfg%jmax_+1
                do i=this%cfg%imin_,this%cfg%imax_+1
-                  ! Interpolation to x-face
-                  call fv_itp_build(n=3,x=this%cfg%x(i+this%stp1:i+this%stp2+1),xp=this%cfg%x(i),coeff=this%itpsc_xp(:,i,j,k))
-                  call fv_itp_build(n=3,x=this%cfg%x(i+this%stm1:i+this%stm2+1),xp=this%cfg%x(i),coeff=this%itpsc_xm(:,i,j,k))
-                  ! Interpolation to y-face
-                  call fv_itp_build(n=3,x=this%cfg%y(j+this%stp1:j+this%stp2+1),xp=this%cfg%y(j),coeff=this%itpsc_yp(:,i,j,k))
-                  call fv_itp_build(n=3,x=this%cfg%y(j+this%stm1:j+this%stm2+1),xp=this%cfg%y(j),coeff=this%itpsc_ym(:,i,j,k))
-                  ! Interpolation to z-face
-                  call fv_itp_build(n=3,x=this%cfg%z(k+this%stp1:k+this%stp2+1),xp=this%cfg%z(k),coeff=this%itpsc_zp(:,i,j,k))
-                  call fv_itp_build(n=3,x=this%cfg%z(k+this%stm1:k+this%stm2+1),xp=this%cfg%z(k),coeff=this%itpsc_zm(:,i,j,k))
+                  !! Interpolation to x-face
+                  !!call fv_itp_build(n=3,x=this%cfg%x(i+this%stp1:i+this%stp2+1),xp=this%cfg%x(i),coeff=this%itpsc_xp(:,i,j,k))
+                  !!call fv_itp_build(n=3,x=this%cfg%x(i+this%stm1:i+this%stm2+1),xp=this%cfg%x(i),coeff=this%itpsc_xm(:,i,j,k))
+                  !! Interpolation to y-face
+                  !call fv_itp_build(n=3,x=this%cfg%y(j+this%stp1:j+this%stp2+1),xp=this%cfg%y(j),coeff=this%itpsc_yp(:,i,j,k))
+                  !call fv_itp_build(n=3,x=this%cfg%y(j+this%stm1:j+this%stm2+1),xp=this%cfg%y(j),coeff=this%itpsc_ym(:,i,j,k))
+                  !! Interpolation to z-face
+                  !call fv_itp_build(n=3,x=this%cfg%z(k+this%stp1:k+this%stp2+1),xp=this%cfg%z(k),coeff=this%itpsc_zp(:,i,j,k))
+                  !call fv_itp_build(n=3,x=this%cfg%z(k+this%stm1:k+this%stm2+1),xp=this%cfg%z(k),coeff=this%itpsc_zm(:,i,j,k))
+                  call fv_itp_build(n=3,x=this%cfg%x(i+this%stp1:i+this%stp2+1),xp=this%cfg%x(i),coeff=this%itpsc_xp(:,i,j,k));print *, 'itpsc_xp',i,j,k,this%itpsc_xp(:,i,j,k) 
+                  this%itpsc_xp(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
+                  this%itpsc_xm(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
+                  this%itpsc_yp(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
+                  this%itpsc_ym(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
+                  this%itpsc_zp(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
+                  this%itpsc_zm(:,i,j,k) = [0.0_WP,1.0_WP,0.0_WP]
                end do
             end do
          end do
@@ -738,6 +745,9 @@ contains
       this%implicit%sol=0.0_WP
       call this%implicit%solve()
       resSC=this%implicit%sol
+
+      ! Sync residual
+      call this%cfg%sync(resSC)
       
    end subroutine solve_implicit
    
