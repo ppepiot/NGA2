@@ -818,7 +818,6 @@ contains
          sc%diff(:,:,:,iTl)=alpha_l
          sc%diff(:,:,:,iTg)=alpha_g
          ! Initialize the linear solver
-         ! ss=ddadi(cfg=cfg,name='Scalar',nst=7)
          ss=hypre_str(cfg=cfg,name='Scalar',method=pcg_smg,nst=7)
          call param_read('Scalar iteration',ss%maxit)
          call param_read('Scalar tolerance',ss%rcvg)
@@ -1070,7 +1069,7 @@ contains
          fs%Vold=fs%V
          fs%Wold=fs%W
 
-         ! VOF solver step
+         ! ================== VOF ================== !
          call vf%advance(dt=time%dt,U=fs%U,V=fs%V,W=fs%W)
          call vf%apply_bcond(time%t,time%dt)
          call sym_irl()
@@ -1133,7 +1132,6 @@ contains
                               sc%SC(i,j,k,nsc)=0.0_WP
                            else if (sc%PVF(i,j,k,p).lt.1.0_WP) then
                               sc%SC(i,j,k,nsc)=T_sat
-                           else
                            end if
                         end do
                      end do

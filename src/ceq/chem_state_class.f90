@@ -1278,7 +1278,7 @@ module chem_state_class
             if (this%iter_T.gt.this%iter_T_max) then
                this%iter_T=this%iter_T-1
                this%success=.false.
-               write(output_unit,'(" >   [chem_state get_ceq_PH]: Reached max number of temperature iterations")')
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH]: Reached max number of temperature iterations")')
                return
             end if
             this%Nuold=this%Nu
@@ -1293,12 +1293,12 @@ module chem_state_class
             ! Check that T is within limits
             if (this%T.eq.T_high.and.this%dT.gt.0.0_WP) then
                this%success=.false.
-               write(output_unit,'(" >   [chem_state get_ceq_PH] T > T_high")')
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH] T > T_high")')
                return
             end if
             if (this%T.eq.T_low .and.this%dT.lt.0.0_WP) then
                this%success=.false.
-               write(output_unit,'(" >   [chem_state get_ceq_PH] T < T_low")')
+               ! write(output_unit,'(" >   [chem_state get_ceq_PH] T < T_low")')
                return
             end if
             ! Ensure that Tn is within limits

@@ -96,6 +96,7 @@ module lgpc_class
       procedure :: get_cfl                                               !< Get the CFL
       procedure :: extend_normal                                         !< Extend the interface normal                                             
       procedure :: pure_interfacial_extp                                 !< Extrapolate from pure to interfacial cells
+      procedure :: pure_zero_interfacial_extp                            !< Extrapolate from pure to interfacial cells
       procedure :: get_grad                                              !< Get the Gauss gradient of a scalar field
       procedure :: add_bcond                                             !< Add a boundary condition
       procedure :: get_bcond                                             !< Get a boundary condition
@@ -492,7 +493,7 @@ contains
       implicit none
       class(lgpc), intent(inout) :: this
       integer, intent(in) :: phase
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: A !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer  :: i,j,k,ihat,jhat,khat,index,ierr
       real(WP), dimension(:,:,:), allocatable :: w
       real(WP) :: wsum,denum
@@ -579,6 +580,105 @@ contains
       deallocate(w)
 
    end subroutine pure_interfacial_extp
+
+
+   !> Extrapolate a scalar field from pure to interfacial cells that have a zero value of A
+   subroutine pure_zero_interfacial_extp(this,phase,A)
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
+      use parallel,  only: MPI_REAL_WP
+      use messager,  only: die
+      implicit none
+      class(lgpc), intent(inout) :: this
+      integer, intent(in) :: phase
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer  :: i,j,k,ihat,jhat,khat,index,ierr
+      real(WP), dimension(:,:,:), allocatable :: w
+      real(WP) :: wsum,denum
+      integer :: stxm,stym,stzm
+      integer :: stxp,styp,stzp
+      integer :: stx,sty,stz
+      real(WP), dimension(3) :: d
+      
+      ! Check the dimensions
+      if (this%nCell(1).gt.1) then
+         stxm=-extp_stc; stxp=+extp_stc
+      else
+         stxm= 0; stxp= 0
+      end if
+      if (this%nCell(2).gt.1) then
+         stym=-extp_stc; styp=+extp_stc
+      else
+         stym= 0; styp= 0
+      end if
+      if (this%nCell(3).gt.1) then
+         stzm=-extp_stc; stzp=+extp_stc
+      else
+         stzm= 0; stzp= 0
+      end if
+
+      ! Allocate the weight matrix
+      allocate(w(stxm:stxp,stym:styp,stzm:stzp))
+
+      ! Get the interface normal
+      call this%get_normal()
+
+      ! Apply boundary conditions
+      call this%apply_bcond()
+
+      ! Loop over the interfacial cells
+      do index=1,this%vf%band_count(0)
+         ! Get the interfacial cell indices
+         ihat=this%vf%band_map(1,index)
+         jhat=this%vf%band_map(2,index)
+         khat=this%vf%band_map(3,index)
+         ! Skip the non zero interfacial cells
+         if (A(ihat,jhat,khat).ne.0.0_WP) cycle
+         ! Initialize weights
+         w=0.0_WP
+         ! Loop over the stencil
+         do stz=stzm,stzp
+            k=khat+stz
+            do sty=stym,styp
+               j=jhat+sty
+               do stx=stxm,stxp
+                  i=ihat+stx
+                  ! Calculate the weight
+                  if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
+                     d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
+                     denum=sum(d*d)
+                     ! w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*denum
+                     denum=denum*denum
+                     if (denum.gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/denum
+                  end if
+               end do
+            end do
+         end do
+         ! Normalize the weights
+         wsum=sum(W)
+         if (wsum.gt.epsilon(wsum)) w=w/wsum
+         ! Initialize with zero
+         A(ihat,jhat,khat)=0.0_WP
+         ! Loop over the stencil
+         do stz=stzm,stzp
+            k=khat+stz
+            do sty=stym,styp
+               j=jhat+sty
+               do stx=stxm,stxp
+                  i=ihat+stx
+                  ! Update the interfacial value
+                  if (w(stx,sty,stz).gt.0.0_WP) A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
+               end do
+            end do
+         end do
+      end do
+
+      ! Sync the scalar field
+      call this%cfg%sync(A)
+
+      ! Deallocate weights
+      deallocate(w)
+
+   end subroutine pure_zero_interfacial_extp
 
 
    ! !> Get the gradient of a scalar field
