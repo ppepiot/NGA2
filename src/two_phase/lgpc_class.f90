@@ -96,6 +96,7 @@ module lgpc_class
       procedure :: get_cfl                                               !< Get the CFL
       procedure :: extend_normal                                         !< Extend the interface normal                                             
       procedure :: pure_interfacial_extp                                 !< Extrapolate from pure to interfacial cells
+      procedure :: pure_zero_interfacial_extp                            !< Extrapolate from pure to interfacial cells
       procedure :: get_grad                                              !< Get the Gauss gradient of a scalar field
       procedure :: add_bcond                                             !< Add a boundary condition
       procedure :: get_bcond                                             !< Get a boundary condition
@@ -246,7 +247,7 @@ contains
                do index=1,sum(this%vf%band_count(1:ext_lvl))
                   ! Offset for the interfacial cells' index
                   index_pure=this%vf%band_count(0)+index
-                  ! Get the cell indices
+                  ! Get the pure cell indices
                   i=this%vf%band_map(1,index_pure)
                   j=this%vf%band_map(2,index_pure)
                   k=this%vf%band_map(3,index_pure)
@@ -492,7 +493,7 @@ contains
       implicit none
       class(lgpc), intent(inout) :: this
       integer, intent(in) :: phase
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: A !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer  :: i,j,k,ihat,jhat,khat,index,ierr
       real(WP), dimension(:,:,:), allocatable :: w
       real(WP) :: wsum,denum
@@ -581,6 +582,233 @@ contains
    end subroutine pure_interfacial_extp
 
 
+   !> Extrapolate a scalar field from pure to interfacial cells that have a zero value of A
+   subroutine pure_zero_interfacial_extp(this,phase,A)
+      use mpi_f08,   only: MPI_ALLREDUCE,MPI_SUM
+      use parallel,  only: MPI_REAL_WP
+      use messager,  only: die
+      implicit none
+      class(lgpc), intent(inout) :: this
+      integer, intent(in) :: phase
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout)  :: A  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer  :: i,j,k,ihat,jhat,khat,index,ierr
+      real(WP), dimension(:,:,:), allocatable :: w
+      real(WP) :: wsum,denum
+      integer :: stxm,stym,stzm
+      integer :: stxp,styp,stzp
+      integer :: stx,sty,stz
+      real(WP), dimension(3) :: d
+      
+      ! Check the dimensions
+      if (this%nCell(1).gt.1) then
+         stxm=-extp_stc; stxp=+extp_stc
+      else
+         stxm= 0; stxp= 0
+      end if
+      if (this%nCell(2).gt.1) then
+         stym=-extp_stc; styp=+extp_stc
+      else
+         stym= 0; styp= 0
+      end if
+      if (this%nCell(3).gt.1) then
+         stzm=-extp_stc; stzp=+extp_stc
+      else
+         stzm= 0; stzp= 0
+      end if
+
+      ! Allocate the weight matrix
+      allocate(w(stxm:stxp,stym:styp,stzm:stzp))
+
+      ! Get the interface normal
+      call this%get_normal()
+
+      ! Apply boundary conditions
+      call this%apply_bcond()
+
+      ! Loop over the interfacial cells
+      do index=1,this%vf%band_count(0)
+         ! Get the interfacial cell indices
+         ihat=this%vf%band_map(1,index)
+         jhat=this%vf%band_map(2,index)
+         khat=this%vf%band_map(3,index)
+         ! Skip the non zero interfacial cells
+         if (A(ihat,jhat,khat).ne.0.0_WP) cycle
+         ! Initialize weights
+         w=0.0_WP
+         ! Loop over the stencil
+         do stz=stzm,stzp
+            k=khat+stz
+            do sty=stym,styp
+               j=jhat+sty
+               do stx=stxm,stxp
+                  i=ihat+stx
+                  ! Calculate the weight
+                  if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
+                     d=[this%cfg%xm(ihat)-this%cfg%xm(i),this%cfg%ym(jhat)-this%cfg%ym(j),this%cfg%zm(khat)-this%cfg%zm(k)]
+                     denum=sum(d*d)
+                     ! w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))*denum
+                     denum=denum*denum
+                     if (denum.gt.0.0_WP) w(stx,sty,stz)=abs(sum(d*this%normal(ihat,jhat,khat,:)))/denum
+                  end if
+               end do
+            end do
+         end do
+         ! Normalize the weights
+         wsum=sum(W)
+         if (wsum.gt.epsilon(wsum)) w=w/wsum
+         ! Initialize with zero
+         A(ihat,jhat,khat)=0.0_WP
+         ! Loop over the stencil
+         do stz=stzm,stzp
+            k=khat+stz
+            do sty=stym,styp
+               j=jhat+sty
+               do stx=stxm,stxp
+                  i=ihat+stx
+                  ! Update the interfacial value
+                  if (w(stx,sty,stz).gt.0.0_WP) A(ihat,jhat,khat)=A(ihat,jhat,khat)+w(stx,sty,stz)*A(i,j,k)
+               end do
+            end do
+         end do
+      end do
+
+      ! Sync the scalar field
+      call this%cfg%sync(A)
+
+      ! Deallocate weights
+      deallocate(w)
+
+   end subroutine pure_zero_interfacial_extp
+
+
+   ! !> Get the gradient of a scalar field
+   ! subroutine get_grad(this,phase,A,A_grd)
+   !    use irl_fortran_interface, only: calculateCentroid
+   !    implicit none
+   !    class(lgpc), intent(in) :: this
+   !    integer, intent(in) :: phase
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: A     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: A_grd !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+   !    integer :: index,index_pure,i,j,k
+   !    real(WP) :: grdX,grdY,grdZ
+   !    real(WP) :: grdm,grdp
+   !    real(WP) :: Am,Ap,lm,lp,vof
+   !    real(WP), dimension(3) :: posI
+   !    ! Initialize with zeros
+   !    A_grd=0.0_WP
+   !    ! Loop over the pure cells within the stencil
+   !    do index=1,sum(this%vf%band_count(1:extp_stc))
+   !       ! Offset for the interfacial cells' index
+   !       index_pure=this%vf%band_count(0)+index
+   !       ! Get the pure cell indices
+   !       i=this%vf%band_map(1,index_pure)
+   !       j=this%vf%band_map(2,index_pure)
+   !       k=this%vf%band_map(3,index_pure)
+   !       ! Calculate the Gauss gradient
+   !       if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
+   !          ! ! X grad
+   !          ! vof=this%vf%VF(i-1,j,k)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+   !          !    lm=0.5_WP*this%cfg%dx(i)
+   !          !    ! lp=this%cfg%dx(i-1)*abs(real(phase,WP)-vof)
+   !          !    lp=abs(this%cfg%x(i)-posI(1))
+   !          !    Am=(lm*A(i-1,j,k)+lp*A(i,j,k))/(lm+lp)
+   !          ! else
+   !          !    Am=this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k)
+   !          ! end if
+   !          ! vof=this%vf%VF(i+1,j,k)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    ! lm=this%cfg%dx(i+1)*abs(real(phase,WP)-vof)
+   !          !    lm=abs(posI(1)-this%cfg%x(i+1))
+   !          !    lp=0.5_WP*this%cfg%dx(i)
+   !          !    Ap=(lm*A(i,j,k)+lp*A(i+1,j,k))/(lm+lp)
+   !          ! else
+   !          !    Ap=this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)
+   !          ! end if
+   !          ! grdX=this%div(1)%arr(0,i,j,k)*Am+this%div(1)%arr(1,i,j,k)*Ap
+   !          ! ! Y grad
+   !          ! vof=this%vf%VF(i,j-1,k)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    lm=0.5_WP*this%cfg%dy(j)
+   !          !    ! lp=this%cfg%dy(j-1)*abs(real(phase,WP)-vof)
+   !          !    lp=abs(this%cfg%y(j)-posI(2))
+   !          !    Am=(lm*A(i,j-1,k)+lp*A(i,j,k))/(lm+lp)
+   !          ! else
+   !          !    Am=this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k)
+   !          ! end if
+   !          ! vof=this%vf%VF(i,j+1,k)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    ! lm=this%cfg%dy(j+1)*abs(real(phase,WP)-vof)
+   !          !    lm=abs(posI(2)-this%cfg%y(j+1))
+   !          !    lp=0.5_WP*this%cfg%dy(j)
+   !          !    Ap=(lm*A(i,j,k)+lp*A(i,j+1,k))/(lm+lp)
+   !          ! else
+   !          !    Ap=this%itp(2)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)
+   !          ! end if
+   !          ! grdY=this%div(2)%arr(0,i,j,k)*Am+this%div(2)%arr(1,i,j,k)*Ap
+   !          ! ! Z grad
+   !          ! vof=this%vf%VF(i,j,k-1)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    lm=0.5_WP*this%cfg%dz(k)
+   !          !    ! lp=this%cfg%dz(k-1)*abs(real(phase,WP)-vof)
+   !          !    lp=abs(this%cfg%z(k)-posI(3))
+   !          !    Am=(lm*A(i,j,k-1)+lp*A(i,j,k))/(lm+lp)
+   !          ! else
+   !          !    Am=this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k)
+   !          ! end if
+   !          ! vof=this%vf%VF(i,j,k+1)
+   !          ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
+   !          !    ! lm=this%cfg%dz(k+1)*abs(real(phase,WP)-vof)
+   !          !    lm=abs(posI(3)-this%cfg%z(k+1))
+   !          !    lp=0.5_WP*this%cfg%dz(k)
+   !          !    Ap=(lm*A(i,j,k)+lp*A(i,j,k+1))/(lm+lp)
+   !          ! else
+   !          !    Ap=this%itp(3)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)
+   !          ! end if
+   !          ! grdZ=this%div(3)%arr(0,i,j,k)*Am+this%div(3)%arr(1,i,j,k)*Ap
+
+   !          A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
+   !          &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
+   !          &            +(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))**2.0_WP)**0.5_WP
+
+   !          ! grdm=this%cfg%dxmi(i  )*(A(i  ,j,k)-A(i-1,j,k))
+   !          ! grdp=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i  ,j,k))
+   !          ! grdX=minmod(grdm,grdp)
+   !          ! grdm=this%cfg%dymi(j  )*(A(i,j  ,k)-A(i,j-1,k))
+   !          ! grdp=this%cfg%dymi(j+1)*(A(i,j+1,k)-A(i,j ,k))
+   !          ! grdY=minmod(grdm,grdp)
+   !          ! grdm=this%cfg%dzmi(k  )*(A(i,j,k  )-A(i,j,k-1))
+   !          ! grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
+   !          ! grdZ=minmod(grdm,grdp)
+
+   !          ! A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
+   !       end if
+   !    end do
+   !    ! Sync it
+   !    call this%cfg%sync(A_grd)
+
+   !    contains
+      
+   !       !> Minmod gradient
+   !       function minmod(g1,g2) result(g)
+   !          implicit none
+   !          real(WP), intent(in) :: g1,g2
+   !          real(WP) :: g
+   !          if (g1*g2.le.0.0_WP) then
+   !             g=0.0_WP
+   !          else
+   !             if (abs(g1).lt.abs(g2)) then
+   !                g=g1
+   !             else
+   !                g=g2
+   !             end if
+   !          end if
+   !       end function minmod
+
+   ! end subroutine get_grad
+
+
    !> Get the gradient of a scalar field
    subroutine get_grad(this,phase,A,A_grd)
       use irl_fortran_interface, only: calculateCentroid
@@ -592,7 +820,7 @@ contains
       integer :: index,index_pure,i,j,k
       real(WP) :: grdX,grdY,grdZ
       real(WP) :: grdm,grdp
-      real(WP) :: Am,Ap,lm,lp,vof
+      real(WP) :: Am,Ap,lm,lp,vofm,vofp
       real(WP), dimension(3) :: posI
       ! Initialize with zeros
       A_grd=0.0_WP
@@ -600,73 +828,42 @@ contains
       do index=1,sum(this%vf%band_count(1:extp_stc))
          ! Offset for the interfacial cells' index
          index_pure=this%vf%band_count(0)+index
-         ! Get the interfacial cell indices
+         ! Get the pure cell indices
          i=this%vf%band_map(1,index_pure)
          j=this%vf%band_map(2,index_pure)
          k=this%vf%band_map(3,index_pure)
          ! Calculate the Gauss gradient
          if (this%vf%VF(i,j,k).eq.(1.0_WP-real(phase,WP))) then
             ! ! X grad
-            ! vof=this%vf%VF(i-1,j,k)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
-            !    lm=0.5_WP*this%cfg%dx(i)
-            !    ! lp=this%cfg%dx(i-1)*abs(real(phase,WP)-vof)
-            !    lp=abs(this%cfg%x(i)-posI(1))
-            !    Am=(lm*A(i-1,j,k)+lp*A(i,j,k))/(lm+lp)
+            ! vofm=this%vf%VF(i-1,j,k)
+            ! vofp=this%vf%VF(i+1,j,k)
+            ! if ((vofm.gt.0.0_WP).and.(vofm.lt.1.0_WP)) then
+            !    grdX=this%cfg%dxmi(i+1)*(A(i+1,j,k)-A(i,j,k))
+            ! else if ((vofp.gt.0.0_WP).and.(vofp.lt.1.0_WP)) then
+            !    grdX=this%cfg%dxmi(i)*(A(i,j,k)-A(i-1,j,k))
             ! else
-            !    Am=this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k)
+            !    grdX=(this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))
             ! end if
-            ! vof=this%vf%VF(i+1,j,k)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    ! lm=this%cfg%dx(i+1)*abs(real(phase,WP)-vof)
-            !    lm=abs(posI(1)-this%cfg%x(i+1))
-            !    lp=0.5_WP*this%cfg%dx(i)
-            !    Ap=(lm*A(i,j,k)+lp*A(i+1,j,k))/(lm+lp)
-            ! else
-            !    Ap=this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)
-            ! end if
-            ! grdX=this%div(1)%arr(0,i,j,k)*Am+this%div(1)%arr(1,i,j,k)*Ap
             ! ! Y grad
-            ! vof=this%vf%VF(i,j-1,k)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    lm=0.5_WP*this%cfg%dy(j)
-            !    ! lp=this%cfg%dy(j-1)*abs(real(phase,WP)-vof)
-            !    lp=abs(this%cfg%y(j)-posI(2))
-            !    Am=(lm*A(i,j-1,k)+lp*A(i,j,k))/(lm+lp)
+            ! vofm=this%vf%VF(i,j-1,k)
+            ! vofp=this%vf%VF(i,j+1,k)
+            ! if ((vofm.gt.0.0_WP).and.(vofm.lt.1.0_WP)) then
+            !    grdY=this%cfg%dymi(j+1)*(A(i,j+1,k)-A(i,j,k))
+            ! else if ((vofp.gt.0.0_WP).and.(vofp.lt.1.0_WP)) then
+            !    grdY=this%cfg%dymi(j)*(A(i,j,k)-A(i,j-1,k))
             ! else
-            !    Am=this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k)
+            !    grdY=(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))
             ! end if
-            ! vof=this%vf%VF(i,j+1,k)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    ! lm=this%cfg%dy(j+1)*abs(real(phase,WP)-vof)
-            !    lm=abs(posI(2)-this%cfg%y(j+1))
-            !    lp=0.5_WP*this%cfg%dy(j)
-            !    Ap=(lm*A(i,j,k)+lp*A(i,j+1,k))/(lm+lp)
-            ! else
-            !    Ap=this%itp(2)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)
-            ! end if
-            ! grdY=this%div(2)%arr(0,i,j,k)*Am+this%div(2)%arr(1,i,j,k)*Ap
             ! ! Z grad
-            ! vof=this%vf%VF(i,j,k-1)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    lm=0.5_WP*this%cfg%dz(k)
-            !    ! lp=this%cfg%dz(k-1)*abs(real(phase,WP)-vof)
-            !    lp=abs(this%cfg%z(k)-posI(3))
-            !    Am=(lm*A(i,j,k-1)+lp*A(i,j,k))/(lm+lp)
+            ! vofm=this%vf%VF(i,j,k-1)
+            ! vofp=this%vf%VF(i,j,k+1)
+            ! if ((vofm.gt.0.0_WP).and.(vofm.lt.1.0_WP)) then
+            !    grdZ=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k))
+            ! else if ((vofp.gt.0.0_WP).and.(vofp.lt.1.0_WP)) then
+            !    grdZ=this%cfg%dzmi(k)*(A(i,j,k)-A(i,j,k-1))
             ! else
-            !    Am=this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k)
+            !    grdZ=(this%div(3)%arr(0,i,j,k)*(this%itp(3)%arr(-1,i,j,k)*A(i,j,k-1)+this%itp(3)%arr(0,i,j,k)*A(i,j,k))+this%div(3)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)))
             ! end if
-            ! vof=this%vf%VF(i,j,k+1)
-            ! if ((vof.gt.0.0_WP).and.(vof.lt.1.0_WP)) then
-            !    ! lm=this%cfg%dz(k+1)*abs(real(phase,WP)-vof)
-            !    lm=abs(posI(3)-this%cfg%z(k+1))
-            !    lp=0.5_WP*this%cfg%dz(k)
-            !    Ap=(lm*A(i,j,k)+lp*A(i,j,k+1))/(lm+lp)
-            ! else
-            !    Ap=this%itp(3)%arr(-1,i,j,k+1)*A(i,j,k)+this%itp(3)%arr(0,i,j,k+1)*A(i,j,k+1)
-            ! end if
-            ! grdZ=this%div(3)%arr(0,i,j,k)*Am+this%div(3)%arr(1,i,j,k)*Ap
 
             A_grd(i,j,k)=((this%div(1)%arr(0,i,j,k)*(this%itp(1)%arr(-1,i,j,k)*A(i-1,j,k)+this%itp(1)%arr(0,i,j,k)*A(i,j,k))+this%div(1)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i+1,j,k)*A(i,j,k)+this%itp(1)%arr(0,i+1,j,k)*A(i+1,j,k)))**2.0_WP &
             &            +(this%div(2)%arr(0,i,j,k)*(this%itp(2)%arr(-1,i,j,k)*A(i,j-1,k)+this%itp(2)%arr(0,i,j,k)*A(i,j,k))+this%div(2)%arr(1,i,j,k)*(this%itp(1)%arr(-1,i,j+1,k)*A(i,j,k)+this%itp(2)%arr(0,i,j+1,k)*A(i,j+1,k)))**2.0_WP &
@@ -682,7 +879,7 @@ contains
             ! grdp=this%cfg%dzmi(k+1)*(A(i,j,k+1)-A(i,j,k  ))
             ! grdZ=minmod(grdm,grdp)
 
-            ! A_grd(i,j,k)=sqrt(grdX**2.0_WP+grdY**2.0_WP+grdZ**2.0_WP)
+            ! A_grd(i,j,k)=sqrt(grdX**2+grdY**2+grdZ**2)
          end if
       end do
       ! Sync it
@@ -717,52 +914,52 @@ contains
    end subroutine get_div
 
 
-   ! !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
-   ! subroutine get_temperature_grad(this)
-   !    implicit none
-   !    class(lgpc), intent(inout) :: this
-   !    ! Apply boundary conditions
-   !    call this%apply_bcond()
-   !    ! Get the temperature gradients
-   !    call this%get_grad(Lphase,this%Tl,this%Tl_grd)
-   !    call this%get_grad(Gphase,this%Tg,this%Tg_grd)
-   !    ! Extrapolate the gradients to interface
-   !    call this%pure_interfacial_extp(Lphase,this%Tl_grd)
-   !    call this%pure_interfacial_extp(Gphase,this%Tg_grd)
-   ! end subroutine get_temperature_grad
-
-
-   !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   !> Calculate temperature gradients on the liquid and gas sides (Boyd and Ling 2023)
    subroutine get_temperature_grad(this)
-      use irl_fortran_interface, only: calculateCentroid
       implicit none
       class(lgpc), intent(inout) :: this
-      real(WP), dimension(3) :: posI,nI
-      integer  :: i,j,k,index
-      ! Get the interface normal
-      call this%get_normal()
       ! Apply boundary conditions
       call this%apply_bcond()
-      ! Zero out the gradients
-      this%Tl_grd=0.0_WP
-      this%Tg_grd=0.0_WP
-      ! Loop over the interfacial cells
-      do index=1,this%vf%band_count(0)
-         ! Get the interfacial cell indices
-         i=this%vf%band_map(1,index)
-         j=this%vf%band_map(2,index)
-         k=this%vf%band_map(3,index)
-         ! Get the interface center and normal
-         posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
-         nI(1)=this%normal(i,j,k,1)
-         nI(2)=this%normal(i,j,k,2)
-         nI(3)=this%normal(i,j,k,3)
-         ! Get the liquid side gradient
-         call this%get_one_sided_grad(phase=Lphase,F=this%Tl,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
-         ! Get the gas side gradient
-         call this%get_one_sided_grad(phase=Gphase,F=this%Tg,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
-      end do
+      ! Get the temperature gradients
+      call this%get_grad(Lphase,this%Tl,this%Tl_grd)
+      call this%get_grad(Gphase,this%Tg,this%Tg_grd)
+      ! Extrapolate the gradients to interface
+      call this%pure_interfacial_extp(Lphase,this%Tl_grd)
+      call this%pure_interfacial_extp(Gphase,this%Tg_grd)
    end subroutine get_temperature_grad
+
+
+   ! !> Calculate temperature gradients on the liquid and gas sides (Bothe and Fleckenstein 2013)
+   ! subroutine get_temperature_grad(this)
+   !    use irl_fortran_interface, only: calculateCentroid
+   !    implicit none
+   !    class(lgpc), intent(inout) :: this
+   !    real(WP), dimension(3) :: posI,nI
+   !    integer  :: i,j,k,index
+   !    ! Get the interface normal
+   !    call this%get_normal()
+   !    ! Apply boundary conditions
+   !    call this%apply_bcond()
+   !    ! Zero out the gradients
+   !    this%Tl_grd=0.0_WP
+   !    this%Tg_grd=0.0_WP
+   !    ! Loop over the interfacial cells
+   !    do index=1,this%vf%band_count(0)
+   !       ! Get the interfacial cell indices
+   !       i=this%vf%band_map(1,index)
+   !       j=this%vf%band_map(2,index)
+   !       k=this%vf%band_map(3,index)
+   !       ! Get the interface center and normal
+   !       posI=calculateCentroid(this%vf%interface_polygon(1,i,j,k))
+   !       nI(1)=this%normal(i,j,k,1)
+   !       nI(2)=this%normal(i,j,k,2)
+   !       nI(3)=this%normal(i,j,k,3)
+   !       ! Get the liquid side gradient
+   !       call this%get_one_sided_grad(phase=Lphase,F=this%Tl_grd,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tl_grd(i,j,k))
+   !       ! Get the gas side gradient
+   !       call this%get_one_sided_grad(phase=Gphase,F=this%Tg_grd,posI=posI,i=i,j=j,k=k,normal=nI,Fgrd=this%Tg_grd(i,j,k))
+   !    end do
+   ! end subroutine get_temperature_grad
 
 
    !> Calculate the one-sided gradient dot producted by the interface normal at a given phase

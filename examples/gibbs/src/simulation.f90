@@ -17,6 +17,7 @@ module simulation
 
    !> Thermodynamic quantities
    real(WP) :: T,p
+   real(WP), dimension(:), allocatable :: N_init
 
    !> Chemical system and state
    type(chem_sys)   :: sys
@@ -35,7 +36,7 @@ contains
 
    !> Initialization of problem solver
    subroutine simulation_init
-      use param,     only: param_read,param_getsize
+      use param,     only: param_exists,param_read,param_getsize
       use messager,  only: die
       implicit none
       integer :: np=2,ns,ne,ncs
@@ -45,7 +46,6 @@ contains
       real(WP), allocatable :: nasa_coef(:,:)
       character(len=str_medium), dimension(:), allocatable :: const_sp
       integer,  dimension(:), allocatable :: CS
-      real(WP), dimension(:), allocatable :: N_init
 
       ! Parse the mechanism file
       parse_mech: block
@@ -67,23 +67,28 @@ contains
          logical :: new_elem
          ! Get the target species from input
          ns=param_getsize('Species')
-         nn=param_getsize('Initial moles')
-         ncs=param_getsize('Constrained species')
-         if (ns.ne.nn) call die('Unequal number of species and moles in the input file.')
+         if (param_exists('Constrained species')) then
+            ncs=param_getsize('Constrained species')
+            allocate(const_sp(1:ncs))
+            allocate(const_sp_copy(1:ncs))
+            call param_read('Constrained species',const_sp)
+            const_sp_copy=const_sp
+         else
+            ncs=0
+         end if
          allocate(sp_names(1:ns))
-         allocate(inpt2mch_sp_order(1:ns))
          allocate(sp_names_copy(1:ns))
-         allocate(N_init(1:ns))
-         allocate(N_init_copy(1:ns))
-         allocate(const_sp(1:ncs))
-         allocate(const_sp_copy(1:ncs))
          allocate(CS(ncs))
          call param_read('Species',sp_names)
-         call param_read('Initial moles',N_init)
-         call param_read('Constrained species',const_sp)
          sp_names_copy=sp_names
+         ! Get the target species from input
+         nn=param_getsize('Initial moles')
+         if (ns.ne.nn) call die('Unequal number of species and moles in the input file.')
+         allocate(inpt2mch_sp_order(1:ns))
+         allocate(N_init(1:ns))
+         allocate(N_init_copy(1:ns))
+         call param_read('Initial moles',N_init)
          N_init_copy=N_init
-         const_sp_copy=const_sp
          ! Read the mechanism file path
          call param_read('Mechanism file',mch_file)
          ! Open the mechanism
@@ -198,19 +203,21 @@ contains
          call sp%destroy()
          call comp%destroy()
          call thermo%destroy()
-         deallocate(sp_names_copy,N_init_copy,const_sp_copy)
+         deallocate(sp_names_copy,N_init_copy)
+         if (allocated(const_sp_copy)) deallocate(const_sp_copy)
       end block parse_mech
 
       ! Initialize the chemical equilibrium framework
       ceq_init: block
-         use param,     only: param_exists
-         use mathtools, only: reorder_rows
-         use messager,  only: die
-         integer :: ng=1
+         use param,            only: param_exists
+         use mathtools,        only: reorder_rows
+         use messager,         only: die
+         use chem_state_class, only: BS,NR,FD,LS
+         integer :: ng=1,PH_method,dNdT_method
          real(WP), dimension(:,:), allocatable :: Bg
          real(WP), dimension(:),   allocatable :: N_h,N_h_c
          real(WP) :: T_h,T_g
-         character(len=2) :: eq_cond
+         character(len=2) :: eq_cond,PH_alg,dNdT_alg
          integer :: isc
          ! Read inputs
          call param_read('Temperature',T)
@@ -244,7 +251,23 @@ contains
                call state%initialize(sys=sys,cond=fixed_PT,p=p)
                call state%N_init(T=T,N=N_init)
             case ('PH')
-               call state%initialize(sys=sys,cond=fixed_PH,p=p)
+               call param_read('PH algorithm',PH_alg)
+               if (PH_alg.eq.'BS') then
+                  PH_method=BS
+               else if (PH_alg.eq.'NR') then
+                  PH_method=NR
+                  call param_read('dNdT algorithm',dNdT_alg)
+                  if (dNdT_alg.eq.'FD') then
+                     dNdT_method=FD
+                  else if (dNdT_alg.eq.'LS') then
+                     dNdT_method=LS
+                  else
+                     call die('Wrong dNdT method')
+                  end if
+               else
+                  call die('Wrong PH method')
+               end if
+               call state%initialize(sys=sys,cond=fixed_PH,PH_method=PH_method,dNdT_method=dNdT_method,p=p)
                call param_read('Temperature for enthalpy calculation',T_h)
                call param_read('Composition for enthalpy calculation',N_h)
                N_h_c=N_h
@@ -253,6 +276,8 @@ contains
                if (param_exists('Temperature initial guess')) then
                   call param_read('Temperature initial guess',T_g)
                   call state%N_init(N=N_init,N_h=N_h,T_h=T_h,T_g=T_g)
+                  ! call state%N_init(N=N_init,HoR=-33690.099223276899_WP,T_g=T_g)
+                  print*,'state%HoR = ',state%HoR
                else
                   call state%N_init(N=N_init,N_h=N_h,T_h=T_h)
                end if
@@ -261,6 +286,17 @@ contains
          end select
          if (.not.state%success) call die('chem state N_init failed')
          print*,'Equilibrium condition: Constant ',eq_cond
+         ! Read in numerical inputs
+         call param_read('Newton tolerance',state%tol_N)
+         call param_read('Newton max iterations',state%iter_N_max)
+         if (state%cond.eq.fixed_PH) then
+            if (state%PH_method.eq.BS) then
+               call param_read('H tolerance',state%tol_H)
+            else if (state%PH_method.eq.NR) then
+               call param_read('T tolerance',state%tol_T)
+            end if
+            call param_read('T max iterations',state%iter_T_max)
+         end if
          ! Re-initialization of moles
          if (scale) then 
             print*,'Re-initialization of moles (Scaled):'
@@ -274,16 +310,9 @@ contains
          deallocate(Bg,N_h,N_h_c)
       end block ceq_init
 
-      ! Read in Newton and temperature iterations inputs
-      call param_read('Newton tolerance',state%tol_N)
-      call param_read('Newton max iterations',state%iter_N_max)
-      if (state%cond.eq.fixed_PH) then
-         call param_read('T tolerance',state%tol_T)
-         call param_read('T max iterations',state%iter_T_max)
-      end if
-
       ! Deallocate arrays
-      deallocate(nasa_coef,const_sp,CS,N_init,e_names,elem_mat,phse_mat)
+      deallocate(nasa_coef,CS,e_names,elem_mat,phse_mat)
+      if (allocated(const_sp)) deallocate(const_sp)
       
    end subroutine simulation_init
 
@@ -291,17 +320,26 @@ contains
    !> Perform an NGA2 simulation - this mimicks NGA's old time integration for multiphase
    subroutine simulation_run
       use messager, only: die
+      use chem_state_class, only: BS,NR
       implicit none
       integer :: isc
 
       ! Obtain the chemical equilibrium state
+      if (state%PH_method.eq.BS) then
+         state%Tlo=350.0_WP
+         state%Thi=450.0_WP
+      end if
       call state%equilibrate()
       if (.not.state%success) call die('chem state equilibrate failed')
 
       ! Output
       if (state%cond.eq.fixed_PH) then
          print*,'Number of temperature iterations = ',state%iter_T
-         print*,'Relative residual error of T = ',state%dT/state%T
+         if (state%PH_method.eq.NR) then
+            print*,'Relative residual error of T = ',state%dT/state%T
+         else if (state%PH_method.eq.BS) then
+            print*,'Relative residual error of H = ',state%RH/state%HoR
+         end if
       else
          print*,'Number of Newton iterations = ',state%iter_N
          print*,'Residal error = ', norm2(state%R)

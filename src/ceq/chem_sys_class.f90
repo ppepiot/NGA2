@@ -307,15 +307,21 @@ module chem_sys_class
          sp_det=0
          this%sp_order=0
          kk=0
-         do k=1,this%ns
-            if (norm2(U(k,this%nb+1:this%ns)).lt.thresh) then
-               sp_det(k)=1	! species k is determined
-               kk=kk+1
-               this%sp_order(kk)=k	! determined species are first in ordering
-            endif
-         end do
+         ! print*,'nb = ',this%nb
+         ! print*,'ns = ',this%ns
+         if (this%nb.lt.this%ns) then
+            do k=1,this%ns
+               if (norm2(U(k,this%nb+1:this%ns)).lt.thresh) then
+                  sp_det(k)=1	! species k is determined
+                  kk=kk+1
+                  this%sp_order(kk)=k	! determined species are first in ordering
+               endif
+            end do
+         end if
          this%nsd=sum(sp_det)
          this%nsu=this%ns-this%nsd
+         ! print*,'nsd = ',this%nsd
+         ! print*,'nsu = ',this%nsu
 
          do k=1,this%ns
             if (sp_det(k).eq.0) then
