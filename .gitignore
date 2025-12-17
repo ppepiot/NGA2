@@ -32,10 +32,14 @@ Make.local
 
 # Docs stuff
 !docs/_config.yml
+!docs/_data/
+!docs/_data/**
 !docs/_layouts/
 !docs/_layouts/**
 !docs/_includes/
 !docs/_includes/**
+!docs/_pages/
+!docs/_pages/**
 !docs/_sass/
 !docs/_sass/**
 
