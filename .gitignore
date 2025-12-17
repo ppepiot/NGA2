@@ -31,7 +31,8 @@ Make.local
 *.mod
 
 # Doc stuff
-doc/
+!docs/_layouts/
+!docs/_config.yml
 
 # Runtime files
 *.h5
