@@ -1,0 +1,5 @@
+title: NGA2
+description: High-performance multiphysics CFD framework
+url: "https://desjardi.github.io"
+baseurl: "/NGA2"
+markdown: kramdown
