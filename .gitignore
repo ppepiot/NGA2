@@ -11,11 +11,6 @@
 *.ilg
 *.ind
 
-# Jekyll build files
-**/_site/
-**/.jekyll-cache/
-**/.sass-cache/
-
 # Emacs temporaries
 *~
 \#*
@@ -43,7 +38,19 @@ Make.local
 !docs/_includes/**
 !docs/_sass/
 !docs/_sass/**
-docs/Gemfile.lock
+
+# Ruby Gem
+*.gem
+.bundle
+Gemfile.lock
+**/vendor/bundle
+
+# Jekyll generated files
+.jekyll-cache
+.jekyll-metadata
+.sass-cache
+_asset_bundler_cache
+_site
 
 # Runtime files
 *.h5
