@@ -1,9 +1,13 @@
 ---
-layout: default
 title: NGA2 Landing Page
+layout: single
 ---
 
-Welcome to the **NGA2** project page!
+# Welcome to NGA2
 
-- Check out the code on [GitHub](https://github.com/desjardi/NGA2)
-- More content will be added soon
+This is the NGA2 code landing page. Check out the NGA2 on [GitHub](https://github.com/desjardi/NGA2).
+
+- **Images**  
+- **Code snippets**  
+- **Video embeds**  
+- **Documentation sections**
