@@ -43,6 +43,7 @@ Make.local
 !docs/_includes/**
 !docs/_sass/
 !docs/_sass/**
+docs/Gemfile.lock
 
 # Runtime files
 *.h5

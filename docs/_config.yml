@@ -3,7 +3,7 @@ description: High-performance multiphysics CFD framework
 url: "https://desjardi.github.io"
 baseurl: "/NGA2"
 markdown: kramdown
-remote_theme: mmistakes/minimal-mistakes
+remote_theme: "mmistakes/minimal-mistakes@4.27.3"
 plugins:
   - jekyll-remote-theme
   - jekyll-include-cache
