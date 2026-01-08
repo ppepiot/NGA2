@@ -1,25 +1,25 @@
 ---
-title: "Getting Started"
-permalink: /getting-started/
+title: "Tutorials"
+permalink: /tutorials/
 layout: single
 sidebar:
-  nav: "getting_started"
+  nav: "tutorials"
 ---
 
 This page is the tutorial hub for NGA2, starting from “it builds” and moving toward more realistic workflows.
 
 Use the sidebar to navigate through the sequence, or start here:
 
-- [Installing dependencies]({{ '/getting-started/install-deps/' | relative_url }})
-- [Installing NGA2]({{ '/getting-started/install-nga2/' | relative_url }})
-- [A first run]({{ '/getting-started/first-run/' | relative_url }})
-- [A second run]({{ '/getting-started/second-run/' | relative_url }})
+- [Installing dependencies]({{ '/tutorials/install-deps/' | relative_url }})
+- [Installing NGA2]({{ '/tutorials/install-nga2/' | relative_url }})
+- [A first run]({{ '/tutorials/first-run/' | relative_url }})
+- [A second run]({{ '/tutorials/second-run/' | relative_url }})
 
 ## Before you start
 
 - Follow the installation steps:
-  - [Installing dependencies]({{ '/getting-started/install-deps/' | relative_url }})
-  - [Installing NGA2]({{ '/getting-started/install-nga2/' | relative_url }})
+  - [Installing dependencies]({{ '/tutorials/install-deps/' | relative_url }})
+  - [Installing NGA2]({{ '/tutorials/install-nga2/' | relative_url }})
 - Pick one example case from the repository’s `examples/` directory.
 
 ## Tutorials

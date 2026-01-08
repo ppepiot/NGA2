@@ -1,9 +1,9 @@
 ---
 title: "Installing dependencies"
-permalink: /getting-started/install-deps/
+permalink: /tutorials/install-deps/
 layout: single
 sidebar:
-  nav: "getting_started"
+  nav: "tutorials"
 ---
 
 This page lists the external dependencies needed to build and run NGA2.

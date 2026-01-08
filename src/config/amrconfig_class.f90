@@ -8,12 +8,12 @@ module amrconfig_class
    use mpi_f08,          only: MPI_Comm
    implicit none
    private
-   
-   
+
+
    ! Expose type/constructor/methods
    public :: amrconfig,finalize_amrex
-   
-   
+
+
    !> Amrconfig object definition based on AMReX's amrcore
    type :: amrconfig
       ! Name of amrconfig
@@ -72,8 +72,8 @@ module amrconfig_class
       procedure :: average_down              !< Average down a given multifab throughout all levels
       procedure :: average_downto            !< Average down a given multifab to level lvl
    end type amrconfig
-   
-   
+
+
    !> Interfaces for user-defined subroutines
    abstract interface
       subroutine mak_lvl_stype(lvl,time,ba,dm) bind(c)
@@ -98,11 +98,11 @@ module amrconfig_class
          character(kind=c_char), intent(in), value :: clrval
       end subroutine err_est_stype
    end interface
-   
-   
+
+
 contains
-   
-   
+
+
    !> Initialization of an amrconfig object
    subroutine initialize(this,name)
       use messager, only: die
@@ -217,8 +217,8 @@ contains
          this%min_meshsize=min(this%dx(this%nlvl),this%dy(this%nlvl),this%dz(this%nlvl))
       end block compute_shortcuts
    end subroutine initialize
-   
-   
+
+
    !> Finalization of amrconfig object
    impure elemental subroutine finalize(this)
       use mpi_f08,       only: MPI_COMM_NULL
@@ -246,8 +246,8 @@ contains
       ! Do not free comm as it was passed to us
       this%comm=MPI_COMM_NULL
    end subroutine finalize
-   
-   
+
+
    !> Register user-defined procedures for regriding
    subroutine register_udp(this,mak_lvl_init,mak_lvl_crse,mak_lvl_remk,clr_lvl,err_est)
       implicit none
@@ -265,8 +265,8 @@ contains
       end interface
       call amrex_fi_init_virtual_functions(c_funloc(mak_lvl_init),c_funloc(mak_lvl_crse),c_funloc(mak_lvl_remk),c_funloc(clr_lvl),c_funloc(err_est),this%amrcore)
    end subroutine register_udp
-   
-   
+
+
    !> Initialize grid on an amrconfig object
    subroutine initialize_grid(this,time)
       implicit none
@@ -285,8 +285,8 @@ contains
       ! Generate info about grid
       call this%get_info()
    end subroutine initialize_grid
-   
-   
+
+
    !> Perform regriding operation on baselvl
    subroutine regrid(this,baselvl,time)
       implicit none
@@ -307,8 +307,8 @@ contains
       ! Generate info about grid
       call this%get_info()
    end subroutine regrid
-   
-   
+
+
    !> Get info on amrconfig object
    subroutine get_info(this)
       use amrex_amr_module, only: amrex_boxarray,amrex_box
@@ -345,8 +345,8 @@ contains
       &                this%geom(this%clvl())%dx(3)*&
       &                this%ncells/((this%xhi-this%xlo)*(this%yhi-this%ylo)*(this%zhi-this%zlo))
    end subroutine get_info
-   
-   
+
+
    !> Print amrconfig object
    subroutine print(this)
       use, intrinsic :: iso_fortran_env, only: output_unit
@@ -379,8 +379,8 @@ contains
          end do
       end if
    end subroutine print
-   
-   
+
+
    !> Obtain box array at a level
    function get_boxarray(this,lvl) result(ba)
       use amrex_amr_module, only: amrex_boxarray
@@ -399,8 +399,8 @@ contains
       end interface
       call amrex_fi_get_boxarray(ba%p,lvl,this%amrcore)
    end function get_boxarray
-   
-   
+
+
    !> Obtain distromap at a level
    function get_distromap(this,lvl) result(dm)
       use amrex_amr_module, only: amrex_distromap
@@ -419,8 +419,8 @@ contains
       end interface
       call amrex_fi_get_distromap(dm%p,lvl,this%amrcore)
    end function get_distromap
-   
-   
+
+
    !> Build mfiter at a level
    subroutine mfiter_build(this,lvl,mfi)
       use amrex_amr_module, only: amrex_boxarray,amrex_distromap,amrex_mfiter,amrex_mfiter_build
@@ -434,8 +434,8 @@ contains
       dm=this%get_distromap(lvl)
       call amrex_mfiter_build(mfi,ba,dm)
    end subroutine mfiter_build
-   
-   
+
+
    !> Destroy mfiter
    subroutine mfiter_destroy(this,mfi)
       use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_destroy
@@ -464,8 +464,8 @@ contains
       face=.false.; if (present(atface)) face=atface
       call amrex_multifab_build(mfab,ba,dm,ncomp,nover,face)
    end subroutine mfab_build
-   
-   
+
+
    !> Destroy mfab
    subroutine mfab_destroy(this,mfab)
       use amrex_amr_module, only: amrex_multifab,amrex_multifab_destroy
@@ -474,8 +474,8 @@ contains
       type(amrex_multifab), intent(inout) :: mfab
       call amrex_multifab_destroy(mfab)
    end subroutine mfab_destroy
-   
-   
+
+
    !> Return current finest level
    function clvl(this) result(cl)
       use amrex_amr_module, only: amrex_boxarray
@@ -491,8 +491,8 @@ contains
       end interface
       cl=amrex_fi_get_finest_level(this%amrcore)
    end function clvl
-   
-   
+
+
    !> Average down entire multifab array
    subroutine average_down(this,mfaba)
       use amrex_amr_module, only: amrex_multifab,amrex_average_down
@@ -504,8 +504,8 @@ contains
          call amrex_average_down(mfaba(n+1),mfaba(n),this%geom(n+1),this%geom(n),1,mfaba(0)%nc,this%rref(n))
       end do
    end subroutine average_down
-   
-   
+
+
    !> Average entire multifab array down to level lvl
    subroutine average_downto(this,mfaba,lvl)
       use amrex_amr_module, only: amrex_multifab,amrex_average_down
@@ -515,14 +515,14 @@ contains
       integer, intent(in) :: lvl
       call amrex_average_down(mfaba(lvl+1),mfaba(lvl),this%geom(lvl+1),this%geom(lvl),1,mfaba(0)%nc,this%rref(lvl))
    end subroutine average_downto
-   
-   
+
+
    !> Finalization of amrex
    subroutine finalize_amrex()
       use amrex_amr_module, only: amrex_finalize
       implicit none
       call amrex_finalize()
    end subroutine finalize_amrex
-   
-   
+
+
 end module amrconfig_class

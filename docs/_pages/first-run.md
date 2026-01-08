@@ -1,9 +1,9 @@
 ---
 title: "A first run"
-permalink: /getting-started/first-run/
+permalink: /tutorials/first-run/
 layout: single
 sidebar:
-  nav: "getting_started"
+  nav: "tutorials"
 ---
 
 Goal: run an included example case end-to-end.
@@ -23,4 +23,4 @@ Document the exact command line(s) you expect users to run here.
 
 ## Next
 
-Continue to: [A second run]({{ '/getting-started/second-run/' | relative_url }})
+Continue to: [A second run]({{ '/tutorials/second-run/' | relative_url }})

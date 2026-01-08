@@ -1,21 +1,21 @@
 main:
   - title: "Home"
     url: /
-  - title: "Getting Started"
-    url: /getting-started/
+  - title: "Tutorials"
+    url: /tutorials/
   - title: "Gallery"
     url: /gallery/
   - title: "About"
     url: /about/
 
-getting_started:
+tutorials:
   - title: "Overview"
-    url: /getting-started/
+    url: /tutorials/
   - title: "Installing dependencies"
-    url: /getting-started/install-deps/
+    url: /tutorials/install-deps/
   - title: "Installing NGA2"
-    url: /getting-started/install-nga2/
+    url: /tutorials/install-nga2/
   - title: "A first run"
-    url: /getting-started/first-run/
+    url: /tutorials/first-run/
   - title: "A second run"
-    url: /getting-started/second-run/
+    url: /tutorials/second-run/

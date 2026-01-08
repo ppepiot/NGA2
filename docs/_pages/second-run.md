@@ -1,9 +1,9 @@
 ---
 title: "A second run"
-permalink: /getting-started/second-run/
+permalink: /tutorials/second-run/
 layout: single
 sidebar:
-  nav: "getting_started"
+  nav: "tutorials"
 ---
 
 Goal: make one intentional change and confirm the outcome changes.

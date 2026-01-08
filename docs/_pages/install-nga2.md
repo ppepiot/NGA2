@@ -1,9 +1,9 @@
 ---
 title: "Installing NGA2"
-permalink: /getting-started/install-nga2/
+permalink: /tutorials/install-nga2/
 layout: single
 sidebar:
-  nav: "getting_started"
+  nav: "tutorials"
 ---
 
 This page describes how to build NGA2 once dependencies are installed.
@@ -16,4 +16,4 @@ This page describes how to build NGA2 once dependencies are installed.
 
 ## Next
 
-Continue to: [A first run]({{ '/getting-started/first-run/' | relative_url }})
+Continue to: [A first run]({{ '/tutorials/first-run/' | relative_url }})
