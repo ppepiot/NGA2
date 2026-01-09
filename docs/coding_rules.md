@@ -133,12 +133,34 @@ This document specifies coding rules and standards for the NGA2 codebase. These 
   - Example: `call bx1%initialize(lo=[0,0,0], hi=[31,31,31], itype=[CELL,CELL,CELL])`
   - Not: `call bx1%initialize([0,0,0], [31,31,31], [CELL,CELL,CELL])`
 
+- **Data-first argument ordering for APIs**
+  - When designing APIs, order arguments: required data first, then options, then optional name
+  - Example: `call ens%add_scalar(data=pressure, comp=1, name="P")`
+  - Example: `call amr%register(data=velocity, ncomp=3, ng=1, name="velocity")`
+  - This makes the most important argument (the data) prominent
+
+- **Use `target` attribute for objects stored by pointer**
+  - When an object will be stored by pointer in a registry or collection, declare it with `target`
+  - Example: `type(amrdata), target :: velocity`
+  - The receiving procedure should use `class(...), target, intent(in)` for the argument
+
 ## Testing
 
 - **Use the examples directory for tests**
   - Test cases should live in `examples/` subdirectories
   - Use the standard testing environment (not external test frameworks)
   - Tests should be comprehensive and cover all features
+  - Run parallel tests with: `mpiexec -n 4 ./executable`
+
+## AMR Implementation Notes (amrbase)
+
+These are design choices in the current implementation, not strict rules:
+
+- **Registry pattern**: Fields are registered with `amr%register(data=field, ...)` and automatically allocated/reallocated during regrid callbacks
+
+- **Singleton pointer for callback routing**: AMReX callbacks don't pass user context, so `current_amrgrid` and `current_amrdata` module-level pointers are used to route callbacks to the correct object. This is a workaround for AMReX's C-style callback interface.
+
+- **Boundary condition arrays**: `lo_bc(3,ncomp)` and `hi_bc(3,ncomp)` store per-direction, per-component BCs with defaults based on periodicity
 
 ## File Organization
 

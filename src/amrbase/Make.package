@@ -1,0 +1,4 @@
+f90EXE_sources += amrgrid_class.f90 amrdata_class.f90 amrflux_class.f90 amrensight_class.f90
+
+INCLUDE_LOCATIONS += $(NGA_HOME)/src/amrbase
+VPATH_LOCATIONS   += $(NGA_HOME)/src/amrbase
