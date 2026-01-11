@@ -235,6 +235,8 @@ void amrcore_get_distromap(void **dm_ptr, int lev, void *core) {
 
 //-----------------------------------------------------------------------------
 // FillPatch for Level 0 (single level, just physical BCs)
+// Note: scomp/dcomp are 1-indexed (Fortran convention), converted to 0-indexed
+// here
 //-----------------------------------------------------------------------------
 void amrmfab_fillpatch_single(void *mf_ptr, double time_old, void *mf_old_ptr,
                               double time_new, void *mf_new_ptr, void *geom_ptr,
@@ -251,12 +253,14 @@ void amrmfab_fillpatch_single(void *mf_ptr, double time_old, void *mf_old_ptr,
 
   nga2::NGA2BCFunctor bc_functor(solver_ctx, bc_dispatch, geom);
 
-  amrex::FillPatchSingleLevel(*mf, time, smf, stime, scomp, dcomp, ncomp, *geom,
-                              bc_functor, 0);
+  // Convert from 1-indexed (Fortran) to 0-indexed (C++)
+  amrex::FillPatchSingleLevel(*mf, time, smf, stime, scomp - 1, dcomp - 1,
+                              ncomp, *geom, bc_functor, 0);
 }
-
 //-----------------------------------------------------------------------------
 // FillPatch for Fine Levels (two levels: coarse + fine)
+// Note: scomp/dcomp are 1-indexed (Fortran convention), converted to 0-indexed
+// here
 //-----------------------------------------------------------------------------
 void amrmfab_fillpatch_two(void *mf_ptr, double time_old_c, void *mf_old_c_ptr,
                            double time_new_c, void *mf_new_c_ptr,
@@ -314,13 +318,16 @@ void amrmfab_fillpatch_two(void *mf_ptr, double time_old_c, void *mf_old_c_ptr,
 
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
 
-  amrex::FillPatchTwoLevels(*mf, time, cmf, ctime, fmf, ftime, scomp, dcomp,
-                            ncomp, *geom_c, *geom_f, bc_functor_c, 0,
+  // Convert from 1-indexed (Fortran) to 0-indexed (C++)
+  amrex::FillPatchTwoLevels(*mf, time, cmf, ctime, fmf, ftime, scomp - 1,
+                            dcomp - 1, ncomp, *geom_c, *geom_f, bc_functor_c, 0,
                             bc_functor_f, 0, ratio, interp, bcs, 0);
 }
 
 //-----------------------------------------------------------------------------
 // FillCoarsePatch - fill fine level from coarse only (no fine data needed)
+// Note: scomp/dcomp are 1-indexed (Fortran convention), converted to 0-indexed
+// here
 //-----------------------------------------------------------------------------
 void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
                              void *geom_c_ptr, void *geom_f_ptr,
@@ -367,10 +374,11 @@ void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
 
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
 
+  // Convert from 1-indexed (Fortran) to 0-indexed (C++)
   // Use InterpFromCoarseLevel which doesn't require fine-level source data
-  amrex::InterpFromCoarseLevel(*mf_f, time, *mf_c, scomp, dcomp, ncomp, *geom_c,
-                               *geom_f, bc_functor_c, 0, bc_functor_f, 0, ratio,
-                               interp, bcs, 0);
+  amrex::InterpFromCoarseLevel(*mf_f, time, *mf_c, scomp - 1, dcomp - 1, ncomp,
+                               *geom_c, *geom_f, bc_functor_c, 0, bc_functor_f,
+                               0, ratio, interp, bcs, 0);
 }
 
 } // extern "C"

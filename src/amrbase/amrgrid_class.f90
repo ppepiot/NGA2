@@ -815,7 +815,7 @@ contains
          data_ctx=c_loc(data)
       end select
       bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call appropriate FillPatch
+      ! Call appropriate FillPatch (note: scomp/dcomp use 1-indexed Fortran convention)
       if (lvl.eq.0) then
          call amrmfab_fillpatch_single(data%mf(0)%p,time_old,data%mf(0)%p, &
          &   time_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
@@ -861,7 +861,7 @@ contains
          data_ctx=c_loc(data)
       end select
       bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call appropriate FillPatch
+      ! Call appropriate FillPatch (note: scomp/dcomp use 1-indexed Fortran convention)
       if (lvl.eq.0) then
          call amrmfab_fillpatch_single(dest%p,t_old,data%mf(0)%p, &
          &   t_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
@@ -896,7 +896,7 @@ contains
          data_ctx=c_loc(data)
       end select
       bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call C++ wrapper
+      ! Call C++ wrapper (scomp/dcomp use 1-indexed Fortran convention)
       call amrmfab_fillcoarsepatch(data%mf(lvl)%p,time,data%mf(lvl-1)%p, &
       &   this%geom(lvl-1)%p,this%geom(lvl)%p,data_ctx,bc_dispatch_ptr, &
       &   1,1,data%ncomp,this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)

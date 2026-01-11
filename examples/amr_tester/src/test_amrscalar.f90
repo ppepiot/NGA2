@@ -36,26 +36,26 @@ contains
       type(amrex_box) :: bx
       character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
       character(kind=c_char), parameter :: SET=char(1)
-      real(WP) :: x,y,z,dx,dy,dz
+      real(WP) :: x,y,z,dx,dy,dz,radius
       integer :: i,j,k
       tags=tags_ptr
-      dx=amr_ptr%geom(lvl)%dx(1)
-      dy=amr_ptr%geom(lvl)%dx(2)
-      dz=amr_ptr%geom(lvl)%dx(3)
+      ! Time-varying radius to force grid changes
+      radius = 0.1_WP + 0.3_WP * time
+      dx=amr%geom(lvl)%dx(1)
+      dy=amr%geom(lvl)%dx(2)
+      dz=amr%geom(lvl)%dx(3)
       call amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
          bx=mfi%tilebox()
          tagarr=>tags%dataPtr(mfi)
          do k=bx%lo(3),bx%hi(3)
-            z=amr_ptr%zlo+(real(k,WP)+0.5_WP)*dz
+            z=amr%zlo+(real(k,WP)+0.5_WP)*dz
             do j=bx%lo(2),bx%hi(2)
-               y=amr_ptr%ylo+(real(j,WP)+0.5_WP)*dy
+               y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                do i=bx%lo(1),bx%hi(1)
-                  x=amr_ptr%xlo+(real(i,WP)+0.5_WP)*dx
-                  ! Refine center of domain
-                  if (x>0.25_WP.and.x<0.75_WP.and.&
-                     y>0.25_WP.and.y<0.75_WP.and.&
-                     z>0.25_WP.and.z<0.75_WP) then
+                  x=amr%xlo+(real(i,WP)+0.5_WP)*dx
+                  ! Tag inside time-varying sphere
+                  if (sqrt((x-0.5_WP)**2+(y-0.5_WP)**2+(z-0.5_WP)**2).lt.radius) then
                      tagarr(i,j,k,1)=SET
                   end if
                end do
