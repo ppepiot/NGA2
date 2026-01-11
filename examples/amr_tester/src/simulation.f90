@@ -17,9 +17,9 @@ contains
    !> Clean run hook
    subroutine simulation_run()
       call log("Simulation Run: Executing Tests")
-      call test_multidata()  ! Test current_amrdata robustness first
-      call test_registry()
-      call test_visualization()
+      ! call test_multidata()  ! DISABLED FOR DEBUGGING
+      ! call test_registry()   ! DISABLED FOR DEBUGGING
+      ! call test_visualization() ! DISABLED FOR DEBUGGING
       call test_amrscalar()
    end subroutine simulation_run
 

@@ -178,14 +178,9 @@ contains
       type(amrscalar), pointer :: this
       type(amrex_multifab) :: SCnew
       call c_f_pointer(ctx,this)
-      ! Fill to temp with old+new geometry, then copy
+      ! Fill temp data
       call amrex_multifab_build(SCnew,ba,dm,this%nscalar,0)
-      if (lvl.eq.0) then
-         call this%SC%mf(0)%copy(SCnew,1,1,this%nscalar,0)
-      else
-         ! Use FillPatch to combine coarse + old fine data
-         call this%amr%fill_mfab(SCnew,this%SC,lvl,time)
-      end if
+      call this%amr%fill_mfab(SCnew,this%SC,lvl,time)
       ! Reallocate to new geometry
       call this%SC%define(lvl,ba,dm)
       call this%SCold%define(lvl,ba,dm)

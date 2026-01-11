@@ -12,9 +12,9 @@ module mod_test_amrscalar
    private
    public :: test_amrscalar
 
-   ! Module-level pointers for callbacks
-   type(amrgrid), pointer :: amr_ptr=>null()
-   type(amrscalar), pointer :: sc_ptr=>null()
+   ! Module-level objects (referenced by callbacks)
+   type(amrgrid),   allocatable, target :: amr
+   type(amrscalar), allocatable, target :: sc
    real(WP), parameter :: PI=3.14159265358979323846_WP
    real(WP), parameter :: SC_REFINE_THRESH=0.01_WP  !< Refine where SC > this value
 
@@ -42,7 +42,7 @@ contains
       dx=amr_ptr%geom(lvl)%dx(1)
       dy=amr_ptr%geom(lvl)%dx(2)
       dz=amr_ptr%geom(lvl)%dx(3)
-      call amr_ptr%mfiter_build(lvl,mfi)
+      call amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
          bx=mfi%tilebox()
          tagarr=>tags%dataPtr(mfi)
@@ -62,7 +62,7 @@ contains
             end do
          end do
       end do
-      call amr_ptr%mfiter_destroy(mfi)
+      call amr%mfiter_destroy(mfi)
    end subroutine box_tagger
 
 
@@ -70,8 +70,6 @@ contains
       use iso_c_binding,    only: c_associated
       use amrex_amr_module, only: amrex_mfiter,amrex_box
       implicit none
-      type(amrgrid), target :: amr
-      type(amrscalar), target :: sc
       type(amrensight) :: ens
       type(timetracker) :: time
       type(event) :: regrid_evt,ensight_evt
@@ -85,6 +83,9 @@ contains
       call log("---------------------------------------------------")
       call log("Running Test: amrscalar Time Integration")
       call log("---------------------------------------------------")
+
+      ! Allocate module objects
+      allocate(amr,sc)
 
       ! Setup grid (periodic box)
       amr%nx  =32
@@ -103,13 +104,11 @@ contains
       amr%nmax=16
 
       call amr%initialize("sc_amr")
-      amr_ptr=>amr
 
       ! Initialize scalar solver first (registers callbacks)
       call sc%initialize(amr,nscalar=1,name="test_scalar")
-      sc_ptr=>sc
 
-      ! Set tagging - now sc_ptr is available for gradient-based refinement
+      ! Set tagging
       call amr%add_tagging(box_tagger)
 
       ! Build grid
@@ -282,10 +281,10 @@ contains
       end if
 
       ! Cleanup
-      amr_ptr=>null()
-      sc_ptr=>null()
       call sc%finalize()
       call amr%finalize()
+      if (allocated(sc)) deallocate(sc)
+      if (allocated(amr)) deallocate(amr)
       call log("PASS: amrscalar test complete!")
       call log("View output in ensight/sc_advect/")
 

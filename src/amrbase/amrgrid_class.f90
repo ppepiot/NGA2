@@ -573,8 +573,8 @@ contains
       type(amrgrid), pointer :: this_grid
       integer :: i
       call c_f_pointer(owner,this_grid)
-      ba_obj%p=ba
-      dm_obj%p=dm
+      ba_obj=ba
+      dm_obj=dm
       if (allocated(this_grid%on_init)) then
          do i=1,size(this_grid%on_init)
             call this_grid%on_init(i)%f(this_grid%on_init(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
@@ -594,8 +594,8 @@ contains
       type(amrgrid), pointer :: this_grid
       integer :: i
       call c_f_pointer(owner,this_grid)
-      ba_obj%p=ba
-      dm_obj%p=dm
+      ba_obj=ba
+      dm_obj=dm
       if (allocated(this_grid%on_coarse)) then
          do i=1,size(this_grid%on_coarse)
             call this_grid%on_coarse(i)%f(this_grid%on_coarse(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
@@ -615,8 +615,8 @@ contains
       type(amrgrid), pointer :: this_grid
       integer :: i
       call c_f_pointer(owner,this_grid)
-      ba_obj%p=ba
-      dm_obj%p=dm
+      ba_obj=ba
+      dm_obj=dm
       if (allocated(this_grid%on_remake)) then
          do i=1,size(this_grid%on_remake)
             call this_grid%on_remake(i)%f(this_grid%on_remake(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
