@@ -1,10 +1,10 @@
 !> AMR config object is defined based on amrcore AMREX object
 !> Amrconfig differs quite a bit from other configs
 module amrgrid_class
-   use iso_c_binding,    only: c_ptr,c_null_ptr,c_char,c_int,c_funptr,c_funloc
+   use iso_c_binding,    only: c_ptr,c_null_ptr,c_char,c_int,c_funptr,c_funloc,c_loc
    use precision,        only: WP
    use string,           only: str_medium
-   use amrex_amr_module, only: amrex_geometry
+   use amrex_amr_module, only: amrex_geometry,amrex_boxarray,amrex_distromap
    use mpi_f08,          only: MPI_Comm
    use amrdata_class,    only: amrdata
    use amrflux_class,    only: amrflux
@@ -13,19 +13,11 @@ module amrgrid_class
 
 
    ! Expose type/constructor/methods
-   public :: amrgrid
-
-   ! Wrappers for polymorphism in registry arrays
-   type :: data_ptr_wrapper
-      class(amrdata), pointer :: p=>null()
-   end type data_ptr_wrapper
-   type :: flux_ptr_wrapper
-      class(amrflux), pointer :: p=>null()
-   end type flux_ptr_wrapper
+   public :: amrgrid,dispatch_fillbc
 
    !> Abstract interface for user-provided tagging callback
    abstract interface
-      subroutine tagging_callback(lvl, tags, time)
+      subroutine tagging_callback(lvl,tags,time)
          use iso_c_binding, only: c_ptr
          use precision, only: WP
          implicit none
@@ -35,12 +27,62 @@ module amrgrid_class
       end subroutine tagging_callback
    end interface
 
+   !> Abstract interface for post-regrid callback
+   abstract interface
+      subroutine postregrid_callback()
+         implicit none
+      end subroutine postregrid_callback
+   end interface
+
+   !> Abstract interface for level callbacks (init, coarse, remake)
+   abstract interface
+      subroutine level_callback(ctx,lvl,time,ba,dm)
+         use iso_c_binding, only: c_ptr
+         use precision, only: WP
+         use amrex_amr_module, only: amrex_boxarray,amrex_distromap
+         implicit none
+         type(c_ptr), intent(in) :: ctx
+         integer, intent(in) :: lvl
+         real(WP), intent(in) :: time
+         type(amrex_boxarray), intent(in) :: ba
+         type(amrex_distromap), intent(in) :: dm
+      end subroutine level_callback
+   end interface
+
+   !> Abstract interface for clear level callback
+   abstract interface
+      subroutine clear_callback(ctx,lvl)
+         use iso_c_binding, only: c_ptr
+         implicit none
+         type(c_ptr), intent(in) :: ctx
+         integer, intent(in) :: lvl
+      end subroutine clear_callback
+   end interface
+
+   ! Wrappers for callback lists
+   type :: tagger_wrapper
+      procedure(tagging_callback), pointer, nopass :: f=>null()
+   end type tagger_wrapper
+   type :: postregrid_wrapper
+      procedure(postregrid_callback), pointer, nopass :: f=>null()
+   end type postregrid_wrapper
+   type :: level_cb_wrapper
+      procedure(level_callback), pointer, nopass :: f=>null()
+      type(c_ptr) :: ctx=c_null_ptr
+   end type level_cb_wrapper
+   type :: clear_cb_wrapper
+      procedure(clear_callback), pointer, nopass :: f=>null()
+      type(c_ptr) :: ctx=c_null_ptr
+   end type clear_cb_wrapper
+
    !> Amrgrid object definition based on AMReX's amrcore
    type :: amrgrid
       ! Name of amrgrid
       character(len=str_medium) :: name='UNNAMED_AMRGRID'
       ! Pointer to AMReX's amrcore object
       type(c_ptr) :: amrcore=c_null_ptr
+      ! Self-pointer for C interop (set early before `this` becomes polymorphic)
+      type(c_ptr), private :: self_ptr=c_null_ptr
       ! Coordinate system
       integer :: coordsys=0
       ! Domain periodicity
@@ -75,11 +117,14 @@ module amrgrid_class
       integer  :: nboxes =-1            !< Current total number of boxes
       real(WP) :: ncells =-1.0_WP       !< Current total number of cells (real!)
       real(WP) :: compression=-1.0_WP   !< Current compression ratio (ncells/total cells with uniform mesh)
-      ! Registries
-      type(data_ptr_wrapper), dimension(:), allocatable :: data
-      type(flux_ptr_wrapper), dimension(:), allocatable :: flux
-      ! User-provided tagging callback
-      procedure(tagging_callback), pointer, nopass :: tagger => null()
+      ! Level callback lists (solvers register their handlers)
+      type(level_cb_wrapper), dimension(:), allocatable :: on_init
+      type(level_cb_wrapper), dimension(:), allocatable :: on_coarse
+      type(level_cb_wrapper), dimension(:), allocatable :: on_remake
+      type(clear_cb_wrapper), dimension(:), allocatable :: on_clear
+      ! Tagging and post-regrid callback lists
+      type(tagger_wrapper), dimension(:), allocatable :: taggers
+      type(postregrid_wrapper), dimension(:), allocatable :: postregrid_funcs
    contains
       procedure :: initialize                !< Initialization of amrgrid object
       procedure :: finalize                  !< Finalization of amrgrid object
@@ -87,14 +132,12 @@ module amrgrid_class
       procedure :: regrid                    !< Perform regriding operation on level baselvl
       procedure :: get_info                  !< Calculate various information on our amrgrid object
       procedure :: print                     !< Print out grid info
-      ! Generic register/unregister for both data and flux
-      generic   :: register  =>register_data,register_flux
-      generic   :: unregister=>unregister_data,unregister_flux
-      procedure, private :: register_data
-      procedure, private :: unregister_data
-      procedure, private :: register_flux
-      procedure, private :: unregister_flux
-      procedure :: register_internal_callbacks !< Register static callbacks
+      ! Level callbacks - solvers register their handlers
+      procedure :: add_on_init               !< Add init level callback
+      procedure :: add_on_coarse             !< Add coarse level callback
+      procedure :: add_on_remake             !< Add remake level callback
+      procedure :: add_on_clear              !< Add clear level callback
+      procedure :: clear_level_callbacks     !< Clear all level callbacks
 
       procedure, private :: get_boxarray     !< Obtain box array at a given level
       procedure, private :: get_distromap    !< Obtain distromap at a given level
@@ -105,14 +148,15 @@ module amrgrid_class
       procedure :: average_down              !< Average down a given multifab throughout all levels
       procedure :: average_downto            !< Average down a given multifab to level lvl
       procedure :: fill                      !< Fill ghost cells and coarse-fine boundaries
+      procedure :: fill_mfab                  !< Fill into target MultiFab from source amrdata
+      procedure :: fill_from_coarse          !< Fill fine level from coarse only (for new levels)
       procedure :: mfab_build                !< Build multifab at a given level
       procedure :: mfab_destroy              !< Destroy multifab
-      procedure :: set_tagging               !< Set user-provided tagging callback
+      procedure :: add_tagging               !< Add a tagging callback
+      procedure :: add_postregrid            !< Add a post-regrid callback
+      procedure :: clear_tagging             !< Clear all tagging callbacks
+      procedure :: clear_postregrid          !< Clear all post-regrid callbacks
    end type amrgrid
-
-   ! Singleton for static callback routing
-   type(amrgrid),  pointer :: current_amrgrid=>null()
-   class(amrdata), pointer :: current_amrdata=>null()
 
    ! Instance counter for automated AMReX lifecycle management
    integer :: amr_instance_count=0
@@ -167,51 +211,43 @@ contains
          call pp%addarr('prob_hi'    ,[this%xhi,this%yhi,this%zhi])
          call amrex_parmparse_destroy(pp)
       end block set_params
-      ! Create an amrcore object
+      ! Create an amrcore object using our C++ interface
       create_amrcore_obj: block
-         interface
-            subroutine amrex_fi_new_amrcore(core) bind(c)
-               import :: c_ptr
-               implicit none
-               type(c_ptr) :: core
-            end subroutine amrex_fi_new_amrcore
-         end interface
-         call amrex_fi_new_amrcore(this%amrcore)
+         use amrex_interface, only: amrcore_create,amrcore_set_owner, &
+         &   amrcore_set_on_init_dispatch,amrcore_set_on_coarse_dispatch, &
+         &   amrcore_set_on_remake_dispatch,amrcore_set_on_clear_dispatch, &
+         &   amrcore_set_on_tag_dispatch,amrcore_set_on_postregrid_dispatch
+         this%amrcore=amrcore_create()
+         ! Set owner pointer - use select type to get c_loc of concrete type
+         select type (this)
+          type is (amrgrid)
+            this%self_ptr=c_loc(this)
+         end select
+         call amrcore_set_owner(this%amrcore,this%self_ptr)
+         call amrcore_set_on_init_dispatch(this%amrcore,c_funloc(dispatch_mak_lvl_init))
+         call amrcore_set_on_coarse_dispatch(this%amrcore,c_funloc(dispatch_mak_lvl_crse))
+         call amrcore_set_on_remake_dispatch(this%amrcore,c_funloc(dispatch_mak_lvl_remk))
+         call amrcore_set_on_clear_dispatch(this%amrcore,c_funloc(dispatch_clr_lvl))
+         call amrcore_set_on_tag_dispatch(this%amrcore,c_funloc(dispatch_err_est))
+         call amrcore_set_on_postregrid_dispatch(this%amrcore,c_funloc(dispatch_postregrid))
          if (present(name)) this%name=trim(adjustl(name))
-         ! Setup Singleton for static callbacks
-         current_amrgrid => this
       end block create_amrcore_obj
       ! Get back geometry objects
       store_geometries: block
          use amrex_amr_module, only: amrex_geometry_init_data
-         interface
-            subroutine amrex_fi_get_geometry(geom,lvl,core) bind(c)
-               import :: c_ptr,c_int
-               implicit none
-               type(c_ptr), intent(out) :: geom
-               integer(c_int), value :: lvl
-               type(c_ptr), value :: core
-            end subroutine amrex_fi_get_geometry
-         end interface
+         use amrex_interface, only: amrcore_get_geometry
          integer :: n
          allocate(this%geom(0:this%nlvl))
          do n=0,this%nlvl
-            call amrex_fi_get_geometry(this%geom(n)%p,n,this%amrcore)
+            call amrcore_get_geometry(this%geom(n)%p,n,this%amrcore)
             call amrex_geometry_init_data(this%geom(n))
          end do
       end block store_geometries
       ! Store effective refinement ratio
       store_ref_ratio: block
-         interface
-            subroutine amrex_fi_get_ref_ratio(ref_ratio,core) bind(c)
-               import :: c_ptr
-               implicit none
-               integer, dimension(*), intent(inout) :: ref_ratio
-               type(c_ptr), value :: core
-            end subroutine amrex_fi_get_ref_ratio
-         end interface
+         use amrex_interface, only: amrcore_get_ref_ratio
          if (allocated(this%rref)) deallocate(this%rref); allocate(this%rref(0:this%nlvl-1))
-         call amrex_fi_get_ref_ratio(this%rref,this%amrcore)
+         call amrcore_get_ref_ratio(this%rref,this%amrcore)
       end block store_ref_ratio
       ! Store parallel info
       store_parallel_info: block
@@ -243,18 +279,12 @@ contains
    impure elemental subroutine finalize(this)
       use mpi_f08,       only: MPI_COMM_NULL
       use iso_c_binding, only: c_associated
+      use amrex_interface, only: amrcore_destroy
       implicit none
       class(amrgrid), intent(inout) :: this
-      interface
-         subroutine amrex_fi_delete_amrcore(core) bind(c)
-            import :: c_ptr
-            implicit none
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_delete_amrcore
-      end interface
       ! Delete amrcore object if it exists
       if (c_associated(this%amrcore)) then
-         call amrex_fi_delete_amrcore(this%amrcore)
+         call amrcore_destroy(this%amrcore)
          this%amrcore=c_null_ptr
       end if
       ! Deallocate allocatable arrays
@@ -263,8 +293,13 @@ contains
       if (allocated(this%dx))   deallocate(this%dx)
       if (allocated(this%dy))   deallocate(this%dy)
       if (allocated(this%dz))   deallocate(this%dz)
-      if (allocated(this%data)) deallocate(this%data)
-      if (allocated(this%flux)) deallocate(this%flux)
+      ! Deallocate callback lists
+      if (allocated(this%on_init))   deallocate(this%on_init)
+      if (allocated(this%on_coarse)) deallocate(this%on_coarse)
+      if (allocated(this%on_remake)) deallocate(this%on_remake)
+      if (allocated(this%on_clear))  deallocate(this%on_clear)
+      if (allocated(this%taggers)) deallocate(this%taggers)
+      if (allocated(this%postregrid_funcs)) deallocate(this%postregrid_funcs)
       ! Do not free comm as it was passed to us
       this%comm=MPI_COMM_NULL
       ! Handle automated AMReX finalization
@@ -276,150 +311,116 @@ contains
    end subroutine finalize
 
 
-   !> Register an amrdata object to be managed by the amrgrid
-   !> Optional: name, ncomp, ng to configure the data at registration
-   subroutine register_data(this,data,name,ncomp,ng)
-      use amrex_amr_module, only: amrex_bc_int_dir
+   !> Add a level init callback (called for MakeNewLevelFromScratch)
+   subroutine add_on_init(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
       implicit none
       class(amrgrid), intent(inout) :: this
-      class(amrdata), target, intent(inout) :: data
-      character(len=*), intent(in), optional :: name
-      integer, intent(in), optional :: ncomp,ng
-      type(data_ptr_wrapper), dimension(:), allocatable :: temp
+      procedure(level_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
+      type(level_cb_wrapper), dimension(:), allocatable :: tmp
       integer :: n
-      ! Configure data metadata
-      if (present(name))  data%name=trim(adjustl(name))
-      if (present(ncomp)) data%ncomp=ncomp
-      if (present(ng))    data%ng=ng
-      ! Allocate BC arrays - default to int_dir (interior/do nothing)
-      ! User sets specific BCs after registration: data%lo_bc(1,:)=amrex_bc_foextrap
-      if (allocated(data%lo_bc)) deallocate(data%lo_bc)
-      if (allocated(data%hi_bc)) deallocate(data%hi_bc)
-      allocate(data%lo_bc(3,data%ncomp),data%hi_bc(3,data%ncomp))
-      data%lo_bc=amrex_bc_int_dir
-      data%hi_bc=amrex_bc_int_dir
-      ! Allocate/resize registry
-      if (.not.allocated(this%data)) then
-         allocate(this%data(1))
+      if (allocated(this%on_init)) then
+         n=size(this%on_init)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%on_init
+         tmp(n+1)%f=>callback
+         tmp(n+1)%ctx=ctx
+         call move_alloc(tmp,this%on_init)
       else
-         n=size(this%data)
-         allocate(temp(n+1))
-         temp(1:n)=this%data
-         call move_alloc(temp,this%data)
+         allocate(this%on_init(1))
+         this%on_init(1)%f=>callback
+         this%on_init(1)%ctx=ctx
       end if
-      ! Add to registry
-      n=size(this%data)
-      this%data(n)%p=>data
-      ! Allocate data levels to match the grid
-      if (.not.allocated(data%mf)) allocate(data%mf(0:this%nlvl))
-   end subroutine register_data
+   end subroutine add_on_init
 
-   !> Unregister an amrdata object from the registry
-   subroutine unregister_data(this,data)
+   !> Add a coarse level callback (called for MakeNewLevelFromCoarse)
+   subroutine add_on_coarse(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
       implicit none
       class(amrgrid), intent(inout) :: this
-      class(amrdata), target, intent(in) :: data
-      type(data_ptr_wrapper), dimension(:), allocatable :: temp
-      integer :: i,n,pos
-      if (.not.allocated(this%data)) return
-      n=size(this%data)
-      pos=0
-      ! Find position
-      do i=1,n
-         if (associated(this%data(i)%p,data)) then
-            pos=i
-            exit
-         end if
-      end do
-      if (pos.gt.0) then
-         if (n.eq.1) then
-            deallocate(this%data)
-         else
-            allocate(temp(n-1))
-            if (pos.gt.1) temp(1:pos-1)=this%data(1:pos-1)
-            if (pos.lt.n) temp(pos:)   =this%data(pos+1:)
-            call move_alloc(temp,this%data)
-         end if
-      end if
-   end subroutine unregister_data
-
-   !> Register an amrflux object to be managed by the amrgrid
-   !> Optional: name, ncomp to configure the flux at registration
-   subroutine register_flux(this,flux,name,ncomp)
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      class(amrflux), target, intent(inout) :: flux
-      character(len=*), intent(in), optional :: name
-      integer, intent(in), optional :: ncomp
-      type(flux_ptr_wrapper), dimension(:), allocatable :: temp
+      procedure(level_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
+      type(level_cb_wrapper), dimension(:), allocatable :: tmp
       integer :: n
-      ! Configure flux metadata
-      if (present(name))  flux%name=trim(adjustl(name))
-      if (present(ncomp)) flux%ncomp=ncomp
-      ! Allocate/resize registry
-      if (.not.allocated(this%flux)) then
-         allocate(this%flux(1))
+      if (allocated(this%on_coarse)) then
+         n=size(this%on_coarse)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%on_coarse
+         tmp(n+1)%f=>callback
+         tmp(n+1)%ctx=ctx
+         call move_alloc(tmp,this%on_coarse)
       else
-         n=size(this%flux)
-         allocate(temp(n+1))
-         temp(1:n)=this%flux
-         call move_alloc(temp,this%flux)
+         allocate(this%on_coarse(1))
+         this%on_coarse(1)%f=>callback
+         this%on_coarse(1)%ctx=ctx
       end if
-      ! Add to registry
-      n=size(this%flux)
-      this%flux(n)%p=>flux
-      ! Allocate flux register array (levels 1:nlvl, no level 0)
-      if (.not.allocated(flux%fr).and.this%nlvl.ge.1) allocate(flux%fr(1:this%nlvl))
-   end subroutine register_flux
+   end subroutine add_on_coarse
 
-   !> Unregister an amrflux object from the registry
-   subroutine unregister_flux(this,flux)
+   !> Add a remake level callback (called for RemakeLevel)
+   subroutine add_on_remake(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
       implicit none
       class(amrgrid), intent(inout) :: this
-      class(amrflux), target, intent(in) :: flux
-      type(flux_ptr_wrapper), dimension(:), allocatable :: temp
-      integer :: i,n,pos
-      if (.not.allocated(this%flux)) return
-      n=size(this%flux)
-      pos=0
-      ! Find position
-      do i=1,n
-         if (associated(this%flux(i)%p,flux)) then
-            pos=i
-            exit
-         end if
-      end do
-      if (pos.gt.0) then
-         if (n.eq.1) then
-            deallocate(this%flux)
-         else
-            allocate(temp(n-1))
-            if (pos.gt.1) temp(1:pos-1)=this%flux(1:pos-1)
-            if (pos.lt.n) temp(pos:)   =this%flux(pos+1:)
-            call move_alloc(temp,this%flux)
-         end if
+      procedure(level_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
+      type(level_cb_wrapper), dimension(:), allocatable :: tmp
+      integer :: n
+      if (allocated(this%on_remake)) then
+         n=size(this%on_remake)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%on_remake
+         tmp(n+1)%f=>callback
+         tmp(n+1)%ctx=ctx
+         call move_alloc(tmp,this%on_remake)
+      else
+         allocate(this%on_remake(1))
+         this%on_remake(1)%f=>callback
+         this%on_remake(1)%ctx=ctx
       end if
-   end subroutine unregister_flux
+   end subroutine add_on_remake
+
+   !> Add a clear level callback (called for ClearLevel)
+   subroutine add_on_clear(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      procedure(clear_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
+      type(clear_cb_wrapper), dimension(:), allocatable :: tmp
+      integer :: n
+      if (allocated(this%on_clear)) then
+         n=size(this%on_clear)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%on_clear
+         tmp(n+1)%f=>callback
+         tmp(n+1)%ctx=ctx
+         call move_alloc(tmp,this%on_clear)
+      else
+         allocate(this%on_clear(1))
+         this%on_clear(1)%f=>callback
+         this%on_clear(1)%ctx=ctx
+      end if
+   end subroutine add_on_clear
+
+   !> Clear all level callbacks
+   subroutine clear_level_callbacks(this)
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      if (allocated(this%on_init))   deallocate(this%on_init)
+      if (allocated(this%on_coarse)) deallocate(this%on_coarse)
+      if (allocated(this%on_remake)) deallocate(this%on_remake)
+      if (allocated(this%on_clear))  deallocate(this%on_clear)
+   end subroutine clear_level_callbacks
 
    !> Initialize grid on an amrgrid object
    subroutine initialize_grid(this,time)
+      use amrex_interface, only: amrcore_init_from_scratch
       implicit none
       class(amrgrid), target, intent(inout) :: this
       real(WP), intent(in) :: time
-      interface
-         subroutine amrex_fi_init_from_scratch(t,core) bind(c)
-            import :: c_ptr,WP
-            implicit none
-            real(WP), value :: t
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_init_from_scratch
-      end interface
-      ! Setup the singleton for static callbacks
-      current_amrgrid=>this
-      ! Register our internal static dispatchers with C++
-      call this%register_internal_callbacks()
       ! Generate grid and allocate data
-      call amrex_fi_init_from_scratch(time,this%amrcore)
+      call amrcore_init_from_scratch(this%amrcore,time)
       ! Generate info about grid
       call this%get_info()
    end subroutine initialize_grid
@@ -427,46 +428,16 @@ contains
 
    !> Perform regriding operation on baselvl
    subroutine regrid(this,baselvl,time)
+      use amrex_interface, only: amrcore_regrid
       implicit none
       class(amrgrid), target, intent(inout) :: this
       integer,  intent(in) :: baselvl
       real(WP), intent(in) :: time
-      interface
-         subroutine amrex_fi_regrid(blvl,t,core) bind(c)
-            import :: c_ptr,c_int,WP
-            implicit none
-            integer(c_int), value :: blvl
-            real(WP), value :: t
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_regrid
-      end interface
-      ! Ensure Singleton matches this instance
-      current_amrgrid=>this
       ! Regenerate grid and resize/transfer data
-      call amrex_fi_regrid(baselvl,time,this%amrcore)
+      call amrcore_regrid(this%amrcore,baselvl,time)
       ! Generate info about grid
       call this%get_info()
    end subroutine regrid
-
-   !> Internal: Register the static dispatchers with AmrCore
-   subroutine register_internal_callbacks(this)
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      interface
-         subroutine amrex_fi_init_virtual_functions(maklvl_init,maklvl_crse,maklvl_remk,clrlvl,errest,core) bind(c)
-            import :: c_ptr,c_funptr
-            implicit none
-            type(c_funptr), value :: maklvl_init,maklvl_crse,maklvl_remk,clrlvl,errest
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_init_virtual_functions
-      end interface
-      call amrex_fi_init_virtual_functions(c_funloc(dispatch_mak_lvl_init), &
-      &                                    c_funloc(dispatch_mak_lvl_crse), &
-      &                                    c_funloc(dispatch_mak_lvl_remk), &
-      &                                    c_funloc(dispatch_clr_lvl), &
-      &                                    c_funloc(dispatch_err_est), &
-      &                                    this%amrcore)
-   end subroutine register_internal_callbacks
 
    !> Get info on amrgrid object
    subroutine get_info(this)
@@ -543,40 +514,24 @@ contains
    !> Obtain box array at a level
    function get_boxarray(this,lvl) result(ba)
       use amrex_amr_module, only: amrex_boxarray
+      use amrex_interface, only: amrcore_get_boxarray
       implicit none
       class(amrgrid), intent(inout) :: this
       integer, intent(in)  :: lvl
       type(amrex_boxarray) :: ba
-      interface
-         subroutine amrex_fi_get_boxarray(barray,lev,core) bind(c)
-            import :: c_ptr,c_int
-            implicit none
-            type(c_ptr), intent(out) :: barray
-            integer(c_int), value :: lev
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_get_boxarray
-      end interface
-      call amrex_fi_get_boxarray(ba%p,lvl,this%amrcore)
+      call amrcore_get_boxarray(ba%p,lvl,this%amrcore)
    end function get_boxarray
 
 
    !> Obtain distromap at a level
    function get_distromap(this,lvl) result(dm)
       use amrex_amr_module, only: amrex_distromap
+      use amrex_interface, only: amrcore_get_distromap
       implicit none
       class(amrgrid), intent(inout) :: this
       integer, intent(in)  :: lvl
       type(amrex_distromap) :: dm
-      interface
-         subroutine amrex_fi_get_distromap(dmap,lev,core) bind(c)
-            import :: c_ptr,c_int
-            implicit none
-            type(c_ptr), intent(out) :: dmap
-            integer(c_int), value :: lev
-            type(c_ptr), value :: core
-         end subroutine amrex_fi_get_distromap
-      end interface
-      call amrex_fi_get_distromap(dm%p,lvl,this%amrcore)
+      call amrcore_get_distromap(dm%p,lvl,this%amrcore)
    end function get_distromap
 
 
@@ -605,159 +560,204 @@ contains
    end subroutine mfiter_destroy
 
    ! --- STATIC DISPATCHERS (bind(c)) ---
-   ! These receive calls from C++ and route them to current_amrgrid%data
-   subroutine dispatch_mak_lvl_init(lvl, time, ba, dm) bind(c)
-      use iso_c_binding, only: c_ptr, c_int, c_double
-      use amrex_amr_module, only: amrex_boxarray, amrex_distromap
+   ! These receive calls from C++ with the owner pointer
+   subroutine dispatch_mak_lvl_init(owner,lvl,time,ba,dm) bind(c)
+      use iso_c_binding, only: c_ptr,c_int,c_double,c_f_pointer
       implicit none
+      type(c_ptr), value, intent(in) :: owner
       integer(c_int), value, intent(in) :: lvl
       real(c_double), value, intent(in) :: time
-      type(c_ptr), value, intent(in) :: ba, dm ! Raw pointers
+      type(c_ptr), value, intent(in) :: ba,dm
       type(amrex_boxarray) :: ba_obj
       type(amrex_distromap) :: dm_obj
+      type(amrgrid), pointer :: this_grid
       integer :: i
-      ! Wrap pointers
+      call c_f_pointer(owner,this_grid)
       ba_obj%p=ba
       dm_obj%p=dm
-      ! Route to data
-      if (associated(current_amrgrid)) then
-         if (allocated(current_amrgrid%data)) then
-            do i=1,size(current_amrgrid%data)
-               call current_amrgrid%data(i)%p%define(int(lvl),ba_obj,dm_obj)
-            end do
-         end if
-         ! Build flux registers for fine levels
-         if (int(lvl).ge.1.and.allocated(current_amrgrid%flux)) then
-            do i=1,size(current_amrgrid%flux)
-               call current_amrgrid%flux(i)%p%build_level(int(lvl),ba_obj,dm_obj,&
-               &   current_amrgrid%rref(int(lvl)-1))
-            end do
-         end if
+      if (allocated(this_grid%on_init)) then
+         do i=1,size(this_grid%on_init)
+            call this_grid%on_init(i)%f(this_grid%on_init(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
+         end do
       end if
    end subroutine dispatch_mak_lvl_init
 
-   subroutine dispatch_mak_lvl_crse(lvl,time,ba,dm) bind(c)
-      use iso_c_binding, only: c_ptr,c_int,c_double
-      use amrex_amr_module, only: amrex_boxarray,amrex_distromap
+   subroutine dispatch_mak_lvl_crse(owner,lvl,time,ba,dm) bind(c)
+      use iso_c_binding, only: c_ptr,c_int,c_double,c_f_pointer
       implicit none
+      type(c_ptr), value, intent(in) :: owner
       integer(c_int), value, intent(in) :: lvl
       real(c_double), value, intent(in) :: time
       type(c_ptr), value, intent(in) :: ba,dm
       type(amrex_boxarray) :: ba_obj
       type(amrex_distromap) :: dm_obj
+      type(amrgrid), pointer :: this_grid
       integer :: i
+      call c_f_pointer(owner,this_grid)
       ba_obj%p=ba
       dm_obj%p=dm
-      if (associated(current_amrgrid)) then
-         ! Build data
-         if (allocated(current_amrgrid%data)) then
-            do i=1,size(current_amrgrid%data)
-               call current_amrgrid%data(i)%p%define(int(lvl),ba_obj,dm_obj)
-            end do
-         end if
-         ! Build flux registers for fine levels
-         if (int(lvl).ge.1.and.allocated(current_amrgrid%flux)) then
-            do i=1,size(current_amrgrid%flux)
-               call current_amrgrid%flux(i)%p%build_level(int(lvl),ba_obj,dm_obj,&
-               &   current_amrgrid%rref(int(lvl)-1))
-            end do
-         end if
+      if (allocated(this_grid%on_coarse)) then
+         do i=1,size(this_grid%on_coarse)
+            call this_grid%on_coarse(i)%f(this_grid%on_coarse(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
+         end do
       end if
    end subroutine dispatch_mak_lvl_crse
 
-   subroutine dispatch_mak_lvl_remk(lvl,time,ba,dm) bind(c)
-      use iso_c_binding, only: c_ptr,c_int,c_double
-      use amrex_amr_module, only: amrex_boxarray,amrex_distromap
+   subroutine dispatch_mak_lvl_remk(owner,lvl,time,ba,dm) bind(c)
+      use iso_c_binding, only: c_ptr,c_int,c_double,c_f_pointer
       implicit none
+      type(c_ptr), value, intent(in) :: owner
       integer(c_int), value, intent(in) :: lvl
       real(c_double), value, intent(in) :: time
       type(c_ptr), value, intent(in) :: ba,dm
       type(amrex_boxarray) :: ba_obj
       type(amrex_distromap) :: dm_obj
+      type(amrgrid), pointer :: this_grid
       integer :: i
+      call c_f_pointer(owner,this_grid)
       ba_obj%p=ba
       dm_obj%p=dm
-      if (associated(current_amrgrid)) then
-         ! Build data
-         if (allocated(current_amrgrid%data)) then
-            do i=1,size(current_amrgrid%data)
-               call current_amrgrid%data(i)%p%define(int(lvl),ba_obj,dm_obj)
-            end do
-         end if
-         ! Build flux registers for fine levels
-         if (int(lvl).ge.1.and.allocated(current_amrgrid%flux)) then
-            do i=1,size(current_amrgrid%flux)
-               call current_amrgrid%flux(i)%p%build_level(int(lvl),ba_obj,dm_obj,&
-               &   current_amrgrid%rref(int(lvl)-1))
-            end do
-         end if
+      if (allocated(this_grid%on_remake)) then
+         do i=1,size(this_grid%on_remake)
+            call this_grid%on_remake(i)%f(this_grid%on_remake(i)%ctx,int(lvl),real(time,WP),ba_obj,dm_obj)
+         end do
       end if
    end subroutine dispatch_mak_lvl_remk
 
-   subroutine dispatch_clr_lvl(lvl) bind(c)
-      use iso_c_binding, only: c_int
+   subroutine dispatch_clr_lvl(owner,lvl) bind(c)
+      use iso_c_binding, only: c_ptr,c_int,c_f_pointer
       implicit none
+      type(c_ptr), value, intent(in) :: owner
       integer(c_int), value, intent(in) :: lvl
+      type(amrgrid), pointer :: this_grid
       integer :: i
-      if (associated(current_amrgrid)) then
-         ! Clear data at this level
-         if (allocated(current_amrgrid%data)) then
-            do i=1,size(current_amrgrid%data)
-               call current_amrgrid%data(i)%p%clear_level(int(lvl))
-            end do
-         end if
-         ! Clear flux registers at this level
-         if (int(lvl).ge.1.and.allocated(current_amrgrid%flux)) then
-            do i=1,size(current_amrgrid%flux)
-               call current_amrgrid%flux(i)%p%destroy_level(int(lvl))
-            end do
-         end if
+      call c_f_pointer(owner,this_grid)
+      if (allocated(this_grid%on_clear)) then
+         do i=1,size(this_grid%on_clear)
+            call this_grid%on_clear(i)%f(this_grid%on_clear(i)%ctx,int(lvl))
+         end do
       end if
    end subroutine dispatch_clr_lvl
 
 
-   !> Error estimation callback - calls user's tagger if set
-   subroutine dispatch_err_est(lvl,tags,time,tagval,clrval) bind(c)
-      use iso_c_binding, only: c_ptr, c_char, c_int, c_double
+
+   !> Error estimation callback - calls all registered taggers
+   subroutine dispatch_err_est(owner, lvl, tags, time, tagval, clrval) bind(c)
+      use iso_c_binding, only: c_ptr, c_char, c_int, c_double, c_f_pointer
       implicit none
+      type(c_ptr), value, intent(in) :: owner
       integer(c_int), value, intent(in) :: lvl
       type(c_ptr), value, intent(in) :: tags
       real(c_double), value, intent(in) :: time
-      character(kind=c_char), value, intent(in) :: tagval,clrval
-      ! Call user's tagging callback if set
-      if (associated(current_amrgrid%tagger)) then
-         call current_amrgrid%tagger(int(lvl),tags,real(time,WP))
+      character(kind=c_char), value, intent(in) :: tagval, clrval
+      type(amrgrid), pointer :: this_grid
+      integer :: i
+      call c_f_pointer(owner,this_grid)
+      ! Call all registered tagging callbacks
+      if (allocated(this_grid%taggers)) then
+         do i=1,size(this_grid%taggers)
+            call this_grid%taggers(i)%f(int(lvl), tags, real(time, WP))
+         end do
       end if
    end subroutine dispatch_err_est
 
 
-   !> Set the user-provided tagging callback
-   subroutine set_tagging(this,tagger)
+   !> Post-regrid callback - calls all registered post-regrid callbacks
+   subroutine dispatch_postregrid(owner) bind(c)
+      use iso_c_binding, only: c_ptr,c_f_pointer
+      implicit none
+      type(c_ptr), value, intent(in) :: owner
+      type(amrgrid), pointer :: this_grid
+      integer :: i
+      call c_f_pointer(owner,this_grid)
+      ! Call all registered post-regrid callbacks
+      if (allocated(this_grid%postregrid_funcs)) then
+         do i=1,size(this_grid%postregrid_funcs)
+            call this_grid%postregrid_funcs(i)%f()
+         end do
+      end if
+   end subroutine dispatch_postregrid
+
+   !> Dispatch FillPatch BC callback to amrdata%fillbc
+   !> Receives amrdata as context from C++, converts and calls fillbc
+   subroutine dispatch_fillbc(data_ctx,mf_ptr,geom_ptr,time,scomp,ncomp) bind(c)
+      use iso_c_binding, only: c_ptr,c_f_pointer,c_double,c_int
+      implicit none
+      type(c_ptr), value, intent(in) :: data_ctx
+      type(c_ptr), value, intent(in) :: mf_ptr
+      type(c_ptr), value, intent(in) :: geom_ptr
+      real(c_double), value, intent(in) :: time
+      integer(c_int), value, intent(in) :: scomp
+      integer(c_int), value, intent(in) :: ncomp
+      type(amrdata), pointer :: data
+      call c_f_pointer(data_ctx,data)
+      call data%fillbc(mf_ptr,geom_ptr,real(time,WP),int(scomp),int(ncomp))
+   end subroutine dispatch_fillbc
+
+   !> Add a tagging callback to the list
+   subroutine add_tagging(this,tagger)
       implicit none
       class(amrgrid), intent(inout) :: this
-      procedure(tagging_callback), optional :: tagger
-      if (present(tagger)) then
-         this%tagger=>tagger
+      procedure(tagging_callback) :: tagger
+      type(tagger_wrapper), dimension(:), allocatable :: tmp
+      integer :: n
+      if (allocated(this%taggers)) then
+         n=size(this%taggers)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%taggers
+         tmp(n+1)%f=>tagger
+         call move_alloc(tmp,this%taggers)
       else
-         this%tagger=>null()
+         allocate(this%taggers(1))
+         this%taggers(1)%f=>tagger
       end if
-   end subroutine set_tagging
+   end subroutine add_tagging
+
+
+   !> Clear all tagging callbacks
+   subroutine clear_tagging(this)
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      if (allocated(this%taggers)) deallocate(this%taggers)
+   end subroutine clear_tagging
+
+
+   !> Add a post-regrid callback to the list
+   subroutine add_postregrid(this,callback)
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      procedure(postregrid_callback) :: callback
+      type(postregrid_wrapper), dimension(:), allocatable :: tmp
+      integer :: n
+      if (allocated(this%postregrid_funcs)) then
+         n=size(this%postregrid_funcs)
+         allocate(tmp(n+1))
+         tmp(1:n)=this%postregrid_funcs
+         tmp(n+1)%f=>callback
+         call move_alloc(tmp,this%postregrid_funcs)
+      else
+         allocate(this%postregrid_funcs(1))
+         this%postregrid_funcs(1)%f=>callback
+      end if
+   end subroutine add_postregrid
+
+
+   !> Clear all post-regrid callbacks
+   subroutine clear_postregrid(this)
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      if (allocated(this%postregrid_funcs)) deallocate(this%postregrid_funcs)
+   end subroutine clear_postregrid
 
 
    !> Return current finest level
    function clvl(this) result(cl)
       use amrex_amr_module, only: amrex_boxarray
+      use amrex_interface, only: amrcore_finest_level
       implicit none
       class(amrgrid), intent(inout) :: this
       integer :: cl
-      interface
-         integer(c_int) function amrex_fi_get_finest_level(core) bind(c)
-            import :: c_int,c_ptr
-            implicit none
-            type(c_ptr), value :: core
-         end function amrex_fi_get_finest_level
-      end interface
-      cl=amrex_fi_get_finest_level(this%amrcore)
+      cl=amrcore_finest_level(this%amrcore)
    end function clvl
 
 
@@ -789,8 +789,8 @@ contains
    !> For lvl>0: interpolates from coarser level and fills ghosts
    !> Optional: data_old for time interpolation (subcycling)
    subroutine fill(this,data,lvl,time,data_old,t_old,t_new)
-      use iso_c_binding, only: c_ptr,c_funloc
-      use amrex_amr_module, only: amrex_fillpatch
+      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
+      use amrex_interface, only: amrmfab_fillpatch_single,amrmfab_fillpatch_two
       implicit none
       class(amrgrid), intent(inout) :: this
       class(amrdata), target, intent(inout) :: data
@@ -799,7 +799,9 @@ contains
       class(amrdata), target, intent(in), optional :: data_old
       real(WP), intent(in), optional :: t_old,t_new
       real(WP) :: time_old,time_new
-      ! Set up times (if no old data, use single time)
+      type(c_ptr) :: data_ctx
+      type(c_funptr) :: bc_dispatch_ptr
+      ! Set up times
       if (present(data_old).and.present(t_old).and.present(t_new)) then
          time_old=t_old
          time_new=t_new
@@ -807,56 +809,98 @@ contains
          time_old=time-1.0e200_WP
          time_new=time
       end if
-      ! Set singleton for callback
-      current_amrdata=>data
-      ! Call fillpatch
+      ! Get context pointer
+      select type (data)
+       type is (amrdata)
+         data_ctx=c_loc(data)
+      end select
+      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
+      ! Call appropriate FillPatch
       if (lvl.eq.0) then
-         ! Level 0: just fill ghost cells with BC
-         call amrex_fillpatch(data%mf(0),time_old,data%mf(0),time_new,data%mf(0),&
-         &   this%geom(0),fillbc,time,1,1,data%ncomp)
+         call amrmfab_fillpatch_single(data%mf(0)%p,time_old,data%mf(0)%p, &
+         &   time_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
+         &   time,1,1,data%ncomp)
       else
-         ! Fine levels: interpolate from coarse + fill ghosts
          if (present(data_old)) then
-            call amrex_fillpatch(data%mf(lvl),&
-            &   time_old,data_old%mf(lvl-1),time_new,data%mf(lvl-1),this%geom(lvl-1),fillbc,&
-            &   time_old,data_old%mf(lvl  ),time_new,data%mf(lvl  ),this%geom(lvl  ),fillbc,&
-            &   time,1,1,data%ncomp,this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc)
+            call amrmfab_fillpatch_two(data%mf(lvl)%p,time_old,data_old%mf(lvl-1)%p, &
+            &   time_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
+            &   time_old,data_old%mf(lvl)%p,time_new,data%mf(lvl)%p,this%geom(lvl)%p, &
+            &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
+            &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
          else
-            call amrex_fillpatch(data%mf(lvl),&
-            &   time_old,data%mf(lvl-1),time_new,data%mf(lvl-1),this%geom(lvl-1),fillbc,&
-            &   time_old,data%mf(lvl  ),time_new,data%mf(lvl  ),this%geom(lvl  ),fillbc,&
-            &   time,1,1,data%ncomp,this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc)
+            call amrmfab_fillpatch_two(data%mf(lvl)%p,time_old,data%mf(lvl-1)%p, &
+            &   time_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
+            &   time_old,data%mf(lvl)%p,time_new,data%mf(lvl)%p,this%geom(lvl)%p, &
+            &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
+            &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
          end if
       end if
-   contains
-      subroutine fillbc(pmf,scomp,ncomp,t,pgeom) bind(c)
-         use amrex_amr_module, only: amrex_filcc,amrex_geometry,amrex_multifab,amrex_mfiter,amrex_mfiter_build
-         use iso_c_binding, only: c_ptr,c_int
-         type(c_ptr), value :: pmf,pgeom
-         integer(c_int), value :: scomp,ncomp
-         real(WP), value :: t
-         type(amrex_geometry) :: geom
-         type(amrex_multifab) :: mf
-         type(amrex_mfiter) :: mfi
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: p
-         integer, dimension(4) :: plo,phi
-         ! Skip if fully periodic
-         if (this%xper.and.this%yper.and.this%zper) return
-         ! Convert pointers
-         geom=pgeom; mf=pmf
-         ! Loop over boxes
-         call amrex_mfiter_build(mfi,mf)
-         do while(mfi%next())
-            p=>mf%dataptr(mfi)
-            ! Check if part of box is outside the domain
-            if (.not.geom%domain%contains(p)) then
-               plo=lbound(p); phi=ubound(p)
-               call amrex_filcc(p,plo,phi,geom%domain%lo,geom%domain%hi,geom%dx,&
-               &   geom%get_physical_location(plo),current_amrdata%lo_bc,current_amrdata%hi_bc)
-            end if
-         end do
-      end subroutine fillbc
    end subroutine fill
+
+
+   !> Fill a target MultiFab from source amrdata (for regrid callbacks)
+   !> Allows filling into a temporary MultiFab with different geometry
+   subroutine fill_mfab(this,dest,data,lvl,time)
+      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
+      use amrex_amr_module, only: amrex_multifab
+      use amrex_interface, only: amrmfab_fillpatch_single,amrmfab_fillpatch_two
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      type(amrex_multifab), intent(inout) :: dest
+      class(amrdata), target, intent(in) :: data
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      real(WP) :: t_old,t_new
+      type(c_ptr) :: data_ctx
+      type(c_funptr) :: bc_dispatch_ptr
+      t_old=time-1.0e200_WP
+      t_new=time
+      ! Get context pointer
+      select type (data)
+       type is (amrdata)
+         data_ctx=c_loc(data)
+      end select
+      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
+      ! Call appropriate FillPatch
+      if (lvl.eq.0) then
+         call amrmfab_fillpatch_single(dest%p,t_old,data%mf(0)%p, &
+         &   t_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
+         &   time,1,1,data%ncomp)
+      else
+         call amrmfab_fillpatch_two(dest%p,t_old,data%mf(lvl-1)%p, &
+         &   t_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
+         &   t_old,data%mf(lvl)%p,t_new,data%mf(lvl)%p,this%geom(lvl)%p, &
+         &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
+         &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
+      end if
+   end subroutine fill_mfab
+
+
+   !> Fill fine level from coarse only (for creating new fine levels)
+   !> Uses InterpFromCoarseLevel - no fine-level data needed
+   subroutine fill_from_coarse(this,data,lvl,time)
+      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
+      use amrex_interface, only: amrmfab_fillcoarsepatch
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      class(amrdata), target, intent(inout) :: data
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(c_ptr) :: data_ctx
+      type(c_funptr) :: bc_dispatch_ptr
+      ! Only valid for fine levels
+      if (lvl.lt.1) return
+      ! Get context pointer
+      select type (data)
+       type is (amrdata)
+         data_ctx=c_loc(data)
+      end select
+      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
+      ! Call C++ wrapper
+      call amrmfab_fillcoarsepatch(data%mf(lvl)%p,time,data%mf(lvl-1)%p, &
+      &   this%geom(lvl-1)%p,this%geom(lvl)%p,data_ctx,bc_dispatch_ptr, &
+      &   1,1,data%ncomp,this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
+   end subroutine fill_from_coarse
 
    !> Build multifab at a level
    subroutine mfab_build(this,lvl,mfab,ncomp,nover,atface)

@@ -27,6 +27,7 @@ module amrdata_class
       procedure :: destroy
       procedure :: clear_level
       procedure :: fill_ghosts
+      procedure :: fillbc          !< Default physical BC callback (uses amrex_filcc)
       procedure :: get_data_ptr
       procedure :: on_regrid
    end type amrdata
@@ -107,5 +108,36 @@ contains
       real(WP), intent(in) :: time
       ! Default: do nothing (override for fillpatch, etc.)
    end subroutine on_regrid
+
+   !> Default physical BC callback - applies amrex_filcc using lo_bc/hi_bc
+   !> This is called by amrgrid%fill() via the C++ FillPatch wrapper
+   subroutine fillbc(this,mf_ptr,geom_ptr,time,scomp,ncomp)
+      use amrex_amr_module, only: amrex_filcc,amrex_geometry,amrex_multifab,amrex_mfiter,amrex_mfiter_build
+      use iso_c_binding, only: c_ptr,c_int,c_f_pointer
+      class(amrdata), intent(inout) :: this
+      type(c_ptr), value :: mf_ptr
+      type(c_ptr), value :: geom_ptr
+      real(WP), value :: time
+      integer, value :: scomp,ncomp
+      type(amrex_geometry) :: geom
+      type(amrex_multifab) :: mf
+      type(amrex_mfiter) :: mfi
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
+      integer, dimension(4) :: plo,phi
+      ! Convert C pointers to Fortran types
+      geom=geom_ptr
+      mf=mf_ptr
+      ! Loop over boxes and apply filcc
+      call amrex_mfiter_build(mfi,mf)
+      do while(mfi%next())
+         p=>mf%dataptr(mfi)
+         ! Check if part of box is outside the domain
+         if (.not.geom%domain%contains(p)) then
+            plo=lbound(p); phi=ubound(p)
+            call amrex_filcc(p,plo,phi,geom%domain%lo,geom%domain%hi,geom%dx,&
+            &   geom%get_physical_location(plo),this%lo_bc,this%hi_bc)
+         end if
+      end do
+   end subroutine fillbc
 
 end module amrdata_class
