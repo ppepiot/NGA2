@@ -6,14 +6,12 @@ module amrgrid_class
    use string,           only: str_medium
    use amrex_amr_module, only: amrex_geometry,amrex_boxarray,amrex_distromap
    use mpi_f08,          only: MPI_Comm
-   use amrdata_class,    only: amrdata
-   use amrflux_class,    only: amrflux
    implicit none
    private
 
 
    ! Expose type/constructor/methods
-   public :: amrgrid,dispatch_fillbc
+   public :: amrgrid
 
    !> Abstract interface for user-provided tagging callback
    abstract interface
@@ -145,17 +143,13 @@ module amrgrid_class
       procedure :: mfiter_build              !< Build mfiter at a given level
       procedure :: mfiter_destroy            !< Destroy mfiter
       procedure :: clvl                      !< Return current finest level
-      procedure :: average_down              !< Average down a given multifab throughout all levels
-      procedure :: average_downto            !< Average down a given multifab to level lvl
-      procedure :: fill                      !< Fill ghost cells and coarse-fine boundaries
-      procedure :: fill_mfab                  !< Fill into target MultiFab from source amrdata
-      procedure :: fill_from_coarse          !< Fill fine level from coarse only (for new levels)
       procedure :: mfab_build                !< Build multifab at a given level
       procedure :: mfab_destroy              !< Destroy multifab
       procedure :: add_tagging               !< Add a tagging callback
       procedure :: add_postregrid            !< Add a post-regrid callback
       procedure :: clear_tagging             !< Clear all tagging callbacks
       procedure :: clear_postregrid          !< Clear all post-regrid callbacks
+      procedure :: init_from_scratch         !< Build all levels by looping regrid
    end type amrgrid
 
    ! Instance counter for automated AMReX lifecycle management
@@ -678,21 +672,6 @@ contains
       end if
    end subroutine dispatch_postregrid
 
-   !> Dispatch FillPatch BC callback to amrdata%fillbc
-   !> Receives amrdata as context from C++, converts and calls fillbc
-   subroutine dispatch_fillbc(data_ctx,mf_ptr,geom_ptr,time,scomp,ncomp) bind(c)
-      use iso_c_binding, only: c_ptr,c_f_pointer,c_double,c_int
-      implicit none
-      type(c_ptr), value, intent(in) :: data_ctx
-      type(c_ptr), value, intent(in) :: mf_ptr
-      type(c_ptr), value, intent(in) :: geom_ptr
-      real(c_double), value, intent(in) :: time
-      integer(c_int), value, intent(in) :: scomp
-      integer(c_int), value, intent(in) :: ncomp
-      type(amrdata), pointer :: data
-      call c_f_pointer(data_ctx,data)
-      call data%fillbc(mf_ptr,geom_ptr,real(time,WP),int(scomp),int(ncomp))
-   end subroutine dispatch_fillbc
 
    !> Add a tagging callback to the list
    subroutine add_tagging(this,tagger)
@@ -749,6 +728,17 @@ contains
       if (allocated(this%postregrid_funcs)) deallocate(this%postregrid_funcs)
    end subroutine clear_postregrid
 
+   !> Initialize grid hierarchy from scratch using AMReX's native init
+   !> This calls MakeNewLevelFromScratch for ALL levels (triggers on_init callbacks)
+   subroutine init_from_scratch(this, time)
+      use amrex_interface, only: amrcore_init_from_scratch
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      real(WP), intent(in) :: time
+      ! Use AMReX's native init_from_scratch which properly builds all levels
+      call amrcore_init_from_scratch(this%amrcore, time)
+   end subroutine init_from_scratch
+
 
    !> Return current finest level
    function clvl(this) result(cl)
@@ -760,147 +750,6 @@ contains
       cl=amrcore_finest_level(this%amrcore)
    end function clvl
 
-
-   !> Average down entire multifab array
-   subroutine average_down(this,mfaba)
-      use amrex_amr_module, only: amrex_multifab,amrex_average_down
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      type(amrex_multifab), dimension(0:) :: mfaba
-      integer :: n
-      do n=this%clvl()-1,0,-1
-         call amrex_average_down(mfaba(n+1),mfaba(n),this%geom(n+1),this%geom(n),1,mfaba(0)%nc,this%rref(n))
-      end do
-   end subroutine average_down
-
-
-   !> Average entire multifab array down to level lvl
-   subroutine average_downto(this,mfaba,lvl)
-      use amrex_amr_module, only: amrex_multifab,amrex_average_down
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      type(amrex_multifab), dimension(0:) :: mfaba
-      integer, intent(in) :: lvl
-      call amrex_average_down(mfaba(lvl+1),mfaba(lvl),this%geom(lvl+1),this%geom(lvl),1,mfaba(0)%nc,this%rref(lvl))
-   end subroutine average_downto
-
-   !> Fill ghost cells and coarse-fine boundary data
-   !> For lvl=0: fills ghost cells using boundary conditions
-   !> For lvl>0: interpolates from coarser level and fills ghosts
-   !> Optional: data_old for time interpolation (subcycling)
-   subroutine fill(this,data,lvl,time,data_old,t_old,t_new)
-      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
-      use amrex_interface, only: amrmfab_fillpatch_single,amrmfab_fillpatch_two
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      class(amrdata), target, intent(inout) :: data
-      integer, intent(in) :: lvl
-      real(WP), intent(in) :: time
-      class(amrdata), target, intent(in), optional :: data_old
-      real(WP), intent(in), optional :: t_old,t_new
-      real(WP) :: time_old,time_new
-      type(c_ptr) :: data_ctx
-      type(c_funptr) :: bc_dispatch_ptr
-      ! Set up times
-      if (present(data_old).and.present(t_old).and.present(t_new)) then
-         time_old=t_old
-         time_new=t_new
-      else
-         time_old=time-1.0e200_WP
-         time_new=time
-      end if
-      ! Get context pointer
-      select type (data)
-       type is (amrdata)
-         data_ctx=c_loc(data)
-      end select
-      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call appropriate FillPatch (note: scomp/dcomp use 1-indexed Fortran convention)
-      if (lvl.eq.0) then
-         call amrmfab_fillpatch_single(data%mf(0)%p,time_old,data%mf(0)%p, &
-         &   time_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
-         &   time,1,1,data%ncomp)
-      else
-         if (present(data_old)) then
-            call amrmfab_fillpatch_two(data%mf(lvl)%p,time_old,data_old%mf(lvl-1)%p, &
-            &   time_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
-            &   time_old,data_old%mf(lvl)%p,time_new,data%mf(lvl)%p,this%geom(lvl)%p, &
-            &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
-            &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
-         else
-            call amrmfab_fillpatch_two(data%mf(lvl)%p,time_old,data%mf(lvl-1)%p, &
-            &   time_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
-            &   time_old,data%mf(lvl)%p,time_new,data%mf(lvl)%p,this%geom(lvl)%p, &
-            &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
-            &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
-         end if
-      end if
-   end subroutine fill
-
-
-   !> Fill a target MultiFab from source amrdata (for regrid callbacks)
-   !> Allows filling into a temporary MultiFab with different geometry
-   subroutine fill_mfab(this,dest,data,lvl,time)
-      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
-      use amrex_amr_module, only: amrex_multifab
-      use amrex_interface, only: amrmfab_fillpatch_single,amrmfab_fillpatch_two
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      type(amrex_multifab), intent(inout) :: dest
-      class(amrdata), target, intent(in) :: data
-      integer, intent(in) :: lvl
-      real(WP), intent(in) :: time
-      real(WP) :: t_old,t_new
-      type(c_ptr) :: data_ctx
-      type(c_funptr) :: bc_dispatch_ptr
-      t_old=time-1.0e200_WP
-      t_new=time
-      ! Get context pointer
-      select type (data)
-       type is (amrdata)
-         data_ctx=c_loc(data)
-      end select
-      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call appropriate FillPatch (note: scomp/dcomp use 1-indexed Fortran convention)
-      if (lvl.eq.0) then
-         call amrmfab_fillpatch_single(dest%p,t_old,data%mf(0)%p, &
-         &   t_new,data%mf(0)%p,this%geom(0)%p,data_ctx,bc_dispatch_ptr, &
-         &   time,1,1,data%ncomp)
-      else
-         call amrmfab_fillpatch_two(dest%p,t_old,data%mf(lvl-1)%p, &
-         &   t_new,data%mf(lvl-1)%p,this%geom(lvl-1)%p, &
-         &   t_old,data%mf(lvl)%p,t_new,data%mf(lvl)%p,this%geom(lvl)%p, &
-         &   data_ctx,bc_dispatch_ptr,time,1,1,data%ncomp, &
-         &   this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
-      end if
-   end subroutine fill_mfab
-
-
-   !> Fill fine level from coarse only (for creating new fine levels)
-   !> Uses InterpFromCoarseLevel - no fine-level data needed
-   subroutine fill_from_coarse(this,data,lvl,time)
-      use iso_c_binding, only: c_ptr,c_loc,c_funloc,c_funptr
-      use amrex_interface, only: amrmfab_fillcoarsepatch
-      implicit none
-      class(amrgrid), intent(inout) :: this
-      class(amrdata), target, intent(inout) :: data
-      integer, intent(in) :: lvl
-      real(WP), intent(in) :: time
-      type(c_ptr) :: data_ctx
-      type(c_funptr) :: bc_dispatch_ptr
-      ! Only valid for fine levels
-      if (lvl.lt.1) return
-      ! Get context pointer
-      select type (data)
-       type is (amrdata)
-         data_ctx=c_loc(data)
-      end select
-      bc_dispatch_ptr=c_funloc(dispatch_fillbc)
-      ! Call C++ wrapper (scomp/dcomp use 1-indexed Fortran convention)
-      call amrmfab_fillcoarsepatch(data%mf(lvl)%p,time,data%mf(lvl-1)%p, &
-      &   this%geom(lvl-1)%p,this%geom(lvl)%p,data_ctx,bc_dispatch_ptr, &
-      &   1,1,data%ncomp,this%rref(lvl-1),data%interp,data%lo_bc,data%hi_bc,data%ncomp)
-   end subroutine fill_from_coarse
 
    !> Build multifab at a level
    subroutine mfab_build(this,lvl,mfab,ncomp,nover,atface)

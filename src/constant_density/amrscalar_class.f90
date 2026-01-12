@@ -1,7 +1,7 @@
 module amrscalar_class
    use precision,        only: WP
    use string,           only: str_medium
-   use amrgrid_class,    only: amrgrid,dispatch_fillbc
+   use amrgrid_class,    only: amrgrid
    use amrdata_class,    only: amrdata
    use amrflux_class,    only: amrflux
    use amrsolver_class,  only: amrsolver
@@ -57,7 +57,6 @@ contains
    subroutine initialize(this,amr,nscalar,name)
       use iso_c_binding,    only: c_loc
       use messager,         only: die
-      use amrex_amr_module, only: amrex_bc_int_dir,amrex_bc_reflect_even,amrex_interp_cell_cons
       implicit none
       class(amrscalar), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
@@ -83,33 +82,12 @@ contains
       allocate(this%SCmax(1:this%nscalar)); this%SCmax=-huge(1.0_WP)
       allocate(this%SCint(1:this%nscalar)); this%SCint= 0.0_WP
 
-      ! Configure SC amrdata
-      this%SC%name='SC'
-      this%SC%ncomp=this%nscalar
-      this%SC%ng=0
-      this%SC%interp=amrex_interp_cell_cons
-      allocate(this%SC%mf(0:this%amr%nlvl))
-      allocate(this%SC%lo_bc(3,this%nscalar),this%SC%hi_bc(3,this%nscalar))
-      this%SC%lo_bc=amrex_bc_reflect_even
-      if (this%amr%xper) this%SC%lo_bc(1,:)=amrex_bc_int_dir
-      if (this%amr%yper) this%SC%lo_bc(2,:)=amrex_bc_int_dir
-      if (this%amr%zper) this%SC%lo_bc(3,:)=amrex_bc_int_dir
-      this%SC%hi_bc=this%SC%lo_bc
+      ! Initialize SC and SCold using amrdata%initialize
+      call this%SC%initialize(amr, name='SC', ncomp=this%nscalar, ng=0)
+      call this%SCold%initialize(amr, name='SCold', ncomp=this%nscalar, ng=0)
 
-      ! Configure SCold amrdata
-      this%SCold%name='SCold'
-      this%SCold%ncomp=this%nscalar
-      this%SCold%ng=0
-      this%SCold%interp=amrex_interp_cell_cons
-      allocate(this%SCold%mf(0:this%amr%nlvl))
-      allocate(this%SCold%lo_bc(3,this%nscalar),this%SCold%hi_bc(3,this%nscalar))
-      this%SCold%lo_bc=this%SC%lo_bc
-      this%SCold%hi_bc=this%SC%hi_bc
-
-      ! Configure flux register
-      this%flux%name='SC_flux'
-      this%flux%ncomp=this%nscalar
-      allocate(this%flux%fr(1:this%amr%nlvl))
+      ! Initialize flux register
+      call this%flux%initialize(amr%nlvl, name='SC_flux', ncomp=this%nscalar)
 
       ! Register callbacks with amrgrid (pass self as context)
       ! Note: Need select type since c_loc requires non-polymorphic type
@@ -135,9 +113,9 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx,this)
-      ! Allocate SC and SCold
-      call this%SC%define(lvl,ba,dm)
-      call this%SCold%define(lvl,ba,dm)
+      ! Initialize SC and SCold (calls define + user_on_init if set)
+      call this%SC%on_init(lvl,ba,dm,this%amr%geom(lvl))
+      call this%SCold%on_init(lvl,ba,dm,this%amr%geom(lvl))
       ! Build flux register for fine levels
       if (lvl.ge.1) call this%flux%build_level(lvl,ba,dm,this%amr%rref(lvl-1))
    end subroutine on_init_level
@@ -154,21 +132,19 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx,this)
-      ! Allocate SC and SCold
-      call this%SC%define(lvl,ba,dm)
-      call this%SCold%define(lvl,ba,dm)
-      ! Fill SC from coarse level
-      call this%amr%fill_from_coarse(this%SC,lvl,time)
+      ! Initialize SC (define + fill_from_coarse or user override)
+      call this%SC%on_coarse(lvl, ba, dm, time)
+      ! SCold only needs to be defined (no fill needed)
+      call this%SCold%define(lvl, ba, dm)
       ! Build flux register for fine levels
       if (lvl.ge.1) call this%flux%build_level(lvl,ba,dm,this%amr%rref(lvl-1))
    end subroutine on_coarse_level
 
 
+
    !> Callback: remake level (after regrid)
-   !> NOTE: This is only called for levels that already exist; new levels go through on_coarse_level
    subroutine on_remake_level(ctx,lvl,time,ba,dm)
       use iso_c_binding, only: c_ptr,c_f_pointer
-      use amrex_amr_module, only: amrex_multifab_build,amrex_multifab_destroy
       implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
@@ -176,32 +152,18 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       type(amrscalar), pointer :: this
-      type(amrex_multifab) :: SCnew
       call c_f_pointer(ctx,this)
-
-      ! Build temp MultiFab with new geometry
-      call amrex_multifab_build(SCnew,ba,dm,this%nscalar,0)
-
-      ! Fill temp from old data
-      call this%amr%fill_mfab(SCnew,this%SC,lvl,time)
-
-      ! Destroy old
-      call amrex_multifab_destroy(this%SC%mf(lvl))
-      call amrex_multifab_destroy(this%SCold%mf(lvl))
-      if (lvl.ge.1) call this%flux%destroy_level(lvl)
-
-      ! Build new
-      call amrex_multifab_build(this%SC%mf(lvl),ba,dm,this%nscalar,this%SC%ng)
-      call amrex_multifab_build(this%SCold%mf(lvl),ba,dm,this%nscalar,this%SCold%ng)
-      if (lvl.ge.1) call this%flux%build_level(lvl,ba,dm,this%amr%rref(lvl-1))
-
-      ! Copy from temp
-      call this%SC%mf(lvl)%copy(SCnew,1,1,this%nscalar,0)
-
-      ! Destroy temp
-      call amrex_multifab_destroy(SCnew)
+      ! Remake SC (handles fill from old data internally)
+      call this%SC%on_remake(lvl, ba, dm, time)
+      ! SCold just needs to be rebuilt (no fill)
+      call this%SCold%clear_level(lvl)
+      call this%SCold%define(lvl, ba, dm)
+      ! Rebuild flux register
+      if (lvl.ge.1) then
+         call this%flux%destroy_level(lvl)
+         call this%flux%build_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      end if
    end subroutine on_remake_level
-
 
 
    !> Callback: clear level
@@ -212,8 +174,8 @@ contains
       integer, intent(in) :: lvl
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx,this)
-      call this%SC%clear_level(lvl)
-      call this%SCold%clear_level(lvl)
+      call this%SC%on_clear(lvl)
+      call this%SCold%on_clear(lvl)
       if (lvl.ge.1) call this%flux%destroy_level(lvl)
    end subroutine on_clear_level
 
@@ -369,7 +331,7 @@ contains
          end subroutine amrex_fi_fluxregister_reflux
       end interface
       call amrex_fi_fluxregister_reflux(this%flux%fr(lvl+1)%p,this%SC%mf(lvl)%p,dt,this%amr%geom(lvl)%p)
-      call this%amr%average_downto(this%SC%mf,lvl)
+      call this%SC%average_downto(lvl)
    end subroutine reflux_avg_lvl
 
 

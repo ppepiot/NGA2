@@ -1,7 +1,7 @@
 !> Abstract base class for AMR solvers
 !> Provides context for coupled BC callbacks and regrid handling
 module amrsolver_class
-   use iso_c_binding, only: c_ptr,c_null_ptr,c_loc,c_funloc,c_f_pointer
+   use iso_c_binding, only: c_ptr
    use precision,     only: WP
    use string,        only: str_medium
    implicit none

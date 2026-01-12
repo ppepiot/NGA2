@@ -21,6 +21,7 @@ module amrflux_class
       character(len=str_medium) :: name='UNNAMED_AMRFLUX'
       integer :: ncomp=1   !< Number of components
    contains
+      procedure :: initialize    !< Initialize amrflux with parameters
       procedure :: build_level
       procedure :: destroy_level
       procedure :: destroy
@@ -32,6 +33,21 @@ module amrflux_class
    end type amrflux
 
 contains
+
+   !> Initialize amrflux with parameters
+   !> Allocates the fr array
+   subroutine initialize(this, nlvl, name, ncomp)
+      class(amrflux), intent(inout) :: this
+      integer, intent(in) :: nlvl              !< Max level (from amr%nlvl)
+      character(len=*), intent(in) :: name
+      integer, intent(in) :: ncomp
+      ! Set metadata
+      this%name = name
+      this%ncomp = ncomp
+      ! Allocate fr array (flux registers only exist for levels >= 1)
+      if (.not.allocated(this%fr)) allocate(this%fr(1:nlvl))
+   end subroutine initialize
+
 
    !> Build flux register at a specific fine level
    !> Requires BoxArray and DistroMap of the fine level

@@ -58,6 +58,39 @@ contains
    end subroutine box_tagger
 
 
+   !> Initialize scalar field with Gaussian blob (called by amrdata on_init callback)
+   subroutine init_gaussian_blob(lvl, mf, geom)
+      use amrex_amr_module, only: amrex_multifab, amrex_geometry, amrex_mfiter, amrex_box, amrex_mfiter_build
+      implicit none
+      integer, intent(in) :: lvl
+      type(amrex_multifab), intent(inout) :: mf
+      type(amrex_geometry), intent(in) :: geom
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
+      real(WP) :: x,y,z,dx,dy,dz
+      integer :: i,j,k
+      dx = geom%dx(1)
+      dy = geom%dx(2)
+      dz = geom%dx(3)
+      call amrex_mfiter_build(mfi, mf)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         pSC => mf%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            z = amr%zlo + (real(k,WP)+0.5_WP)*dz
+            do j = bx%lo(2), bx%hi(2)
+               y = amr%ylo + (real(j,WP)+0.5_WP)*dy
+               do i = bx%lo(1), bx%hi(1)
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  ! Smaller, sharper Gaussian offset from center
+                  pSC(i,j,k,1) = exp(-200.0_WP*((x-0.25_WP)**2 + (y-0.5_WP)**2 + (z-0.5_WP)**2))
+               end do
+            end do
+         end do
+      end do
+   end subroutine init_gaussian_blob
+
    subroutine test_amrscalar()
       use iso_c_binding,    only: c_associated
       use amrex_amr_module, only: amrex_mfiter,amrex_box
@@ -102,6 +135,10 @@ contains
       ! Initialize scalar solver first (registers callbacks)
       call sc%initialize(amr,nscalar=1,name="test_scalar")
 
+      ! Set user on_init callback for SC to initialize level 0 with Gaussian blob
+      ! (fine levels get interpolated data via fill_from_coarse, then we average_down)
+      call sc%SC%set_on_init(init_gaussian_blob)
+
       ! Set tagging
       call amr%add_tagging(box_tagger)
 
@@ -114,37 +151,14 @@ contains
       call ens%initialize(amr=amr,name="sc_advect")
       call ens%add_scalar(data=sc%SC,comp=1,name="SC")
 
-      ! Initialize scalar with Gaussian blob at (0.25, 0.5, 0.5) - offset to see rotation
-      do lvl=0,amr%clvl()
-         dx=amr%geom(lvl)%dx(1)
-         dy=amr%geom(lvl)%dx(2)
-         dz=amr%geom(lvl)%dx(3)
-         call amr%mfiter_build(lvl,mfi)
-         do while (mfi%next())
-            bx=mfi%tilebox()
-            pSC=>sc%SC%mf(lvl)%dataptr(mfi)
-            do k=bx%lo(3),bx%hi(3)
-               z=amr%zlo+(real(k,WP)+0.5_WP)*dz
-               do j=bx%lo(2),bx%hi(2)
-                  y=amr%ylo+(real(j,WP)+0.5_WP)*dy
-                  do i=bx%lo(1),bx%hi(1)
-                     x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                     ! Smaller, sharper Gaussian offset from center
-                     pSC(i,j,k,1)=exp(-200.0_WP*((x-0.25_WP)**2+(y-0.5_WP)**2+(z-0.5_WP)**2))
-                  end do
-               end do
-            end do
-         end do
-         call amr%mfiter_destroy(mfi)
-      end do
-
-      ! Regrid now that we have data - creates refined levels where SC > threshold
-      call amr%regrid(baselvl=0,time=0.0_WP)
+      ! Build all levels using init_from_scratch
+      ! (callback init_gaussian_blob is called automatically for each level)
+      call amr%init_from_scratch(time=0.0_WP)
       call amr%get_info()
-      call log("After initial regrid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
+      call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
 
-      ! Average down to make levels consistent (only if we have fine levels)
-      if (amr%clvl().ge.1) call amr%average_downto(sc%SC%mf,0)
+      ! Average down to make levels consistent
+      call sc%SC%average_down()
 
       ! Get initial integral
       call sc%get_info()
@@ -237,7 +251,7 @@ contains
             call amr%mfiter_destroy(mfi)
 
             ! Fill SCfill with ghost cells properly (uses FillPatch for C-F interface)
-            call amr%fill_mfab(SCfill,sc%SCold,lvl,time%t)
+            call sc%SCold%fill_mfab(SCfill, lvl, time%t)
 
             ! Calculate dSC/dt
             call sc%get_dSCdt(lvl,dSCdt,SCfill,U,V,W)
@@ -263,7 +277,7 @@ contains
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
             call amr%get_info()
-            if (amr%clvl().ge.1) call amr%average_downto(sc%SC%mf,0)
+            call sc%SC%average_down()
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
          end if
 
@@ -291,6 +305,7 @@ contains
       end if
 
       ! Cleanup
+      call mfile%finalize()
       call sc%finalize()
       call amr%finalize()
       if (allocated(sc)) deallocate(sc)

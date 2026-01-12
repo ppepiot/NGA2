@@ -91,8 +91,8 @@ contains
       print *, ""
       print *, "TEST 1: Sequential FillPatch"
       do lvl=0,amr%clvl()
-         call amr%fill(sc1%SC, lvl, time=0.0_WP)
-         call amr%fill(sc2%SC, lvl, time=0.0_WP)
+         call sc1%SC%fill(lvl, time=0.0_WP)
+         call sc2%SC%fill(lvl, time=0.0_WP)
       end do
       sum1_after = sc1%SC%mf(0)%sum(1)
       sum2_after = sc2%SC%mf(0)%sum(1)
@@ -112,8 +112,8 @@ contains
       sum1_before = sc1%SC%mf(0)%sum(1)
       sum2_before = sc2%SC%mf(0)%sum(1)
       do lvl=0,amr%clvl()
-         call amr%fill(sc1%SC, lvl, time=0.0_WP)
-         call amr%fill(sc2%SC, lvl, time=0.0_WP)
+         call sc1%SC%fill(lvl, time=0.0_WP)
+         call sc2%SC%fill(lvl, time=0.0_WP)
       end do
       sum1_after = sc1%SC%mf(0)%sum(1)
       sum2_after = sc2%SC%mf(0)%sum(1)
@@ -132,8 +132,8 @@ contains
       call amr%get_info()
       print *, "After regrid: ", amr%nlevels, " levels"
       do lvl=0,amr%clvl()
-         call amr%fill(sc1%SC, lvl, time=1.0_WP)
-         call amr%fill(sc2%SC, lvl, time=1.0_WP)
+         call sc1%SC%fill(lvl, time=1.0_WP)
+         call sc2%SC%fill(lvl, time=1.0_WP)
       end do
       print *, ">>> PASS: Regrid + dual fill (no crash)"
 

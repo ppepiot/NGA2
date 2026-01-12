@@ -90,11 +90,11 @@ contains
       call c_f_pointer(ctx,data)
       if (associated(data%velocity)) then
          call data%velocity%define(lvl,ba,dm)
-         call amr_ptr%fill_from_coarse(data%velocity,lvl,time)
+         call data%velocity%fill_from_coarse(lvl, time)
       end if
       if (associated(data%pressure)) then
          call data%pressure%define(lvl,ba,dm)
-         call amr_ptr%fill_from_coarse(data%pressure,lvl,time)
+         call data%pressure%fill_from_coarse(lvl, time)
       end if
    end subroutine on_coarse_level
 
@@ -154,22 +154,9 @@ contains
       cb_data%velocity=>velocity
       cb_data%pressure=>pressure
 
-      ! Configure amrdata
-      velocity%name="velocity"
-      velocity%ncomp=3
-      velocity%ng=1
-      allocate(velocity%mf(0:amr%nlvl))
-      allocate(velocity%lo_bc(3,3),velocity%hi_bc(3,3))
-      velocity%lo_bc=amrex_bc_int_dir
-      velocity%hi_bc=amrex_bc_int_dir
-
-      pressure%name="pressure"
-      pressure%ncomp=1
-      pressure%ng=1
-      allocate(pressure%mf(0:amr%nlvl))
-      allocate(pressure%lo_bc(3,1),pressure%hi_bc(3,1))
-      pressure%lo_bc=amrex_bc_int_dir
-      pressure%hi_bc=amrex_bc_int_dir
+      ! Initialize amrdata using the new initialize method
+      call velocity%initialize(amr, name='velocity', ncomp=3, ng=1)
+      call pressure%initialize(amr, name='pressure', ncomp=1, ng=1)
 
       ! Register callbacks with context
       call amr%add_tagging(box_tagger)
