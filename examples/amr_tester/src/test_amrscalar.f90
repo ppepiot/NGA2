@@ -15,7 +15,7 @@ module mod_test_amrscalar
    ! Module-level objects (referenced by callbacks)
    type(amrgrid),   allocatable, target :: amr
    type(amrscalar), allocatable, target :: sc
-   real(WP), parameter :: PI=3.14159265358979323846_WP
+
    real(WP), parameter :: SC_REFINE_THRESH=0.01_WP  !< Refine where SC > this value
 
 contains
@@ -60,6 +60,7 @@ contains
    subroutine test_amrscalar()
       use iso_c_binding,    only: c_associated
       use amrex_amr_module, only: amrex_mfiter,amrex_box
+      use mathtools,        only: Pi
       implicit none
       type(amrensight) :: ens
       type(timetracker) :: time
@@ -155,7 +156,7 @@ contains
       time=timetracker(amRoot=amr%amRoot)
       time%dt=0.005_WP
       time%dtmax=time%dt
-      time%tmax=1.0_WP
+      time%tmax=2.0_WP*PI  ! Full circle rotation
       time%t=0.0_WP
       time%n=0
 
@@ -189,7 +190,7 @@ contains
             call amr%mfab_build(lvl=lvl,mfab=dSCdt,ncomp=1,nover=0,atface=[.false.,.false.,.false.])
             call amr%mfab_build(lvl=lvl,mfab=SCfill,ncomp=1,nover=2,atface=[.false.,.false.,.false.])
 
-            ! Set velocity: rotating vortex in z-plane (U=-y+0.5, V=x-0.5, W=0)
+            ! Set velocity: solid body rotation in z-plane (U=-(y-0.5), V=(x-0.5), W=0)
             call amr%mfiter_build(lvl,mfi)
             do while (mfi%next())
                bx=mfi%tilebox()
@@ -201,7 +202,9 @@ contains
                   do j=lbound(pU,2),ubound(pU,2)
                      y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                      do i=lbound(pU,1),ubound(pU,1)
-                        pU(i,j,k,1)=-(y-0.5_WP)*cos(PI*time%t/time%tmax)
+                        ! Constant rotation (old: time-reversing)
+                        pU(i,j,k,1)=-(y-0.5_WP)
+                        !pU(i,j,k,1)=-(y-0.5_WP)*cos(Pi*time%t/time%tmax)
                      end do
                   end do
                end do
@@ -210,7 +213,9 @@ contains
                   do j=lbound(pV,2),ubound(pV,2)
                      do i=lbound(pV,1),ubound(pV,1)
                         x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                        pV(i,j,k,1)=(x-0.5_WP)*cos(PI*time%t/time%tmax)
+                        ! Constant rotation (old: time-reversing)
+                        pV(i,j,k,1)=(x-0.5_WP)
+                        !pV(i,j,k,1)=(x-0.5_WP)*cos(Pi*time%t/time%tmax)
                      end do
                   end do
                end do
