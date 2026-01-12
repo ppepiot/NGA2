@@ -1,6 +1,7 @@
 !> Test amrscalar solver with time integration and Ensight output
 module mod_test_amrscalar
    use precision,         only: WP
+   use string,            only: itoa,rtoa
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
    use amrensight_class,  only: amrensight
@@ -152,13 +153,10 @@ contains
       call ens%add_scalar(data=sc%SC,comp=1,name="SC")
 
       ! Build all levels using init_from_scratch
-      ! (callback init_gaussian_blob is called automatically for each level)
-      call amr%init_from_scratch(time=0.0_WP)
+      ! (callback init_gaussian_blob is called for each level, then postregrid fires average_down)
+      call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
       call amr%get_info()
       call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-
-      ! Average down to make levels consistent
-      call sc%SC%average_down()
 
       ! Get initial integral
       call sc%get_info()
@@ -258,7 +256,7 @@ contains
 
             ! Forward Euler step: SC = SCold + dt*dSC/dt
             call sc%SC%mf(lvl)%lincomb(a=1.0_WP,srcmf1=sc%SCold%mf(lvl),srccomp1=1,&
-            &                          b=time%dt,srcmf2=dSCdt            ,srccomp2=1,&
+            &                          b=time%dt,srcmf2=dSCdt          ,srccomp2=1,&
             &                          dstcomp=1,nc=1,ng=0)
 
             ! Cleanup level work arrays
@@ -272,12 +270,11 @@ contains
          ! Reflux and average down
          call sc%reflux_avg(time%dt)
 
-         ! Regrid if needed
+         ! Regrid if needed (average_down is now handled by amrscalar postregrid callback)
          if (regrid_evt%occurs()) then
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
             call amr%get_info()
-            call sc%SC%average_down()
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
          end if
 
@@ -313,17 +310,6 @@ contains
       call log("PASS: amrscalar test complete!")
       call log("View output in ensight/sc_advect/")
 
-   contains
-      function itoa(ii) result(str)
-         integer, intent(in) :: ii
-         character(len=32) :: str
-         write(str,'(i0)') ii
-      end function itoa
-      function rtoa(r) result(str)
-         real(WP), intent(in) :: r
-         character(len=32) :: str
-         write(str,'(es10.3)') r
-      end function rtoa
    end subroutine test_amrscalar
 
 end module mod_test_amrscalar

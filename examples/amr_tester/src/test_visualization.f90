@@ -1,6 +1,7 @@
 !> Visualization test - create fields, output to ensight, verify in paraview
 module mod_test_visualization
    use precision,        only: WP
+   use string,           only: itoa
    use amrgrid_class,    only: amrgrid
    use amrdata_class,    only: amrdata
    use amrensight_class, only: amrensight
@@ -221,13 +222,6 @@ contains
       call amr%finalize()
       call log("PASS: Visualization test complete!")
       call log("Open ensight/viz_test/nga.lev0.case and nga.lev1.case in ParaView")
-
-   contains
-      function itoa(ii) result(str)
-         integer, intent(in) :: ii
-         character(len=32) :: str
-         write(str,'(i0)') ii
-      end function itoa
 
    end subroutine test_visualization
 

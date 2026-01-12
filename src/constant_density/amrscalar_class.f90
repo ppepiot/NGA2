@@ -99,6 +99,7 @@ contains
          call this%amr%add_on_coarse(on_coarse_level,c_loc(this))
          call this%amr%add_on_remake(on_remake_level,c_loc(this))
          call this%amr%add_on_clear(on_clear_level,c_loc(this))
+         call this%amr%add_postregrid(on_postregrid,c_loc(this))
       end select
 
    end subroutine initialize
@@ -179,6 +180,18 @@ contains
       call this%SCold%on_clear(lvl)
       if (lvl.ge.1) call this%flux%destroy_level(lvl)
    end subroutine on_clear_level
+
+
+   !> Callback: post-regrid (called once after all levels are processed)
+   subroutine on_postregrid(ctx)
+      use iso_c_binding, only: c_ptr,c_f_pointer
+      implicit none
+      type(c_ptr), intent(in) :: ctx
+      type(amrscalar), pointer :: this
+      call c_f_pointer(ctx,this)
+      ! Average down to ensure level consistency after regrid
+      call this%SC%average_down()
+   end subroutine on_postregrid
 
 
    !> Finalization for amrscalar solver

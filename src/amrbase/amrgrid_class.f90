@@ -25,10 +25,12 @@ module amrgrid_class
       end subroutine tagging_callback
    end interface
 
-   !> Abstract interface for post-regrid callback
+   !> Abstract interface for post-regrid callback (with context)
    abstract interface
-      subroutine postregrid_callback()
+      subroutine postregrid_callback(ctx)
+         use iso_c_binding, only: c_ptr
          implicit none
+         type(c_ptr), intent(in) :: ctx
       end subroutine postregrid_callback
    end interface
 
@@ -63,6 +65,7 @@ module amrgrid_class
    end type tagger_wrapper
    type :: postregrid_wrapper
       procedure(postregrid_callback), pointer, nopass :: f=>null()
+      type(c_ptr) :: ctx=c_null_ptr
    end type postregrid_wrapper
    type :: level_cb_wrapper
       procedure(level_callback), pointer, nopass :: f=>null()
@@ -664,10 +667,10 @@ contains
       type(amrgrid), pointer :: this_grid
       integer :: i
       call c_f_pointer(owner,this_grid)
-      ! Call all registered post-regrid callbacks
+      ! Call all registered post-regrid callbacks with their context
       if (allocated(this_grid%postregrid_funcs)) then
          do i=1,size(this_grid%postregrid_funcs)
-            call this_grid%postregrid_funcs(i)%f()
+            call this_grid%postregrid_funcs(i)%f(this_grid%postregrid_funcs(i)%ctx)
          end do
       end if
    end subroutine dispatch_postregrid
@@ -702,10 +705,12 @@ contains
 
 
    !> Add a post-regrid callback to the list
-   subroutine add_postregrid(this,callback)
+   subroutine add_postregrid(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
       implicit none
       class(amrgrid), intent(inout) :: this
       procedure(postregrid_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
       type(postregrid_wrapper), dimension(:), allocatable :: tmp
       integer :: n
       if (allocated(this%postregrid_funcs)) then
@@ -713,10 +718,12 @@ contains
          allocate(tmp(n+1))
          tmp(1:n)=this%postregrid_funcs
          tmp(n+1)%f=>callback
+         tmp(n+1)%ctx=ctx
          call move_alloc(tmp,this%postregrid_funcs)
       else
          allocate(this%postregrid_funcs(1))
          this%postregrid_funcs(1)%f=>callback
+         this%postregrid_funcs(1)%ctx=ctx
       end if
    end subroutine add_postregrid
 
@@ -730,13 +737,27 @@ contains
 
    !> Initialize grid hierarchy from scratch using AMReX's native init
    !> This calls MakeNewLevelFromScratch for ALL levels (triggers on_init callbacks)
-   subroutine init_from_scratch(this, time)
+   !> If do_postregrid=.true. (default), fires post-regrid callbacks after init
+   subroutine init_from_scratch(this, time, do_postregrid)
+      use iso_c_binding, only: c_loc
       use amrex_interface, only: amrcore_init_from_scratch
       implicit none
-      class(amrgrid), intent(inout) :: this
+      class(amrgrid), target, intent(inout) :: this
       real(WP), intent(in) :: time
+      logical, intent(in), optional :: do_postregrid
+      logical :: fire_postregrid
+      ! Default: fire post-regrid callbacks
+      fire_postregrid = .true.
+      if (present(do_postregrid)) fire_postregrid = do_postregrid
       ! Use AMReX's native init_from_scratch which properly builds all levels
       call amrcore_init_from_scratch(this%amrcore, time)
+      ! Optionally fire post-regrid callbacks (for average_down, etc.)
+      if (fire_postregrid) then
+         select type (this)
+          type is (amrgrid)
+            call dispatch_postregrid(c_loc(this))
+         end select
+      end if
    end subroutine init_from_scratch
 
 
