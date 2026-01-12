@@ -69,7 +69,7 @@ contains
       amr%ylo =0.0_WP; amr%yhi =1.0_WP
       amr%zlo =0.0_WP; amr%zhi =1.0_WP
       amr%xper=.false.; amr%yper=.false.; amr%zper=.false.
-      amr%nlvl=1; amr%nmax=8
+      amr%maxlvl=1; amr%nmax=8
 
       call amr%initialize("multidata_amr")
       amr_ptr=>amr

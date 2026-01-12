@@ -94,7 +94,7 @@ contains
       if (present(lvls)) then
          ! Check that they are all valid
          do n=1,size(lvls)
-            if (lvls(n).lt.0.or.lvls(n).gt.this%amr%nlvl) call die('[amrensight initialize] lvls provided are improper')
+            if (lvls(n).lt.0.or.lvls(n).gt.this%amr%maxlvl) call die('[amrensight initialize] lvls provided are improper')
          end do
          ! If so, store in our object
          this%nlvlout=size(lvls)
@@ -102,7 +102,7 @@ contains
          this%lvlout=lvls
       else
          ! By default, include all the levels
-         this%nlvlout=this%amr%nlvl+1
+         this%nlvlout=this%amr%maxlvl+1
          allocate(this%lvlout(this%nlvlout))
          do n=1,this%nlvlout
             this%lvlout(n)=n-1

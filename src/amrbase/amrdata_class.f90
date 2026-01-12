@@ -361,7 +361,7 @@ contains
       this%ncomp = ncomp
       if (present(ng)) this%ng = ng
       ! Allocate mf array
-      if (.not.allocated(this%mf)) allocate(this%mf(0:amr%nlvl))
+      if (.not.allocated(this%mf)) allocate(this%mf(0:amr%maxlvl))
       ! Allocate and set default BCs (periodic if grid is periodic)
       if (.not.allocated(this%lo_bc)) allocate(this%lo_bc(3,ncomp))
       if (.not.allocated(this%hi_bc)) allocate(this%hi_bc(3,ncomp))

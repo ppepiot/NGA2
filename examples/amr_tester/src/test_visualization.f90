@@ -141,7 +141,7 @@ contains
       amr%xper=.true.
       amr%yper=.true.
       amr%zper=.true.
-      amr%nlvl=1
+      amr%maxlvl=1
       amr%nmax=16
 
       ! Initialize AMR grid

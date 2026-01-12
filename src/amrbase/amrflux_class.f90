@@ -15,7 +15,7 @@ module amrflux_class
 
    !> Flux register object wrapping array of FluxRegisters (one per fine level)
    type :: amrflux
-      ! Underlying AMReX objects (array 1:nlvl, no level 0)
+      ! Underlying AMReX objects (array 1:maxlvl, no level 0)
       type(amrex_fluxregister), dimension(:), allocatable :: fr
       ! Metadata
       character(len=str_medium) :: name='UNNAMED_AMRFLUX'
@@ -36,16 +36,16 @@ contains
 
    !> Initialize amrflux with parameters
    !> Allocates the fr array
-   subroutine initialize(this, nlvl, name, ncomp)
+   subroutine initialize(this, maxlvl, name, ncomp)
       class(amrflux), intent(inout) :: this
-      integer, intent(in) :: nlvl              !< Max level (from amr%nlvl)
+      integer, intent(in) :: maxlvl              !< Max level (from amr%maxlvl)
       character(len=*), intent(in) :: name
       integer, intent(in) :: ncomp
       ! Set metadata
       this%name = name
       this%ncomp = ncomp
       ! Allocate fr array (flux registers only exist for levels >= 1)
-      if (.not.allocated(this%fr)) allocate(this%fr(1:nlvl))
+      if (.not.allocated(this%fr)) allocate(this%fr(1:maxlvl))
    end subroutine initialize
 
 

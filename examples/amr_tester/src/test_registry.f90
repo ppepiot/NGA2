@@ -59,7 +59,7 @@ contains
       amr%yhi=1.0_WP
       amr%zlo=0.0_WP
       amr%zhi=1.0_WP
-      amr%nlvl=0
+      amr%maxlvl=0
       amr%nmax=32
 
       call amr%initialize("TestGrid")
@@ -69,7 +69,7 @@ contains
       velocity%name="velocity"
       velocity%ncomp=3
       velocity%ng=1
-      allocate(velocity%mf(0:amr%nlvl))
+      allocate(velocity%mf(0:amr%maxlvl))
       velocity_ptr=>velocity
       call log("Data 'velocity' configured (ncomp=3, ng=1).")
 

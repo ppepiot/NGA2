@@ -89,7 +89,7 @@ contains
       call this%SCold%initialize(amr, name='SCold', ncomp=this%nscalar, ng=0)
 
       ! Initialize flux register
-      call this%flux%initialize(amr%nlvl, name='SC_flux', ncomp=this%nscalar)
+      call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
 
       ! Register callbacks with amrgrid (pass self as context)
       ! Note: Need select type since c_loc requires non-polymorphic type

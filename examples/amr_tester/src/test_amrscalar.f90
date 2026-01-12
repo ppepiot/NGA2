@@ -127,7 +127,7 @@ contains
       amr%xper=.true.
       amr%yper=.true.
       amr%zper=.true.
-      amr%nlvl=2   ! 3 levels total (0,1,2)
+      amr%maxlvl=2   ! 3 levels total (0,1,2)
       amr%nmax=16
 
       call amr%initialize("sc_amr")

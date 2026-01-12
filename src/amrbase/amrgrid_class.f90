@@ -91,7 +91,7 @@ module amrgrid_class
       ! Level 0 mesh dimensions
       integer :: nx,ny,nz
       ! Number of refinement levels
-      integer :: nlvl
+      integer :: maxlvl
       ! Max grid size
       integer :: nmax=32
       ! Blocking factor
@@ -187,8 +187,8 @@ contains
          integer, dimension(3) :: per
          call amrex_parmparse_build(pp,'amr')
          call pp%addarr('n_cell'         ,[this%nx,this%ny,this%nz])
-         if (this%nlvl.lt.0) call die('[amrgrid initialize] nlvl must be >= 0')
-         call pp%add   ('max_level'      ,this%nlvl)
+         if (this%maxlvl.lt.0) call die('[amrgrid initialize] maxlvl must be >= 0')
+         call pp%add   ('max_level'      ,this%maxlvl)
          call pp%add   ('blocking_factor',this%nbloc)
          call pp%add   ('max_grid_size'  ,this%nmax)
          if (.not.allocated(this%rref)) this%rref=[2]
@@ -231,8 +231,8 @@ contains
          use amrex_amr_module, only: amrex_geometry_init_data
          use amrex_interface, only: amrcore_get_geometry
          integer :: n
-         allocate(this%geom(0:this%nlvl))
-         do n=0,this%nlvl
+         allocate(this%geom(0:this%maxlvl))
+         do n=0,this%maxlvl
             call amrcore_get_geometry(this%geom(n)%p,n,this%amrcore)
             call amrex_geometry_init_data(this%geom(n))
          end do
@@ -240,7 +240,7 @@ contains
       ! Store effective refinement ratio
       store_ref_ratio: block
          use amrex_interface, only: amrcore_get_ref_ratio
-         if (allocated(this%rref)) deallocate(this%rref); allocate(this%rref(0:this%nlvl-1))
+         if (allocated(this%rref)) deallocate(this%rref); allocate(this%rref(0:this%maxlvl-1))
          call amrcore_get_ref_ratio(this%rref,this%amrcore)
       end block store_ref_ratio
       ! Store parallel info
@@ -255,8 +255,8 @@ contains
       compute_shortcuts: block
          integer :: lvl
          ! Mesh size at each level
-         allocate(this%dx(0:this%nlvl),this%dy(0:this%nlvl),this%dz(0:this%nlvl))
-         do lvl=0,this%nlvl
+         allocate(this%dx(0:this%maxlvl),this%dy(0:this%maxlvl),this%dz(0:this%maxlvl))
+         do lvl=0,this%maxlvl
             this%dx(lvl)=this%geom(lvl)%dx(1)
             this%dy(lvl)=this%geom(lvl)%dx(2)
             this%dz(lvl)=this%geom(lvl)%dx(3)
@@ -264,7 +264,7 @@ contains
          ! Total domain volume
          this%vol=(this%xhi-this%xlo)*(this%yhi-this%ylo)*(this%zhi-this%zlo)
          ! Smallest mesh size
-         this%min_meshsize=min(this%dx(this%nlvl),this%dy(this%nlvl),this%dz(this%nlvl))
+         this%min_meshsize=min(this%dx(this%maxlvl),this%dy(this%maxlvl),this%dz(this%maxlvl))
       end block compute_shortcuts
    end subroutine initialize
 
@@ -485,7 +485,7 @@ contains
       if (this%amRoot) then
          write(output_unit,'("AMR Cartesian grid [",a,"]")') trim(this%name)
          write(output_unit,'(" > amr level = ",i2)') this%clvl()
-         write(output_unit,'(" > max level = ",i2)') this%nlvl
+         write(output_unit,'(" > max level = ",i2)') this%maxlvl
          if (allocated(this%rref)) write(output_unit,'(" > ref ratio = ",100(" ",i0))') this%rref
          write(output_unit,'(" >    extent = [",es12.5,",",es12.5,"]x[",es12.5,",",es12.5,"]x[",es12.5,",",es12.5,"]")') this%xlo,this%xhi,this%ylo,this%yhi,this%zlo,this%zhi
          write(output_unit,'(" >  periodic = ",l1,"x",l1,"x",l1)') this%xper,this%yper,this%zper
