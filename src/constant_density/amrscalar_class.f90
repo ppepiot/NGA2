@@ -45,6 +45,8 @@ module amrscalar_class
       procedure :: copy2old
       procedure :: reflux_avg_lvl
       procedure :: reflux_avg
+      ! Fill with solver context (for coupled BCs)
+      procedure :: fill
       ! Implement amrsolver abstract methods
       procedure :: fillbc => amrscalar_fillbc
       procedure :: on_regrid => amrscalar_on_regrid
@@ -386,6 +388,58 @@ contains
       real(WP), value :: time
       ! Default: nothing special needed - rebuild is done in callbacks
    end subroutine amrscalar_on_regrid
+
+
+   !> Fill ghost cells for an amrdata field using solver context
+   !> This allows the BC callback to access all solver fields (for coupled BCs)
+   subroutine fill(this, data, lvl, time)
+      use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
+      use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two
+      implicit none
+      class(amrscalar), target, intent(inout) :: this
+      class(amrdata), intent(inout) :: data
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      real(WP) :: t_old, t_new
+      type(c_ptr) :: solver_ctx
+      type(c_funptr) :: bc_dispatch_ptr
+      t_old = time - 1.0e200_WP
+      t_new = time
+      ! Get solver context (use select type for c_loc compatibility)
+      select type (this)
+       type is (amrscalar)
+         solver_ctx = c_loc(this)
+      end select
+      bc_dispatch_ptr = c_funloc(dispatch_amrscalar_fillbc)
+      ! Call appropriate FillPatch
+      if (lvl .eq. 0) then
+         call amrmfab_fillpatch_single(data%mf(0)%p, t_old, data%mf(0)%p, &
+         &   t_new, data%mf(0)%p, data%amr%geom(0)%p, solver_ctx, bc_dispatch_ptr, &
+         &   time, 1, 1, data%ncomp)
+      else
+         call amrmfab_fillpatch_two(data%mf(lvl)%p, t_old, data%mf(lvl-1)%p, &
+         &   t_new, data%mf(lvl-1)%p, data%amr%geom(lvl-1)%p, &
+         &   t_old, data%mf(lvl)%p, t_new, data%mf(lvl)%p, data%amr%geom(lvl)%p, &
+         &   solver_ctx, bc_dispatch_ptr, time, 1, 1, data%ncomp, &
+         &   data%amr%rref(lvl-1), data%interp, data%lo_bc, data%hi_bc, data%ncomp)
+      end if
+   end subroutine fill
+
+
+   !> BC dispatch for solver-level fill - recovers amrscalar and calls fillbc
+   subroutine dispatch_amrscalar_fillbc(solver_ctx, mf_ptr, geom_ptr, time, scomp, ncomp) bind(c)
+      use iso_c_binding, only: c_ptr, c_f_pointer, c_double, c_int
+      implicit none
+      type(c_ptr), value, intent(in) :: solver_ctx
+      type(c_ptr), value, intent(in) :: mf_ptr
+      type(c_ptr), value, intent(in) :: geom_ptr
+      real(c_double), value, intent(in) :: time
+      integer(c_int), value, intent(in) :: scomp
+      integer(c_int), value, intent(in) :: ncomp
+      type(amrscalar), pointer :: sc
+      call c_f_pointer(solver_ctx, sc)
+      call sc%fillbc(mf_ptr, geom_ptr, real(time, WP), int(scomp), int(ncomp))
+   end subroutine dispatch_amrscalar_fillbc
 
 
 end module amrscalar_class
