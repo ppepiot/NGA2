@@ -155,8 +155,7 @@ contains
       call c_f_pointer(ctx,this)
       ! Remake SC (handles fill from old data internally)
       call this%SC%on_remake(lvl, ba, dm, time)
-      ! SCold just needs to be rebuilt (no fill)
-      call this%SCold%clear_level(lvl)
+      ! SCold just needs new geometry (define clears if needed)
       call this%SCold%define(lvl, ba, dm)
       ! Rebuild flux register
       if (lvl.ge.1) then
