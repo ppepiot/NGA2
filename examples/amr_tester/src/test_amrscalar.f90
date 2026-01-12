@@ -228,9 +228,8 @@ contains
             end do
             call amr%mfiter_destroy(mfi)
 
-            ! Copy interior from SCold and fill ghost cells
-            call SCfill%copy(sc%SCold%mf(lvl),1,1,1,0)
-            call SCfill%fill_boundary(amr%geom(lvl))
+            ! Fill SCfill with ghost cells properly (uses FillPatch for C-F interface)
+            call amr%fill_mfab(SCfill,sc%SCold,lvl,time%t)
 
             ! Calculate dSC/dt
             call sc%get_dSCdt(lvl,dSCdt,SCfill,U,V,W)

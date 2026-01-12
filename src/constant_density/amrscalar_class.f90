@@ -179,26 +179,26 @@ contains
       type(amrex_multifab) :: SCnew
       call c_f_pointer(ctx,this)
 
-      ! Step 1: Build temp MultiFab with new geometry
+      ! Build temp MultiFab with new geometry
       call amrex_multifab_build(SCnew,ba,dm,this%nscalar,0)
 
-      ! Step 2: Fill temp from old data (old MultiFabs still valid)
+      ! Fill temp from old data
       call this%amr%fill_mfab(SCnew,this%SC,lvl,time)
 
-      ! Step 3: Destroy old data
+      ! Destroy old
       call amrex_multifab_destroy(this%SC%mf(lvl))
       call amrex_multifab_destroy(this%SCold%mf(lvl))
       if (lvl.ge.1) call this%flux%destroy_level(lvl)
 
-      ! Step 4: Build new data on new geometry
+      ! Build new
       call amrex_multifab_build(this%SC%mf(lvl),ba,dm,this%nscalar,this%SC%ng)
       call amrex_multifab_build(this%SCold%mf(lvl),ba,dm,this%nscalar,this%SCold%ng)
       if (lvl.ge.1) call this%flux%build_level(lvl,ba,dm,this%amr%rref(lvl-1))
 
-      ! Step 5: Copy from temp to new SC
+      ! Copy from temp
       call this%SC%mf(lvl)%copy(SCnew,1,1,this%nscalar,0)
 
-      ! Step 6: Destroy temp
+      ! Destroy temp
       call amrex_multifab_destroy(SCnew)
    end subroutine on_remake_level
 
