@@ -20,10 +20,7 @@ module mod_test_amrscalar
 
 contains
 
-   !> Geometric tagger - refine center of domain
-   !> NOTE: SC-based tagging requires that the tags BoxArray and SC MultiFab
-   !> BoxArray be identical. During regrid, they may differ, causing crashes.
-   !> Future improvement: implement coordinate-based lookup into SC data.
+   !> Scalar-based tagger - refine where SC > threshold
    subroutine box_tagger(lvl,tags_ptr,time)
       use iso_c_binding,    only: c_ptr,c_char
       use amrex_amr_module, only: amrex_tagboxarray,amrex_mfiter,amrex_box
@@ -35,27 +32,21 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
       character(kind=c_char), parameter :: SET=char(1)
-      real(WP) :: x,y,z,dx,dy,dz,radius
       integer :: i,j,k
       tags=tags_ptr
-      ! Time-varying radius to force grid changes
-      radius = 0.1_WP + 0.3_WP * time
-      dx=amr%geom(lvl)%dx(1)
-      dy=amr%geom(lvl)%dx(2)
-      dz=amr%geom(lvl)%dx(3)
+      ! Iterate over level boxes (SC and tags have same BoxArray)
       call amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
          bx=mfi%tilebox()
+         pSC=>sc%SC%mf(lvl)%dataptr(mfi)
          tagarr=>tags%dataPtr(mfi)
          do k=bx%lo(3),bx%hi(3)
-            z=amr%zlo+(real(k,WP)+0.5_WP)*dz
             do j=bx%lo(2),bx%hi(2)
-               y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                do i=bx%lo(1),bx%hi(1)
-                  x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                  ! Tag inside time-varying sphere
-                  if (sqrt((x-0.5_WP)**2+(y-0.5_WP)**2+(z-0.5_WP)**2).lt.radius) then
+                  ! Tag where SC exceeds threshold
+                  if (pSC(i,j,k,1).gt.SC_REFINE_THRESH) then
                      tagarr(i,j,k,1)=SET
                   end if
                end do
@@ -120,7 +111,7 @@ contains
       call ens%initialize(amr=amr,name="sc_advect")
       call ens%add_scalar(data=sc%SC,comp=1,name="SC")
 
-      ! Initialize scalar with Gaussian blob centered at (0.5, 0.5, 0.5)
+      ! Initialize scalar with Gaussian blob at (0.25, 0.5, 0.5) - offset to see rotation
       do lvl=0,amr%clvl()
          dx=amr%geom(lvl)%dx(1)
          dy=amr%geom(lvl)%dx(2)
@@ -135,8 +126,8 @@ contains
                   y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                   do i=bx%lo(1),bx%hi(1)
                      x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                     ! Gaussian blob
-                     pSC(i,j,k,1)=exp(-50.0_WP*((x-0.5_WP)**2+(y-0.5_WP)**2+(z-0.5_WP)**2))
+                     ! Smaller, sharper Gaussian offset from center
+                     pSC(i,j,k,1)=exp(-200.0_WP*((x-0.25_WP)**2+(y-0.5_WP)**2+(z-0.5_WP)**2))
                   end do
                end do
             end do
