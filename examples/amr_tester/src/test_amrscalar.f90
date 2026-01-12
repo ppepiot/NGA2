@@ -4,6 +4,7 @@ module mod_test_amrscalar
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
    use amrensight_class,  only: amrensight
+   use monitor_class,     only: monitor
    use timetracker_class, only: timetracker
    use event_class,       only: event
    use messager,          only: log,warn
@@ -63,6 +64,7 @@ contains
       use mathtools,        only: Pi
       implicit none
       type(amrensight) :: ens
+      type(monitor) :: mfile
       type(timetracker) :: time
       type(event) :: regrid_evt,ensight_evt
       type(amrex_mfiter) :: mfi
@@ -92,7 +94,7 @@ contains
       amr%xper=.true.
       amr%yper=.true.
       amr%zper=.true.
-      amr%nlvl=1   ! 2 levels total (0,1)
+      amr%nlvl=2   ! 3 levels total (0,1,2)
       amr%nmax=16
 
       call amr%initialize("sc_amr")
@@ -154,7 +156,7 @@ contains
 
       ! Setup timetracker
       time=timetracker(amRoot=amr%amRoot)
-      time%dt=0.005_WP
+      time%dt=0.0025_WP
       time%dtmax=time%dt
       time%tmax=2.0_WP*PI  ! Full circle rotation
       time%t=0.0_WP
@@ -167,6 +169,16 @@ contains
       ! Setup ensight event (every 20 steps)
       ensight_evt=event(time=time,name='Ensight')
       ensight_evt%nper=20
+
+      ! Setup monitor file
+      call sc%get_info()
+      mfile=monitor(amr%amRoot,'scalar')
+      call mfile%add_column(time%n,'Timestep')
+      call mfile%add_column(time%t,'Time')
+      call mfile%add_column(sc%SCmin(1),'SC_min')
+      call mfile%add_column(sc%SCmax(1),'SC_max')
+      call mfile%add_column(sc%SCint(1),'SC_int')
+      call mfile%write()
 
       call log("Advancing to t="//trim(rtoa(time%tmax))//", dt="//trim(rtoa(time%dt)))
 
@@ -258,9 +270,12 @@ contains
          ! Write ensight output
          if (ensight_evt%occurs().or.time%done()) then
             call ens%write_data(time=time%t)
-            call sc%get_info()
             call log("Step "//trim(itoa(time%n))//": t="//trim(rtoa(time%t))//", SCint="//trim(rtoa(sc%SCint(1))))
          end if
+
+         ! Update monitor file every step
+         call sc%get_info()
+         call mfile%write()
       end do
 
       ! Final conservation check
