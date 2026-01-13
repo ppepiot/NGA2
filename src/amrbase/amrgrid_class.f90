@@ -140,8 +140,8 @@ module amrgrid_class
       procedure :: add_on_clear              !< Add clear level callback
       procedure :: clear_level_callbacks     !< Clear all level callbacks
 
-      procedure, private :: get_boxarray     !< Obtain box array at a given level
-      procedure, private :: get_distromap    !< Obtain distromap at a given level
+      procedure :: get_boxarray              !< Obtain box array at a given level
+      procedure :: get_distromap             !< Obtain distromap at a given level
 
       procedure :: mfiter_build              !< Build mfiter at a given level
       procedure :: mfiter_destroy            !< Destroy mfiter
