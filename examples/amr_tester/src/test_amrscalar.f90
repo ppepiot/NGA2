@@ -1,11 +1,12 @@
 !> Test amrscalar solver with time integration and Ensight output
 module mod_test_amrscalar
    use precision,         only: WP
-   use string,            only: itoa,rtoa
+   use string,            only: itoa,rtoa,str_medium
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
    use amrensight_class,  only: amrensight
    use amrviz_class,      only: amrviz
+   use amrio_class,       only: amrio
    use monitor_class,     only: monitor
    use timetracker_class, only: timetracker
    use event_class,       only: event
@@ -100,6 +101,7 @@ contains
       implicit none
       type(amrensight) :: ens
       type(amrviz) :: viz
+      type(amrio) :: io
       type(monitor) :: mfile
       type(timetracker) :: time
       type(event) :: regrid_evt,ensight_evt,hdf5_evt
@@ -320,9 +322,56 @@ contains
          call warn("FAIL: Conservation error too large!")
       end if
 
+      ! Test checkpoint round-trip
+      call io%initialize(amr, nfiles=1)
+      call sc%register_checkpoint(io)  ! Solver registers its fields
+      call io%add_scalar('dt', time%dt)  ! Store dt as metadata
+      call io%write('checkpoint_test', time%t, time%n)
+      call log("PASS: Checkpoint written to checkpoint_test/")
+
+      ! Save current integral, then zero the data
+      call sc%get_info()
+      int0 = sc%SCint(1)
+      call log("  Before zero: SCint="//trim(rtoa(int0)))
+
+      ! Zero out SC data to test read_data
+      do lvl = 0, amr%clvl()
+         call amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            pSC => sc%SC%mf(lvl)%dataptr(mfi)
+            pSC = 0.0_WP
+         end do
+         call amr%mfiter_destroy(mfi)
+      end do
+      call sc%get_info()
+      call log("  After zero: SCint="//trim(rtoa(sc%SCint(1))))
+
+      ! Read checkpoint back
+      block
+         real(WP) :: read_time, read_dt
+         integer :: read_step
+         call io%read_header('checkpoint_test', read_time, read_step)
+         call io%get_scalar('dt', read_dt)
+         call sc%restore_checkpoint(io, 'checkpoint_test')  ! Solver restores its fields
+         call log("  Read checkpoint: time="//trim(rtoa(read_time))//" step="//trim(itoa(read_step))//" dt="//trim(rtoa(read_dt)))
+      end block
+
+      ! Verify data restored
+      call sc%get_info()
+      intF = sc%SCint(1)
+      call log("  After read: SCint="//trim(rtoa(intF)))
+
+      if (abs(intF-int0)/int0 .lt. 1.0e-10_WP) then
+         call log("PASS: Checkpoint round-trip verified!")
+      else
+         call warn("FAIL: Checkpoint round-trip failed! Integral mismatch.")
+      end if
+
       call log("PASS: HDF5 plotfiles written to amrviz/sc_advect/")
 
       ! Cleanup
+      call io%finalize()
+      call viz%finalize()
       call mfile%finalize()
       call sc%finalize()
       call amr%finalize()

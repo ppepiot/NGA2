@@ -60,6 +60,8 @@ module amrex_interface
    public :: amrmfab_vismf_read
    public :: amrcheckpoint_prebuild_dirs
    public :: amrcheckpoint_mfab_prefix
+   public :: amrvismf_set_noutfiles
+   public :: amrvismf_get_noutfiles
 
    interface
 
@@ -297,6 +299,17 @@ module amrex_interface
          integer(c_int), value :: result_len, lev
          character(kind=1), intent(in) :: dirname(*), level_prefix(*), mfab_name(*)
       end subroutine amrcheckpoint_mfab_prefix
+
+      !> Set number of output files for VisMF (controls I/O aggregation)
+      subroutine amrvismf_set_noutfiles(nfiles) bind(c)
+         import :: c_int
+         integer(c_int), value :: nfiles
+      end subroutine amrvismf_set_noutfiles
+
+      !> Get current number of output files setting
+      integer(c_int) function amrvismf_get_noutfiles() bind(c)
+         import :: c_int
+      end function amrvismf_get_noutfiles
 
    end interface
 

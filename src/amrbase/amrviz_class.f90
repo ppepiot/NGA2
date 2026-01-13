@@ -46,6 +46,7 @@ module amrviz_class
       procedure :: add_scalar                    !< Register a scalar field
       procedure :: add_vector                    !< Register a vector field
       procedure :: write                         !< Write all registered fields to single HDF5
+      procedure :: finalize                      !< Clean up registered field lists
    end type amrviz
 
 contains
@@ -375,5 +376,37 @@ contains
       deallocate(varnames, varname_ptrs)
 
    end subroutine write
+
+
+   !> Finalize: clean up registered field lists
+   subroutine finalize(this)
+      implicit none
+      class(amrviz), intent(inout) :: this
+      type(scl), pointer :: cur_scl, next_scl
+      type(vct), pointer :: cur_vct, next_vct
+
+      ! Clean up scalar list
+      cur_scl => this%first_scl
+      do while (associated(cur_scl))
+         next_scl => cur_scl%next
+         deallocate(cur_scl)
+         cur_scl => next_scl
+      end do
+      nullify(this%first_scl)
+
+      ! Clean up vector list
+      cur_vct => this%first_vct
+      do while (associated(cur_vct))
+         next_vct => cur_vct%next
+         deallocate(cur_vct)
+         cur_vct => next_vct
+      end do
+      nullify(this%first_vct)
+
+      ! Reset state
+      nullify(this%amr)
+      this%ntime = 0
+      if (allocated(this%time)) deallocate(this%time)
+   end subroutine finalize
 
 end module amrviz_class

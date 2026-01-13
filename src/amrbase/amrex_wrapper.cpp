@@ -488,6 +488,13 @@ void amrcheckpoint_mfab_prefix(char *result, int result_len, int lev,
   result[len] = '\0';
 }
 
+// Set number of output files for VisMF (controls I/O aggregation)
+// nfiles=1 gives single file output; nfiles=nranks gives file-per-rank
+void amrvismf_set_noutfiles(int nfiles) { amrex::VisMF::SetNOutFiles(nfiles); }
+
+// Get current number of output files setting
+int amrvismf_get_noutfiles() { return amrex::VisMF::GetNOutFiles(); }
+
 //=============================================================================
 // HDF5 Plotfile Utilities
 //=============================================================================

@@ -50,6 +50,8 @@ module amrscalar_class
       ! Implement amrsolver abstract methods
       procedure :: fillbc => amrscalar_fillbc
       procedure :: on_regrid => amrscalar_on_regrid
+      procedure :: register_checkpoint => amrscalar_register_checkpoint
+      procedure :: restore_checkpoint => amrscalar_restore_checkpoint
    end type amrscalar
 
 contains
@@ -453,6 +455,31 @@ contains
       call c_f_pointer(solver_ctx, sc)
       call sc%fillbc(mf_ptr, geom_ptr, real(time, WP), int(scomp), int(ncomp))
    end subroutine dispatch_amrscalar_fillbc
+
+
+   !> Register fields for checkpoint with amrio
+   subroutine amrscalar_register_checkpoint(this, io)
+      use amrio_class, only: amrio
+      implicit none
+      class(amrscalar), intent(inout) :: this
+      class(amrio), intent(inout) :: io
+      ! Register SC and SCold containers (each contains all nscalar components)
+      call io%add_data(this%SC, 'SC')
+      call io%add_data(this%SCold, 'SCold')
+   end subroutine amrscalar_register_checkpoint
+
+
+   !> Restore fields from checkpoint
+   subroutine amrscalar_restore_checkpoint(this, io, dirname)
+      use amrio_class, only: amrio
+      implicit none
+      class(amrscalar), intent(inout) :: this
+      class(amrio), intent(inout) :: io
+      character(len=*), intent(in) :: dirname
+      ! Restore SC and SCold containers
+      call io%read_data(dirname, this%SC, 'SC')
+      call io%read_data(dirname, this%SCold, 'SCold')
+   end subroutine amrscalar_restore_checkpoint
 
 
 end module amrscalar_class
