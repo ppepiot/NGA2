@@ -212,7 +212,7 @@ contains
       call log("Ensight output initialized")
 
       ! Write output
-      call ens%write_data(time=0.0_WP)
+      call ens%write(time=0.0_WP)
       call log("Ensight data written to ensight/viz_test/")
 
       ! Cleanup

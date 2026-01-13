@@ -5,6 +5,7 @@ module mod_test_amrscalar
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
    use amrensight_class,  only: amrensight
+   use amrviz_class,      only: amrviz
    use monitor_class,     only: monitor
    use timetracker_class, only: timetracker
    use event_class,       only: event
@@ -98,9 +99,10 @@ contains
       use mathtools,        only: Pi
       implicit none
       type(amrensight) :: ens
+      type(amrviz) :: viz
       type(monitor) :: mfile
       type(timetracker) :: time
-      type(event) :: regrid_evt,ensight_evt
+      type(event) :: regrid_evt,ensight_evt,hdf5_evt
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       type(amrex_multifab) :: U,V,W,dSCdt,SCfill
@@ -152,6 +154,11 @@ contains
       call ens%initialize(amr=amr,name="sc_advect")
       call ens%add_scalar(data=sc%SC,comp=1,name="SC")
 
+      ! Initialize HDF5 viz output (all fields in single file per timestep)
+      call viz%initialize(amr=amr,name='sc_advect')
+      call viz%add_scalar(sc%SC, 1, 'SC')
+      call viz%add_scalar(sc%SCold, 1, 'SCold')
+
       ! Build all levels using init_from_scratch
       ! (callback init_gaussian_blob is called for each level, then postregrid fires average_down)
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
@@ -163,8 +170,7 @@ contains
       int0=sc%SCint(1)
       call log("Initial: SCint="//trim(rtoa(int0)))
 
-      ! Write initial output
-      call ens%write_data(time=0.0_WP)
+
 
       ! Setup timetracker
       time=timetracker(amRoot=amr%amRoot)
@@ -180,7 +186,11 @@ contains
 
       ! Setup ensight event (every 20 steps)
       ensight_evt=event(time=time,name='Ensight')
-      ensight_evt%nper=20
+      ensight_evt%tper=0.125_WP
+
+      ! Setup HDF5 event (every 0.125 time units)
+      hdf5_evt=event(time=time,name='HDF5')
+      hdf5_evt%tper=0.125_WP
 
       ! Setup monitor file
       call sc%get_info()
@@ -191,6 +201,10 @@ contains
       call mfile%add_column(sc%SCmax(1),'SC_max')
       call mfile%add_column(sc%SCint(1),'SC_int')
       call mfile%write()
+
+      ! Write initial output at start time
+      call ens%write(time=time%t)
+      call viz%write(time=time%t)
 
       call log("Advancing to t="//trim(rtoa(time%tmax))//", dt="//trim(rtoa(time%dt)))
 
@@ -279,9 +293,14 @@ contains
          end if
 
          ! Write ensight output
-         if (ensight_evt%occurs().or.time%done()) then
-            call ens%write_data(time=time%t)
+         if (ensight_evt%occurs()) then
+            call ens%write(time=time%t)
             call log("Step "//trim(itoa(time%n))//": t="//trim(rtoa(time%t))//", SCint="//trim(rtoa(sc%SCint(1))))
+         end if
+
+         ! Write HDF5 output
+         if (hdf5_evt%occurs()) then
+            call viz%write(time=time%t)
          end if
 
          ! Update monitor file every step
@@ -300,6 +319,8 @@ contains
       else
          call warn("FAIL: Conservation error too large!")
       end if
+
+      call log("PASS: HDF5 plotfiles written to amrviz/sc_advect/")
 
       ! Cleanup
       call mfile%finalize()

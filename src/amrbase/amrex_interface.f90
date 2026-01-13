@@ -46,6 +46,21 @@ module amrex_interface
    public :: amrmfab_fillpatch_two
    public :: amrmfab_fillcoarsepatch
 
+   !=====================================================================
+   ! Plotfile Output
+   !=====================================================================
+   public :: amrplotfile_write_native
+   public :: amrplotfile_write_hdf5
+   public :: amrplotfile_read_time
+
+   !=====================================================================
+   ! Checkpoint I/O (VisMF)
+   !=====================================================================
+   public :: amrmfab_vismf_write
+   public :: amrmfab_vismf_read
+   public :: amrcheckpoint_prebuild_dirs
+   public :: amrcheckpoint_mfab_prefix
+
    interface
 
       !------------------------------------------------------------------
@@ -212,6 +227,76 @@ module amrex_interface
          integer(c_int), value :: scomp,dcomp,ncomp,ref_ratio,interp_type,nbc
          integer(c_int), intent(in) :: lo_bc(*),hi_bc(*)
       end subroutine amrmfab_fillcoarsepatch
+
+      !====================================================================
+      ! Plotfile Output
+      !====================================================================
+
+      !> Write multi-level plotfile in native AMReX format
+      subroutine amrplotfile_write_native(name, nlevels, mf_ptrs, varnames, ncomp, &
+      &   geom_ptrs, time, level_steps, ref_ratios) bind(c)
+         import :: c_ptr,c_double,c_int
+         character(kind=1), intent(in) :: name(*)
+         integer(c_int), value :: nlevels, ncomp
+         type(c_ptr), intent(in) :: mf_ptrs(*), geom_ptrs(*)
+         type(c_ptr), intent(in) :: varnames(*)
+         real(c_double), value :: time
+         integer(c_int), intent(in) :: level_steps(*), ref_ratios(*)
+      end subroutine amrplotfile_write_native
+
+      !> Write multi-level plotfile in HDF5 format (if available)
+      subroutine amrplotfile_write_hdf5(name, nlevels, mf_ptrs, varnames, ncomp, &
+      &   geom_ptrs, time, level_steps, ref_ratios, compression) bind(c)
+         import :: c_ptr,c_double,c_int
+         character(kind=1), intent(in) :: name(*)
+         integer(c_int), value :: nlevels, ncomp
+         type(c_ptr), intent(in) :: mf_ptrs(*), geom_ptrs(*)
+         type(c_ptr), intent(in) :: varnames(*)
+         real(c_double), value :: time
+         integer(c_int), intent(in) :: level_steps(*), ref_ratios(*)
+         character(kind=1), intent(in) :: compression(*)
+      end subroutine amrplotfile_write_hdf5
+
+      !> Read time attribute from HDF5 plotfile (returns -1 if file not found)
+      function amrplotfile_read_time(filename) result(time) bind(c)
+         import :: c_double
+         character(kind=1), intent(in) :: filename(*)
+         real(c_double) :: time
+      end function amrplotfile_read_time
+
+      !====================================================================
+      ! Checkpoint I/O (VisMF)
+      !====================================================================
+
+      !> Write MultiFab to disk using VisMF
+      subroutine amrmfab_vismf_write(mf, path) bind(c)
+         import :: c_ptr
+         type(c_ptr), value :: mf
+         character(kind=1), intent(in) :: path(*)
+      end subroutine amrmfab_vismf_write
+
+      !> Read MultiFab from disk using VisMF
+      subroutine amrmfab_vismf_read(mf, path) bind(c)
+         import :: c_ptr
+         type(c_ptr), value :: mf
+         character(kind=1), intent(in) :: path(*)
+      end subroutine amrmfab_vismf_read
+
+      !> Create directory hierarchy for checkpoints
+      subroutine amrcheckpoint_prebuild_dirs(dirname, subdir_prefix, nlevels) bind(c)
+         import :: c_int
+         character(kind=1), intent(in) :: dirname(*), subdir_prefix(*)
+         integer(c_int), value :: nlevels
+      end subroutine amrcheckpoint_prebuild_dirs
+
+      !> Get MultiFab file prefix for a level
+      subroutine amrcheckpoint_mfab_prefix(result, result_len, lev, dirname, &
+      &   level_prefix, mfab_name) bind(c)
+         import :: c_int
+         character(kind=1), intent(out) :: result(*)
+         integer(c_int), value :: result_len, lev
+         character(kind=1), intent(in) :: dirname(*), level_prefix(*), mfab_name(*)
+      end subroutine amrcheckpoint_mfab_prefix
 
    end interface
 

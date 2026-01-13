@@ -9,6 +9,10 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_PhysBCFunct.H>
+#include <AMReX_PlotFileUtil.H>
+#ifdef AMREX_USE_HDF5
+#include <AMReX_PlotFileUtilHDF5.H>
+#endif
 
 namespace nga2 {
 
@@ -380,5 +384,146 @@ void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
                                *geom_c, *geom_f, bc_functor_c, 0, bc_functor_f,
                                0, ratio, interp, bcs, 0);
 }
+
+//-----------------------------------------------------------------------------
+// Plotfile Output (Native and HDF5)
+//-----------------------------------------------------------------------------
+
+void amrplotfile_write_native(const char *name, int nlevels, void **mf_ptrs,
+                              const char **varnames, int ncomp,
+                              void **geom_ptrs, double time, int *level_steps,
+                              int *ref_ratios) {
+  // Convert void* arrays to AMReX types
+  amrex::Vector<const amrex::MultiFab *> mf_vec(nlevels);
+  amrex::Vector<amrex::Geometry> geom_vec(nlevels);
+  amrex::Vector<int> steps_vec(nlevels);
+  amrex::Vector<amrex::IntVect> rr_vec(nlevels - 1);
+  amrex::Vector<std::string> varname_vec(ncomp);
+
+  for (int lev = 0; lev < nlevels; ++lev) {
+    mf_vec[lev] = static_cast<amrex::MultiFab *>(mf_ptrs[lev]);
+    geom_vec[lev] = *static_cast<amrex::Geometry *>(geom_ptrs[lev]);
+    steps_vec[lev] = level_steps[lev];
+  }
+  for (int lev = 0; lev < nlevels - 1; ++lev) {
+    rr_vec[lev] = amrex::IntVect(
+        AMREX_D_DECL(ref_ratios[lev], ref_ratios[lev], ref_ratios[lev]));
+  }
+  for (int i = 0; i < ncomp; ++i) {
+    varname_vec[i] = std::string(varnames[i]);
+  }
+
+  amrex::WriteMultiLevelPlotfile(std::string(name), nlevels, mf_vec,
+                                 varname_vec, geom_vec, time, steps_vec,
+                                 rr_vec);
+}
+
+#ifdef AMREX_USE_HDF5
+void amrplotfile_write_hdf5(const char *name, int nlevels, void **mf_ptrs,
+                            const char **varnames, int ncomp, void **geom_ptrs,
+                            double time, int *level_steps, int *ref_ratios,
+                            const char *compression) {
+  // Convert void* arrays to AMReX types
+  amrex::Vector<const amrex::MultiFab *> mf_vec(nlevels);
+  amrex::Vector<amrex::Geometry> geom_vec(nlevels);
+  amrex::Vector<int> steps_vec(nlevels);
+  amrex::Vector<amrex::IntVect> rr_vec(nlevels - 1);
+  amrex::Vector<std::string> varname_vec(ncomp);
+
+  for (int lev = 0; lev < nlevels; ++lev) {
+    mf_vec[lev] = static_cast<amrex::MultiFab *>(mf_ptrs[lev]);
+    geom_vec[lev] = *static_cast<amrex::Geometry *>(geom_ptrs[lev]);
+    steps_vec[lev] = level_steps[lev];
+  }
+  for (int lev = 0; lev < nlevels - 1; ++lev) {
+    rr_vec[lev] = amrex::IntVect(
+        AMREX_D_DECL(ref_ratios[lev], ref_ratios[lev], ref_ratios[lev]));
+  }
+  for (int i = 0; i < ncomp; ++i) {
+    varname_vec[i] = std::string(varnames[i]);
+  }
+
+  std::string comp_str = compression ? std::string(compression) : "";
+  amrex::WriteMultiLevelPlotfileHDF5(std::string(name), nlevels, mf_vec,
+                                     varname_vec, geom_vec, time, steps_vec,
+                                     rr_vec, comp_str);
+}
+#endif
+
+//-----------------------------------------------------------------------------
+// Checkpoint I/O (VisMF)
+//-----------------------------------------------------------------------------
+#include <AMReX_Utility.H>
+#include <AMReX_VisMF.H>
+
+// Write a MultiFab to disk using VisMF
+void amrmfab_vismf_write(void *mf, const char *path) {
+  amrex::VisMF::Write(*static_cast<amrex::MultiFab *>(mf), std::string(path));
+}
+
+// Read a MultiFab from disk using VisMF
+// NOTE: The MultiFab must already be defined with correct BoxArray/DistroMap
+void amrmfab_vismf_read(void *mf, const char *path) {
+  amrex::VisMF::Read(*static_cast<amrex::MultiFab *>(mf), std::string(path));
+}
+
+// Create directory hierarchy for checkpoints
+void amrcheckpoint_prebuild_dirs(const char *dirname, const char *subdir_prefix,
+                                 int nlevels) {
+  amrex::PreBuildDirectorHierarchy(std::string(dirname),
+                                   std::string(subdir_prefix), nlevels, true);
+}
+
+// Get MultiFab file prefix for a level (e.g., "chk00100/Level_0/phi")
+// Returns the full path that can be used with VisMF::Write/Read
+void amrcheckpoint_mfab_prefix(char *result, int result_len, int lev,
+                               const char *dirname, const char *level_prefix,
+                               const char *mfab_name) {
+  std::string prefix = amrex::MultiFabFileFullPrefix(lev, std::string(dirname),
+                                                     std::string(level_prefix),
+                                                     std::string(mfab_name));
+  // Copy to result buffer
+  size_t len = std::min(prefix.size(), static_cast<size_t>(result_len - 1));
+  std::copy(prefix.begin(), prefix.begin() + len, result);
+  result[len] = '\0';
+}
+
+//=============================================================================
+// HDF5 Plotfile Utilities
+//=============================================================================
+#ifdef AMREX_USE_HDF5
+#include <hdf5.h>
+
+// Read the time attribute from an AMReX HDF5 plotfile
+// Returns the time value, or -1.0 if file doesn't exist or can't be read
+double amrplotfile_read_time(const char *filename) {
+  double time = -1.0;
+
+  // Check if file exists
+  hid_t file_id = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+  if (file_id < 0) {
+    return -1.0; // File doesn't exist or can't be opened
+  }
+
+  // Read the "time" attribute from root group
+  if (H5Aexists(file_id, "time") > 0) {
+    hid_t attr_id = H5Aopen(file_id, "time", H5P_DEFAULT);
+    if (attr_id >= 0) {
+      // Read as double (time is stored as array of size 1)
+      double time_arr[1];
+      H5Aread(attr_id, H5T_NATIVE_DOUBLE, time_arr);
+      time = time_arr[0];
+      H5Aclose(attr_id);
+    }
+  }
+
+  H5Fclose(file_id);
+  return time;
+}
+
+#else
+// Stub when HDF5 not available
+double amrplotfile_read_time(const char *filename) { return -1.0; }
+#endif
 
 } // extern "C"

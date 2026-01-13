@@ -59,7 +59,7 @@ module amrensight_class
    contains
       procedure :: initialize                                         !< Initialization of object
       procedure :: write_geom                                         !< Write out geometry
-      procedure :: write_data                                         !< Write out data
+      procedure :: write                                              !< Write out data
       procedure :: write_case                                         !< Write out case file
       procedure :: write_scalar                                       !< Write out scalar file
       procedure :: write_vector                                       !< Write out vector file
@@ -320,7 +320,7 @@ contains
 
 
    !> Output all data in the object
-   subroutine write_data(this,time)
+   subroutine write(this,time)
       implicit none
       class(amrensight), intent(inout) :: this
       real(WP), intent(in) :: time
@@ -407,7 +407,7 @@ contains
       !   my_prt=>my_prt%next
       !end do
 
-   end subroutine write_data
+   end subroutine write
 
 
    !> Case description serial output to a text file
