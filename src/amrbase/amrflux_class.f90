@@ -68,7 +68,7 @@ contains
       type(amrex_distromap), intent(in) :: dm
       integer, intent(in) :: ref_ratio
       ! Destroy if already built
-      call this%clear_level(lvl)
+      call amrex_fluxregister_destroy(this%fr(lvl))
       ! Build new register
       call amrex_fluxregister_build(this%fr(lvl),ba,dm,ref_ratio,lvl,this%ncomp)
    end subroutine reset_level

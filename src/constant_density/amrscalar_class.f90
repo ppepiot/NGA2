@@ -21,9 +21,9 @@ module amrscalar_class
    !> Constant density scalar solver object definition
    type, extends(amrsolver) :: amrscalar
 
-      ! User-overridable callbacks (set before or after initialize)
-      procedure(scalar_init_iface), pointer, nopass :: on_init => null()
-      procedure(scalar_tagging_iface), pointer, nopass :: tagging => null()
+      ! User-configurable callbacks
+      procedure(scalar_init_iface), pointer, nopass :: user_init => null()
+      procedure(scalar_tagging_iface), pointer, nopass :: user_tagging => null()
 
       ! Scalar variable definition
       integer :: nscalar
@@ -51,6 +51,7 @@ module amrscalar_class
       procedure :: restore_checkpoint
 
       ! Override internal type-bound callbacks from amrsolver
+      procedure :: on_init
       procedure :: on_coarse
       procedure :: on_remake
       procedure :: on_clear
@@ -94,8 +95,6 @@ contains
 
    !> Dispatch on_init: calls user's procedure pointer with typed solver
    subroutine amrscalar_on_init(ctx, lvl, time, ba, dm)
-      use messager, only: log
-      use string, only: itoa
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -103,7 +102,9 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%on_init(this, lvl, time, ba, dm)
+      call this%on_init(lvl, time, ba, dm)
+      ! User-provided initialization
+      if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine amrscalar_on_init
 
    !> Dispatch on_coarse: calls type-bound method
@@ -147,7 +148,8 @@ contains
       real(WP), intent(in) :: time
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%tagging(this, lvl, tags, time)
+      ! User-provided tagging
+      if (associated(this%user_tagging)) call this%user_tagging(this, lvl, tags, time)
    end subroutine amrscalar_tagging
 
    !> Dispatch post_regrid: calls type-bound method
@@ -159,36 +161,6 @@ contains
       call c_f_pointer(ctx, this)
       call this%post_regrid(lbase, time)
    end subroutine amrscalar_postregrid
-
-   ! ============================================================================
-   ! DEFAULT CALLBACKS
-   ! ============================================================================
-
-   !> Default on_init callback: reset levels and set to zero
-   subroutine default_on_init(solver, lvl, time, ba, dm)
-      class(amrscalar), intent(inout) :: solver
-      integer, intent(in) :: lvl
-      real(WP), intent(in) :: time
-      type(amrex_boxarray), intent(in) :: ba
-      type(amrex_distromap), intent(in) :: dm
-      ! Reset level layouts
-      call solver%SC%reset_level(lvl, ba, dm)
-      call solver%SCold%reset_level(lvl, ba, dm)
-      ! Set to zero
-      call solver%SC%mf(lvl)%setval(0.0_WP)
-      call solver%SCold%mf(lvl)%setval(0.0_WP)
-      ! Reset flux register for fine levels
-      if (lvl .ge. 1) call solver%flux%reset_level(lvl, ba, dm, solver%amr%rref(lvl-1))
-   end subroutine default_on_init
-
-   !> Default tagging callback: no refinement
-   subroutine default_tagging(solver, lvl, tags, time)
-      class(amrscalar), intent(inout) :: solver
-      integer, intent(in) :: lvl
-      type(c_ptr), intent(in) :: tags
-      real(WP), intent(in) :: time
-      ! Do nothing - no cells tagged for refinement
-   end subroutine default_tagging
 
    ! ============================================================================
    ! LIFECYCLE METHODS
@@ -232,19 +204,15 @@ contains
       ! Initialize flux register
       call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
 
-      ! Set default callbacks if user hasn't provided
-      if (.not.associated(this%on_init)) this%on_init => default_on_init
-      if (.not.associated(this%tagging)) this%tagging => default_tagging
-
       ! Register all 6 callbacks with amrgrid using concrete dispatchers
       ! Use select type to get non-polymorphic target for c_loc
       select type (this)
        type is (amrscalar)
-         call this%amr%add_on_init(amrscalar_on_init, c_loc(this))
-         call this%amr%add_on_coarse(amrscalar_on_coarse, c_loc(this))
-         call this%amr%add_on_remake(amrscalar_on_remake, c_loc(this))
-         call this%amr%add_on_clear(amrscalar_on_clear, c_loc(this))
-         call this%amr%add_tagging(amrscalar_tagging, c_loc(this))
+         call this%amr%add_on_init   (amrscalar_on_init,    c_loc(this))
+         call this%amr%add_on_coarse (amrscalar_on_coarse,  c_loc(this))
+         call this%amr%add_on_remake (amrscalar_on_remake,  c_loc(this))
+         call this%amr%add_on_clear  (amrscalar_on_clear,   c_loc(this))
+         call this%amr%add_tagging   (amrscalar_tagging,    c_loc(this))
          call this%amr%add_postregrid(amrscalar_postregrid, c_loc(this))
       end select
 
@@ -254,6 +222,23 @@ contains
    ! ============================================================================
    ! INTERNAL CALLBACK OVERRIDES
    ! ============================================================================
+
+   !> Override on_init: reset levels and set to zero
+   subroutine on_init(this, lvl, time, ba, dm)
+      class(amrscalar), intent(inout) :: this
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      ! Reset level layouts
+      call this%SC%reset_level(lvl, ba, dm)
+      call this%SCold%reset_level(lvl, ba, dm)
+      ! Set to zero
+      call this%SC%mf(lvl)%setval(0.0_WP)
+      call this%SCold%mf(lvl)%setval(0.0_WP)
+      ! Reset flux register for fine levels
+      if (lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+   end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
    subroutine on_coarse(this, lvl, time, ba, dm)
@@ -302,8 +287,11 @@ contains
       class(amrscalar), intent(inout) :: this
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
-      !!!! NEEDS TO BE CHANGED TO ACCOUNT FOR LBASE
-      call this%SC%average_down()
+      integer :: lvl
+      ! Average down from finest level to lbase
+      do lvl = this%amr%clvl()-1, lbase, -1
+         call this%SC%average_downto(lvl)
+      end do
    end subroutine post_regrid
 
 
@@ -321,8 +309,8 @@ contains
       if (allocated(this%SCname)) deallocate(this%SCname)
       ! Reset pointers
       nullify(this%amr)
-      nullify(this%on_init)
-      nullify(this%tagging)
+      nullify(this%user_init)
+      nullify(this%user_tagging)
    end subroutine finalize
 
 
@@ -424,8 +412,8 @@ contains
       call this%amr%mfiter_destroy(mfi)
 
       ! Handle refluxing
-      if (lvl .gt. 0) call this%flux%fr(lvl)%fineadd(flx, -1.0_WP)
-      if (lvl .lt. this%amr%clvl()) call this%flux%fr(lvl+1)%crseinit(flx, +1.0_WP)
+      if (lvl .gt. 0) call this%flux%fineadd(lvl, flx, -1.0_WP)
+      if (lvl .lt. this%amr%clvl()) call this%flux%crseinit(lvl+1, flx, +1.0_WP)
 
       ! Cleanup
       call this%amr%mfab_destroy(flx(1))

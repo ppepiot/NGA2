@@ -135,7 +135,7 @@ module amrgrid_class
       type(tagger_wrapper), dimension(:), allocatable :: taggers
       type(postregrid_wrapper), dimension(:), allocatable :: postregrid_funcs
       ! Default tiling for mfiter_build
-      logical :: default_tiling = .true.
+      logical :: default_tiling = .false. ! Not yet functional
    contains
       procedure :: initialize                !< Initialization of amrgrid object
       procedure :: finalize                  !< Finalization of amrgrid object

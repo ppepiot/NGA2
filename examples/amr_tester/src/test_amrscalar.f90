@@ -17,7 +17,7 @@ module mod_test_amrscalar
 contains
 
    !> Custom on_init callback: initialize scalar field with Gaussian blob
-   subroutine gaussian_on_init(solver, lvl, time, ba, dm)
+   subroutine gaussian_init(solver, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_mfiter_build, amrex_mfiter_destroy
       class(amrscalar), intent(inout) :: solver
       integer, intent(in) :: lvl
@@ -29,11 +29,6 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
       real(WP) :: x, y, z, dx, dy, dz
       integer :: i, j, k
-      ! Reset level layouts
-      call solver%SC%reset_level(lvl, ba, dm)
-      call solver%SCold%reset_level(lvl, ba, dm)
-      ! Build flux register for fine levels
-      if (lvl .ge. 1) call solver%flux%reset_level(lvl, ba, dm, solver%amr%rref(lvl-1))
       ! Initialize with Gaussian blob
       dx = solver%amr%dx(lvl)
       dy = solver%amr%dy(lvl)
@@ -55,14 +50,12 @@ contains
          end do
       end do
       call amrex_mfiter_destroy(mfi)
-      ! SCold starts at zero
-      call solver%SCold%mf(lvl)%setval(0.0_WP)
-   end subroutine gaussian_on_init
+   end subroutine gaussian_init
 
 
    !> Custom tagging callback: refine where SC > threshold
    subroutine scalar_tagger(solver, lvl, tags_ptr, time)
-      use iso_c_binding,    only: c_ptr
+      use iso_c_binding,    only: c_ptr, c_char
       use amrex_amr_module, only: amrex_tagboxarray
       use amrgrid_class,    only: SETtag
       class(amrscalar), intent(inout) :: solver
@@ -72,7 +65,7 @@ contains
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      character(kind=1), contiguous, pointer :: tagarr(:,:,:,:)
+      character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
       integer :: i, j, k
       tags = tags_ptr
@@ -138,20 +131,19 @@ contains
       amr%xper=.true.
       amr%yper=.true.
       amr%zper=.true.
-      amr%maxlvl=1   ! 2 levels (0,1)
+      amr%maxlvl=2   ! 3 levels (0,1,2)
       amr%nmax=16
 
       call amr%initialize("sc_amr")
 
       ! Initialize scalar solver
       call sc%initialize(amr, nscalar=1, name="test_scalar")
-      sc%on_init => gaussian_on_init
-      sc%tagging => scalar_tagger
+      sc%user_init => gaussian_init
+      sc%user_tagging => scalar_tagger
 
       ! Initialize HDF5 viz output
       call viz%initialize(amr=amr, name='sc_advect')
-      call viz%add_scalar(sc%SC, 1, 'SC')
-      call viz%add_scalar(sc%SCold, 1, 'SCold')
+      call viz%add_scalar(data=sc%SC, comp=1, name='SC')
 
       ! Build all levels
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
@@ -208,10 +200,10 @@ contains
             dz=amr%dz(lvl)
 
             ! Build velocity (rotating vortex in xy plane)
-            call amr%mfab_build(lvl=lvl,mfab=U,ncomp=1,nover=0,atface=[.true.,.false.,.false.])
-            call amr%mfab_build(lvl=lvl,mfab=V,ncomp=1,nover=0,atface=[.false.,.true.,.false.])
-            call amr%mfab_build(lvl=lvl,mfab=W,ncomp=1,nover=0,atface=[.false.,.false.,.true.])
-            call amr%mfab_build(lvl=lvl,mfab=dSCdt,ncomp=1,nover=0,atface=[.false.,.false.,.false.])
+            call amr%mfab_build(lvl=lvl,mfab=U     ,ncomp=1,nover=0,atface=[.true. ,.false.,.false.])
+            call amr%mfab_build(lvl=lvl,mfab=V     ,ncomp=1,nover=0,atface=[.false.,.true. ,.false.])
+            call amr%mfab_build(lvl=lvl,mfab=W     ,ncomp=1,nover=0,atface=[.false.,.false.,.true. ])
+            call amr%mfab_build(lvl=lvl,mfab=dSCdt ,ncomp=1,nover=0,atface=[.false.,.false.,.false.])
             call amr%mfab_build(lvl=lvl,mfab=SCfill,ncomp=1,nover=2,atface=[.false.,.false.,.false.])
 
             ! Set velocity: solid body rotation in z-plane
@@ -235,7 +227,7 @@ contains
                   do j=lbound(pV,2),ubound(pV,2)
                      do i=lbound(pV,1),ubound(pV,1)
                         x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                        pV(i,j,k,1)=(x-0.5_WP)
+                        pV(i,j,k,1)=+(x-0.5_WP)
                      end do
                   end do
                end do
@@ -310,12 +302,7 @@ contains
 
       ! Zero out SC data
       do lvl = 0, amr%clvl()
-         call amr%mfiter_build(lvl, mfi)
-         do while (mfi%next())
-            pSC => sc%SC%mf(lvl)%dataptr(mfi)
-            pSC = 0.0_WP
-         end do
-         call amr%mfiter_destroy(mfi)
+         call sc%SC%mf(lvl)%setval(0.0_WP)
       end do
       call sc%get_info()
       call log("  After zero: SCint="//trim(rtoa(sc%SCint(1))))
