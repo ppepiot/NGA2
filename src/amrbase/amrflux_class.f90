@@ -79,7 +79,7 @@ contains
    subroutine clear_level(this,lvl)
       class(amrflux), intent(inout) :: this
       integer, intent(in) :: lvl
-      if (c_associated(this%fr(lvl)%p)) call amrex_fluxregister_destroy(this%fr(lvl))
+      call amrex_fluxregister_destroy(this%fr(lvl))
    end subroutine clear_level
 
    !> Initialize coarse-side fluxes (resets the register)
