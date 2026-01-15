@@ -67,8 +67,6 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       integer, intent(in) :: ref_ratio
-      ! Flux registers only exist for levels >= 1
-      if (lvl.lt.1) return
       ! Destroy if already built
       call this%clear_level(lvl)
       ! Build new register
@@ -88,9 +86,7 @@ contains
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(in) :: fluxes(amrex_spacedim)
       real(amrex_real), intent(in) :: scale
-      if (.not.allocated(this%fr)) return
-      if (lvl.lt.1.or.lvl.gt.ubound(this%fr,1)) return
-      if (c_associated(this%fr(lvl)%p)) call this%fr(lvl)%crseinit(fluxes,scale)
+      call this%fr(lvl)%crseinit(fluxes,scale)
    end subroutine crseinit
 
    !> Add fine-side fluxes
@@ -99,9 +95,7 @@ contains
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(in) :: fluxes(amrex_spacedim)
       real(amrex_real), intent(in) :: scale
-      if (.not.allocated(this%fr)) return
-      if (lvl.lt.1.or.lvl.gt.ubound(this%fr,1)) return
-      if (c_associated(this%fr(lvl)%p)) call this%fr(lvl)%fineadd(fluxes,scale)
+      call this%fr(lvl)%fineadd(fluxes,scale)
    end subroutine fineadd
 
    !> Apply correction to coarse-level data
@@ -111,9 +105,7 @@ contains
       type(amrex_multifab), intent(inout) :: mf
       real(amrex_real), intent(in) :: scale
       type(amrex_geometry), intent(in) :: geom
-      if (.not.allocated(this%fr)) return
-      if (lvl.lt.1.or.lvl.gt.ubound(this%fr,1)) return
-      if (c_associated(this%fr(lvl)%p)) call this%fr(lvl)%reflux(mf,scale)
+      call this%fr(lvl)%reflux(mf,scale)
    end subroutine reflux
 
    !> Set all values in the register
@@ -121,9 +113,7 @@ contains
       class(amrflux), intent(inout) :: this
       integer, intent(in) :: lvl
       real(amrex_real), intent(in) :: val
-      if (.not.allocated(this%fr)) return
-      if (lvl.lt.1.or.lvl.gt.ubound(this%fr,1)) return
-      if (c_associated(this%fr(lvl)%p)) call this%fr(lvl)%setval(val)
+      call this%fr(lvl)%setval(val)
    end subroutine setval
 
 end module amrflux_class
