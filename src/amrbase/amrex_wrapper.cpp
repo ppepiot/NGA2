@@ -19,6 +19,10 @@ namespace nga2 {
 //=============================================================================
 // Callback function types - these are bind(c) Fortran procedures
 // They receive the owner pointer and handle dispatching in Fortran
+//
+// Notes on AMReX callback parameters:
+// - ngrow in ErrorEst: AMReX always passes 0, not needed
+// - initial in regrid: Unused in AmrCore implementation, dropped
 //=============================================================================
 extern "C" {
 // Level callbacks: owner, level, time, boxarray ptr, distromap ptr
@@ -27,11 +31,13 @@ using LevelDispatcher = void (*)(void *owner, int lev, double time,
                                  const amrex::DistributionMapping *);
 // Clear callback: owner, level
 using ClearDispatcher = void (*)(void *owner, int lev);
-// Tag callback: owner, level, tagboxarray ptr, time, tagval, clearval
+// Tag callback: owner, level, tagboxarray ptr, time
+// Note: SET/CLEAR values are constants (char(2)/char(0)) - defined in Fortran
 using TagDispatcher = void (*)(void *owner, int lev, amrex::TagBoxArray *,
-                               double time, char tagval, char clearval);
-// Post-regrid callback: owner only
-using PostRegridDispatcher = void (*)(void *owner);
+                               double time);
+// Post-regrid callback: owner, lbase, time
+// Called after regrid completes; lbase is the base level for regridding
+using PostRegridDispatcher = void (*)(void *owner, int lbase, double time);
 }
 
 //=============================================================================
@@ -50,10 +56,11 @@ public:
   PostRegridDispatcher on_postregrid_dispatch = nullptr;
 
   // Public override of regrid to call post-regrid dispatch after base class
+  // Note: 'initial' parameter from AMReX is unused, we drop it
   void regrid(int lbase, amrex::Real time, bool initial = false) override {
     amrex::FAmrCore::regrid(lbase, time, initial);
     if (on_postregrid_dispatch && owner) {
-      on_postregrid_dispatch(owner);
+      on_postregrid_dispatch(owner, lbase, time);
     }
   }
 
@@ -87,11 +94,12 @@ protected:
     }
   }
 
+  // Note: ngrow parameter from AMReX is always 0, we drop it
+  // SET/CLEAR are TagBox::SET=char(2) and TagBox::CLEAR=char(0)
   void ErrorEst(int lev, amrex::TagBoxArray &tags, amrex::Real time,
                 int /*ngrow*/) override {
     if (on_tag_dispatch && owner) {
-      on_tag_dispatch(owner, lev, &tags, time, amrex::TagBox::SET,
-                      amrex::TagBox::CLEAR);
+      on_tag_dispatch(owner, lev, &tags, time);
     }
   }
 };
@@ -100,11 +108,11 @@ protected:
 // FillPatch BC Callback - receives solver context, can access all fields
 //=============================================================================
 
-// Fortran BC callback signature: receives solver context, multifab, geometry,
-// time
+// Fortran BC callback: ctx first, then AMReX order (mf, scomp, ncomp, time,
+// geom)
 using FillPatchBCDispatcher = void (*)(void *solver_ctx, amrex::MultiFab *mf,
-                                       const amrex::Geometry *geom,
-                                       amrex::Real time, int scomp, int ncomp);
+                                       int scomp, int ncomp, amrex::Real time,
+                                       const amrex::Geometry *geom);
 
 // Functor that AMReX FillPatch calls; forwards to Fortran with context
 class NGA2BCFunctor {
@@ -122,7 +130,7 @@ public:
                   amrex::IntVect const & /*nghost*/, amrex::Real time,
                   int /*bccomp*/) {
     if (bc_dispatch && solver_ctx) {
-      bc_dispatch(solver_ctx, &mf, geom, time, icomp, ncomp);
+      bc_dispatch(solver_ctx, &mf, icomp, ncomp, time, geom);
     }
   }
 };

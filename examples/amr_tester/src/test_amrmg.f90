@@ -25,13 +25,15 @@ module mod_test_amrmg
 contains
 
    !> Simple tagging: refine center region
-   subroutine tag_center(lvl, tags_ptr, time)
-      use iso_c_binding, only: c_ptr, c_char
+   subroutine tag_center(ctx, lvl, tags_ptr, time)
+      use iso_c_binding, only: c_ptr, c_char, c_f_pointer
       use amrex_amr_module, only: amrex_tagboxarray, amrex_mfiter, amrex_box
       implicit none
+      type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags_ptr
       real(WP), intent(in) :: time
+      type(amrgrid), pointer :: amr
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
@@ -39,18 +41,20 @@ contains
       character(kind=c_char), parameter :: SET=char(1)
       real(WP) :: x, y, z, dx
       integer :: i, j, k
+      ! Cast ctx to amrgrid
+      call c_f_pointer(ctx, amr)
       tags = tags_ptr
-      dx = amr_mg%dx(lvl)
-      call amr_mg%mfiter_build(lvl, mfi)
+      dx = amr%dx(lvl)
+      call amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
          tagarr => tags%dataPtr(mfi)
          do k = bx%lo(3), bx%hi(3)
-            z = amr_mg%zlo + (real(k,WP)+0.5_WP)*dx
+            z = amr%zlo + (real(k,WP)+0.5_WP)*dx
             do j = bx%lo(2), bx%hi(2)
-               y = amr_mg%ylo + (real(j,WP)+0.5_WP)*dx
+               y = amr%ylo + (real(j,WP)+0.5_WP)*dx
                do i = bx%lo(1), bx%hi(1)
-                  x = amr_mg%xlo + (real(i,WP)+0.5_WP)*dx
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
                   ! Tag center region for refinement
                   if (x > 0.3_WP .and. x < 0.7_WP .and. &
                      y > 0.3_WP .and. y < 0.7_WP .and. &
@@ -61,7 +65,7 @@ contains
             end do
          end do
       end do
-      call amr_mg%mfiter_destroy(mfi)
+      call amr%mfiter_destroy(mfi)
    end subroutine tag_center
 
    subroutine test_amrmg()
@@ -93,7 +97,7 @@ contains
       amr_mg%nbloc = 8
 
       call amr_mg%initialize("mg_test")
-      call amr_mg%add_tagging(tag_center)
+      call amr_mg%add_tagging(tag_center, amr_mg%self_ptr)
 
       ! Build phi, rhs, exact - register for regrid callbacks
       allocate(phi, rhs_mg, exact)
@@ -205,9 +209,11 @@ contains
    end subroutine test_amrmg
 
    !> Initialize phi with exact solution (including ghosts for BC)
-   subroutine init_phi(lvl, mf, geom)
+   subroutine init_phi(data_ptr, lvl, mf, geom)
+      use iso_c_binding,    only: c_ptr
       use amrex_amr_module, only: amrex_multifab, amrex_geometry, amrex_mfiter, amrex_box, amrex_mfiter_build
       implicit none
+      type(c_ptr), intent(in) :: data_ptr
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(inout) :: mf
       type(amrex_geometry), intent(in) :: geom
@@ -236,9 +242,11 @@ contains
    end subroutine init_phi
 
    !> Initialize RHS with source term
-   subroutine init_rhs(lvl, mf, geom)
+   subroutine init_rhs(data_ptr, lvl, mf, geom)
+      use iso_c_binding,    only: c_ptr
       use amrex_amr_module, only: amrex_multifab, amrex_geometry, amrex_mfiter, amrex_box, amrex_mfiter_build
       implicit none
+      type(c_ptr), intent(in) :: data_ptr
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(inout) :: mf
       type(amrex_geometry), intent(in) :: geom
@@ -267,9 +275,11 @@ contains
    end subroutine init_rhs
 
    !> Initialize exact solution
-   subroutine init_exact(lvl, mf, geom)
+   subroutine init_exact(data_ptr, lvl, mf, geom)
+      use iso_c_binding,    only: c_ptr
       use amrex_amr_module, only: amrex_multifab, amrex_geometry, amrex_mfiter, amrex_box, amrex_mfiter_build
       implicit none
+      type(c_ptr), intent(in) :: data_ptr
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(inout) :: mf
       type(amrex_geometry), intent(in) :: geom

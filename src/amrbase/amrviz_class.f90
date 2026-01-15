@@ -54,7 +54,7 @@ contains
    !> Initialize visualization handler with AMR grid
    !> If output directory already exists with files, reads their times to continue series
    subroutine initialize(this, amr, name)
-      use filesys, only: makedir, isdir
+      use filesys, only: makedir, isdir, isfile
       use mpi_f08, only: MPI_BCAST, MPI_INTEGER
       use parallel, only: MPI_REAL_WP
       implicit none
@@ -86,8 +86,9 @@ contains
          do
             n = n + 1
             write(filename,'(a,"/nga2amr.",i6.6,".h5")') trim(dirname), n
+            if (.not.isfile(trim(filename))) exit
             file_time = amrplotfile_read_time(trim(filename)//c_null_char)
-            if (file_time .lt. 0.0_WP) exit  ! File doesn't exist
+            if (file_time .lt. 0.0_WP) exit  ! File exists but unreadable
          end do
          this%ntime = n - 1  ! Last existing file number
 

@@ -1,11 +1,11 @@
 !> Simulation hooks for AMR Tester
 module simulation
-   use mod_test_registry,      only: test_registry
-   use mod_test_visualization, only: test_visualization
+   ! use mod_test_registry,      only: test_registry        ! DISABLED
+   use mod_test_amrdata,       only: test_amrdata
+   ! use mod_test_visualization, only: test_visualization   ! DISABLED
    use mod_test_amrscalar,     only: test_amrscalar
-   use mod_test_multidata,     only: test_multidata
-   use mod_test_amrmg,         only: test_amrmg
-   use mod_test_amrabeclap,    only: test_amrabeclap
+   ! use mod_test_amrmg,         only: test_amrmg           ! DISABLED
+   ! use mod_test_amrabeclap,    only: test_amrabeclap      ! DISABLED
    use messager, only: log
    implicit none
 
@@ -19,12 +19,11 @@ contains
    !> Clean run hook
    subroutine simulation_run()
       call log("Simulation Run: Executing Tests")
-      ! call test_multidata()  ! DISABLED FOR DEBUGGING
-      ! call test_registry()   ! DISABLED FOR DEBUGGING
-      ! call test_visualization() ! DISABLED FOR DEBUGGING
-      ! call test_amrscalar()  ! DISABLED FOR DEBUGGING
-      ! call test_amrmg()      ! Constant coeff Poisson
-      call test_amrabeclap()   ! Variable coeff solver
+      call test_amrdata()
+      ! call test_visualization()
+      call test_amrscalar()
+      ! call test_amrmg()
+      ! call test_amrabeclap()
    end subroutine simulation_run
 
    !> Finalization hook

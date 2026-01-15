@@ -1,17 +1,9 @@
-!> Test amrscalar solver with time integration and Ensight output
+!> Test amrscalar solver with time integration
 module mod_test_amrscalar
    use precision,         only: WP
-   use string,            only: itoa,rtoa,str_medium
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
-   use amrensight_class,  only: amrensight
-   use amrviz_class,      only: amrviz
-   use amrio_class,       only: amrio
-   use monitor_class,     only: monitor
-   use timetracker_class, only: timetracker
-   use event_class,       only: event
-   use messager,          only: log,warn
-   use amrex_amr_module,  only: amrex_boxarray,amrex_distromap,amrex_multifab
+   use amrex_amr_module,  only: amrex_boxarray,amrex_distromap,amrex_multifab,amrex_mfiter,amrex_box
    implicit none
    private
    public :: test_amrscalar
@@ -24,87 +16,101 @@ module mod_test_amrscalar
 
 contains
 
-   !> Scalar-based tagger - refine where SC > threshold
-   subroutine box_tagger(lvl,tags_ptr,time)
-      use iso_c_binding,    only: c_ptr,c_char
-      use amrex_amr_module, only: amrex_tagboxarray,amrex_mfiter,amrex_box
-      implicit none
+   !> Custom on_init callback: initialize scalar field with Gaussian blob
+   subroutine gaussian_on_init(solver, lvl, time, ba, dm)
+      use amrex_amr_module, only: amrex_mfiter_build, amrex_mfiter_destroy
+      class(amrscalar), intent(inout) :: solver
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
+      real(WP) :: x, y, z, dx, dy, dz
+      integer :: i, j, k
+      ! Reset level layouts
+      call solver%SC%reset_level(lvl, ba, dm)
+      call solver%SCold%reset_level(lvl, ba, dm)
+      ! Build flux register for fine levels
+      if (lvl .ge. 1) call solver%flux%reset_level(lvl, ba, dm, solver%amr%rref(lvl-1))
+      ! Initialize with Gaussian blob
+      dx = solver%amr%dx(lvl)
+      dy = solver%amr%dy(lvl)
+      dz = solver%amr%dz(lvl)
+      call amrex_mfiter_build(mfi, solver%SC%mf(lvl))
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         pSC => solver%SC%mf(lvl)%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            z = solver%amr%zlo + (real(k,WP)+0.5_WP)*dz
+            do j = bx%lo(2), bx%hi(2)
+               y = solver%amr%ylo + (real(j,WP)+0.5_WP)*dy
+               do i = bx%lo(1), bx%hi(1)
+                  x = solver%amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  ! Gaussian offset from center
+                  pSC(i,j,k,1) = exp(-200.0_WP*((x-0.25_WP)**2 + (y-0.5_WP)**2 + (z-0.5_WP)**2))
+               end do
+            end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+      ! SCold starts at zero
+      call solver%SCold%mf(lvl)%setval(0.0_WP)
+   end subroutine gaussian_on_init
+
+
+   !> Custom tagging callback: refine where SC > threshold
+   subroutine scalar_tagger(solver, lvl, tags_ptr, time)
+      use iso_c_binding,    only: c_ptr
+      use amrex_amr_module, only: amrex_tagboxarray
+      class(amrscalar), intent(inout) :: solver
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags_ptr
       real(WP), intent(in) :: time
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
+      character(kind=1), contiguous, pointer :: tagarr(:,:,:,:)
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
-      character(kind=c_char), parameter :: SET=char(1)
-      integer :: i,j,k
-      tags=tags_ptr
-      ! Iterate over level boxes (SC and tags have same BoxArray)
-      call amr%mfiter_build(lvl,mfi)
+      character(kind=1), parameter :: SET = char(1)
+      integer :: i, j, k
+      tags = tags_ptr
+      ! Iterate over level boxes
+      call solver%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
-         bx=mfi%tilebox()
-         pSC=>sc%SC%mf(lvl)%dataptr(mfi)
-         tagarr=>tags%dataPtr(mfi)
-         do k=bx%lo(3),bx%hi(3)
-            do j=bx%lo(2),bx%hi(2)
-               do i=bx%lo(1),bx%hi(1)
-                  ! Tag where SC exceeds threshold
-                  if (pSC(i,j,k,1).gt.SC_REFINE_THRESH) then
-                     tagarr(i,j,k,1)=SET
+         bx = mfi%tilebox()
+         pSC => solver%SC%mf(lvl)%dataptr(mfi)
+         tagarr => tags%dataPtr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            do j = bx%lo(2), bx%hi(2)
+               do i = bx%lo(1), bx%hi(1)
+                  if (pSC(i,j,k,1) .gt. SC_REFINE_THRESH) then
+                     tagarr(i,j,k,1) = SET
                   end if
                end do
             end do
          end do
       end do
-      call amr%mfiter_destroy(mfi)
-   end subroutine box_tagger
+      call solver%amr%mfiter_destroy(mfi)
+   end subroutine scalar_tagger
 
-
-   !> Initialize scalar field with Gaussian blob (called by amrdata on_init callback)
-   subroutine init_gaussian_blob(lvl, mf, geom)
-      use amrex_amr_module, only: amrex_multifab, amrex_geometry, amrex_mfiter, amrex_box, amrex_mfiter_build
-      implicit none
-      integer, intent(in) :: lvl
-      type(amrex_multifab), intent(inout) :: mf
-      type(amrex_geometry), intent(in) :: geom
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
-      real(WP) :: x,y,z,dx,dy,dz
-      integer :: i,j,k
-      dx = geom%dx(1)
-      dy = geom%dx(2)
-      dz = geom%dx(3)
-      call amrex_mfiter_build(mfi, mf)
-      do while (mfi%next())
-         bx = mfi%tilebox()
-         pSC => mf%dataptr(mfi)
-         do k = bx%lo(3), bx%hi(3)
-            z = amr%zlo + (real(k,WP)+0.5_WP)*dz
-            do j = bx%lo(2), bx%hi(2)
-               y = amr%ylo + (real(j,WP)+0.5_WP)*dy
-               do i = bx%lo(1), bx%hi(1)
-                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
-                  ! Smaller, sharper Gaussian offset from center
-                  pSC(i,j,k,1) = exp(-200.0_WP*((x-0.25_WP)**2 + (y-0.5_WP)**2 + (z-0.5_WP)**2))
-               end do
-            end do
-         end do
-      end do
-   end subroutine init_gaussian_blob
 
    subroutine test_amrscalar()
-      use iso_c_binding,    only: c_associated
-      use amrex_amr_module, only: amrex_mfiter,amrex_box
-      use mathtools,        only: Pi
+      use string,            only: itoa,rtoa,str_medium
+      use mathtools,         only: Pi
+      use amrviz_class,      only: amrviz
+      use amrio_class,       only: amrio
+      use monitor_class,     only: monitor
+      use timetracker_class, only: timetracker
+      use event_class,       only: event
+      use messager,          only: log,warn
       implicit none
-      type(amrensight) :: ens
       type(amrviz) :: viz
       type(amrio) :: io
       type(monitor) :: mfile
       type(timetracker) :: time
-      type(event) :: regrid_evt,ensight_evt,hdf5_evt
+      type(event) :: regrid_evt,hdf5_evt
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       type(amrex_multifab) :: U,V,W,dSCdt,SCfill
@@ -137,32 +143,17 @@ contains
 
       call amr%initialize("sc_amr")
 
-      ! Initialize scalar solver first (registers callbacks)
-      call sc%initialize(amr,nscalar=1,name="test_scalar")
+      ! Initialize scalar solver
+      call sc%initialize(amr, nscalar=1, name="test_scalar")
+      sc%on_init => gaussian_on_init
+      sc%tagging => scalar_tagger
 
-      ! Set user on_init callback for SC to initialize level 0 with Gaussian blob
-      ! (fine levels get interpolated data via fill_from_coarse, then we average_down)
-      call sc%SC%set_on_init(init_gaussian_blob)
-
-      ! Set tagging
-      call amr%add_tagging(box_tagger)
-
-      ! Build grid
-      call amr%initialize_grid(0.0_WP)
-      call amr%get_info()
-      call log("Grid built: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-
-      ! Initialize ensight output
-      call ens%initialize(amr=amr,name="sc_advect")
-      call ens%add_scalar(data=sc%SC,comp=1,name="SC")
-
-      ! Initialize HDF5 viz output (all fields in single file per timestep)
-      call viz%initialize(amr=amr,name='sc_advect')
+      ! Initialize HDF5 viz output
+      call viz%initialize(amr=amr, name='sc_advect')
       call viz%add_scalar(sc%SC, 1, 'SC')
       call viz%add_scalar(sc%SCold, 1, 'SCold')
 
-      ! Build all levels using init_from_scratch
-      ! (callback init_gaussian_blob is called for each level, then postregrid fires average_down)
+      ! Build all levels
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
       call amr%get_info()
       call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
@@ -172,13 +163,11 @@ contains
       int0=sc%SCint(1)
       call log("Initial: SCint="//trim(rtoa(int0)))
 
-
-
       ! Setup timetracker
       time=timetracker(amRoot=amr%amRoot)
       time%dt=0.0025_WP
       time%dtmax=time%dt
-      time%tmax=2.0_WP*PI  ! Full circle rotation
+      time%tmax=2.0_WP*Pi  ! Full circle rotation
       time%t=0.0_WP
       time%n=0
 
@@ -186,11 +175,7 @@ contains
       regrid_evt=event(time=time,name='Regrid')
       regrid_evt%nper=10
 
-      ! Setup ensight event (every 20 steps)
-      ensight_evt=event(time=time,name='Ensight')
-      ensight_evt%tper=0.125_WP
-
-      ! Setup HDF5 event (every 0.125 time units)
+      ! Setup HDF5 event
       hdf5_evt=event(time=time,name='HDF5')
       hdf5_evt%tper=0.125_WP
 
@@ -204,8 +189,7 @@ contains
       call mfile%add_column(sc%SCint(1),'SC_int')
       call mfile%write()
 
-      ! Write initial output at start time
-      call ens%write(time=time%t)
+      ! Write initial output
       call viz%write(time=time%t)
 
       call log("Advancing to t="//trim(rtoa(time%tmax))//", dt="//trim(rtoa(time%dt)))
@@ -230,7 +214,7 @@ contains
             call amr%mfab_build(lvl=lvl,mfab=dSCdt,ncomp=1,nover=0,atface=[.false.,.false.,.false.])
             call amr%mfab_build(lvl=lvl,mfab=SCfill,ncomp=1,nover=2,atface=[.false.,.false.,.false.])
 
-            ! Set velocity: solid body rotation in z-plane (U=-(y-0.5), V=(x-0.5), W=0)
+            ! Set velocity: solid body rotation in z-plane
             call amr%mfiter_build(lvl,mfi)
             do while (mfi%next())
                bx=mfi%tilebox()
@@ -242,9 +226,7 @@ contains
                   do j=lbound(pU,2),ubound(pU,2)
                      y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                      do i=lbound(pU,1),ubound(pU,1)
-                        ! Constant rotation (old: time-reversing)
                         pU(i,j,k,1)=-(y-0.5_WP)
-                        !pU(i,j,k,1)=-(y-0.5_WP)*cos(Pi*time%t/time%tmax)
                      end do
                   end do
                end do
@@ -253,9 +235,7 @@ contains
                   do j=lbound(pV,2),ubound(pV,2)
                      do i=lbound(pV,1),ubound(pV,1)
                         x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                        ! Constant rotation (old: time-reversing)
                         pV(i,j,k,1)=(x-0.5_WP)
-                        !pV(i,j,k,1)=(x-0.5_WP)*cos(Pi*time%t/time%tmax)
                      end do
                   end do
                end do
@@ -264,15 +244,15 @@ contains
             end do
             call amr%mfiter_destroy(mfi)
 
-            ! Fill SCfill with ghost cells properly (uses FillPatch for C-F interface)
+            ! Fill SCfill with ghost cells
             call sc%SCold%fill_mfab(SCfill, lvl, time%t)
 
             ! Calculate dSC/dt
             call sc%get_dSCdt(lvl,dSCdt,SCfill,U,V,W)
 
-            ! Forward Euler step: SC = SCold + dt*dSC/dt
+            ! Forward Euler step
             call sc%SC%mf(lvl)%lincomb(a=1.0_WP,srcmf1=sc%SCold%mf(lvl),srccomp1=1,&
-            &                          b=time%dt,srcmf2=dSCdt          ,srccomp2=1,&
+            &                          b=time%dt,srcmf2=dSCdt,srccomp2=1,&
             &                          dstcomp=1,nc=1,ng=0)
 
             ! Cleanup level work arrays
@@ -286,26 +266,20 @@ contains
          ! Reflux and average down
          call sc%reflux_avg(time%dt)
 
-         ! Regrid if needed (average_down is now handled by amrscalar postregrid callback)
+         ! Regrid if needed
          if (regrid_evt%occurs()) then
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
-            call amr%get_info()
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-         end if
-
-         ! Write ensight output
-         if (ensight_evt%occurs()) then
-            call ens%write(time=time%t)
-            call log("Step "//trim(itoa(time%n))//": t="//trim(rtoa(time%t))//", SCint="//trim(rtoa(sc%SCint(1))))
          end if
 
          ! Write HDF5 output
          if (hdf5_evt%occurs()) then
             call viz%write(time=time%t)
+            call log("Step "//trim(itoa(time%n))//": t="//trim(rtoa(time%t))//", SCint="//trim(rtoa(sc%SCint(1))))
          end if
 
-         ! Update monitor file every step
+         ! Update monitor file
          call sc%get_info()
          call mfile%write()
       end do
@@ -324,8 +298,8 @@ contains
 
       ! Test checkpoint round-trip
       call io%initialize(amr, nfiles=1)
-      call sc%register_checkpoint(io)  ! Solver registers its fields
-      call io%add_scalar('dt', time%dt)  ! Store dt as metadata
+      call sc%register_checkpoint(io)
+      call io%add_scalar('dt', time%dt)
       call io%write('checkpoint_test', time%t, time%n)
       call log("PASS: Checkpoint written to checkpoint_test/")
 
@@ -334,7 +308,7 @@ contains
       int0 = sc%SCint(1)
       call log("  Before zero: SCint="//trim(rtoa(int0)))
 
-      ! Zero out SC data to test read_data
+      ! Zero out SC data
       do lvl = 0, amr%clvl()
          call amr%mfiter_build(lvl, mfi)
          do while (mfi%next())
@@ -352,7 +326,7 @@ contains
          integer :: read_step
          call io%read_header('checkpoint_test', read_time, read_step)
          call io%get_scalar('dt', read_dt)
-         call sc%restore_checkpoint(io, 'checkpoint_test')  ! Solver restores its fields
+         call sc%restore_checkpoint(io, 'checkpoint_test')
          call log("  Read checkpoint: time="//trim(rtoa(read_time))//" step="//trim(itoa(read_step))//" dt="//trim(rtoa(read_dt)))
       end block
 
@@ -364,7 +338,7 @@ contains
       if (abs(intF-int0)/int0 .lt. 1.0e-10_WP) then
          call log("PASS: Checkpoint round-trip verified!")
       else
-         call warn("FAIL: Checkpoint round-trip failed! Integral mismatch.")
+         call warn("FAIL: Checkpoint round-trip failed!")
       end if
 
       call log("PASS: HDF5 plotfiles written to amrviz/sc_advect/")
@@ -378,7 +352,6 @@ contains
       if (allocated(sc)) deallocate(sc)
       if (allocated(amr)) deallocate(amr)
       call log("PASS: amrscalar test complete!")
-      call log("View output in ensight/sc_advect/")
 
    end subroutine test_amrscalar
 

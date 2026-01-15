@@ -11,9 +11,6 @@ module mod_test_visualization
    private
    public :: test_visualization
 
-   ! Module-level amr object for tagger callback access
-   type(amrgrid), pointer :: amr_ptr=>null()
-
    ! Wrapper type for callback context (holds multiple data objects)
    type :: viz_callback_data
       type(amrdata), pointer :: velocity=>null()
@@ -23,13 +20,15 @@ module mod_test_visualization
 contains
 
    !> Simple geometric tagger - tag center of domain
-   subroutine box_tagger(lvl,tags_ptr,time)
-      use iso_c_binding,    only: c_ptr,c_char
+   subroutine box_tagger(ctx,lvl,tags_ptr,time)
+      use iso_c_binding,    only: c_ptr,c_char,c_f_pointer
       use amrex_amr_module, only: amrex_tagboxarray,amrex_mfiter,amrex_box
       implicit none
+      type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags_ptr
       real(WP), intent(in) :: time
+      type(amrgrid), pointer :: amr
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
@@ -37,20 +36,22 @@ contains
       character(kind=c_char), parameter :: SET=char(1)
       real(WP) :: x,y,z,dx,dy,dz
       integer :: i,j,k
+      ! Cast ctx to amrgrid
+      call c_f_pointer(ctx, amr)
       tags=tags_ptr
-      dx=amr_ptr%geom(lvl)%dx(1)
-      dy=amr_ptr%geom(lvl)%dx(2)
-      dz=amr_ptr%geom(lvl)%dx(3)
-      call amr_ptr%mfiter_build(lvl,mfi)
+      dx=amr%geom(lvl)%dx(1)
+      dy=amr%geom(lvl)%dx(2)
+      dz=amr%geom(lvl)%dx(3)
+      call amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
          bx=mfi%tilebox()
          tagarr=>tags%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3)
-            z=amr_ptr%zlo+(real(k,WP)+0.5_WP)*dz
+            z=amr%zlo+(real(k,WP)+0.5_WP)*dz
             do j=bx%lo(2),bx%hi(2)
-               y=amr_ptr%ylo+(real(j,WP)+0.5_WP)*dy
+               y=amr%ylo+(real(j,WP)+0.5_WP)*dy
                do i=bx%lo(1),bx%hi(1)
-                  x=amr_ptr%xlo+(real(i,WP)+0.5_WP)*dx
+                  x=amr%xlo+(real(i,WP)+0.5_WP)*dx
                   if (x>0.25_WP.and.x<0.75_WP.and.&
                      y>0.25_WP.and.y<0.75_WP.and.&
                      z>0.25_WP.and.z<0.75_WP) then
@@ -60,7 +61,7 @@ contains
             end do
          end do
       end do
-      call amr_ptr%mfiter_destroy(mfi)
+      call amr%mfiter_destroy(mfi)
    end subroutine box_tagger
 
    !> Callback for init level - allocate data
@@ -149,7 +150,7 @@ contains
       call amr%initialize("viz_amr")
 
       ! Set module pointer for tagger callback
-      amr_ptr=>amr
+
 
       ! Configure callback data wrapper
       cb_data%velocity=>velocity
@@ -160,7 +161,7 @@ contains
       call pressure%initialize(amr, name='pressure', ncomp=1, ng=1)
 
       ! Register callbacks with context
-      call amr%add_tagging(box_tagger)
+      call amr%add_tagging(box_tagger, amr%self_ptr)
       call amr%add_on_init(on_init_level,c_loc(cb_data))
       call amr%add_on_coarse(on_coarse_level,c_loc(cb_data))
       call amr%add_on_clear(on_clear_level,c_loc(cb_data))
@@ -216,7 +217,7 @@ contains
       call log("Ensight data written to ensight/viz_test/")
 
       ! Cleanup
-      amr_ptr=>null()
+
       cb_data%velocity=>null()
       cb_data%pressure=>null()
       call amr%finalize()

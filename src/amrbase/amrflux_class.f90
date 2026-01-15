@@ -22,9 +22,9 @@ module amrflux_class
       integer :: ncomp=1   !< Number of components
    contains
       procedure :: initialize    !< Initialize amrflux with parameters
-      procedure :: build_level
-      procedure :: destroy_level
-      procedure :: destroy
+      procedure :: finalize      !< Finalize amrflux
+      procedure :: reset_level   !< Reset flux register at a fine level
+      procedure :: clear_level   !< Clear flux register at a fine level
       ! Wrapper methods that forward to underlying fluxregister
       procedure :: crseinit
       procedure :: fineadd
@@ -48,36 +48,8 @@ contains
       if (.not.allocated(this%fr)) allocate(this%fr(1:maxlvl))
    end subroutine initialize
 
-
-   !> Build flux register at a specific fine level
-   !> Requires BoxArray and DistroMap of the fine level
-   subroutine build_level(this,lvl,ba,dm,ref_ratio)
-      class(amrflux), intent(inout) :: this
-      integer, intent(in) :: lvl
-      type(amrex_boxarray), intent(in) :: ba
-      type(amrex_distromap), intent(in) :: dm
-      integer, intent(in) :: ref_ratio
-      ! Flux registers only exist for levels >= 1
-      if (lvl.lt.1) return
-      if (.not.allocated(this%fr)) return
-      if (lvl.gt.ubound(this%fr,1)) return
-      ! Destroy if already built
-      call this%destroy_level(lvl)
-      ! Build new register
-      call amrex_fluxregister_build(this%fr(lvl),ba,dm,ref_ratio,lvl,this%ncomp)
-   end subroutine build_level
-
-   !> Destroy flux register at a specific level
-   subroutine destroy_level(this,lvl)
-      class(amrflux), intent(inout) :: this
-      integer, intent(in) :: lvl
-      if (.not.allocated(this%fr)) return
-      if (lvl.lt.1.or.lvl.gt.ubound(this%fr,1)) return
-      if (c_associated(this%fr(lvl)%p)) call amrex_fluxregister_destroy(this%fr(lvl))
-   end subroutine destroy_level
-
-   !> Destroy all flux registers
-   subroutine destroy(this)
+   !> Finalize flux register object
+   subroutine finalize(this)
       class(amrflux), intent(inout) :: this
       integer :: i
       if (allocated(this%fr)) then
@@ -86,7 +58,29 @@ contains
          end do
          deallocate(this%fr)
       end if
-   end subroutine destroy
+   end subroutine finalize
+
+   !> Reset flux register at a fine level
+   subroutine reset_level(this,lvl,ba,dm,ref_ratio)
+      class(amrflux), intent(inout) :: this
+      integer, intent(in) :: lvl
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      integer, intent(in) :: ref_ratio
+      ! Flux registers only exist for levels >= 1
+      if (lvl.lt.1) return
+      ! Destroy if already built
+      call this%clear_level(lvl)
+      ! Build new register
+      call amrex_fluxregister_build(this%fr(lvl),ba,dm,ref_ratio,lvl,this%ncomp)
+   end subroutine reset_level
+
+   !> Clear flux register at a specific level
+   subroutine clear_level(this,lvl)
+      class(amrflux), intent(inout) :: this
+      integer, intent(in) :: lvl
+      if (c_associated(this%fr(lvl)%p)) call amrex_fluxregister_destroy(this%fr(lvl))
+   end subroutine clear_level
 
    !> Initialize coarse-side fluxes (resets the register)
    subroutine crseinit(this,lvl,fluxes,scale)
