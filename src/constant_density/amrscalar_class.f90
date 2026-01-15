@@ -382,8 +382,8 @@ contains
             do k = bx%lo(3), bx%hi(3)
                do j = bx%lo(2), bx%hi(2)
                   do i = bx%lo(1), bx%hi(1)+1
-                     FX(i,j,k,nsc) = -0.5_WP*(pU(i,j,k,1)+abs(pU(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i-2,j,k,nsc)+5.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+2.0_WP/6.0_WP*pSC(i,j,k,nsc)) &
-                     &             -0.5_WP*(pU(i,j,k,1)-abs(pU(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+5.0_WP/6.0_WP*pSC(i,j,k,nsc)-1.0_WP/6.0_WP*pSC(i+1,j,k,nsc))
+                     FX(i,j,k,nsc) = -0.5_WP*(pU(i,j,k,1)+abs(pU(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i-2,j,k,nsc)+5.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+2.0_WP/6.0_WP*pSC(i  ,j,k,nsc)) &
+                     &               -0.5_WP*(pU(i,j,k,1)-abs(pU(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+5.0_WP/6.0_WP*pSC(i  ,j,k,nsc)-1.0_WP/6.0_WP*pSC(i+1,j,k,nsc))
                   end do
                end do
             end do
@@ -391,8 +391,8 @@ contains
             do k = bx%lo(3), bx%hi(3)
                do j = bx%lo(2), bx%hi(2)+1
                   do i = bx%lo(1), bx%hi(1)
-                     FY(i,j,k,nsc) = -0.5_WP*(pV(i,j,k,1)+abs(pV(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j-2,k,nsc)+5.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+2.0_WP/6.0_WP*pSC(i,j,k,nsc)) &
-                     &             -0.5_WP*(pV(i,j,k,1)-abs(pV(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+5.0_WP/6.0_WP*pSC(i,j,k,nsc)-1.0_WP/6.0_WP*pSC(i,j+1,k,nsc))
+                     FY(i,j,k,nsc) = -0.5_WP*(pV(i,j,k,1)+abs(pV(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j-2,k,nsc)+5.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+2.0_WP/6.0_WP*pSC(i,j  ,k,nsc)) &
+                     &               -0.5_WP*(pV(i,j,k,1)-abs(pV(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+5.0_WP/6.0_WP*pSC(i,j  ,k,nsc)-1.0_WP/6.0_WP*pSC(i,j+1,k,nsc))
                   end do
                end do
             end do
@@ -400,8 +400,8 @@ contains
             do k = bx%lo(3), bx%hi(3)+1
                do j = bx%lo(2), bx%hi(2)
                   do i = bx%lo(1), bx%hi(1)
-                     FZ(i,j,k,nsc) = -0.5_WP*(pW(i,j,k,1)+abs(pW(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j,k-2,nsc)+5.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+2.0_WP/6.0_WP*pSC(i,j,k,nsc)) &
-                     &             -0.5_WP*(pW(i,j,k,1)-abs(pW(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+5.0_WP/6.0_WP*pSC(i,j,k,nsc)-1.0_WP/6.0_WP*pSC(i,j,k+1,nsc))
+                     FZ(i,j,k,nsc) = -0.5_WP*(pW(i,j,k,1)+abs(pW(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j,k-2,nsc)+5.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+2.0_WP/6.0_WP*pSC(i,j,k  ,nsc)) &
+                     &               -0.5_WP*(pW(i,j,k,1)-abs(pW(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+5.0_WP/6.0_WP*pSC(i,j,k  ,nsc)-1.0_WP/6.0_WP*pSC(i,j,k+1,nsc))
                   end do
                end do
             end do
@@ -410,8 +410,8 @@ contains
                do j = bx%lo(2), bx%hi(2)
                   do i = bx%lo(1), bx%hi(1)
                      rhs(i,j,k,nsc) = (FX(i+1,j,k,nsc)-FX(i,j,k,nsc))/this%amr%dx(lvl) + &
-                     &               (FY(i,j+1,k,nsc)-FY(i,j,k,nsc))/this%amr%dy(lvl) + &
-                     &               (FZ(i,j,k+1,nsc)-FZ(i,j,k,nsc))/this%amr%dz(lvl)
+                     &                (FY(i,j+1,k,nsc)-FY(i,j,k,nsc))/this%amr%dy(lvl) + &
+                     &                (FZ(i,j,k+1,nsc)-FZ(i,j,k,nsc))/this%amr%dz(lvl)
                   end do
                end do
             end do

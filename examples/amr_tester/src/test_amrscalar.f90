@@ -64,6 +64,7 @@ contains
    subroutine scalar_tagger(solver, lvl, tags_ptr, time)
       use iso_c_binding,    only: c_ptr
       use amrex_amr_module, only: amrex_tagboxarray
+      use amrgrid_class,    only: SETtag
       class(amrscalar), intent(inout) :: solver
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags_ptr
@@ -73,7 +74,6 @@ contains
       type(amrex_box) :: bx
       character(kind=1), contiguous, pointer :: tagarr(:,:,:,:)
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC
-      character(kind=1), parameter :: SET = char(1)
       integer :: i, j, k
       tags = tags_ptr
       ! Iterate over level boxes
@@ -86,7 +86,7 @@ contains
             do j = bx%lo(2), bx%hi(2)
                do i = bx%lo(1), bx%hi(1)
                   if (pSC(i,j,k,1) .gt. SC_REFINE_THRESH) then
-                     tagarr(i,j,k,1) = SET
+                     tagarr(i,j,k,1) = SETtag
                   end if
                end do
             end do
@@ -138,7 +138,7 @@ contains
       amr%xper=.true.
       amr%yper=.true.
       amr%zper=.true.
-      amr%maxlvl=2   ! 3 levels total (0,1,2)
+      amr%maxlvl=2   ! 3 levels (0,1,2)
       amr%nmax=16
 
       call amr%initialize("sc_amr")
