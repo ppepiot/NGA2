@@ -368,7 +368,7 @@ contains
       type(amrex_box) :: bx
       character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
       real(WP), contiguous, pointer :: rhsarr(:,:,:,:)
-      real(WP), parameter :: threshold = 10.0_WP  ! Tag where |rhs| > threshold
+      real(WP), parameter :: threshold = 50.0_WP  ! Tag where |rhs| > threshold
       integer :: i,j,k
       call c_f_pointer(ctx, rhs)
       if (.not.c_associated(rhs%mf(lvl)%p)) return
@@ -389,7 +389,8 @@ contains
       call rhs%amr%mfiter_destroy(mfi)
    end subroutine rhs_tagger
 
-   !> user_init callback: fill RHS with manufactured solution RHS
+   !> user_init callback: fill RHS with two sharp Gaussians (positive + negative)
+   !> This creates a balanced source for Neumann BC compatibility
    subroutine rhs_user_init(this, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_boxarray, amrex_distromap, amrex_mfiter, amrex_box, &
       & amrex_mfiter_build, amrex_mfiter_destroy
@@ -401,9 +402,13 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), contiguous, pointer :: arr(:,:,:,:)
-      real(WP) :: x, y, z, dx, dy, dz, phi_exact
+      real(WP) :: x, y, z, dx, dy, dz, r1_sq, r2_sq, g1, g2
       integer :: i, j, k
-      ! Fill RHS: -∇²ϕ = 3π²ϕ for Poisson (ϕ = sin(πx)sin(πy)sin(πz))
+      ! Two sharp Gaussians: positive at (0.25, 0.5, 0.5), negative at (0.75, 0.5, 0.5)
+      real(WP), parameter :: sigma = 0.01_WP  ! Sharp Gaussian width
+      real(WP), parameter :: amp = 500.0_WP   ! Amplitude
+      real(WP), parameter :: x1 = 0.25_WP, y1 = 0.5_WP, z1 = 0.5_WP  ! Positive source
+      real(WP), parameter :: x2 = 0.75_WP, y2 = 0.5_WP, z2 = 0.5_WP  ! Negative source
       dx = this%amr%geom(lvl)%dx(1)
       dy = this%amr%geom(lvl)%dx(2)
       dz = this%amr%geom(lvl)%dx(3)
@@ -417,51 +422,17 @@ contains
                y = this%amr%ylo + (real(j,WP)+0.5_WP)*dy
                do i = bx%lo(1), bx%hi(1)
                   x = this%amr%xlo + (real(i,WP)+0.5_WP)*dx
-                  phi_exact = sin(Pi*x) * sin(Pi*y) * sin(Pi*z)
-                  arr(i,j,k,1) = -3.0_WP*Pi**2 * phi_exact  ! Poisson: ∇²ϕ = f
+                  r1_sq = (x-x1)**2 + (y-y1)**2 + (z-z1)**2
+                  r2_sq = (x-x2)**2 + (y-y2)**2 + (z-z2)**2
+                  g1 = amp * exp(-r1_sq / (2.0_WP*sigma**2))  ! Positive Gaussian
+                  g2 = amp * exp(-r2_sq / (2.0_WP*sigma**2))  ! Negative Gaussian
+                  arr(i,j,k,1) = g1 - g2  ! Net zero for Neumann compatibility
                end do
             end do
          end do
       end do
       call amrex_mfiter_destroy(mfi)
    end subroutine rhs_user_init
-
-   !> user_init callback: fill phi with BC values (Dirichlet from exact solution)
-   subroutine phi_user_init(this, lvl, time, ba, dm)
-      use amrex_amr_module, only: amrex_boxarray, amrex_distromap, amrex_mfiter, amrex_box, &
-      & amrex_mfiter_build, amrex_mfiter_destroy
-      class(amrdata), intent(inout) :: this
-      integer, intent(in) :: lvl
-      real(WP), intent(in) :: time
-      type(amrex_boxarray), intent(in) :: ba
-      type(amrex_distromap), intent(in) :: dm
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      real(WP), contiguous, pointer :: arr(:,:,:,:)
-      real(WP) :: x, y, z, dx, dy, dz
-      integer :: i, j, k
-      ! Fill phi with exact solution in ghosts (for Dirichlet BC)
-      dx = this%amr%geom(lvl)%dx(1)
-      dy = this%amr%geom(lvl)%dx(2)
-      dz = this%amr%geom(lvl)%dx(3)
-      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=.true.)
-      do while (mfi%next())
-         bx = mfi%tilebox()
-         arr => this%mf(lvl)%dataPtr(mfi)
-         ! Fill including ghosts
-         do k = lbound(arr,3), ubound(arr,3)
-            z = this%amr%zlo + (real(k,WP)+0.5_WP)*dz
-            do j = lbound(arr,2), ubound(arr,2)
-               y = this%amr%ylo + (real(j,WP)+0.5_WP)*dy
-               do i = lbound(arr,1), ubound(arr,1)
-                  x = this%amr%xlo + (real(i,WP)+0.5_WP)*dx
-                  arr(i,j,k,1) = sin(Pi*x) * sin(Pi*y) * sin(Pi*z)
-               end do
-            end do
-         end do
-      end do
-      call amrex_mfiter_destroy(mfi)
-   end subroutine phi_user_init
 
    !> Test multi-level AMR Poisson solve with RHS-based refinement
    subroutine test_multilevel()
@@ -475,7 +446,7 @@ contains
 
       call log('')
       call log('--- Testing multi-level AMR Poisson solver ---')
-      call log('Refining based on RHS magnitude (|rhs| > 10)')
+      call log('Neumann BC with dual Gaussian sources (positive + negative)')
 
       ! Allocate and configure grid with 2 levels
       allocate(amr)
@@ -483,8 +454,8 @@ contains
       amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
-      amr%xper = .false.; amr%yper = .false.; amr%zper = .false.
-      amr%maxlvl = 1  ! Allow 1 level of refinement
+      amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
+      amr%maxlvl = 2  ! 3 levels (0, 1, 2)
       amr%nmax = 16
       call amr%initialize(name='multilevel_test')
 
@@ -494,7 +465,6 @@ contains
       call rhs%initialize(amr=amr, name='rhs', ncomp=1, ng=0)
 
       ! Set user_init callbacks
-      phi%user_init => phi_user_init
       rhs%user_init => rhs_user_init
 
       ! Register fields
@@ -512,8 +482,6 @@ contains
 
       ! Initialize and setup solver
       call solver%initialize(amr=amr, type=amrmg_cstcoef)
-      solver%lo_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
-      solver%hi_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
       solver%tol_rel = 1.0e-10_WP
       solver%verbose = 0
       solver%bottom_solver = amrmg_bottom_hypre
@@ -523,10 +491,6 @@ contains
       call solver%setup()
       call tmr%stop()
       write(msg,'(a,es12.5,a)') '  Setup time: ', tmr%time, ' s'; call log(msg)
-
-      ! Zero interior for initial guess, keep BC values
-      call phi%mf(0)%setval(0.0_WP)
-      if (amr%nlevels .gt. 1) call phi%mf(1)%setval(0.0_WP)
 
       ! Solve
       call tmr%reset(); call tmr%start()

@@ -207,7 +207,7 @@ contains
       character(len=64), target, allocatable :: varnames(:)
       type(c_ptr), allocatable :: varname_ptrs(:)
 
-      nlev = this%amr%maxlvl + 1
+      nlev = this%amr%clvl() + 1
 
       ! Time-based insertion with tolerance for floating point
       if (this%ntime.eq.0) then
@@ -246,7 +246,7 @@ contains
       if (ncomp == 0) return  ! Nothing to write
 
       ! Allocate combined MultiFab for each level
-      allocate(combined(0:this%amr%maxlvl))
+      allocate(combined(0:this%amr%clvl()))
 
       ! Build variable names array
       allocate(varnames(ncomp))
@@ -278,7 +278,7 @@ contains
       end do
 
       ! Build combined MultiFab for each level and copy data
-      do lev = 0, this%amr%maxlvl
+      do lev = 0, this%amr%clvl()
          ! Get a reference amrdata to use for building the combined mfab
          my_scl => this%first_scl
          if (.not.associated(my_scl)) call die('[amrviz write] No scalars registered')
@@ -349,17 +349,17 @@ contains
       write(filename(len_trim(filename)+1:len_trim(filename)+6),'(i6.6)') this%ntime
 
       ! Prepare pointers for HDF5 writer
-      allocate(mf_ptrs(0:this%amr%maxlvl))
-      allocate(geom_ptrs(0:this%amr%maxlvl))
-      allocate(level_steps(0:this%amr%maxlvl))
-      allocate(ref_ratios(0:max(this%amr%maxlvl-1,0)))
+      allocate(mf_ptrs(0:this%amr%clvl()))
+      allocate(geom_ptrs(0:this%amr%clvl()))
+      allocate(level_steps(0:this%amr%clvl()))
+      allocate(ref_ratios(0:max(this%amr%clvl()-1,0)))
 
-      do lev = 0, this%amr%maxlvl
+      do lev = 0, this%amr%clvl()
          mf_ptrs(lev) = combined(lev)%p
          geom_ptrs(lev) = this%amr%geom(lev)%p
          level_steps(lev) = this%ntime
       end do
-      do lev = 0, this%amr%maxlvl-1
+      do lev = 0, this%amr%clvl()-1
          ref_ratios(lev) = this%amr%rref(lev)
       end do
 
@@ -369,7 +369,7 @@ contains
          ref_ratios, c_null_char)
 
       ! Cleanup combined MultiFabs
-      do lev = 0, this%amr%maxlvl
+      do lev = 0, this%amr%clvl()
          call amrex_multifab_destroy(combined(lev))
       end do
       deallocate(combined)

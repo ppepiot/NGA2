@@ -262,7 +262,7 @@ contains
       call amrex_mfiter_destroy(mfi)
    end subroutine default_fillbc
 
-   !> Default on_init: reset level and leave data uninitialized
+   !> Default on_init: reset level and zero out data
    subroutine default_on_init(this, lvl, time, ba, dm)
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
@@ -270,6 +270,7 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       call this%reset_level(lvl, ba, dm)
+      call this%mf(lvl)%setval(0.0_WP)
       ! User-provided initialization
       if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine default_on_init
