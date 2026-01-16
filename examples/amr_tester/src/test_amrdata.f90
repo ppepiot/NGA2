@@ -12,7 +12,7 @@ module mod_test_amrdata
    use amrdata_class,    only: amrdata
    use amrviz_class,     only: amrviz
    use amrex_amr_module, only: amrex_boxarray,amrex_distromap,amrex_multifab,amrex_geometry
-   use messager,         only: log,warn
+   use messager,         only: log,warn,die
    implicit none
    private
    public :: test_amrdata
@@ -160,9 +160,9 @@ contains
       call this%mf(lvl)%setval(fill_val)
    end subroutine custom_on_init_from_parent
 
-   !> Custom on_init for data5: fills MultiFab with a 3D Gaussian bump
+   !> Custom user_init for data5: fills MultiFab with a 3D Gaussian bump
    !> Uses parent pointer to get Gaussian parameters
-   subroutine custom_on_init_gaussian(this, lvl, time, ba, dm)
+   subroutine custom_user_init_gaussian(this, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, amrex_box
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
@@ -174,18 +174,15 @@ contains
       real(WP), contiguous, pointer :: arr(:,:,:,:)
       real(WP) :: x,y,z,dx,dy,dz,r2,x0,y0,z0,sigma,amp
       integer :: i,j,k,lo(4),hi(4)
-      ! Build the MultiFab
-      call this%reset_level(lvl, ba, dm)
-      ! Get Gaussian parameters from parent, or use defaults
-      x0 = 0.5_WP; y0 = 0.5_WP; z0 = 0.5_WP
-      sigma = 0.15_WP; amp = 1.0_WP
-      if (associated(this%parent)) then
-         select type (p => this%parent)
-          type is (gaussian_params)
-            x0 = p%x0; y0 = p%y0; z0 = p%z0
-            sigma = p%sigma; amp = p%amplitude
-         end select
-      end if
+      ! Get Gaussian parameters from parent
+      if (.not.associated(this%parent)) call die("custom_user_init_gaussian: parent pointer not set!")
+      select type (p => this%parent)
+       type is (gaussian_params)
+         x0 = p%x0; y0 = p%y0; z0 = p%z0
+         sigma = p%sigma; amp = p%amplitude
+       class default
+         call die("custom_user_init_gaussian: parent is not gaussian_params type!")
+      end select
       ! Fill with Gaussian bump: amp * exp(-r^2 / sigma^2)
       dx = this%amr%geom(lvl)%dx(1)
       dy = this%amr%geom(lvl)%dx(2)
@@ -208,10 +205,10 @@ contains
          end do
       end do
       call amrex_mfiter_destroy(mfi)
-      call log("    custom_on_init_gaussian: level " // trim(itoa(lvl)) // &
+      call log("    custom_user_init_gaussian: level " // trim(itoa(lvl)) // &
       &        " min=" // trim(rtoa(this%mf(lvl)%min(1))) // &
       &        " max=" // trim(rtoa(this%mf(lvl)%max(1))))
-   end subroutine custom_on_init_gaussian
+   end subroutine custom_user_init_gaussian
 
    !> Main test routine - multiple amrdata with varying configurations
    subroutine test_amrdata()
@@ -295,7 +292,7 @@ contains
       gauss%sigma = 0.08_WP; gauss%amplitude = 1.0_WP  ! Narrow Gaussian for small region
       call data5%initialize(amr, 'data5', ncomp=1, ng=0)
       data5%parent => gauss
-      data5%on_init => custom_on_init_gaussian
+      data5%user_init => custom_user_init_gaussian
       call data5%register()
       call log("    data5 initialized with Gaussian at (0.8,0.8,0.8) and registered")
 

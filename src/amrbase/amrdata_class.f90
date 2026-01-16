@@ -33,6 +33,8 @@ module amrdata_class
       procedure(on_remake_iface), pointer, nopass :: on_remake => null()
       procedure(on_clear_iface),  pointer, nopass :: on_clear  => null()
       procedure(fillbc_iface),    pointer, nopass :: fillbc    => null()
+      ! User-provided initialization callback
+      procedure(on_init_iface),   pointer, nopass :: user_init => null()
    contains
       ! Lifecycle methods
       procedure :: initialize       !< Initialize amrdata with amrgrid and parameters
@@ -161,6 +163,7 @@ contains
       nullify(this%on_remake)
       nullify(this%on_clear)
       nullify(this%fillbc)
+      nullify(this%user_init)
       ! Reset scalars to defaults
       this%name = 'UNNAMED_AMRDATA'
       this%ncomp = 1
@@ -234,6 +237,8 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       call this%reset_level(lvl, ba, dm)
+      ! User-provided initialization
+      if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine default_on_init
 
    !> Default on_coarse: reset level and fill from coarse

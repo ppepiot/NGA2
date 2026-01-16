@@ -335,16 +335,18 @@ contains
 
    !> Calculate dSC/dt at level (lvl)
    subroutine get_dSCdt(this, lvl, dSCdt, SC, U, V, W)
-      use amrex_amr_module, only: amrex_mfiter, amrex_box
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_fab
       implicit none
       class(amrscalar), intent(inout) :: this
       integer, intent(in) :: lvl
       type(amrex_multifab), intent(inout) :: dSCdt
       type(amrex_multifab), intent(in) :: SC, U, V, W
       type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      type(amrex_multifab), dimension(3) :: flx
+      type(amrex_box) :: bx, fbx
+      type(amrex_multifab), dimension(3) :: flx  ! Flux multifabs
+      type(amrex_fab) :: flux_fab(3)             ! Temporary flux FABs for tiling
       real(WP), dimension(:,:,:,:), contiguous, pointer :: rhs, pSC, FX, FY, FZ, pU, pV, pW
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pFlx  ! For copying FAB -> MFab
       integer :: i, j, k, nsc
 
       ! Prepare flux multifabs
@@ -352,7 +354,7 @@ contains
       call this%amr%mfab_build(lvl=lvl, mfab=flx(2), ncomp=this%nscalar, nover=0, atface=[.false., .true., .false.])
       call this%amr%mfab_build(lvl=lvl, mfab=flx(3), ncomp=this%nscalar, nover=0, atface=[.false., .false., .true.])
 
-      ! Loop over boxes
+      ! Loop over boxes/tiles
       call this%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
@@ -361,9 +363,11 @@ contains
          pU => U%dataptr(mfi)
          pV => V%dataptr(mfi)
          pW => W%dataptr(mfi)
-         FX => flx(1)%dataptr(mfi)
-         FY => flx(2)%dataptr(mfi)
-         FZ => flx(3)%dataptr(mfi)
+
+         ! Build temporary FABs sized to this tile's nodal boxes and get pointers to data
+         fbx = bx; call fbx%nodalize(1); call flux_fab(1)%resize(fbx, this%nscalar); FX => flux_fab(1)%dataptr()
+         fbx = bx; call fbx%nodalize(2); call flux_fab(2)%resize(fbx, this%nscalar); FY => flux_fab(2)%dataptr()
+         fbx = bx; call fbx%nodalize(3); call flux_fab(3)%resize(fbx, this%nscalar); FZ => flux_fab(3)%dataptr()
 
          do nsc = 1, this%nscalar
             ! X fluxes
@@ -404,10 +408,12 @@ contains
                end do
             end do
          end do
-         ! Scale fluxes for refluxing
-         FX = FX * this%amr%dy(lvl) * this%amr%dz(lvl)
-         FY = FY * this%amr%dz(lvl) * this%amr%dx(lvl)
-         FZ = FZ * this%amr%dx(lvl) * this%amr%dy(lvl)
+
+         ! Copy scaled flux_fabs into flx mfab for refluxing
+         fbx = mfi%nodaltilebox(1); pFlx => flx(1)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FX(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dy(lvl) * this%amr%dz(lvl)
+         fbx = mfi%nodaltilebox(2); pFlx => flx(2)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FY(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dz(lvl) * this%amr%dx(lvl)
+         fbx = mfi%nodaltilebox(3); pFlx => flx(3)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FZ(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dx(lvl) * this%amr%dy(lvl)
+
       end do
       call this%amr%mfiter_destroy(mfi)
 
