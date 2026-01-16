@@ -1,8 +1,8 @@
 !> Simulation hooks for AMR Tester
 module simulation
-   use mod_test_amrdata,       only: test_amrdata
-   use mod_test_amrscalar,     only: test_amrscalar
-   use mod_test_amrabeclap,    only: test_amrabeclap
+   use mod_test_amrdata,    only: test_amrdata
+   use mod_test_amrscalar,  only: test_amrscalar
+   use mod_test_amrmg,      only: test_amrmg
    use messager, only: log
    implicit none
 
@@ -18,7 +18,7 @@ contains
       call log("Simulation Run: Executing Tests")
       call test_amrdata()
       call test_amrscalar()
-      call test_amrabeclap()
+      call test_amrmg()
    end subroutine simulation_run
 
    !> Finalization hook
