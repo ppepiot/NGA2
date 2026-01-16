@@ -135,72 +135,68 @@ contains
       type(amrex_geometry), dimension(:), allocatable :: geom
       type(amrex_boxarray), dimension(:), allocatable :: ba
       type(amrex_distromap), dimension(:), allocatable :: dm
-      type(amrex_multifab) :: bcoef(3)
-      integer :: lev
 
       if (this%type .eq. -1) call die('[amrmg setup] Solver not initialized')
-
-      ! If already setup, destroy first
       if (this%setup_done) call this%destroy()
 
-      ! Build AMReX wrapper arrays from amrgrid (use clvl() for current finest level)
-      allocate(geom(0:this%amr%clvl()))
-      allocate(ba(0:this%amr%clvl()))
-      allocate(dm(0:this%amr%clvl()))
+      ! Build AMReX wrapper arrays
+      build_arrays: block
+         integer :: lev
+         allocate(geom(0:this%amr%clvl()))
+         allocate(ba(0:this%amr%clvl()))
+         allocate(dm(0:this%amr%clvl()))
+         do lev = 0, this%amr%clvl()
+            geom(lev) = this%amr%geom(lev)
+            ba(lev) = this%amr%get_boxarray(lev)
+            dm(lev) = this%amr%get_distromap(lev)
+         end do
+      end block build_arrays
 
-      do lev = 0, this%amr%clvl()
-         geom(lev) = this%amr%geom(lev)
-         ba(lev) = this%amr%get_boxarray(lev)
-         dm(lev) = this%amr%get_distromap(lev)
-      end do
-
-      ! Build operator and multigrid based on type
+      ! Build operator based on type
       select case (this%type)
 
        case (amrmg_cstcoef)
-         ! Build Poisson operator
-         call amrex_poisson_build(this%poisson, geom, ba, dm, &
-            metric_term=.false., agglomeration=.true., consolidation=.true., &
-            max_coarsening_level=30)
-         call this%poisson%set_domain_bc(this%lo_bc, this%hi_bc)
-
-         ! Build multigrid
-         call amrex_multigrid_build(this%multigrid, this%poisson)
-         call this%multigrid%set_verbose(this%verbose)
-         call this%multigrid%set_max_iter(this%max_iter)
-         call this%multigrid%set_bottom_solver(this%bottom_solver)
+         poisson_setup: block
+            call amrex_poisson_build(this%poisson, geom, ba, dm, &
+               metric_term=.false., agglomeration=.true., consolidation=.true., &
+               max_coarsening_level=30)
+            call this%poisson%set_domain_bc(this%lo_bc, this%hi_bc)
+            call amrex_multigrid_build(this%multigrid, this%poisson)
+            call this%multigrid%set_verbose(this%verbose)
+            call this%multigrid%set_max_iter(this%max_iter)
+            call this%multigrid%set_bottom_solver(this%bottom_solver)
+         end block poisson_setup
 
        case (amrmg_varcoef)
-         ! Build ABecLaplacian operator
-         call amrex_abeclaplacian_build(this%abeclap, geom, ba, dm, &
-            metric_term=.false., agglomeration=.true., consolidation=.true., &
-            max_coarsening_level=30)
-         call this%abeclap%set_domain_bc(this%lo_bc, this%hi_bc)
-         call this%abeclap%set_maxorder(this%maxorder)
-         call this%abeclap%set_scalars(this%alpha, this%beta)
-
-         ! Set spatially-varying A coefficient if provided
-         if (present(acoef)) then
-            do lev = 0, this%amr%clvl()
-               call this%abeclap%set_acoeffs(lev, acoef%mf(lev))
-            end do
-         end if
-
-         ! Set spatially-varying B coefficients if provided
-         if (present(bcoef_x) .and. present(bcoef_y) .and. present(bcoef_z)) then
-            do lev = 0, this%amr%clvl()
-               bcoef(1) = bcoef_x%mf(lev)
-               bcoef(2) = bcoef_y%mf(lev)
-               bcoef(3) = bcoef_z%mf(lev)
-               call this%abeclap%set_bcoeffs(lev, bcoef)
-            end do
-         end if
-
-         ! Build multigrid
-         call amrex_multigrid_build(this%multigrid, this%abeclap)
-         call this%multigrid%set_verbose(this%verbose)
-         call this%multigrid%set_max_iter(this%max_iter)
-         call this%multigrid%set_bottom_solver(this%bottom_solver)
+         abeclap_setup: block
+            type(amrex_multifab) :: bcoef(3)
+            integer :: lev
+            call amrex_abeclaplacian_build(this%abeclap, geom, ba, dm, &
+               metric_term=.false., agglomeration=.true., consolidation=.true., &
+               max_coarsening_level=30)
+            call this%abeclap%set_domain_bc(this%lo_bc, this%hi_bc)
+            call this%abeclap%set_maxorder(this%maxorder)
+            call this%abeclap%set_scalars(this%alpha, this%beta)
+            ! Set A coefficient
+            if (present(acoef)) then
+               do lev = 0, this%amr%clvl()
+                  call this%abeclap%set_acoeffs(lev, acoef%mf(lev))
+               end do
+            end if
+            ! Set B coefficients
+            if (present(bcoef_x) .and. present(bcoef_y) .and. present(bcoef_z)) then
+               do lev = 0, this%amr%clvl()
+                  bcoef(1) = bcoef_x%mf(lev)
+                  bcoef(2) = bcoef_y%mf(lev)
+                  bcoef(3) = bcoef_z%mf(lev)
+                  call this%abeclap%set_bcoeffs(lev, bcoef)
+               end do
+            end if
+            call amrex_multigrid_build(this%multigrid, this%abeclap)
+            call this%multigrid%set_verbose(this%verbose)
+            call this%multigrid%set_max_iter(this%max_iter)
+            call this%multigrid%set_bottom_solver(this%bottom_solver)
+         end block abeclap_setup
 
       end select
 
@@ -217,47 +213,162 @@ contains
       type(amrdata), intent(in) :: rhs
 
       type(amrex_multifab), dimension(:), allocatable :: sol, rhsmf
-      integer :: lev
 
       if (this%type .eq. -1) call die('[amrmg solve] Solver not initialized')
       if (.not. this%setup_done) call die('[amrmg solve] Solver not setup')
 
       ! Build solution/rhs arrays
-      allocate(sol(0:this%amr%clvl()))
-      allocate(rhsmf(0:this%amr%clvl()))
-      do lev = 0, this%amr%clvl()
-         sol(lev) = phi%mf(lev)
-         rhsmf(lev) = rhs%mf(lev)
-      end do
-
-      ! Set level BCs from solution ghost cells
-      select case (this%type)
-       case (amrmg_cstcoef)
+      build_arrays: block
+         integer :: lev
+         allocate(sol(0:this%amr%clvl()))
+         allocate(rhsmf(0:this%amr%clvl()))
          do lev = 0, this%amr%clvl()
-            call this%poisson%set_level_bc(lev, sol(lev))
+            sol(lev) = phi%mf(lev)
+            rhsmf(lev) = rhs%mf(lev)
          end do
-       case (amrmg_varcoef)
-         do lev = 0, this%amr%clvl()
-            call this%abeclap%set_level_bc(lev, sol(lev))
-         end do
-      end select
+      end block build_arrays
 
-      ! Solve
+      ! Set level BCs
+      set_bcs: block
+         integer :: lev
+         select case (this%type)
+          case (amrmg_cstcoef)
+            do lev = 0, this%amr%clvl()
+               call this%poisson%set_level_bc(lev, sol(lev))
+            end do
+          case (amrmg_varcoef)
+            do lev = 0, this%amr%clvl()
+               call this%abeclap%set_level_bc(lev, sol(lev))
+            end do
+         end select
+      end block set_bcs
+
+      ! Solve and get iteration count
       this%res = this%multigrid%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
-      ! Note: AMReX Fortran interface doesn't expose iteration count yet
-      this%niter = 0
+      get_niters: block
+         use amrex_interface, only: amrmlmg_get_niters
+         this%niter = amrmlmg_get_niters(this%multigrid%p)
+      end block get_niters
    end subroutine solve
 
    !> Level-by-level solve (for subcycling)
-   subroutine solve_level(this, lev, phi, rhs, phi_crse)
-      use messager, only: die
+   !> Builds single-level operator on-the-fly (not stored)
+   !> @param lev Level to solve on (0-indexed, for geometry lookup)
+   !> @param phi_mf Solution MultiFab (in: initial guess, out: solution)
+   !> @param rhs_mf Right-hand side MultiFab
+   !> @param phi_crse_mf Coarse level solution for C/F BC (required if lev>0)
+   !> @param acoef_mf Optional cell-centered A coefficient (varcoef only)
+   !> @param bcoef_x_mf,bcoef_y_mf,bcoef_z_mf Optional face-centered B coefficients (varcoef only)
+   subroutine solve_level(this, lev, phi_mf, rhs_mf, phi_crse_mf, acoef_mf, bcoef_x_mf, bcoef_y_mf, bcoef_z_mf)
+      use messager, only: die, log
+      use string, only: str_long
       class(amrmg), intent(inout) :: this
       integer, intent(in) :: lev
-      type(amrdata), intent(inout) :: phi
-      type(amrdata), intent(in) :: rhs
-      type(amrdata), intent(in), optional :: phi_crse
+      type(amrex_multifab), intent(inout) :: phi_mf
+      type(amrex_multifab), intent(in) :: rhs_mf
+      type(amrex_multifab), intent(in), optional :: phi_crse_mf
+      type(amrex_multifab), intent(in), optional :: acoef_mf
+      type(amrex_multifab), intent(in), optional :: bcoef_x_mf, bcoef_y_mf, bcoef_z_mf
 
-      call die('[amrmg solve_level] Not yet implemented - use solve()')
+      ! Single-level arrays for operator (always size 1, index 0)
+      type(amrex_geometry) :: geom(0:0)
+      type(amrex_boxarray) :: ba(0:0)
+      type(amrex_distromap) :: dm(0:0)
+      type(amrex_multifab) :: sol(0:0), rhsmf(0:0)
+      integer :: rref
+
+      ! Validate inputs
+      if (this%type .eq. -1) call die('[amrmg solve_level] Solver not initialized')
+      if (lev .gt. 0 .and. .not.present(phi_crse_mf)) call die('[amrmg solve_level] phi_crse_mf required for lev>0')
+
+      ! Build single-level arrays
+      setup_arrays: block
+         geom(0) = this%amr%geom(lev)
+         ba(0) = this%amr%get_boxarray(lev)
+         dm(0) = this%amr%get_distromap(lev)
+         sol(0) = phi_mf
+         rhsmf(0) = rhs_mf
+         if (lev .gt. 0) rref = this%amr%rref(lev-1)
+      end block setup_arrays
+
+      ! Solve based on operator type
+      select case (this%type)
+
+       case (amrmg_cstcoef)
+         poisson_solve: block
+            type(amrex_poisson) :: linop
+            type(amrex_multigrid) :: mlmg
+            ! Build operator
+            call amrex_poisson_build(linop, geom, ba, dm, &
+               metric_term=.false., agglomeration=.true., consolidation=.true., &
+               max_coarsening_level=30)
+            call linop%set_domain_bc(this%lo_bc, this%hi_bc)
+            ! Set C/F BC if on refined level
+            if (lev .gt. 0) call linop%set_coarse_fine_bc(phi_crse_mf, rref)
+            call linop%set_level_bc(0, sol(0))
+            ! Solve
+            call amrex_multigrid_build(mlmg, linop)
+            call mlmg%set_verbose(this%verbose)
+            call mlmg%set_max_iter(this%max_iter)
+            call mlmg%set_bottom_solver(this%bottom_solver)
+            this%res = mlmg%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
+            ! Get iteration count before cleanup
+            get_niters_p: block
+               use amrex_interface, only: amrmlmg_get_niters
+               this%niter = amrmlmg_get_niters(mlmg%p)
+            end block get_niters_p
+            call amrex_multigrid_destroy(mlmg)
+            call amrex_poisson_destroy(linop)
+         end block poisson_solve
+
+       case (amrmg_varcoef)
+         abeclap_solve: block
+            type(amrex_abeclaplacian) :: linop
+            type(amrex_multigrid) :: mlmg
+            type(amrex_multifab) :: bcoef(3)
+            ! Build operator
+            call amrex_abeclaplacian_build(linop, geom, ba, dm, &
+               metric_term=.false., agglomeration=.true., consolidation=.true., &
+               max_coarsening_level=30)
+            call linop%set_domain_bc(this%lo_bc, this%hi_bc)
+            call linop%set_maxorder(this%maxorder)
+            call linop%set_scalars(this%alpha, this%beta)
+            ! Set coefficients
+            if (present(acoef_mf)) call linop%set_acoeffs(0, acoef_mf)
+            if (present(bcoef_x_mf) .and. present(bcoef_y_mf) .and. present(bcoef_z_mf)) then
+               bcoef(1) = bcoef_x_mf
+               bcoef(2) = bcoef_y_mf
+               bcoef(3) = bcoef_z_mf
+               call linop%set_bcoeffs(0, bcoef)
+            end if
+            ! Set C/F BC if on refined level
+            if (lev .gt. 0) call linop%set_coarse_fine_bc(phi_crse_mf, rref)
+            call linop%set_level_bc(0, sol(0))
+            ! Solve
+            call amrex_multigrid_build(mlmg, linop)
+            call mlmg%set_verbose(this%verbose)
+            call mlmg%set_max_iter(this%max_iter)
+            call mlmg%set_bottom_solver(this%bottom_solver)
+            this%res = mlmg%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
+            ! Get iteration count before cleanup
+            get_niters_a: block
+               use amrex_interface, only: amrmlmg_get_niters
+               this%niter = amrmlmg_get_niters(mlmg%p)
+            end block get_niters_a
+            call amrex_multigrid_destroy(mlmg)
+            call amrex_abeclaplacian_destroy(linop)
+         end block abeclap_solve
+
+      end select
+
+      ! Log result
+      log_result: block
+         character(len=str_long) :: message
+         if (this%amr%amRoot) then
+            write(message,'("[amrmg solve_level] lev=",i0," res=",es12.5)') lev, this%res
+            call log(message)
+         end if
+      end block log_result
    end subroutine solve_level
 
    !> Destroy solver internals - call before setup when operator changes

@@ -63,6 +63,11 @@ module amrex_interface
    public :: amrvismf_set_noutfiles
    public :: amrvismf_get_noutfiles
 
+   !=====================================================================
+   ! MLMG Utilities
+   !=====================================================================
+   public :: amrmlmg_get_niters
+
    interface
 
       !------------------------------------------------------------------
@@ -310,6 +315,16 @@ module amrex_interface
       integer(c_int) function amrvismf_get_noutfiles() bind(c)
          import :: c_int
       end function amrvismf_get_noutfiles
+
+      !====================================================================
+      ! MLMG Utilities (not available in AMReX Fortran interface)
+      !====================================================================
+
+      !> Get number of iterations from last MLMG solve
+      integer(c_int) function amrmlmg_get_niters(mlmg) bind(c)
+         import :: c_int,c_ptr
+         type(c_ptr), value :: mlmg
+      end function amrmlmg_get_niters
 
    end interface
 

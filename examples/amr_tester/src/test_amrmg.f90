@@ -31,6 +31,9 @@ contains
       ! Test multi-level AMR with refinement based on RHS
       call test_multilevel()
 
+      ! Test per-level solve (for subcycling)
+      call test_solve_level()
+
       call log('')
       call log('=== TEST_AMRMG COMPLETE ===')
    end subroutine test_amrmg
@@ -525,6 +528,136 @@ contains
       deallocate(phi, rhs)
       call amr%finalize(); deallocate(amr)
    end subroutine test_multilevel
+
+   !> Test per-level solve (for subcycling)
+   !> Uses 3-level grid like test_multilevel:
+   !> 1) Composite solve to get reference solution
+   !> 2) Zero out levels 1 and 2 of phi
+   !> 3) solve_level on level 1 only (using level 0 as coarse BC)
+   !> 4) Output to ParaView - should show correct solution on levels 0,1 and zeros on level 2
+   subroutine test_solve_level()
+      use iso_c_binding, only: c_loc
+      use amrviz_class, only: amrviz
+      type(amrgrid), allocatable, target :: amr
+      type(amrdata), allocatable, target :: phi, rhs
+      type(amrmg) :: solver
+      type(amrviz) :: viz
+      type(timer) :: tmr
+      character(len=str_long) :: msg
+      logical :: passed
+      integer :: lvl
+
+      call log('')
+      call log('--- Testing solve_level (per-level solve with C/F BC) ---')
+      call log('3-level grid: composite solve, then per-level solve on mid-level')
+
+      ! Create 3-level grid (same as test_multilevel)
+      allocate(amr)
+      amr%nx = 32; amr%ny = 32; amr%nz = 32
+      amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
+      amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
+      amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
+      amr%xper = .false.; amr%yper = .false.; amr%zper = .false.
+      amr%maxlvl = 2  ! 3 levels (0, 1, 2)
+      amr%nmax = 16
+      call amr%initialize(name='solve_level_ml')
+
+      ! Allocate fields
+      allocate(phi, rhs)
+      call phi%initialize(amr=amr, name='phi', ncomp=1, ng=1)
+      call rhs%initialize(amr=amr, name='rhs', ncomp=1, ng=0)
+
+      ! Set user_init callbacks (reuses rhs_user_init from above)
+      rhs%user_init => rhs_user_init
+
+      ! Register fields
+      call phi%register()
+      call rhs%register()
+
+      ! Add tagging based on RHS (reuses rhs_tagger from above)
+      call amr%add_tagging(rhs_tagger, c_loc(rhs))
+
+      ! Initialize grid - triggers callbacks and creates refined levels
+      call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
+
+      write(msg,'(a,i0,a)') '  Grid created with ', amr%nlevels, ' levels'
+      call log(msg)
+
+      ! Initialize solver (Neumann BC for Gaussian sources)
+      call solver%initialize(amr=amr, type=amrmg_cstcoef)
+      solver%tol_rel = 1.0e-10_WP
+      solver%verbose = 0
+      solver%bottom_solver = amrmg_bottom_hypre
+
+      tmr = timer(comm=MPI_COMM_WORLD, name='amrmg_slvl')
+
+      ! Step 1: Composite solve to get reference solution on all levels
+      call log('  Step 1: Composite solve on all levels')
+      call tmr%start()
+      call solver%setup()
+      call solver%solve(phi=phi, rhs=rhs)
+      call tmr%stop()
+      write(msg,'(a,es12.5,a,i0)') '    Composite solve: residual = ', solver%res, ', niter = ', solver%niter
+      call log(msg)
+
+      passed = (solver%res .lt. 1.0e-8_WP)
+      if (.not.passed) call log('    FAIL: composite solve did not converge')
+
+      ! Write reference solution (all levels correct)
+      call viz%initialize(amr=amr, name='solve_level_ref')
+      call viz%add_scalar(data=phi, comp=1, name='phi')
+      call viz%add_scalar(data=rhs, comp=1, name='rhs')
+      call viz%write(time=0.0_WP)
+      call viz%finalize()
+      call log('    Reference solution written to amrviz/solve_level_ref/')
+
+      ! Step 2: Zero out phi on levels 1 and 2
+      call log('  Step 2: Zero out phi on levels 1 and 2')
+      do lvl = 1, amr%clvl()
+         call phi%mf(lvl)%setval(0.0_WP)
+      end do
+
+      ! Step 3: solve_level on level 1 only (use level 0 as coarse BC)
+      call log('  Step 3: solve_level on level 1 only (with C/F BC from level 0)')
+      if (amr%clvl() .ge. 1) then
+         call tmr%reset(); call tmr%start()
+         call solver%solve_level(lev=1, phi_mf=phi%mf(1), rhs_mf=rhs%mf(1), phi_crse_mf=phi%mf(0))
+         call tmr%stop()
+         write(msg,'(a,es12.5,a,i0)') '    solve_level(1): residual = ', solver%res, ', niter = ', solver%niter
+         call log(msg)
+
+         if (solver%res .ge. 1.0e-8_WP) then
+            call log('    FAIL: solve_level did not converge')
+            passed = .false.
+         end if
+
+         if (solver%niter .le. 0) then
+            call log('    FAIL: niter should be > 0')
+            passed = .false.
+         end if
+      else
+         call log('    SKIP: only 1 level created, cannot test C/F BC')
+      end if
+
+      ! Step 4: Write output - levels 0,1 should be correct, level 2 should be zero
+      call viz%initialize(amr=amr, name='solve_level_mid')
+      call viz%add_scalar(data=phi, comp=1, name='phi')
+      call viz%add_scalar(data=rhs, comp=1, name='rhs')
+      call viz%write(time=0.0_WP)
+      call viz%finalize()
+      call log('    Per-level solution written to amrviz/solve_level_mid/')
+      call log('    (levels 0,1 should match reference; level 2 should be zero)')
+
+      if (passed) then
+         call log('  PASS: solve_level test')
+      end if
+
+      ! Cleanup
+      call solver%finalize()
+      call phi%finalize(); call rhs%finalize()
+      deallocate(phi, rhs)
+      call amr%finalize(); deallocate(amr)
+   end subroutine test_solve_level
 
 end module mod_test_amrmg
 

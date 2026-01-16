@@ -7,6 +7,7 @@
 #include <AMReX_FAmrCore.H>
 #include <AMReX_FillPatchUtil.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_MLMG.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_PhysBCFunct.H>
 #include <AMReX_PlotFileUtil.H>
@@ -548,5 +549,14 @@ double amrplotfile_read_time(const char *filename) {
 // Stub when HDF5 not available
 double amrplotfile_read_time(const char *filename) { return -1.0; }
 #endif
+
+//=============================================================================
+// MLMG Utilities (not available in AMReX Fortran interface)
+//=============================================================================
+
+// Get number of iterations from last solve
+int amrmlmg_get_niters(void *mlmg) {
+  return static_cast<amrex::MLMG *>(mlmg)->getNumIters();
+}
 
 } // extern "C"
