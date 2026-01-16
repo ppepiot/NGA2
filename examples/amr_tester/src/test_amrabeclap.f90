@@ -5,7 +5,8 @@ module mod_test_amrabeclap
    use precision,         only: WP
    use amrgrid_class,     only: amrgrid
    use amrdata_class,     only: amrdata
-   use amrabeclap_class
+   use amrmg_class
+   use timer_class,       only: timer
    use amrex_amr_module,  only: amrex_mfiter, amrex_box
    use mpi_f08
    implicit none
@@ -22,7 +23,7 @@ module mod_test_amrabeclap
 contains
 
    subroutine test_amrabeclap()
-      type(amrabeclap) :: solver
+      type(amrmg) :: solver
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pPhi, pRhs, pExact
@@ -30,7 +31,7 @@ contains
       real(WP) :: x, y, z, dx, err_l2, local_err, err_linf
       real(WP) :: B, dBdx, phi_exact, d2phi
       integer :: lvl, i, j, k, ierr
-      integer :: lo_bc(3), hi_bc(3)
+      type(timer) :: tmr
 
       write(*,*) '=== TEST_AMRABECLAP STARTING ==='
       write(*,*) ''
@@ -189,24 +190,41 @@ contains
       end do
 
       ! Initialize solver
-      lo_bc = [abeclap_bc_dirichlet, abeclap_bc_dirichlet, abeclap_bc_dirichlet]
-      hi_bc = [abeclap_bc_dirichlet, abeclap_bc_dirichlet, abeclap_bc_dirichlet]
-
-      call solver%initialize(amr_ab, lo_bc, hi_bc)
+      call solver%initialize(amr=amr_ab, type=amrmg_varcoef)
+      solver%lo_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
+      solver%hi_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
       solver%alpha = 0.0_WP    ! No A term
       solver%beta  = 1.0_WP    ! div(B*grad) term
       solver%tol_rel = 1.0e-12_WP
       solver%verbose = 2
-      solver%bottom_solver = abeclap_bottom_hypre
+      solver%bottom_solver = amrmg_bottom_hypre
 
-      write(*,*) 'Starting solve with Hypre bottom solver...'
+      ! Time setup
+      tmr = timer(comm=MPI_COMM_WORLD, name='amrmg')
+      call tmr%start()
+      call solver%setup(bcoef_x=bcoef_x, bcoef_y=bcoef_y, bcoef_z=bcoef_z)
+      call tmr%stop()
+      write(*,'(a,es12.5,a)') ' Setup time: ', tmr%time, ' s'
+
+      ! First solve with zero initial guess
       write(*,*) ''
+      write(*,*) 'Starting first solve with Hypre bottom solver...'
+      call phi%mf(0)%setval(0.0_WP)  ! Zero initial guess
+      call tmr%reset()
+      call tmr%start()
+      call solver%solve(phi=phi, rhs=rhs_ab)
+      call tmr%stop()
+      write(*,'(a,es12.5,a,es12.5,a)') ' First solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
 
-      ! Solve with B coefficients (required for ABecLaplacian)
-      call solver%solve(phi, rhs_ab, bcoef_x=bcoef_x, bcoef_y=bcoef_y, bcoef_z=bcoef_z)
-
+      ! Second solve (reusing operator) with zero initial guess
       write(*,*) ''
-      write(*,*) 'Solve complete: residual =', solver%res
+      write(*,*) 'Testing solver reuse (second solve with zero initial guess)...'
+      call phi%mf(0)%setval(0.0_WP)  ! Reset to zero initial guess
+      call tmr%reset()
+      call tmr%start()
+      call solver%solve(phi=phi, rhs=rhs_ab)
+      call tmr%stop()
+      write(*,'(a,es12.5,a,es12.5,a)') ' Second solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
 
       ! Compute error
       err_l2 = 0.0_WP
