@@ -368,7 +368,7 @@ contains
       type(amrex_box) :: bx
       character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
       real(WP), contiguous, pointer :: rhsarr(:,:,:,:)
-      real(WP), parameter :: threshold = 50.0_WP  ! Tag where |rhs| > threshold
+      real(WP), parameter :: threshold = 1.0_WP  ! Tag where |rhs| > threshold
       integer :: i,j,k
       call c_f_pointer(ctx, rhs)
       if (.not.c_associated(rhs%mf(lvl)%p)) return
@@ -454,7 +454,7 @@ contains
       amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
-      amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
+      amr%xper = .false.; amr%yper = .false.; amr%zper = .false.
       amr%maxlvl = 2  ! 3 levels (0, 1, 2)
       amr%nmax = 16
       call amr%initialize(name='multilevel_test')
