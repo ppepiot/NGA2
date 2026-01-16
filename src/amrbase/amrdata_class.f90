@@ -25,6 +25,7 @@ module amrdata_class
       character(len=str_medium) :: name='UNNAMED_AMRDATA'
       integer :: ncomp=1                                   !< Number of components (default=1)
       integer :: ng=0                                      !< Number of ghost cells (default=0)
+      logical :: nodal(3) = [.false., .false., .false.]    !< false=cell, true=vertex in that direction
       integer :: interp=amrex_interp_cell_cons             !< Interpolation method
       integer, dimension(:,:), allocatable :: lo_bc,hi_bc  !< Boundary conditions: lo_bc(3,ncomp), hi_bc(3,ncomp)
       ! Callback pointers (set to defaults in initialize)
@@ -49,6 +50,8 @@ module amrdata_class
       procedure :: fill_mfab        !< Fill into a target MultiFab
       procedure :: average_down     !< Average from finest to coarsest level
       procedure :: average_downto   !< Average level lvl+1 down to level lvl
+      ! Iteration helper
+      procedure :: mfiter_build     !< Build MFIter from this data's MultiFab
    end type amrdata
 
    !> Abstract interface for on_init callback
@@ -112,20 +115,35 @@ contains
 
    !> Initialize amrdata with amrgrid reference and parameters
    !> This sets the amr pointer, allocates mf array, and configures BCs
-   subroutine initialize(this, amr, name, ncomp, ng)
+   subroutine initialize(this, amr, name, ncomp, ng, nodal, interp)
       use amrex_amr_module, only: amrex_bc_int_dir
+      use amrex_amr_module, only: amrex_interp_face_linear,amrex_interp_node_bilinear
       implicit none
       class(amrdata), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
       character(len=*), intent(in) :: name
       integer, intent(in) :: ncomp
       integer, intent(in) :: ng
+      logical, intent(in), optional :: nodal(3)  !< Data location: false=cell, true=vertex
+      integer, intent(in), optional :: interp    !< Interpolation method override
       ! Store pointer to amrgrid
       this%amr => amr
       ! Set metadata
       this%name = name
       this%ncomp = ncomp
       this%ng = ng
+      ! Set nodal if provided
+      if (present(nodal)) this%nodal = nodal
+      ! Set interpolation: user override or auto-select based on nodal
+      if (present(interp)) then
+         this%interp = interp
+      else if (any(this%nodal)) then
+         if (all(this%nodal)) then
+            this%interp = amrex_interp_node_bilinear  ! Node-centered
+         else
+            this%interp = amrex_interp_face_linear    ! Face-centered
+         end if
+      end if
       ! Allocate mf array
       if (.not.allocated(this%mf)) allocate(this%mf(0:amr%maxlvl))
       ! Allocate and set default BCs to handle periodicity only
@@ -168,6 +186,7 @@ contains
       this%name = 'UNNAMED_AMRDATA'
       this%ncomp = 1
       this%ng = 0
+      this%nodal = [.false., .false., .false.]
       this%interp = amrex_interp_cell_cons
    end subroutine finalize
 
@@ -193,7 +212,7 @@ contains
       type(amrex_boxarray),  intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       call amrex_multifab_destroy(this%mf(lvl))
-      call amrex_multifab_build(this%mf(lvl),ba,dm,this%ncomp,this%ng)
+      call amrex_multifab_build(this%mf(lvl),ba,dm,this%ncomp,this%ng,this%nodal)
    end subroutine reset_level
 
    !> Destroy mfab on a level
@@ -203,7 +222,21 @@ contains
       call amrex_multifab_destroy(this%mf(lvl))
    end subroutine clear_level
 
+   !> Build MFIter from this data's MultiFab (ensures correct layout for staggered data)
+   subroutine mfiter_build(this, lvl, mfi, tiling)
+      use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build
+      class(amrdata), intent(inout) :: this
+      integer, intent(in) :: lvl
+      type(amrex_mfiter), intent(inout) :: mfi
+      logical, intent(in), optional :: tiling
+      logical :: use_tiling
+      use_tiling = this%amr%default_tiling
+      if (present(tiling)) use_tiling = tiling
+      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=use_tiling)
+   end subroutine mfiter_build
+
    !> Default fillbc: applies amrex_filcc using lo_bc/hi_bc
+   !> NOTE: amrex_filcc is designed for cell-centered data only.
    subroutine default_fillbc(this, mf, scomp, ncomp, time, geom)
       use amrex_amr_module, only: amrex_filcc, amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy
       class(amrdata), intent(inout) :: this
@@ -262,12 +295,12 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrex_multifab) :: mf_tmp
       ! Build temp MultiFab with new layout (0 ghost cells for FillPatch)
-      call amrex_multifab_build(mf_tmp, ba, dm, this%ncomp, 0)
+      call amrex_multifab_build(mf_tmp, ba, dm, this%ncomp, 0, this%nodal)
       ! Fill temp from old data via FillPatch
       call this%fill_mfab(mf_tmp, lvl, time)
       ! Clear old and build new with proper ghost count
       call this%clear_level(lvl)
-      call amrex_multifab_build(this%mf(lvl), ba, dm, this%ncomp, this%ng)
+      call amrex_multifab_build(this%mf(lvl), ba, dm, this%ncomp, this%ng, this%nodal)
       ! Copy from temp
       call this%mf(lvl)%copy(mf_tmp, 1, 1, this%ncomp, 0)
       ! Destroy temp

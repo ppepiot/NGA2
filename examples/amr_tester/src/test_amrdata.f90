@@ -5,6 +5,7 @@
 !>   3. data3: Custom on_init with parent pointer pattern
 !>   4. data4: Different ncomp/ng values
 !>   5. data5: Gaussian bump scalar (for value-based tagging)
+!>   6. data6: Face-centered data (staggered X-velocity type)
 module mod_test_amrdata
    use precision,        only: WP
    use string,           only: str_medium,rtoa,itoa
@@ -215,7 +216,7 @@ contains
       use iso_c_binding, only: c_loc, c_associated
       implicit none
       type(amrgrid), target :: amr
-      type(amrdata), target :: data1, data2, data3, data4, data5
+      type(amrdata), target :: data1, data2, data3, data4, data5, data6
       type(mock_solver), target :: solver
       type(gaussian_params), target :: gauss
       type(amrviz) :: viz
@@ -297,6 +298,15 @@ contains
       call log("    data5 initialized with Gaussian at (0.8,0.8,0.8) and registered")
 
       ! -------------------------------------------------------------------
+      ! TEST 6: data6 - Face-centered data (staggered X-velocity type)
+      ! -------------------------------------------------------------------
+      call log("")
+      call log("--- TEST 6: data6 face-centered (nodal X) ---")
+      call data6%initialize(amr, 'data6', ncomp=1, ng=1, nodal=[.true.,.false.,.false.])
+      call data6%register()
+      call log("    data6 initialized with nodal=[T,F,F] and registered")
+
+      ! -------------------------------------------------------------------
       ! Initialize grid - triggers all on_init callbacks
       ! -------------------------------------------------------------------
       call log("")
@@ -369,7 +379,7 @@ contains
       if (amr%nlevels > 1) then
          if (c_associated(data1%mf(1)%p) .and. c_associated(data2%mf(1)%p) .and. &
          &   c_associated(data3%mf(1)%p) .and. c_associated(data4%mf(1)%p) .and. &
-         &   c_associated(data5%mf(1)%p)) then
+         &   c_associated(data5%mf(1)%p) .and. c_associated(data6%mf(1)%p)) then
             call log("PASS: All data objects have level 1 allocated")
             npassed = npassed + 1
          else
@@ -390,6 +400,20 @@ contains
          end if
       else
          call warn("FAIL: data5%mf(0) NOT allocated")
+         nfailed = nfailed + 1
+      end if
+
+      ! Check data6 face-centered: verify nodal flag and allocation
+      if (c_associated(data6%mf(0)%p)) then
+         if (data6%nodal(1) .and. .not.data6%nodal(2) .and. .not.data6%nodal(3)) then
+            call log("PASS: data6%mf(0) face-centered (nodal=[T,F,F])")
+            npassed = npassed + 1
+         else
+            call warn("FAIL: data6 has wrong nodal flags")
+            nfailed = nfailed + 1
+         end if
+      else
+         call warn("FAIL: data6%mf(0) NOT allocated")
          nfailed = nfailed + 1
       end if
 
@@ -421,6 +445,7 @@ contains
       call data3%finalize()
       call data4%finalize()
       call data5%finalize()
+      call data6%finalize()
       call amr%finalize()
 
       if (nfailed > 0) then
