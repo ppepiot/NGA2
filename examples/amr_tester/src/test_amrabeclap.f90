@@ -53,7 +53,7 @@ contains
       amr_ab%nmax = 32
 
       call amr_ab%initialize("abeclap_test")
-      call amr_ab%initialize_grid(0.0_WP)
+      call amr_ab%init_from_scratch(0.0_WP)
 
       ! Allocate fields
       allocate(phi, rhs_ab, exact)
@@ -64,31 +64,25 @@ contains
       call rhs_ab%initialize(amr_ab, name='rhs',   ncomp=1, ng=0)
       call exact%initialize( amr_ab, name='exact', ncomp=1, ng=0)
 
-      ! Face-centered B coefficients (staggered)
-      ! Note: For now using cell-centered as approximation
-      call bcoef_x%initialize(amr_ab, name='bx', ncomp=1, ng=0)
-      call bcoef_y%initialize(amr_ab, name='by', ncomp=1, ng=0)
-      call bcoef_z%initialize(amr_ab, name='bz', ncomp=1, ng=0)
+      ! Face-centered B coefficients (staggered) - using nodal support
+      call bcoef_x%initialize(amr_ab, name='bx', ncomp=1, ng=0, nodal=[.true.,.false.,.false.])
+      call bcoef_y%initialize(amr_ab, name='by', ncomp=1, ng=0, nodal=[.false.,.true.,.false.])
+      call bcoef_z%initialize(amr_ab, name='bz', ncomp=1, ng=0, nodal=[.false.,.false.,.true.])
 
-      ! Build level 0 MultiFabs
-      call phi%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
-      call rhs_ab%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
-      call exact%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
-      call bcoef_x%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
-      call bcoef_y%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
-      call bcoef_z%on_init(0, amr_ab%get_boxarray(0), amr_ab%get_distromap(0), amr_ab%geom(0))
+      ! Build level 0 MultiFabs using on_init callback
+      call phi%on_init(phi, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
+      call rhs_ab%on_init(rhs_ab, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
+      call exact%on_init(exact, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
+      call bcoef_x%on_init(bcoef_x, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
+      call bcoef_y%on_init(bcoef_y, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
+      call bcoef_z%on_init(bcoef_z, 0, 0.0_WP, amr_ab%get_boxarray(0), amr_ab%get_distromap(0))
 
       ! Set up manufactured solution:
       ! phi_exact = sin(pi*x)*sin(pi*y)*sin(pi*z)
-      ! B(x) = 1 + 0.5*sin(pi*x)
-      ! -div(B*grad(phi)) = -[d/dx(B*dphi/dx) + B*d2phi/dy2 + B*d2phi/dz2]
-      !                   = -[dB/dx * dphi/dx + B*d2phi/dx2 + B*d2phi/dy2 + B*d2phi/dz2]
-      ! With dphi/dx = pi*cos(pi*x)*sin(pi*y)*sin(pi*z)
-      !      dB/dx = 0.5*pi*cos(pi*x)
-      !      d2phi/dx2 = -pi^2*sin(pi*x)*sin(pi*y)*sin(pi*z)
-      ! RHS = -[0.5*pi*cos(pi*x) * pi*cos(pi*x)*sin(pi*y)*sin(pi*z) + B*(-3*pi^2*phi)]
-      !     = -0.5*pi^2*cos^2(pi*x)*sin(pi*y)*sin(pi*z) + 3*pi^2*B*phi
+      ! B = 1 (uniform for now)
+      ! -div(B*grad(phi)) = -laplacian(phi) = 3*pi^2*phi
 
+      ! Fill cell-centered fields (phi, rhs, exact)
       do lvl = 0, amr_ab%clvl()
          dx = amr_ab%dx(lvl)
          call amr_ab%mfiter_build(lvl, mfi)
@@ -97,9 +91,6 @@ contains
             pPhi   => phi%mf(lvl)%dataptr(mfi)
             pRhs   => rhs_ab%mf(lvl)%dataptr(mfi)
             pExact => exact%mf(lvl)%dataptr(mfi)
-            pBx    => bcoef_x%mf(lvl)%dataptr(mfi)
-            pBy    => bcoef_y%mf(lvl)%dataptr(mfi)
-            pBz    => bcoef_z%mf(lvl)%dataptr(mfi)
 
             ! Fill phi ghosts with exact solution (for Dirichlet BC)
             do k = bx%lo(3)-1, bx%hi(3)+1
@@ -120,21 +111,59 @@ contains
                   y = amr_ab%ylo + (real(j,WP)+0.5_WP)*dx
                   do i = bx%lo(1), bx%hi(1)
                      x = amr_ab%xlo + (real(i,WP)+0.5_WP)*dx
-
-                     ! Use uniform B=1 for testing (matches Poisson equation)
-                     B = 1.0_WP
-
-                     ! Exact solution
                      phi_exact = sin(pi*x) * sin(pi*y) * sin(pi*z)
                      pExact(i,j,k,1) = phi_exact
-
-                     ! RHS for uniform B=1: -div(grad(phi)) = -laplacian(phi) = 3*pi^2*phi
                      pRhs(i,j,k,1) = 3.0_WP*pi**2 * phi_exact
+                  end do
+               end do
+            end do
+         end do
+         call amr_ab%mfiter_destroy(mfi)
+      end do
 
-                     ! B coefficients (not used when not passed to solve)
-                     pBx(i,j,k,1) = B
-                     pBy(i,j,k,1) = B
-                     pBz(i,j,k,1) = B
+      ! Fill face-centered B coefficients (B = 1 uniform)
+      ! X-faces
+      do lvl = 0, amr_ab%clvl()
+         call bcoef_x%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()  ! Returns nodal box for nodal data
+            pBx => bcoef_x%mf(lvl)%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
+                     pBx(i,j,k,1) = 1.0_WP
+                  end do
+               end do
+            end do
+         end do
+         call amr_ab%mfiter_destroy(mfi)
+      end do
+      ! Y-faces
+      do lvl = 0, amr_ab%clvl()
+         call bcoef_y%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pBy => bcoef_y%mf(lvl)%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
+                     pBy(i,j,k,1) = 1.0_WP
+                  end do
+               end do
+            end do
+         end do
+         call amr_ab%mfiter_destroy(mfi)
+      end do
+      ! Z-faces
+      do lvl = 0, amr_ab%clvl()
+         call bcoef_z%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pBz => bcoef_z%mf(lvl)%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
+                     pBz(i,j,k,1) = 1.0_WP
                   end do
                end do
             end do
@@ -219,12 +248,12 @@ contains
 
       ! Cleanup
       call solver%finalize()
-      call phi%destroy()
-      call rhs_ab%destroy()
-      call exact%destroy()
-      call bcoef_x%destroy()
-      call bcoef_y%destroy()
-      call bcoef_z%destroy()
+      call phi%finalize()
+      call rhs_ab%finalize()
+      call exact%finalize()
+      call bcoef_x%finalize()
+      call bcoef_y%finalize()
+      call bcoef_z%finalize()
       deallocate(phi, rhs_ab, exact, bcoef_x, bcoef_y, bcoef_z)
       call amr_ab%finalize()
       deallocate(amr_ab)

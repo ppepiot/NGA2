@@ -5,7 +5,7 @@ module simulation
    ! use mod_test_visualization, only: test_visualization   ! DISABLED
    use mod_test_amrscalar,     only: test_amrscalar
    ! use mod_test_amrmg,         only: test_amrmg           ! DISABLED
-   ! use mod_test_amrabeclap,    only: test_amrabeclap      ! DISABLED
+   use mod_test_amrabeclap,    only: test_amrabeclap
    use messager, only: log
    implicit none
 
@@ -23,7 +23,7 @@ contains
       ! call test_visualization()
       call test_amrscalar()
       ! call test_amrmg()
-      ! call test_amrabeclap()
+      call test_amrabeclap()
    end subroutine simulation_run
 
    !> Finalization hook
