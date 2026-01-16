@@ -478,9 +478,16 @@ void amrmfab_vismf_read(void *mf, const char *path) {
 // Create directory hierarchy for checkpoints
 void amrcheckpoint_prebuild_dirs(const char *dirname, const char *subdir_prefix,
                                  int nlevels) {
-  amrex::PreBuildDirectorHierarchy(std::string(dirname),
-                                   std::string(subdir_prefix), nlevels,
-                                   false); // backup disabled
+  // Only I/O processor removes existing directory to avoid MPI race condition
+  std::string dirstr(dirname);
+  if (amrex::ParallelDescriptor::IOProcessor()) {
+    if (amrex::FileExists(dirstr)) {
+      amrex::FileSystem::RemoveAll(dirstr);
+    }
+  }
+  amrex::ParallelDescriptor::Barrier(); // Wait for removal to complete
+  amrex::PreBuildDirectorHierarchy(dirstr, std::string(subdir_prefix), nlevels,
+                                   true);
 }
 
 // Get MultiFab file prefix for a level (e.g., "chk00100/Level_0/phi")
