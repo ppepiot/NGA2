@@ -143,12 +143,12 @@ contains
       ! If already setup, destroy first
       if (this%setup_done) call this%destroy()
 
-      ! Build AMReX wrapper arrays from amrgrid
-      allocate(geom(0:this%amr%maxlvl))
-      allocate(ba(0:this%amr%maxlvl))
-      allocate(dm(0:this%amr%maxlvl))
+      ! Build AMReX wrapper arrays from amrgrid (use clvl() for current finest level)
+      allocate(geom(0:this%amr%clvl()))
+      allocate(ba(0:this%amr%clvl()))
+      allocate(dm(0:this%amr%clvl()))
 
-      do lev = 0, this%amr%maxlvl
+      do lev = 0, this%amr%clvl()
          geom(lev) = this%amr%geom(lev)
          ba(lev) = this%amr%get_boxarray(lev)
          dm(lev) = this%amr%get_distromap(lev)
@@ -181,14 +181,14 @@ contains
 
          ! Set spatially-varying A coefficient if provided
          if (present(acoef)) then
-            do lev = 0, this%amr%maxlvl
+            do lev = 0, this%amr%clvl()
                call this%abeclap%set_acoeffs(lev, acoef%mf(lev))
             end do
          end if
 
          ! Set spatially-varying B coefficients if provided
          if (present(bcoef_x) .and. present(bcoef_y) .and. present(bcoef_z)) then
-            do lev = 0, this%amr%maxlvl
+            do lev = 0, this%amr%clvl()
                bcoef(1) = bcoef_x%mf(lev)
                bcoef(2) = bcoef_y%mf(lev)
                bcoef(3) = bcoef_z%mf(lev)
@@ -223,9 +223,9 @@ contains
       if (.not. this%setup_done) call die('[amrmg solve] Solver not setup')
 
       ! Build solution/rhs arrays
-      allocate(sol(0:this%amr%maxlvl))
-      allocate(rhsmf(0:this%amr%maxlvl))
-      do lev = 0, this%amr%maxlvl
+      allocate(sol(0:this%amr%clvl()))
+      allocate(rhsmf(0:this%amr%clvl()))
+      do lev = 0, this%amr%clvl()
          sol(lev) = phi%mf(lev)
          rhsmf(lev) = rhs%mf(lev)
       end do
@@ -233,11 +233,11 @@ contains
       ! Set level BCs from solution ghost cells
       select case (this%type)
        case (amrmg_cstcoef)
-         do lev = 0, this%amr%maxlvl
+         do lev = 0, this%amr%clvl()
             call this%poisson%set_level_bc(lev, sol(lev))
          end do
        case (amrmg_varcoef)
-         do lev = 0, this%amr%maxlvl
+         do lev = 0, this%amr%clvl()
             call this%abeclap%set_level_bc(lev, sol(lev))
          end do
       end select

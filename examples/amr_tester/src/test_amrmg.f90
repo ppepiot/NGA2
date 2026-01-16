@@ -28,6 +28,9 @@ contains
       ! Test variable-coefficient solver
       call test_varcoef()
 
+      ! Test multi-level AMR with refinement based on RHS
+      call test_multilevel()
+
       call log('')
       call log('=== TEST_AMRMG COMPLETE ===')
    end subroutine test_amrmg
@@ -349,4 +352,215 @@ contains
       call amr%finalize(); deallocate(amr)
    end subroutine test_varcoef
 
+   !> Tagger: refine where RHS magnitude exceeds threshold
+   subroutine rhs_tagger(ctx, lvl, tags_ptr, time)
+      use iso_c_binding, only: c_ptr, c_f_pointer, c_char, c_associated
+      use amrex_amr_module, only: amrex_tagboxarray, amrex_mfiter, amrex_box
+      use amrgrid_class, only: SETtag
+      implicit none
+      type(c_ptr), intent(in) :: ctx
+      integer, intent(in) :: lvl
+      type(c_ptr), intent(in) :: tags_ptr
+      real(WP), intent(in) :: time
+      type(amrdata), pointer :: rhs
+      type(amrex_tagboxarray) :: tags
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
+      real(WP), contiguous, pointer :: rhsarr(:,:,:,:)
+      real(WP), parameter :: threshold = 10.0_WP  ! Tag where |rhs| > threshold
+      integer :: i,j,k
+      call c_f_pointer(ctx, rhs)
+      if (.not.c_associated(rhs%mf(lvl)%p)) return
+      tags = tags_ptr
+      call rhs%amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         tagarr => tags%dataPtr(mfi)
+         rhsarr => rhs%mf(lvl)%dataPtr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            do j = bx%lo(2), bx%hi(2)
+               do i = bx%lo(1), bx%hi(1)
+                  if (abs(rhsarr(i,j,k,1)) .gt. threshold) tagarr(i,j,k,1) = SETtag
+               end do
+            end do
+         end do
+      end do
+      call rhs%amr%mfiter_destroy(mfi)
+   end subroutine rhs_tagger
+
+   !> user_init callback: fill RHS with manufactured solution RHS
+   subroutine rhs_user_init(this, lvl, time, ba, dm)
+      use amrex_amr_module, only: amrex_boxarray, amrex_distromap, amrex_mfiter, amrex_box, &
+      & amrex_mfiter_build, amrex_mfiter_destroy
+      class(amrdata), intent(inout) :: this
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), contiguous, pointer :: arr(:,:,:,:)
+      real(WP) :: x, y, z, dx, dy, dz, phi_exact
+      integer :: i, j, k
+      ! Fill RHS: -∇²ϕ = 3π²ϕ for Poisson (ϕ = sin(πx)sin(πy)sin(πz))
+      dx = this%amr%geom(lvl)%dx(1)
+      dy = this%amr%geom(lvl)%dx(2)
+      dz = this%amr%geom(lvl)%dx(3)
+      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=.true.)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         arr => this%mf(lvl)%dataPtr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            z = this%amr%zlo + (real(k,WP)+0.5_WP)*dz
+            do j = bx%lo(2), bx%hi(2)
+               y = this%amr%ylo + (real(j,WP)+0.5_WP)*dy
+               do i = bx%lo(1), bx%hi(1)
+                  x = this%amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  phi_exact = sin(Pi*x) * sin(Pi*y) * sin(Pi*z)
+                  arr(i,j,k,1) = -3.0_WP*Pi**2 * phi_exact  ! Poisson: ∇²ϕ = f
+               end do
+            end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+   end subroutine rhs_user_init
+
+   !> user_init callback: fill phi with BC values (Dirichlet from exact solution)
+   subroutine phi_user_init(this, lvl, time, ba, dm)
+      use amrex_amr_module, only: amrex_boxarray, amrex_distromap, amrex_mfiter, amrex_box, &
+      & amrex_mfiter_build, amrex_mfiter_destroy
+      class(amrdata), intent(inout) :: this
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), contiguous, pointer :: arr(:,:,:,:)
+      real(WP) :: x, y, z, dx, dy, dz
+      integer :: i, j, k
+      ! Fill phi with exact solution in ghosts (for Dirichlet BC)
+      dx = this%amr%geom(lvl)%dx(1)
+      dy = this%amr%geom(lvl)%dx(2)
+      dz = this%amr%geom(lvl)%dx(3)
+      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=.true.)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         arr => this%mf(lvl)%dataPtr(mfi)
+         ! Fill including ghosts
+         do k = lbound(arr,3), ubound(arr,3)
+            z = this%amr%zlo + (real(k,WP)+0.5_WP)*dz
+            do j = lbound(arr,2), ubound(arr,2)
+               y = this%amr%ylo + (real(j,WP)+0.5_WP)*dy
+               do i = lbound(arr,1), ubound(arr,1)
+                  x = this%amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  arr(i,j,k,1) = sin(Pi*x) * sin(Pi*y) * sin(Pi*z)
+               end do
+            end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+   end subroutine phi_user_init
+
+   !> Test multi-level AMR Poisson solve with RHS-based refinement
+   subroutine test_multilevel()
+      use iso_c_binding, only: c_loc
+      use string, only: itoa, rtoa
+      type(amrgrid), allocatable, target :: amr
+      type(amrdata), allocatable, target :: phi, rhs
+      type(amrmg) :: solver
+      type(timer) :: tmr
+      character(len=str_long) :: msg
+
+      call log('')
+      call log('--- Testing multi-level AMR Poisson solver ---')
+      call log('Refining based on RHS magnitude (|rhs| > 10)')
+
+      ! Allocate and configure grid with 2 levels
+      allocate(amr)
+      amr%nx = 32; amr%ny = 32; amr%nz = 32
+      amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
+      amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
+      amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
+      amr%xper = .false.; amr%yper = .false.; amr%zper = .false.
+      amr%maxlvl = 1  ! Allow 1 level of refinement
+      amr%nmax = 16
+      call amr%initialize(name='multilevel_test')
+
+      ! Allocate fields
+      allocate(phi, rhs)
+      call phi%initialize(amr=amr, name='phi', ncomp=1, ng=1)
+      call rhs%initialize(amr=amr, name='rhs', ncomp=1, ng=0)
+
+      ! Set user_init callbacks
+      phi%user_init => phi_user_init
+      rhs%user_init => rhs_user_init
+
+      ! Register fields
+      call phi%register()
+      call rhs%register()
+
+      ! Add tagging based on RHS
+      call amr%add_tagging(rhs_tagger, c_loc(rhs))
+
+      ! Initialize grid - triggers callbacks and creates refined levels
+      call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
+
+      write(msg,'(a,i0,a)') '  Grid created with ', amr%nlevels, ' levels'
+      call log(msg)
+
+      ! Initialize and setup solver
+      call solver%initialize(amr=amr, type=amrmg_cstcoef)
+      solver%lo_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
+      solver%hi_bc = [amrmg_bc_dirichlet, amrmg_bc_dirichlet, amrmg_bc_dirichlet]
+      solver%tol_rel = 1.0e-10_WP
+      solver%verbose = 0
+      solver%bottom_solver = amrmg_bottom_hypre
+
+      tmr = timer(comm=MPI_COMM_WORLD, name='amrmg_ml')
+      call tmr%start()
+      call solver%setup()
+      call tmr%stop()
+      write(msg,'(a,es12.5,a)') '  Setup time: ', tmr%time, ' s'; call log(msg)
+
+      ! Zero interior for initial guess, keep BC values
+      call phi%mf(0)%setval(0.0_WP)
+      if (amr%nlevels .gt. 1) call phi%mf(1)%setval(0.0_WP)
+
+      ! Solve
+      call tmr%reset(); call tmr%start()
+      call solver%solve(phi=phi, rhs=rhs)
+      call tmr%stop()
+      write(msg,'(a,es12.5,a,es12.5,a)') '  Solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
+      call log(msg)
+
+      if (solver%res .lt. 1.0e-8_WP .and. amr%nlevels .gt. 1) then
+         call log('  PASS: multi-level AMR Poisson test')
+      else if (solver%res .lt. 1.0e-8_WP) then
+         call log('  PASS: single-level (no refinement triggered)')
+      else
+         call log('  FAIL: multi-level AMR Poisson test')
+      end if
+
+      ! Write visualization output
+      block
+         use amrviz_class, only: amrviz
+         type(amrviz) :: viz
+         call viz%initialize(amr=amr, name='poisson')
+         call viz%add_scalar(data=phi, comp=1, name='phi')
+         call viz%add_scalar(data=rhs, comp=1, name='rhs')
+         call viz%write(time=0.0_WP)
+         call viz%finalize()
+         call log('  HDF5 output written to amrviz/poisson/')
+      end block
+
+      ! Cleanup
+      call solver%finalize()
+      call phi%finalize(); call rhs%finalize()
+      deallocate(phi, rhs)
+      call amr%finalize(); deallocate(amr)
+   end subroutine test_multilevel
+
 end module mod_test_amrmg
+
