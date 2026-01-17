@@ -1,0 +1,6 @@
+# AMR Tester input file
+# Run with: mpiexec -n 2 ./amr_tester.*.exe -i input
+
+# Select which test to run
+# Valid options: amrdata, amrscalar, amrmg, amrops, all
+Test: all
