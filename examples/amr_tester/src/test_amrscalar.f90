@@ -182,7 +182,7 @@ contains
       call amr%initialize("sc_amr")
 
       ! Initialize scalar solver (default: use_refluxing=.false. for flux averaging)
-      call sc%initialize(amr, nscalar=1, name="test_scalar")
+      call sc%initialize(amr, nscalar=1, name="test_scalar", use_refluxing=.true.)
       sc%user_init => gaussian_init
       sc%user_tagging => scalar_tagger
 

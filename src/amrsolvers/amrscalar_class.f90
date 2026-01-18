@@ -65,7 +65,7 @@ module amrscalar_class
       ! Physics procedures (all-level API)
       procedure :: get_dSCdt
       procedure :: copy2old
-      procedure :: reflux
+      procedure :: reflux           ! Needs to be called before amerage_down if use_refluxing=.true.
       procedure :: average_down
    end type amrscalar
 
@@ -211,9 +211,7 @@ contains
       this%SCold%parent => this
 
       ! Initialize flux register (only used if use_refluxing=.true.)
-      if (this%use_refluxing) then
-         call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
-      end if
+      if (this%use_refluxing) call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
 
       ! Register all 6 callbacks with amrgrid using concrete dispatchers
       ! Use select type to get non-polymorphic target for c_loc
@@ -338,8 +336,7 @@ contains
             this%SCmin(nsc) = min(this%SCmin(nsc), this%SC%mf(lvl)%min(comp=nsc))
             this%SCmax(nsc) = max(this%SCmax(nsc), this%SC%mf(lvl)%max(comp=nsc))
          end do
-         this%SCint(nsc) = this%SC%mf(0)%sum(comp=nsc) * &
-         &   (this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)) / this%amr%vol
+         this%SCint(nsc) = this%SC%mf(0)%sum(comp=nsc) * (this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)) / this%amr%vol
       end do
    end subroutine get_info
 
@@ -428,36 +425,13 @@ contains
          call this%amr%mfab_destroy(SCfill)
       end do
 
-      ! Phase 2: Handle coarse-fine interface
-      if (this%use_refluxing) then
-         ! Store fluxes scaled by face area for FluxRegister
-         do lvl = 0, this%amr%clvl()
-            ! Scale fluxes by face areas
-            call flx(1,lvl)%mult(this%amr%dy(lvl) * this%amr%dz(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
-            call flx(2,lvl)%mult(this%amr%dz(lvl) * this%amr%dx(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
-            call flx(3,lvl)%mult(this%amr%dx(lvl) * this%amr%dy(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
-            ! Add to flux register
-            if (lvl .gt. 0) call this%flux%fineadd(lvl, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], -1.0_WP)
-            if (lvl .lt. this%amr%clvl()) call this%flux%crseinit(lvl+1, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], +1.0_WP)
-         end do
-      else
+      ! Phase 2: Handle coarse-fine interface (flux averaging only)
+      if (.not.this%use_refluxing) then
          ! Flux averaging: average fine fluxes down to coarse
-         block
-            type(amrex_multifab) :: fmf(3), cmf(3)
-            integer :: d
-            do lvl = this%amr%clvl(), 1, -1
-               ! Assign individual elements (not array constructor)
-               do d = 1, 3
-                  fmf(d) = flx(d,lvl)
-                  cmf(d) = flx(d,lvl-1)
-               end do
-               call amrex_average_down_faces(fmf, cmf, this%amr%geom(lvl-1), 1, this%nscalar, this%amr%rref(lvl-1))
-            end do
-         end block
+         do lvl = this%amr%clvl(), 1, -1
+            call amrex_average_down_faces(flx(:,lvl), flx(:,lvl-1), this%amr%geom(lvl-1), 1, this%nscalar, this%amr%rref(lvl-1))
+         end do
       end if
-
-
-
 
       ! Phase 3: Compute divergence to get dSCdt
       do lvl = 0, this%amr%clvl()
@@ -483,12 +457,26 @@ contains
          call this%amr%mfiter_destroy(mfi)
       end do
 
+      ! Phase 4: Store scaled fluxes in FluxRegister (refluxing only)
+      if (this%use_refluxing) then
+         do lvl = 0, this%amr%clvl()
+            ! Scale fluxes by face areas
+            call flx(1,lvl)%mult(this%amr%dy(lvl) * this%amr%dz(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            call flx(2,lvl)%mult(this%amr%dz(lvl) * this%amr%dx(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            call flx(3,lvl)%mult(this%amr%dx(lvl) * this%amr%dy(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            ! Add to flux register
+            if (lvl .gt. 0) call this%flux%fineadd(lvl, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], -1.0_WP)
+            if (lvl .lt. this%amr%clvl()) call this%flux%crseinit(lvl+1, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], +1.0_WP)
+         end do
+      end if
+
       ! Cleanup temp flux storage
       do lvl = 0, this%amr%clvl()
          call this%amr%mfab_destroy(flx(1,lvl))
          call this%amr%mfab_destroy(flx(2,lvl))
          call this%amr%mfab_destroy(flx(3,lvl))
       end do
+
 
    end subroutine get_dSCdt
 
