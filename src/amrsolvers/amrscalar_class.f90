@@ -9,7 +9,9 @@ module amrscalar_class
    use amrflux_class,    only: amrflux
    use amrsolver_class,  only: amrsolver
    use amrio_class,      only: amrio
-   use amrex_amr_module, only: amrex_multifab, amrex_boxarray, amrex_distromap
+   use amrex_amr_module, only: amrex_multifab, amrex_boxarray, amrex_distromap, &
+   &                           amrex_mfiter, amrex_box, amrex_fab
+   use amrex_multifabutil_module, only: amrex_average_down_faces
    implicit none
    private
 
@@ -33,8 +35,11 @@ module amrscalar_class
       type(amrdata) :: SC
       type(amrdata) :: SCold
 
-      ! Flux register for interlevel conservation
+      ! Flux register for interlevel conservation (used when use_refluxing=.true.)
       type(amrflux) :: flux
+
+      ! Conservation strategy: .true. = FluxRegister, .false. = flux averaging (default)
+      logical :: use_refluxing = .false.
 
       ! Overlap size for advection stencil
       integer :: nover = 2
@@ -57,11 +62,11 @@ module amrscalar_class
       procedure :: on_clear
       procedure :: post_regrid
 
-      ! Physics procedures
+      ! Physics procedures (all-level API)
       procedure :: get_dSCdt
       procedure :: copy2old
-      procedure :: reflux_avg_lvl
-      procedure :: reflux_avg
+      procedure :: reflux
+      procedure :: average_down
    end type amrscalar
 
    !> Abstract interface for user-overridable on_init callback
@@ -167,15 +172,19 @@ contains
    ! ============================================================================
 
    !> Initialization for amrscalar solver
-   subroutine initialize(this, amr, nscalar, name)
+   subroutine initialize(this, amr, nscalar, name, use_refluxing)
       use messager, only: die
       class(amrscalar), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
       integer, intent(in) :: nscalar
       character(len=*), intent(in), optional :: name
+      logical, intent(in), optional :: use_refluxing
 
       ! Set the name for the solver
       if (present(name)) this%name = trim(adjustl(name))
+
+      ! Set refluxing mode
+      if (present(use_refluxing)) this%use_refluxing = use_refluxing
 
       ! Point to amrgrid object (stored in base class)
       this%amr => amr
@@ -201,8 +210,10 @@ contains
       this%SC%parent => this
       this%SCold%parent => this
 
-      ! Initialize flux register
-      call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
+      ! Initialize flux register (only used if use_refluxing=.true.)
+      if (this%use_refluxing) then
+         call this%flux%initialize(amr%maxlvl, name='SC_flux', ncomp=this%nscalar)
+      end if
 
       ! Register all 6 callbacks with amrgrid using concrete dispatchers
       ! Use select type to get non-polymorphic target for c_loc
@@ -236,8 +247,8 @@ contains
       ! Set to zero
       call this%SC%mf(lvl)%setval(0.0_WP)
       call this%SCold%mf(lvl)%setval(0.0_WP)
-      ! Reset flux register for fine levels
-      if (lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      ! Reset flux register for fine levels (if using refluxing)
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -251,8 +262,8 @@ contains
       call this%SC%on_coarse(this%SC, lvl, time, ba, dm)
       ! SCold just needs geometry
       call this%SCold%reset_level(lvl, ba, dm)
-      ! Reset flux register
-      if (lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      ! Reset flux register (if using refluxing)
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
    end subroutine on_coarse
 
 
@@ -267,8 +278,8 @@ contains
       call this%SC%on_remake(this%SC, lvl, time, ba, dm)
       ! SCold just needs new geometry
       call this%SCold%reset_level(lvl, ba, dm)
-      ! Rebuild flux register for fine levels
-      if (lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      ! Rebuild flux register for fine levels (if using refluxing)
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
    end subroutine on_remake
 
 
@@ -278,7 +289,7 @@ contains
       integer, intent(in) :: lvl
       call this%SC%clear_level(lvl)
       call this%SCold%clear_level(lvl)
-      if (lvl .ge. 1) call this%flux%clear_level(lvl)
+      if (this%use_refluxing .and. lvl .ge. 1)  call this%flux%clear_level(lvl)
    end subroutine on_clear
 
 
@@ -301,7 +312,7 @@ contains
       ! Destroy containers
       call this%SC%finalize()
       call this%SCold%finalize()
-      call this%flux%finalize()
+      if (this%use_refluxing) call this%flux%finalize()
       ! Deallocate arrays
       if (allocated(this%SCmax)) deallocate(this%SCmax)
       if (allocated(this%SCmin)) deallocate(this%SCmin)
@@ -333,103 +344,156 @@ contains
    end subroutine get_info
 
 
-   !> Calculate dSC/dt at level (lvl)
-   subroutine get_dSCdt(this, lvl, dSCdt, SC, U, V, W)
-      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_fab
+   !> Calculate dSC/dt for all levels (all-level API)
+   !> Uses flux averaging if use_refluxing=.false., FluxRegister if .true.
+   subroutine get_dSCdt(this, U, V, W, dSCdt)
       implicit none
       class(amrscalar), intent(inout) :: this
-      integer, intent(in) :: lvl
-      type(amrex_multifab), intent(inout) :: dSCdt
-      type(amrex_multifab), intent(in) :: SC, U, V, W
+      class(amrdata), intent(in) :: U, V, W        ! Face-centered velocity
+      class(amrdata), intent(inout) :: dSCdt       ! Cell-centered output
+      ! Local variables
+      type(amrex_multifab), dimension(3,0:this%amr%maxlvl) :: flx  ! Temp flux storage
+      type(amrex_multifab) :: SCfill
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx, fbx
-      type(amrex_multifab), dimension(3) :: flx  ! Flux multifabs
-      type(amrex_fab) :: flux_fab(3)             ! Temporary flux FABs for tiling
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: rhs, pSC, FX, FY, FZ, pU, pV, pW
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pFlx  ! For copying FAB -> MFab
-      integer :: i, j, k, nsc
+      type(amrex_fab) :: flux_fab(3)
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: rhs, pSC, FX, FY, FZ, pU, pV, pW, pFlx
+      integer :: lvl, i, j, k, nsc
 
-      ! Prepare flux multifabs
-      call this%amr%mfab_build(lvl=lvl, mfab=flx(1), ncomp=this%nscalar, nover=0, atface=[.true., .false., .false.])
-      call this%amr%mfab_build(lvl=lvl, mfab=flx(2), ncomp=this%nscalar, nover=0, atface=[.false., .true., .false.])
-      call this%amr%mfab_build(lvl=lvl, mfab=flx(3), ncomp=this%nscalar, nover=0, atface=[.false., .false., .true.])
+      ! Phase 1: Compute fluxes for all levels
+      do lvl = 0, this%amr%clvl()
 
-      ! Loop over boxes/tiles
-      call this%amr%mfiter_build(lvl, mfi)
-      do while (mfi%next())
-         bx = mfi%tilebox()
-         pSC => SC%dataptr(mfi)
-         rhs => dSCdt%dataptr(mfi)
-         pU => U%dataptr(mfi)
-         pV => V%dataptr(mfi)
-         pW => W%dataptr(mfi)
+         ! Build temp flux MultiFabs for this level
+         call this%amr%mfab_build(lvl=lvl, mfab=flx(1,lvl), ncomp=this%nscalar, nover=0, atface=[.true., .false., .false.])
+         call this%amr%mfab_build(lvl=lvl, mfab=flx(2,lvl), ncomp=this%nscalar, nover=0, atface=[.false., .true., .false.])
+         call this%amr%mfab_build(lvl=lvl, mfab=flx(3,lvl), ncomp=this%nscalar, nover=0, atface=[.false., .false., .true.])
 
-         ! Build temporary FABs sized to this tile's nodal boxes and get pointers to data
-         fbx = bx; call fbx%nodalize(1); call flux_fab(1)%resize(fbx, this%nscalar); FX => flux_fab(1)%dataptr()
-         fbx = bx; call fbx%nodalize(2); call flux_fab(2)%resize(fbx, this%nscalar); FY => flux_fab(2)%dataptr()
-         fbx = bx; call fbx%nodalize(3); call flux_fab(3)%resize(fbx, this%nscalar); FZ => flux_fab(3)%dataptr()
+         ! Build SCfill with ghost cells
+         call this%amr%mfab_build(lvl=lvl, mfab=SCfill, ncomp=this%nscalar, nover=this%nover, atface=[.false., .false., .false.])
+         call this%SCold%fill_mfab(SCfill, lvl, 0.0_WP)
 
-         do nsc = 1, this%nscalar
-            ! X fluxes
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)+1
-                     FX(i,j,k,nsc) = -0.5_WP*(pU(i,j,k,1)+abs(pU(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i-2,j,k,nsc)+5.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+2.0_WP/6.0_WP*pSC(i  ,j,k,nsc)) &
-                     &               -0.5_WP*(pU(i,j,k,1)-abs(pU(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+5.0_WP/6.0_WP*pSC(i  ,j,k,nsc)-1.0_WP/6.0_WP*pSC(i+1,j,k,nsc))
+         ! Loop over boxes/tiles
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pSC => SCfill%dataptr(mfi)
+            pU => U%mf(lvl)%dataptr(mfi)
+            pV => V%mf(lvl)%dataptr(mfi)
+            pW => W%mf(lvl)%dataptr(mfi)
+
+            ! Build temporary FABs sized to this tile's nodal boxes
+            fbx = bx; call fbx%nodalize(1); call flux_fab(1)%resize(fbx, this%nscalar); FX => flux_fab(1)%dataptr()
+            fbx = bx; call fbx%nodalize(2); call flux_fab(2)%resize(fbx, this%nscalar); FY => flux_fab(2)%dataptr()
+            fbx = bx; call fbx%nodalize(3); call flux_fab(3)%resize(fbx, this%nscalar); FZ => flux_fab(3)%dataptr()
+
+            do nsc = 1, this%nscalar
+               ! X fluxes
+               do k = bx%lo(3), bx%hi(3)
+                  do j = bx%lo(2), bx%hi(2)
+                     do i = bx%lo(1), bx%hi(1)+1
+                        FX(i,j,k,nsc) = -0.5_WP*(pU(i,j,k,1)+abs(pU(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i-2,j,k,nsc)+5.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+2.0_WP/6.0_WP*pSC(i  ,j,k,nsc)) &
+                        &               -0.5_WP*(pU(i,j,k,1)-abs(pU(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i-1,j,k,nsc)+5.0_WP/6.0_WP*pSC(i  ,j,k,nsc)-1.0_WP/6.0_WP*pSC(i+1,j,k,nsc))
+                     end do
+                  end do
+               end do
+               ! Y fluxes
+               do k = bx%lo(3), bx%hi(3)
+                  do j = bx%lo(2), bx%hi(2)+1
+                     do i = bx%lo(1), bx%hi(1)
+                        FY(i,j,k,nsc) = -0.5_WP*(pV(i,j,k,1)+abs(pV(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j-2,k,nsc)+5.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+2.0_WP/6.0_WP*pSC(i,j  ,k,nsc)) &
+                        &               -0.5_WP*(pV(i,j,k,1)-abs(pV(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+5.0_WP/6.0_WP*pSC(i,j  ,k,nsc)-1.0_WP/6.0_WP*pSC(i,j+1,k,nsc))
+                     end do
+                  end do
+               end do
+               ! Z fluxes
+               do k = bx%lo(3), bx%hi(3)+1
+                  do j = bx%lo(2), bx%hi(2)
+                     do i = bx%lo(1), bx%hi(1)
+                        FZ(i,j,k,nsc) = -0.5_WP*(pW(i,j,k,1)+abs(pW(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j,k-2,nsc)+5.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+2.0_WP/6.0_WP*pSC(i,j,k  ,nsc)) &
+                        &               -0.5_WP*(pW(i,j,k,1)-abs(pW(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+5.0_WP/6.0_WP*pSC(i,j,k  ,nsc)-1.0_WP/6.0_WP*pSC(i,j,k+1,nsc))
+                     end do
                   end do
                end do
             end do
-            ! Y fluxes
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)+1
-                  do i = bx%lo(1), bx%hi(1)
-                     FY(i,j,k,nsc) = -0.5_WP*(pV(i,j,k,1)+abs(pV(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j-2,k,nsc)+5.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+2.0_WP/6.0_WP*pSC(i,j  ,k,nsc)) &
-                     &               -0.5_WP*(pV(i,j,k,1)-abs(pV(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j-1,k,nsc)+5.0_WP/6.0_WP*pSC(i,j  ,k,nsc)-1.0_WP/6.0_WP*pSC(i,j+1,k,nsc))
-                  end do
+
+            ! Copy flux_fabs into flx mfab
+            fbx = mfi%nodaltilebox(1); pFlx => flx(1,lvl)%dataptr(mfi)
+            pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FX(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:)
+            fbx = mfi%nodaltilebox(2); pFlx => flx(2,lvl)%dataptr(mfi)
+            pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FY(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:)
+            fbx = mfi%nodaltilebox(3); pFlx => flx(3,lvl)%dataptr(mfi)
+            pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FZ(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:)
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         call this%amr%mfab_destroy(SCfill)
+      end do
+
+      ! Phase 2: Handle coarse-fine interface
+      if (this%use_refluxing) then
+         ! Store fluxes scaled by face area for FluxRegister
+         do lvl = 0, this%amr%clvl()
+            ! Scale fluxes by face areas
+            call flx(1,lvl)%mult(this%amr%dy(lvl) * this%amr%dz(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            call flx(2,lvl)%mult(this%amr%dz(lvl) * this%amr%dx(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            call flx(3,lvl)%mult(this%amr%dx(lvl) * this%amr%dy(lvl), icomp=1, ncomp=this%nscalar, nghost=0)
+            ! Add to flux register
+            if (lvl .gt. 0) call this%flux%fineadd(lvl, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], -1.0_WP)
+            if (lvl .lt. this%amr%clvl()) call this%flux%crseinit(lvl+1, [flx(1,lvl), flx(2,lvl), flx(3,lvl)], +1.0_WP)
+         end do
+      else
+         ! Flux averaging: average fine fluxes down to coarse
+         block
+            type(amrex_multifab) :: fmf(3), cmf(3)
+            integer :: d
+            do lvl = this%amr%clvl(), 1, -1
+               ! Assign individual elements (not array constructor)
+               do d = 1, 3
+                  fmf(d) = flx(d,lvl)
+                  cmf(d) = flx(d,lvl-1)
                end do
+               call amrex_average_down_faces(fmf, cmf, this%amr%geom(lvl-1), 1, this%nscalar, this%amr%rref(lvl-1))
             end do
-            ! Z fluxes
-            do k = bx%lo(3), bx%hi(3)+1
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
-                     FZ(i,j,k,nsc) = -0.5_WP*(pW(i,j,k,1)+abs(pW(i,j,k,1)))*(-1.0_WP/6.0_WP*pSC(i,j,k-2,nsc)+5.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+2.0_WP/6.0_WP*pSC(i,j,k  ,nsc)) &
-                     &               -0.5_WP*(pW(i,j,k,1)-abs(pW(i,j,k,1)))*(+2.0_WP/6.0_WP*pSC(i,j,k-1,nsc)+5.0_WP/6.0_WP*pSC(i,j,k  ,nsc)-1.0_WP/6.0_WP*pSC(i,j,k+1,nsc))
-                  end do
-               end do
-            end do
-            ! RHS
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
-                     rhs(i,j,k,nsc) = (FX(i+1,j,k,nsc)-FX(i,j,k,nsc))/this%amr%dx(lvl) + &
-                     &                (FY(i,j+1,k,nsc)-FY(i,j,k,nsc))/this%amr%dy(lvl) + &
-                     &                (FZ(i,j,k+1,nsc)-FZ(i,j,k,nsc))/this%amr%dz(lvl)
+         end block
+      end if
+
+
+
+
+      ! Phase 3: Compute divergence to get dSCdt
+      do lvl = 0, this%amr%clvl()
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            rhs => dSCdt%mf(lvl)%dataptr(mfi)
+            FX => flx(1,lvl)%dataptr(mfi)
+            FY => flx(2,lvl)%dataptr(mfi)
+            FZ => flx(3,lvl)%dataptr(mfi)
+            do nsc = 1, this%nscalar
+               do k = bx%lo(3), bx%hi(3)
+                  do j = bx%lo(2), bx%hi(2)
+                     do i = bx%lo(1), bx%hi(1)
+                        rhs(i,j,k,nsc) = (FX(i+1,j,k,nsc)-FX(i,j,k,nsc))/this%amr%dx(lvl) + &
+                        &                (FY(i,j+1,k,nsc)-FY(i,j,k,nsc))/this%amr%dy(lvl) + &
+                        &                (FZ(i,j,k+1,nsc)-FZ(i,j,k,nsc))/this%amr%dz(lvl)
+                     end do
                   end do
                end do
             end do
          end do
-
-         ! Copy scaled flux_fabs into flx mfab for refluxing
-         fbx = mfi%nodaltilebox(1); pFlx => flx(1)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FX(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dy(lvl) * this%amr%dz(lvl)
-         fbx = mfi%nodaltilebox(2); pFlx => flx(2)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FY(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dz(lvl) * this%amr%dx(lvl)
-         fbx = mfi%nodaltilebox(3); pFlx => flx(3)%dataptr(mfi); pFlx(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) = FZ(fbx%lo(1):fbx%hi(1), fbx%lo(2):fbx%hi(2), fbx%lo(3):fbx%hi(3),:) * this%amr%dx(lvl) * this%amr%dy(lvl)
-
+         call this%amr%mfiter_destroy(mfi)
       end do
-      call this%amr%mfiter_destroy(mfi)
 
-      ! Handle refluxing
-      if (lvl .gt. 0) call this%flux%fineadd(lvl, flx, -1.0_WP)
-      if (lvl .lt. this%amr%clvl()) call this%flux%crseinit(lvl+1, flx, +1.0_WP)
-
-      ! Cleanup
-      call this%amr%mfab_destroy(flx(1))
-      call this%amr%mfab_destroy(flx(2))
-      call this%amr%mfab_destroy(flx(3))
+      ! Cleanup temp flux storage
+      do lvl = 0, this%amr%clvl()
+         call this%amr%mfab_destroy(flx(1,lvl))
+         call this%amr%mfab_destroy(flx(2,lvl))
+         call this%amr%mfab_destroy(flx(3,lvl))
+      end do
 
    end subroutine get_dSCdt
 
 
-   !> Copy SC in SCold
+   !> Copy SC into SCold for all levels
    subroutine copy2old(this)
       implicit none
       class(amrscalar), intent(inout) :: this
@@ -440,13 +504,13 @@ contains
    end subroutine copy2old
 
 
-   !> Perform refluxing and averaging at a given level
-   subroutine reflux_avg_lvl(this, lvl, dt)
+   !> Apply flux register correction (only if use_refluxing=.true.)
+   subroutine reflux(this, dt)
       use iso_c_binding, only: c_ptr
       implicit none
       class(amrscalar), intent(inout) :: this
       real(WP), intent(in) :: dt
-      integer, intent(in) :: lvl
+      integer :: lvl
       interface
          subroutine amrex_fi_fluxregister_reflux(fr, mf, scale, geom) bind(c)
             import :: c_ptr, WP
@@ -454,21 +518,22 @@ contains
             real(WP), value :: scale
          end subroutine amrex_fi_fluxregister_reflux
       end interface
-      call amrex_fi_fluxregister_reflux(this%flux%fr(lvl+1)%p, this%SC%mf(lvl)%p, dt, this%amr%geom(lvl)%p)
-      call this%SC%average_downto(lvl)
-   end subroutine reflux_avg_lvl
+      if (.not. this%use_refluxing) return
+      do lvl = this%amr%clvl()-1, 0, -1
+         call amrex_fi_fluxregister_reflux(this%flux%fr(lvl+1)%p, this%SC%mf(lvl)%p, dt, this%amr%geom(lvl)%p)
+      end do
+   end subroutine reflux
 
 
-   !> Perform successive refluxing and averaging at all levels
-   subroutine reflux_avg(this, dt)
+   !> Average down SC from fine to coarse (all levels)
+   subroutine average_down(this)
       implicit none
       class(amrscalar), intent(inout) :: this
-      real(WP), intent(in) :: dt
       integer :: lvl
       do lvl = this%amr%clvl()-1, 0, -1
-         call this%reflux_avg_lvl(lvl, dt)
+         call this%SC%average_downto(lvl)
       end do
-   end subroutine reflux_avg
+   end subroutine average_down
 
 
    !> Register solver data for checkpoint

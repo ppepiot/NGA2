@@ -1,9 +1,10 @@
-!> Test amrscalar solver with time integration
+!> Test amrscalar solver with time integration (all-level API)
 module mod_test_amrscalar
    use precision,         only: WP
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
-   use amrex_amr_module,  only: amrex_boxarray,amrex_distromap,amrex_multifab,amrex_mfiter,amrex_box
+   use amrdata_class,     only: amrdata
+   use amrex_amr_module,  only: amrex_boxarray,amrex_distromap,amrex_mfiter,amrex_box
    implicit none
    private
    public :: test_amrscalar
@@ -11,6 +12,12 @@ module mod_test_amrscalar
    ! Module-level objects (referenced by callbacks)
    type(amrgrid),   allocatable, target :: amr
    type(amrscalar), allocatable, target :: sc
+
+   ! Velocity fields (amrdata, face-centered)
+   type(amrdata), allocatable, target :: U, V, W
+
+   ! dSCdt storage (amrdata, cell-centered)
+   type(amrdata), allocatable, target :: dSCdt
 
    real(WP), parameter :: SC_REFINE_THRESH=0.01_WP  !< Refine where SC > this value
 
@@ -89,6 +96,48 @@ contains
    end subroutine scalar_tagger
 
 
+   !> Initialize velocity field for solid body rotation
+   subroutine init_velocity(lvl)
+      integer, intent(in) :: lvl
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      real(WP) :: x, y, dx, dy
+      integer :: i, j, k
+      dx = amr%dx(lvl)
+      dy = amr%dy(lvl)
+      ! Set velocity: solid body rotation in z-plane
+      call amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         pU => U%mf(lvl)%dataptr(mfi)
+         pV => V%mf(lvl)%dataptr(mfi)
+         pW => W%mf(lvl)%dataptr(mfi)
+         ! U on x-faces
+         do k = lbound(pU,3), ubound(pU,3)
+            do j = lbound(pU,2), ubound(pU,2)
+               y = amr%ylo + (real(j,WP)+0.5_WP)*dy
+               do i = lbound(pU,1), ubound(pU,1)
+                  pU(i,j,k,1) = -(y-0.5_WP)
+               end do
+            end do
+         end do
+         ! V on y-faces
+         do k = lbound(pV,3), ubound(pV,3)
+            do j = lbound(pV,2), ubound(pV,2)
+               do i = lbound(pV,1), ubound(pV,1)
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  pV(i,j,k,1) = +(x-0.5_WP)
+               end do
+            end do
+         end do
+         ! W on z-faces
+         pW = 0.0_WP
+      end do
+      call amr%mfiter_destroy(mfi)
+   end subroutine init_velocity
+
+
    subroutine test_amrscalar()
       use string,            only: itoa,rtoa,str_medium
       use mathtools,         only: Pi
@@ -104,19 +153,15 @@ contains
       type(monitor) :: mfile
       type(timetracker) :: time
       type(event) :: regrid_evt,hdf5_evt
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      type(amrex_multifab) :: U,V,W,dSCdt,SCfill
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSC,pU,pV,pW
-      integer :: lvl,i,j,k
-      real(WP) :: x,y,z,dx,dy,dz,int0,intF
+      integer :: lvl
+      real(WP) :: int0,intF
 
       call log("---------------------------------------------------")
-      call log("Running Test: amrscalar Time Integration")
+      call log("Running Test: amrscalar Time Integration (All-Level API)")
       call log("---------------------------------------------------")
 
       ! Allocate module objects
-      allocate(amr,sc)
+      allocate(amr,sc,U,V,W,dSCdt)
 
       ! Setup grid (periodic box)
       amr%nx  =32
@@ -136,10 +181,20 @@ contains
 
       call amr%initialize("sc_amr")
 
-      ! Initialize scalar solver
+      ! Initialize scalar solver (default: use_refluxing=.false. for flux averaging)
       call sc%initialize(amr, nscalar=1, name="test_scalar")
       sc%user_init => gaussian_init
       sc%user_tagging => scalar_tagger
+
+      ! Initialize velocity fields as amrdata (face-centered)
+      ! NOTE: Not registering callbacks - velocity is recomputed analytically after regrid
+      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.])
+      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.])
+      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.])
+
+      ! Initialize dSCdt storage (also no callbacks needed - it's workspace)
+      call dSCdt%initialize(amr, name='dSCdt', ncomp=sc%nscalar, ng=0)
+
 
       ! Initialize HDF5 viz output
       call viz%initialize(amr=amr, name='sc_advect')
@@ -149,6 +204,17 @@ contains
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
       call amr%get_info()
       call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
+
+      ! Manually build MultiFabs for U, V, W, dSCdt (not registered with callbacks)
+      do lvl = 0, amr%clvl()
+         call U%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+         call V%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+         call W%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+         call dSCdt%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+         call init_velocity(lvl)
+      end do
+
+
 
       ! Get initial integral
       call sc%get_info()
@@ -193,77 +259,35 @@ contains
          ! Copy to old
          call sc%copy2old()
 
-         ! Loop over levels (uniform dt)
-         do lvl=0,amr%clvl()
-            dx=amr%dx(lvl)
-            dy=amr%dy(lvl)
-            dz=amr%dz(lvl)
+         ! Calculate dSC/dt for all levels (all-level API)
+         call sc%get_dSCdt(U=U, V=V, W=W, dSCdt=dSCdt)
 
-            ! Build velocity (rotating vortex in xy plane)
-            call amr%mfab_build(lvl=lvl,mfab=U     ,ncomp=1,nover=0,atface=[.true. ,.false.,.false.])
-            call amr%mfab_build(lvl=lvl,mfab=V     ,ncomp=1,nover=0,atface=[.false.,.true. ,.false.])
-            call amr%mfab_build(lvl=lvl,mfab=W     ,ncomp=1,nover=0,atface=[.false.,.false.,.true. ])
-            call amr%mfab_build(lvl=lvl,mfab=dSCdt ,ncomp=1,nover=0,atface=[.false.,.false.,.false.])
-            call amr%mfab_build(lvl=lvl,mfab=SCfill,ncomp=1,nover=2,atface=[.false.,.false.,.false.])
-
-            ! Set velocity: solid body rotation in z-plane
-            call amr%mfiter_build(lvl,mfi)
-            do while (mfi%next())
-               bx=mfi%tilebox()
-               pU=>U%dataptr(mfi)
-               pV=>V%dataptr(mfi)
-               pW=>W%dataptr(mfi)
-               ! U on x-faces
-               do k=lbound(pU,3),ubound(pU,3)
-                  do j=lbound(pU,2),ubound(pU,2)
-                     y=amr%ylo+(real(j,WP)+0.5_WP)*dy
-                     do i=lbound(pU,1),ubound(pU,1)
-                        pU(i,j,k,1)=-(y-0.5_WP)
-                     end do
-                  end do
-               end do
-               ! V on y-faces
-               do k=lbound(pV,3),ubound(pV,3)
-                  do j=lbound(pV,2),ubound(pV,2)
-                     do i=lbound(pV,1),ubound(pV,1)
-                        x=amr%xlo+(real(i,WP)+0.5_WP)*dx
-                        pV(i,j,k,1)=+(x-0.5_WP)
-                     end do
-                  end do
-               end do
-               ! W on z-faces
-               pW=0.0_WP
-            end do
-            call amr%mfiter_destroy(mfi)
-
-            ! Fill SCfill with ghost cells
-            call sc%SCold%fill_mfab(SCfill, lvl, time%t)
-
-            ! Calculate dSC/dt
-            call sc%get_dSCdt(lvl,dSCdt,SCfill,U,V,W)
-
-            ! Forward Euler step
-            call sc%SC%mf(lvl)%lincomb(a=1.0_WP,srcmf1=sc%SCold%mf(lvl),srccomp1=1,&
-            &                          b=time%dt,srcmf2=dSCdt,srccomp2=1,&
-            &                          dstcomp=1,nc=1,ng=0)
-
-            ! Cleanup level work arrays
-            call amr%mfab_destroy(U)
-            call amr%mfab_destroy(V)
-            call amr%mfab_destroy(W)
-            call amr%mfab_destroy(dSCdt)
-            call amr%mfab_destroy(SCfill)
+         ! Forward Euler step (per-level lincomb)
+         do lvl = 0, amr%clvl()
+            call sc%SC%mf(lvl)%lincomb(a=1.0_WP, srcmf1=sc%SCold%mf(lvl), srccomp1=1, &
+            &                          b=time%dt, srcmf2=dSCdt%mf(lvl), srccomp2=1, &
+            &                          dstcomp=1, nc=1, ng=0)
          end do
 
-         ! Reflux and average down
-         call sc%reflux_avg(time%dt)
+         ! Reflux (only applies if use_refluxing=.true.) and average down
+         call sc%reflux(dt=time%dt)
+         call sc%average_down()
 
          ! Regrid if needed
          if (regrid_evt%occurs()) then
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
+            ! Re-build velocity and dSCdt MultiFabs for new grid
+            do lvl = 0, amr%clvl()
+               call U%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+               call V%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+               call W%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+               call dSCdt%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
+               call init_velocity(lvl)
+            end do
          end if
+
 
          ! Write HDF5 output
          if (hdf5_evt%occurs()) then
@@ -334,8 +358,16 @@ contains
       call io%finalize()
       call viz%finalize()
       call mfile%finalize()
+      call dSCdt%finalize()
+      call W%finalize()
+      call V%finalize()
+      call U%finalize()
       call sc%finalize()
       call amr%finalize()
+      if (allocated(dSCdt)) deallocate(dSCdt)
+      if (allocated(W)) deallocate(W)
+      if (allocated(V)) deallocate(V)
+      if (allocated(U)) deallocate(U)
       if (allocated(sc)) deallocate(sc)
       if (allocated(amr)) deallocate(amr)
       call log("PASS: amrscalar test complete!")
