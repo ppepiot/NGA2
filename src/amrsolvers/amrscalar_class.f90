@@ -343,10 +343,11 @@ contains
 
    !> Calculate dSC/dt for all levels (all-level API)
    !> Uses flux averaging if use_refluxing=.false., FluxRegister if .true.
-   subroutine get_dSCdt(this, U, V, W, dSCdt)
+   subroutine get_dSCdt(this, U, V, W, SC, dSCdt)
       implicit none
       class(amrscalar), intent(inout) :: this
       class(amrdata), intent(in) :: U, V, W        ! Face-centered velocity
+      class(amrdata), intent(inout) :: SC          ! Cell-centered scalar state to differentiate
       class(amrdata), intent(inout) :: dSCdt       ! Cell-centered output
       ! Local variables
       type(amrex_multifab), dimension(3,0:this%amr%maxlvl) :: flx  ! Temp flux storage
@@ -365,9 +366,9 @@ contains
          call this%amr%mfab_build(lvl=lvl, mfab=flx(2,lvl), ncomp=this%nscalar, nover=0, atface=[.false., .true., .false.])
          call this%amr%mfab_build(lvl=lvl, mfab=flx(3,lvl), ncomp=this%nscalar, nover=0, atface=[.false., .false., .true.])
 
-         ! Build SCfill with ghost cells
+         ! Build SCfill with ghost cells and fill from provided SC
          call this%amr%mfab_build(lvl=lvl, mfab=SCfill, ncomp=this%nscalar, nover=this%nover, atface=[.false., .false., .false.])
-         call this%SCold%fill_mfab(SCfill, lvl, 0.0_WP)
+         call SC%fill_mfab(SCfill, lvl, 0.0_WP)
 
          ! Loop over boxes/tiles
          call this%amr%mfiter_build(lvl, mfi)

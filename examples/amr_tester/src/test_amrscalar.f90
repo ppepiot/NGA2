@@ -143,6 +143,7 @@ contains
       use mathtools,         only: Pi
       use amrviz_class,      only: amrviz
       use amrio_class,       only: amrio
+      use amrdata_class,     only: amrex_interp_none
       use monitor_class,     only: monitor
       use timetracker_class, only: timetracker
       use event_class,       only: event
@@ -156,9 +157,9 @@ contains
       integer :: lvl
       real(WP) :: int0,intF
 
-      call log("---------------------------------------------------")
+      call log("--------------------------------------------------------")
       call log("Running Test: amrscalar Time Integration (All-Level API)")
-      call log("---------------------------------------------------")
+      call log("--------------------------------------------------------")
 
       ! Allocate module objects
       allocate(amr,sc,U,V,W,dSCdt)
@@ -182,38 +183,36 @@ contains
       call amr%initialize("sc_amr")
 
       ! Initialize scalar solver (default: use_refluxing=.false. for flux averaging)
-      call sc%initialize(amr, nscalar=1, name="test_scalar", use_refluxing=.true.)
+      call sc%initialize(amr, nscalar=1, name="test_scalar")
       sc%user_init => gaussian_init
       sc%user_tagging => scalar_tagger
 
-      ! Initialize velocity fields as amrdata (face-centered)
-      ! NOTE: Not registering callbacks - velocity is recomputed analytically after regrid
-      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.])
-      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.])
-      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.])
+      ! Initialize velocity fields as workspace amrdata (face-centered)
+      ! Using interp=amrex_interp_none means callbacks just allocate, don't fill
+      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none)
+      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_none)
+      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none)
+      call U%register()
+      call V%register()
+      call W%register()
 
-      ! Initialize dSCdt storage (also no callbacks needed - it's workspace)
-      call dSCdt%initialize(amr, name='dSCdt', ncomp=sc%nscalar, ng=0)
-
+      ! Initialize dSCdt as workspace
+      call dSCdt%initialize(amr, name='dSCdt', ncomp=sc%nscalar, ng=0, interp=amrex_interp_none)
+      call dSCdt%register()
 
       ! Initialize HDF5 viz output
       call viz%initialize(amr=amr, name='sc_advect')
       call viz%add_scalar(data=sc%SC, comp=1, name='SC')
 
-      ! Build all levels
+      ! Build all levels (callbacks auto-allocate U, V, W, dSCdt)
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
       call amr%get_info()
       call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
 
-      ! Manually build MultiFabs for U, V, W, dSCdt (not registered with callbacks)
+      ! Initialize velocity
       do lvl = 0, amr%clvl()
-         call U%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-         call V%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-         call W%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-         call dSCdt%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
          call init_velocity(lvl)
       end do
-
 
 
       ! Get initial integral
@@ -260,7 +259,7 @@ contains
          call sc%copy2old()
 
          ! Calculate dSC/dt for all levels (all-level API)
-         call sc%get_dSCdt(U=U, V=V, W=W, dSCdt=dSCdt)
+         call sc%get_dSCdt(U=U, V=V, W=W, SC=sc%SCold, dSCdt=dSCdt)
 
          ! Forward Euler step (per-level lincomb)
          do lvl = 0, amr%clvl()
@@ -278,12 +277,8 @@ contains
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-            ! Re-build velocity and dSCdt MultiFabs for new grid
+            ! Reinitialize velocity
             do lvl = 0, amr%clvl()
-               call U%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-               call V%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-               call W%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
-               call dSCdt%reset_level(lvl, amr%get_boxarray(lvl), amr%get_distromap(lvl))
                call init_velocity(lvl)
             end do
          end if

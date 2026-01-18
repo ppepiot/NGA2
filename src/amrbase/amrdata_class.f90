@@ -13,6 +13,9 @@ module amrdata_class
    public :: amrdata
    public :: amrdata_on_init,amrdata_on_coarse,amrdata_on_remake,amrdata_on_clear,amrdata_fillbc
 
+   ! Constant for "workspace" mode - allocate but don't fill
+   integer, parameter, public :: amrex_interp_none = -1
+
    ! Forward declaration for interfaces
    type :: amrdata
       ! The underlying AMReX objects (array of MultiFabs, one per level)
@@ -269,8 +272,10 @@ contains
       real(WP), intent(in) :: time
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
+      ! Reset level
       call this%reset_level(lvl, ba, dm)
-      call this%mf(lvl)%setval(0.0_WP)
+      ! Zero out data
+      if (this%interp.ne.amrex_interp_none) call this%mf(lvl)%setval(0.0_WP)
       ! User-provided initialization
       if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine default_on_init
@@ -282,8 +287,10 @@ contains
       real(WP), intent(in) :: time
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
+      ! Reset level
       call this%reset_level(lvl, ba, dm)
-      call this%fill_from_coarse(lvl, time)
+      ! Fill from coarse
+      if (this%interp.ne.amrex_interp_none) call this%fill_from_coarse(lvl, time)
    end subroutine default_on_coarse
 
    !> Default on_remake: FillPatch old data into new layout
@@ -295,17 +302,22 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       type(amrex_multifab) :: mf_tmp
-      ! Build temp MultiFab with new layout (0 ghost cells for FillPatch)
-      call amrex_multifab_build(mf_tmp, ba, dm, this%ncomp, 0, this%nodal)
-      ! Fill temp from old data via FillPatch
-      call this%fill_mfab(mf_tmp, lvl, time)
-      ! Clear old and build new with proper ghost count
+      ! If we interpolate, we need to fill the new layout from the old layout
+      if (this%interp.ne.amrex_interp_none) then
+         ! Build temp MultiFab with new layout (0 ghost cells for FillPatch)
+         call amrex_multifab_build(mf_tmp, ba, dm, this%ncomp, 0, this%nodal)
+         ! Fill temp from old data via FillPatch
+         call this%fill_mfab(mf_tmp, lvl, time)
+      end if
+      ! Clear old and build new with proper layout
       call this%clear_level(lvl)
       call amrex_multifab_build(this%mf(lvl), ba, dm, this%ncomp, this%ng, this%nodal)
-      ! Copy from temp
-      call this%mf(lvl)%copy(mf_tmp, 1, 1, this%ncomp, 0)
-      ! Destroy temp
-      call amrex_multifab_destroy(mf_tmp)
+      ! If we interpolate, we need to copy from temp
+      if (this%interp.ne.amrex_interp_none) then
+         call this%mf(lvl)%copy(mf_tmp, 1, 1, this%ncomp, 0)
+         ! Destroy temp
+         call amrex_multifab_destroy(mf_tmp)
+      end if
    end subroutine default_on_remake
 
    !> Default on_clear: just clear the level
