@@ -303,6 +303,24 @@ void amrmfab_fillpatch_two(void *mf_ptr, double time_old_c, void *mf_old_c_ptr,
   case 1: // amrex_interp_node_bilinear
     interp = &amrex::node_bilinear_interp;
     break;
+  case 2: // amrex_interp_cell_bilinear
+    interp = &amrex::cell_bilinear_interp;
+    break;
+  case 3: // amrex_interp_quadratic
+    interp = &amrex::quadratic_interp;
+    break;
+  case 4: // amrex_interp_lincc
+    interp = &amrex::lincc_interp;
+    break;
+  case 6: // amrex_interp_protected
+    interp = &amrex::protected_interp;
+    break;
+  case 7: // amrex_interp_quartic
+    interp = &amrex::quartic_interp;
+    break;
+  case 8: // amrex_interp_face_divfree
+    interp = &amrex::face_divfree_interp;
+    break;
   case 9: // amrex_interp_face_linear
     interp = &amrex::face_linear_interp;
     break;
@@ -369,6 +387,24 @@ void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
     break;
   case 1: // amrex_interp_node_bilinear
     interp = &amrex::node_bilinear_interp;
+    break;
+  case 2: // amrex_interp_cell_bilinear
+    interp = &amrex::cell_bilinear_interp;
+    break;
+  case 3: // amrex_interp_quadratic
+    interp = &amrex::quadratic_interp;
+    break;
+  case 4: // amrex_interp_lincc
+    interp = &amrex::lincc_interp;
+    break;
+  case 6: // amrex_interp_protected
+    interp = &amrex::protected_interp;
+    break;
+  case 7: // amrex_interp_quartic
+    interp = &amrex::quartic_interp;
+    break;
+  case 8: // amrex_interp_face_divfree
+    interp = &amrex::face_divfree_interp;
     break;
   case 9: // amrex_interp_face_linear
     interp = &amrex::face_linear_interp;
