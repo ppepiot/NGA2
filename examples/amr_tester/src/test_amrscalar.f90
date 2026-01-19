@@ -188,7 +188,6 @@ contains
       sc%user_tagging => scalar_tagger
 
       ! Initialize velocity fields as amrdata (face-centered)
-      ! Auto-detection sets interp=amrex_interp_face_linear for face-nodal data
       call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.])
       call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.])
       call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.])
