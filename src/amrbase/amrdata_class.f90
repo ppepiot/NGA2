@@ -13,8 +13,9 @@ module amrdata_class
    public :: amrdata
    public :: amrdata_on_init,amrdata_on_coarse,amrdata_on_remake,amrdata_on_clear,amrdata_fillbc
 
-   ! Constant for "workspace" mode - allocate but don't fill
-   integer, parameter, public :: amrex_interp_none = -1
+   ! Special interpolation modes for amrdata
+   integer, parameter, public :: amrex_interp_none   = -1  !< Workspace: allocate but don't fill
+   integer, parameter, public :: amrex_interp_reinit = -2  !< Reinit: always call user_init on regrid
 
    ! Forward declaration for interfaces
    type :: amrdata
@@ -265,7 +266,7 @@ contains
       call amrex_mfiter_destroy(mfi)
    end subroutine default_fillbc
 
-   !> Default on_init: reset level and zero out data
+   !> Default on_init: reset level and initialize based on interp mode
    subroutine default_on_init(this, lvl, time, ba, dm)
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
@@ -274,13 +275,19 @@ contains
       type(amrex_distromap), intent(in) :: dm
       ! Reset level
       call this%reset_level(lvl, ba, dm)
-      ! Zero out data
-      if (this%interp.ne.amrex_interp_none) call this%mf(lvl)%setval(0.0_WP)
-      ! User-provided initialization
+      ! Handle different modes
+      select case (this%interp)
+       case (amrex_interp_none)
+         ! Workspace mode: just allocate, don't fill
+       case default
+         ! Standard or reinit mode: zero out, then call user_init
+         call this%mf(lvl)%setval(0.0_WP)
+      end select
+      ! User-provided initialization (called for all modes except none without user_init)
       if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine default_on_init
 
-   !> Default on_coarse: reset level and fill from coarse
+   !> Default on_coarse: reset level and fill based on interp mode
    subroutine default_on_coarse(this, lvl, time, ba, dm)
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
@@ -289,11 +296,20 @@ contains
       type(amrex_distromap), intent(in) :: dm
       ! Reset level
       call this%reset_level(lvl, ba, dm)
-      ! Fill from coarse
-      if (this%interp.ne.amrex_interp_none) call this%fill_from_coarse(lvl, time)
+      ! Handle different modes
+      select case (this%interp)
+       case (amrex_interp_none)
+         ! Workspace mode: just allocate, don't fill
+       case (amrex_interp_reinit)
+         ! Reinit mode: call user_init instead of interpolating
+         if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
+       case default
+         ! Standard interpolation: fill from coarse
+         call this%fill_from_coarse(lvl, time)
+      end select
    end subroutine default_on_coarse
 
-   !> Default on_remake: FillPatch old data into new layout
+   !> Default on_remake: handle level relayout based on interp mode
    subroutine default_on_remake(this, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_multifab_build, amrex_multifab_destroy
       class(amrdata), intent(inout) :: this
@@ -302,22 +318,27 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       type(amrex_multifab) :: mf_tmp
-      ! If we interpolate, we need to fill the new layout from the old layout
-      if (this%interp.ne.amrex_interp_none) then
+      ! Handle different modes
+      select case (this%interp)
+       case (amrex_interp_none)
+         ! Workspace mode: just reallocate
+         call this%reset_level(lvl, ba, dm)
+       case (amrex_interp_reinit)
+         ! Reinit mode: reallocate and call user_init
+         call this%reset_level(lvl, ba, dm)
+         if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
+       case default
+         ! Standard interpolation: FillPatch old data into new layout
          ! Build temp MultiFab with new layout (0 ghost cells for FillPatch)
          call amrex_multifab_build(mf_tmp, ba, dm, this%ncomp, 0, this%nodal)
          ! Fill temp from old data via FillPatch
          call this%fill_mfab(mf_tmp, lvl, time)
-      end if
-      ! Clear old and build new with proper layout
-      call this%clear_level(lvl)
-      call amrex_multifab_build(this%mf(lvl), ba, dm, this%ncomp, this%ng, this%nodal)
-      ! If we interpolate, we need to copy from temp
-      if (this%interp.ne.amrex_interp_none) then
+         ! Reset level and copy from temp
+         call this%reset_level(lvl, ba, dm)
          call this%mf(lvl)%copy(mf_tmp, 1, 1, this%ncomp, 0)
          ! Destroy temp
          call amrex_multifab_destroy(mf_tmp)
-      end if
+      end select
    end subroutine default_on_remake
 
    !> Default on_clear: just clear the level

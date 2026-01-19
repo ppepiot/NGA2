@@ -3,7 +3,7 @@ module mod_test_amrscalar
    use precision,         only: WP
    use amrgrid_class,     only: amrgrid
    use amrscalar_class,   only: amrscalar
-   use amrdata_class,     only: amrdata
+   use amrdata_class,     only: amrdata, amrex_interp_reinit, amrex_interp_none
    use amrex_amr_module,  only: amrex_boxarray,amrex_distromap,amrex_mfiter,amrex_box
    implicit none
    private
@@ -96,46 +96,56 @@ contains
    end subroutine scalar_tagger
 
 
-   !> Initialize velocity field for solid body rotation
-   subroutine init_velocity(lvl)
+   !> Velocity initialization callback (called by amrdata on init/regrid)
+   !> Uses this%name to determine which component (U, V, or W)
+   subroutine velocity_init(this, lvl, time, ba, dm)
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
+      &                           amrex_mfiter_build, amrex_mfiter_destroy
+      class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
       real(WP) :: x, y, dx, dy
       integer :: i, j, k
       dx = amr%dx(lvl)
       dy = amr%dy(lvl)
-      ! Set velocity: solid body rotation in z-plane
-      call amr%mfiter_build(lvl, mfi)
+      ! Initialize velocity component based on name
+      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=.false.)
       do while (mfi%next())
          bx = mfi%tilebox()
-         pU => U%mf(lvl)%dataptr(mfi)
-         pV => V%mf(lvl)%dataptr(mfi)
-         pW => W%mf(lvl)%dataptr(mfi)
-         ! U on x-faces
-         do k = lbound(pU,3), ubound(pU,3)
-            do j = lbound(pU,2), ubound(pU,2)
-               y = amr%ylo + (real(j,WP)+0.5_WP)*dy
-               do i = lbound(pU,1), ubound(pU,1)
-                  pU(i,j,k,1) = -(y-0.5_WP)
+         p => this%mf(lvl)%dataptr(mfi)
+         select case (trim(this%name))
+          case ('U')
+            ! U on x-faces: U = -(y-0.5)
+            do k = lbound(p,3), ubound(p,3)
+               do j = lbound(p,2), ubound(p,2)
+                  y = amr%ylo + (real(j,WP)+0.5_WP)*dy
+                  do i = lbound(p,1), ubound(p,1)
+                     p(i,j,k,1) = -(y-0.5_WP)
+                  end do
                end do
             end do
-         end do
-         ! V on y-faces
-         do k = lbound(pV,3), ubound(pV,3)
-            do j = lbound(pV,2), ubound(pV,2)
-               do i = lbound(pV,1), ubound(pV,1)
-                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
-                  pV(i,j,k,1) = +(x-0.5_WP)
+          case ('V')
+            ! V on y-faces: V = +(x-0.5)
+            do k = lbound(p,3), ubound(p,3)
+               do j = lbound(p,2), ubound(p,2)
+                  do i = lbound(p,1), ubound(p,1)
+                     x = amr%xlo + (real(i,WP)+0.5_WP)*dx
+                     p(i,j,k,1) = +(x-0.5_WP)
+                  end do
                end do
             end do
-         end do
-         ! W on z-faces
-         pW = 0.0_WP
+          case ('W')
+            ! W on z-faces: W = 0
+            p = 0.0_WP
+         end select
       end do
-      call amr%mfiter_destroy(mfi)
-   end subroutine init_velocity
+      call amrex_mfiter_destroy(mfi)
+   end subroutine velocity_init
 
 
    subroutine test_amrscalar()
@@ -187,10 +197,13 @@ contains
       sc%user_init => gaussian_init
       sc%user_tagging => scalar_tagger
 
-      ! Initialize velocity fields as amrdata (face-centered)
-      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.])
-      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.])
-      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.])
+      ! Initialize velocity fields with reinit mode (auto-recomputed on regrid)
+      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_reinit)
+      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_reinit)
+      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_reinit)
+      U%user_init => velocity_init
+      V%user_init => velocity_init
+      W%user_init => velocity_init
       call U%register()
       call V%register()
       call W%register()
@@ -207,12 +220,6 @@ contains
       call amr%init_from_scratch(time=0.0_WP, do_postregrid=.true.)
       call amr%get_info()
       call log("After init_from_scratch: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-
-      ! Initialize velocity
-      do lvl = 0, amr%clvl()
-         call init_velocity(lvl)
-      end do
-
 
       ! Get initial integral
       call sc%get_info()
@@ -276,10 +283,6 @@ contains
             call log("Regridding at step "//trim(itoa(time%n)))
             call amr%regrid(baselvl=0,time=time%t)
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
-            ! Reinitialize velocity
-            do lvl = 0, amr%clvl()
-               call init_velocity(lvl)
-            end do
          end if
 
 
