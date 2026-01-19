@@ -187,16 +187,16 @@ contains
       sc%user_init => gaussian_init
       sc%user_tagging => scalar_tagger
 
-      ! Initialize velocity fields as workspace amrdata (face-centered)
-      ! Using interp=amrex_interp_none means callbacks just allocate, don't fill
-      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none)
-      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_none)
-      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none)
+      ! Initialize velocity fields as amrdata (face-centered)
+      ! Auto-detection sets interp=amrex_interp_face_linear for face-nodal data
+      call U%initialize(amr, name='U', ncomp=1, ng=0, nodal=[.true., .false., .false.])
+      call V%initialize(amr, name='V', ncomp=1, ng=0, nodal=[.false., .true., .false.])
+      call W%initialize(amr, name='W', ncomp=1, ng=0, nodal=[.false., .false., .true.])
       call U%register()
       call V%register()
       call W%register()
 
-      ! Initialize dSCdt as workspace
+      ! Initialize dSCdt as workspace (no interpolation needed)
       call dSCdt%initialize(amr, name='dSCdt', ncomp=sc%nscalar, ng=0, interp=amrex_interp_none)
       call dSCdt%register()
 

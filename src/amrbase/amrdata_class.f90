@@ -6,7 +6,7 @@ module amrdata_class
    use amrgrid_class,    only: amrgrid
    use amrex_amr_module, only: amrex_multifab,amrex_boxarray,amrex_distromap,&
    &                           amrex_multifab_build,amrex_multifab_destroy,amrex_geometry,&
-   &                           amrex_interp_cell_cons
+   &                           amrex_interp_cell_cons,amrex_interp_face_linear,amrex_interp_node_bilinear
    implicit none
    private
 

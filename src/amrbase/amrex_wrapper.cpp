@@ -7,6 +7,7 @@
 #include <AMReX_FAmrCore.H>
 #include <AMReX_FillPatchUtil.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_Interpolater.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_PhysBCFunct.H>
@@ -293,12 +294,19 @@ void amrmfab_fillpatch_two(void *mf_ptr, double time_old_c, void *mf_old_c_ptr,
   auto *geom_f = static_cast<amrex::Geometry *>(geom_f_ptr);
 
   // Look up interpolator from type constant (matches AMReX Fortran constants)
+  // See amrex_interpolater_module in AMReX_interpolater_mod.F90
   amrex::Interpolater *interp = nullptr;
   switch (interp_type) {
-  case 0: // amrex_interp_pc (piecewise constant)
+  case 0: // amrex_interp_pc
     interp = &amrex::pc_interp;
     break;
-  case 1: // amrex_interp_cell_cons (cell conservative)
+  case 1: // amrex_interp_node_bilinear
+    interp = &amrex::node_bilinear_interp;
+    break;
+  case 9: // amrex_interp_face_linear
+    interp = &amrex::face_linear_interp;
+    break;
+  case 5: // amrex_interp_cell_cons
   default:
     interp = &amrex::cell_cons_interp;
     break;
@@ -353,13 +361,19 @@ void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
   auto *geom_c = static_cast<amrex::Geometry *>(geom_c_ptr);
   auto *geom_f = static_cast<amrex::Geometry *>(geom_f_ptr);
 
-  // Look up interpolator
+  // Look up interpolator (see amrex_interpolater_module)
   amrex::Interpolater *interp = nullptr;
   switch (interp_type) {
-  case 0:
+  case 0: // amrex_interp_pc
     interp = &amrex::pc_interp;
     break;
-  case 1:
+  case 1: // amrex_interp_node_bilinear
+    interp = &amrex::node_bilinear_interp;
+    break;
+  case 9: // amrex_interp_face_linear
+    interp = &amrex::face_linear_interp;
+    break;
+  case 5: // amrex_interp_cell_cons
   default:
     interp = &amrex::cell_cons_interp;
     break;
