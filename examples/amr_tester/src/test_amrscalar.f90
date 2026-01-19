@@ -114,7 +114,7 @@ contains
       dx = amr%dx(lvl)
       dy = amr%dy(lvl)
       ! Initialize velocity component based on name
-      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=.false.)
+      call amrex_mfiter_build(mfi, this%mf(lvl), tiling=this%amr%default_tiling)
       do while (mfi%next())
          bx = mfi%tilebox()
          p => this%mf(lvl)%dataptr(mfi)
