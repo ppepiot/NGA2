@@ -10,6 +10,7 @@
 #include <AMReX_Interpolater.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_MultiFabUtil.H>
 #include <AMReX_PhysBCFunct.H>
 #include <AMReX_PlotFileUtil.H>
 #ifdef AMREX_USE_HDF5
@@ -607,6 +608,33 @@ double amrplotfile_read_time(const char *filename) { return -1.0; }
 // Get number of iterations from last solve
 int amrmlmg_get_niters(void *mlmg) {
   return static_cast<amrex::MLMG *>(mlmg)->getNumIters();
+}
+
+//=============================================================================
+// MultiFab Averaging Utilities
+// These wrap AMReX's single-direction averaging functions that use IndexType
+// to determine the data centering (not exposed in AMReX's Fortran interface).
+// Signature: (fine_mf, crse_mf, crse_geom, ref_ratio)
+//=============================================================================
+
+// Average down a single face-direction MultiFab (nodal in 1 dir, cell in 2)
+// Uses AMReX's average_down_faces which handles periodicity via geometry
+void amrmfab_average_down_face(void *fine_mf, void *crse_mf, void *crse_geom,
+                               int ref_ratio) {
+  auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
+  auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
+  auto *geom = static_cast<amrex::Geometry *>(crse_geom);
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+  amrex::average_down_faces(*fmf, *cmf, ratio, *geom);
+}
+
+// Average down a single edge-direction MultiFab (nodal in 2 dirs, cell in 1)
+// Uses AMReX's average_down_edges (no geometry version - simple averaging)
+void amrmfab_average_down_edge(void *fine_mf, void *crse_mf, int ref_ratio) {
+  auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
+  auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+  amrex::average_down_edges(*fmf, *cmf, ratio, 0);
 }
 
 } // extern "C"

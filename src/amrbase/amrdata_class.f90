@@ -512,29 +512,50 @@ contains
    end subroutine fill_mfab
 
    !> Average down from finest level to coarsest (ensures level consistency)
+   !> Simply calls average_downto in a loop from finest to coarsest
    subroutine average_down(this)
-      use amrex_amr_module, only: amrex_average_down
       implicit none
       class(amrdata), intent(inout) :: this
       integer :: lvl
       if (.not.associated(this%amr)) return
       ! Loop from finest to coarsest
       do lvl = this%amr%clvl()-1, 0, -1
-         call amrex_average_down(this%mf(lvl+1), this%mf(lvl), &
-         &   this%amr%geom(lvl+1), this%amr%geom(lvl), 1, this%ncomp, this%amr%rref(lvl))
+         call this%average_downto(lvl)
       end do
    end subroutine average_down
 
    !> Average level lvl+1 down to level lvl
+   !> Automatically uses correct AMReX function based on data centering:
+   !> - nodal_count=0 (cell): volume-weighted amrex_average_down
+   !> - nodal_count=1 (face): amrmfab_average_down_face
+   !> - nodal_count=2 (edge): amrmfab_average_down_edge
+   !> - nodal_count=3 (node): amrex_average_down_node
    subroutine average_downto(this, lvl)
       use amrex_amr_module, only: amrex_average_down
+      use amrex_multifabutil_module, only: amrex_average_down_node
+      use amrex_interface, only: amrmfab_average_down_face, amrmfab_average_down_edge
       implicit none
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
+      integer :: nodal_count
       if (.not.associated(this%amr)) return
-      if (lvl.lt.0.or.lvl.ge.this%amr%clvl()) return
-      call amrex_average_down(this%mf(lvl+1), this%mf(lvl), &
-      &   this%amr%geom(lvl+1), this%amr%geom(lvl), 1, this%ncomp, this%amr%rref(lvl))
+      if (lvl.lt.0 .or. lvl.ge.this%amr%clvl()) return
+      nodal_count = count(this%nodal)
+      select case (nodal_count)
+       case (0) ! Cell-centered: volume-weighted, needs both geometries
+         call amrex_average_down(fmf=this%mf(lvl+1), cmf=this%mf(lvl), &
+         &   fgeom=this%amr%geom(lvl+1), cgeom=this%amr%geom(lvl), &
+         &   scomp=1, ncomp=this%ncomp, rr=this%amr%rref(lvl))
+       case (1) ! Face-centered: needs coarse geometry for periodicity
+         call amrmfab_average_down_face(fmf=this%mf(lvl+1), cmf=this%mf(lvl), &
+         &   cgeom=this%amr%geom(lvl), rr=this%amr%rref(lvl))
+       case (2) ! Edge-centered: simple averaging, no geometry
+         call amrmfab_average_down_edge(fmf=this%mf(lvl+1), cmf=this%mf(lvl), &
+         &   rr=this%amr%rref(lvl))
+       case (3) ! Fully nodal: simple averaging, no geometry
+         call amrex_average_down_node(fmf=this%mf(lvl+1), cmf=this%mf(lvl), &
+         &   scomp=1, ncomp=this%ncomp, rr=this%amr%rref(lvl))
+      end select
    end subroutine average_downto
 
 end module amrdata_class

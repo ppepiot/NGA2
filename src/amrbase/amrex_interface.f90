@@ -68,6 +68,12 @@ module amrex_interface
    !=====================================================================
    public :: amrmlmg_get_niters
 
+   !=====================================================================
+   ! MultiFab Averaging (single-direction wrappers, not in AMReX Fortran)
+   !=====================================================================
+   public :: amrmfab_average_down_face  ! Face-centered (nodal_count=1)
+   public :: amrmfab_average_down_edge  ! Edge-centered (nodal_count=2)
+
    interface
 
       !------------------------------------------------------------------
@@ -326,6 +332,49 @@ module amrex_interface
          type(c_ptr), value :: mlmg
       end function amrmlmg_get_niters
 
+      !====================================================================
+      ! MultiFab Averaging (C bindings - private, called by wrappers below)
+      !====================================================================
+
+      subroutine amrmfab_average_down_face_c(fine_mf, crse_mf, crse_geom, ref_ratio) bind(c, name='amrmfab_average_down_face')
+         import :: c_ptr, c_int
+         type(c_ptr), value :: fine_mf, crse_mf, crse_geom
+         integer(c_int), value :: ref_ratio
+      end subroutine amrmfab_average_down_face_c
+
+      subroutine amrmfab_average_down_edge_c(fine_mf, crse_mf, ref_ratio) bind(c, name='amrmfab_average_down_edge')
+         import :: c_ptr, c_int
+         type(c_ptr), value :: fine_mf, crse_mf
+         integer(c_int), value :: ref_ratio
+      end subroutine amrmfab_average_down_edge_c
+
    end interface
 
+contains
+
+   !====================================================================
+   ! MultiFab Averaging Wrappers (accept amrex types, like AMReX routines)
+   !====================================================================
+
+   !> Average down face-centered MultiFab (nodal in 1 dir, cell in 2)
+   subroutine amrmfab_average_down_face(fmf, cmf, cgeom, rr)
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(in) :: fmf
+      type(amrex_multifab), intent(inout) :: cmf
+      type(amrex_geometry), intent(in) :: cgeom
+      integer, intent(in) :: rr
+      call amrmfab_average_down_face_c(fmf%p, cmf%p, cgeom%p, rr)
+   end subroutine amrmfab_average_down_face
+
+   !> Average down edge-centered MultiFab (nodal in 2 dirs, cell in 1)
+   subroutine amrmfab_average_down_edge(fmf, cmf, rr)
+      use amrex_multifab_module, only: amrex_multifab
+      type(amrex_multifab), intent(in) :: fmf
+      type(amrex_multifab), intent(inout) :: cmf
+      integer, intent(in) :: rr
+      call amrmfab_average_down_edge_c(fmf%p, cmf%p, rr)
+   end subroutine amrmfab_average_down_edge
+
 end module amrex_interface
+
