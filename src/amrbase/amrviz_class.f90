@@ -16,7 +16,7 @@ module amrviz_class
 
    public :: amrviz
 
-   ! Scalar field registration node
+   !> Scalar field registration node
    type :: scl
       type(scl), pointer :: next => null()
       character(len=str_medium) :: name
@@ -25,29 +25,16 @@ module amrviz_class
       logical :: recenter = .true.  !< If true, interpolate to cell centers
    end type scl
 
-   ! Vector field registration node
-   type :: vct
-      type(vct), pointer :: next => null()
-      character(len=str_medium) :: name
-      type(amrdata), pointer :: ptrx => null()
-      type(amrdata), pointer :: ptry => null()
-      type(amrdata), pointer :: ptrz => null()
-      integer :: compx, compy, compz
-      logical :: recenter = .true.  !< If true, interpolate to cell centers
-   end type vct
-
    !> AMR visualization handler
    type :: amrviz
       class(amrgrid), pointer :: amr => null()   !< Pointer to AMR grid
       character(len=str_medium) :: name          !< Subdirectory name for output
       type(scl), pointer :: first_scl => null()  !< Registered scalars
-      type(vct), pointer :: first_vct => null()  !< Registered vectors
       integer :: ntime = 0                       !< File counter for output
       real(WP), allocatable :: time(:)           !< Time values for each file
    contains
       procedure :: initialize                    !< Initialize with grid
       procedure :: add_scalar                    !< Register a scalar field
-      procedure :: add_vector                    !< Register a vector field
       procedure :: write                         !< Write all registered fields to single HDF5
       procedure :: finalize                      !< Clean up registered field lists
    end type amrviz
@@ -73,7 +60,6 @@ contains
       this%name = trim(adjustl(name))
       this%ntime = 0
       this%first_scl => null()
-      this%first_vct => null()
 
       ! Create output directory: amrviz/<name>/
       dirname = 'amrviz/'//trim(this%name)
@@ -171,45 +157,6 @@ contains
    end subroutine add_scalar
 
 
-   !> Register a vector field for output (3 components from 3 amrdata objects)
-   !> For MAC velocity: each component is recentered from its native face to cell centers
-   subroutine add_vector(this, datax, compx, datay, compy, dataz, compz, name)
-      use messager, only: die
-      implicit none
-      class(amrviz), intent(inout) :: this
-      type(amrdata), target, intent(in) :: datax, datay, dataz
-      integer, intent(in) :: compx, compy, compz
-      character(len=*), intent(in), optional :: name
-      type(vct), pointer :: new_vct
-
-      ! Check that the components are meaningful
-      if (compx.le.0) call die('[amrviz add_vector] compx must be at least one')
-      if (compx.gt.datax%ncomp) call die('[amrviz add_vector] compx is too large for provided datax')
-      if (compy.le.0) call die('[amrviz add_vector] compy must be at least one')
-      if (compy.gt.datay%ncomp) call die('[amrviz add_vector] compy is too large for provided datay')
-      if (compz.le.0) call die('[amrviz add_vector] compz must be at least one')
-      if (compz.gt.dataz%ncomp) call die('[amrviz add_vector] compz is too large for provided dataz')
-
-      ! Create new vector node
-      allocate(new_vct)
-      if (present(name)) then
-         new_vct%name = trim(adjustl(name))
-      else
-         new_vct%name = 'vector'
-      end if
-      new_vct%ptrx => datax
-      new_vct%ptry => datay
-      new_vct%ptrz => dataz
-      new_vct%compx = compx
-      new_vct%compy = compy
-      new_vct%compz = compz
-      new_vct%recenter = .true.  ! Vectors always recenter to cell
-
-      ! Insert at front of list
-      new_vct%next => this%first_vct
-      this%first_vct => new_vct
-   end subroutine add_vector
-
 
    !> Write all registered fields to HDF5 plotfiles
    !> Fields are grouped by centering type - one file per centering
@@ -220,9 +167,8 @@ contains
       class(amrviz), intent(inout) :: this
       real(WP), intent(in) :: time
 
-      integer :: nlev, lev, nscl_grp, nvct_grp, ncomp, icomp, i, n, ngroups
+      integer :: nlev, lev, nscl_grp, ncomp, icomp, i, n, ngroups
       type(scl), pointer :: my_scl
-      type(vct), pointer :: my_vct
       real(WP), dimension(:), allocatable :: temp_time
       character(len=str_medium) :: filename
       character(len=8) :: suffix
@@ -278,28 +224,6 @@ contains
          my_scl => my_scl%next
       end do
 
-      ! Count vectors: vectors always recenter to cell-centered
-      my_vct => this%first_vct
-      do while (associated(my_vct))
-         eff_nodal = [.false., .false., .false.]  ! Vectors always go to cell-centered
-
-         ! Find or create cell-centered group
-         found = .false.
-         do i = 1, ngroups
-            if (all(eff_nodal .eqv. group_nodal(:,i))) then
-               group_count(i) = group_count(i) + 3  ! Vector has 3 components
-               found = .true.
-               exit
-            end if
-         end do
-         if (.not.found) then
-            ngroups = ngroups + 1
-            group_nodal(:,ngroups) = eff_nodal
-            group_count(ngroups) = 3
-         end if
-         my_vct => my_vct%next
-      end do
-
       if (ngroups == 0) return  ! Nothing to write
 
       ! --- Time tracking (shared across all groups) ---
@@ -349,20 +273,7 @@ contains
             my_scl => my_scl%next
          end do
 
-         ! Collect varnames for vectors (cell-centered group only)
-         if (all(.not.group_nodal(:,i))) then  ! Cell-centered group
-            my_vct => this%first_vct
-            do while (associated(my_vct))
-               varnames(icomp+1) = trim(my_vct%name)//'_x'//c_null_char
-               varnames(icomp+2) = trim(my_vct%name)//'_y'//c_null_char
-               varnames(icomp+3) = trim(my_vct%name)//'_z'//c_null_char
-               varname_ptrs(icomp+1) = c_loc(varnames(icomp+1))
-               varname_ptrs(icomp+2) = c_loc(varnames(icomp+2))
-               varname_ptrs(icomp+3) = c_loc(varnames(icomp+3))
-               icomp = icomp + 3
-               my_vct => my_vct%next
-            end do
-         end if
+         ! Allocate combined MultiFab for each level
          allocate(combined(0:this%amr%clvl()))
 
          ! Build combined MF and copy matching scalar data
@@ -421,93 +332,9 @@ contains
                end if
                my_scl => my_scl%next
             end do
-
-            ! Copy vector components (cell-centered group only)
-            if (all(.not.group_nodal(:,i))) then
-               my_vct => this%first_vct
-               do while (associated(my_vct))
-                  ! Process X component
-                  icomp = icomp + 1
-                  call amrex_mfiter_build(mfi, combined(lev), tiling=this%amr%default_tiling)
-                  do while (mfi%next())
-                     bx = mfi%tilebox()
-                     src => my_vct%ptrx%mf(lev)%dataptr(mfi)
-                     dst => combined(lev)%dataptr(mfi)
-                     native_nodal = my_vct%ptrx%nodal
-                     do kk = bx%lo(3), bx%hi(3)
-                        do jj = bx%lo(2), bx%hi(2)
-                           do ii = bx%lo(1), bx%hi(1)
-                              dst(ii,jj,kk,icomp) = 0.0_WP
-                              do dk = 0, merge(1,0,native_nodal(3))
-                                 do dj = 0, merge(1,0,native_nodal(2))
-                                    do di = 0, merge(1,0,native_nodal(1))
-                                       dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) + src(ii+di, jj+dj, kk+dk, my_vct%compx)
-                                    end do
-                                 end do
-                              end do
-                              dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) / real(2**count(native_nodal), WP)
-                           end do
-                        end do
-                     end do
-                  end do
-                  call amrex_mfiter_destroy(mfi)
-
-                  ! Process Y component
-                  icomp = icomp + 1
-                  call amrex_mfiter_build(mfi, combined(lev), tiling=this%amr%default_tiling)
-                  do while (mfi%next())
-                     bx = mfi%tilebox()
-                     src => my_vct%ptry%mf(lev)%dataptr(mfi)
-                     dst => combined(lev)%dataptr(mfi)
-                     native_nodal = my_vct%ptry%nodal
-                     do kk = bx%lo(3), bx%hi(3)
-                        do jj = bx%lo(2), bx%hi(2)
-                           do ii = bx%lo(1), bx%hi(1)
-                              dst(ii,jj,kk,icomp) = 0.0_WP
-                              do dk = 0, merge(1,0,native_nodal(3))
-                                 do dj = 0, merge(1,0,native_nodal(2))
-                                    do di = 0, merge(1,0,native_nodal(1))
-                                       dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) + src(ii+di, jj+dj, kk+dk, my_vct%compy)
-                                    end do
-                                 end do
-                              end do
-                              dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) / real(2**count(native_nodal), WP)
-                           end do
-                        end do
-                     end do
-                  end do
-                  call amrex_mfiter_destroy(mfi)
-
-                  ! Process Z component
-                  icomp = icomp + 1
-                  call amrex_mfiter_build(mfi, combined(lev), tiling=this%amr%default_tiling)
-                  do while (mfi%next())
-                     bx = mfi%tilebox()
-                     src => my_vct%ptrz%mf(lev)%dataptr(mfi)
-                     dst => combined(lev)%dataptr(mfi)
-                     native_nodal = my_vct%ptrz%nodal
-                     do kk = bx%lo(3), bx%hi(3)
-                        do jj = bx%lo(2), bx%hi(2)
-                           do ii = bx%lo(1), bx%hi(1)
-                              dst(ii,jj,kk,icomp) = 0.0_WP
-                              do dk = 0, merge(1,0,native_nodal(3))
-                                 do dj = 0, merge(1,0,native_nodal(2))
-                                    do di = 0, merge(1,0,native_nodal(1))
-                                       dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) + src(ii+di, jj+dj, kk+dk, my_vct%compz)
-                                    end do
-                                 end do
-                              end do
-                              dst(ii,jj,kk,icomp) = dst(ii,jj,kk,icomp) / real(2**count(native_nodal), WP)
-                           end do
-                        end do
-                     end do
-                  end do
-                  call amrex_mfiter_destroy(mfi)
-
-                  my_vct => my_vct%next
-               end do
-            end if
          end do
+
+         ! Generate filename with centering type
          filename = 'amrviz/'//trim(this%name)//'/nga2.'//trim(suffix)//'.'
          write(filename(len_trim(filename)+1:len_trim(filename)+6),'(i6.6)') this%ntime
 
@@ -573,7 +400,6 @@ contains
       implicit none
       class(amrviz), intent(inout) :: this
       type(scl), pointer :: cur_scl, next_scl
-      type(vct), pointer :: cur_vct, next_vct
 
       ! Clean up scalar list
       cur_scl => this%first_scl
@@ -583,15 +409,6 @@ contains
          cur_scl => next_scl
       end do
       nullify(this%first_scl)
-
-      ! Clean up vector list
-      cur_vct => this%first_vct
-      do while (associated(cur_vct))
-         next_vct => cur_vct%next
-         deallocate(cur_vct)
-         cur_vct => next_vct
-      end do
-      nullify(this%first_vct)
 
       ! Reset state
       nullify(this%amr)

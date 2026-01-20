@@ -165,7 +165,9 @@ contains
       allocate(viz); call viz%initialize(amr, 'test_incomp')
       call viz%add_scalar(fs%P, 1, 'pressure')
       call viz%add_scalar(fs%div, 1, 'divergence')
-      call viz%add_vector(fs%U, 1, fs%V, 1, fs%W, 1, 'velocity')
+      call viz%add_scalar(fs%U, 1, 'U')
+      call viz%add_scalar(fs%V, 1, 'V')
+      call viz%add_scalar(fs%W, 1, 'W')
 
       ! Build grid - triggers on_init + user_init callbacks, creates all levels
       call amr%init_from_scratch(time=time)
