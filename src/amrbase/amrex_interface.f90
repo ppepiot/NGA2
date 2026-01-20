@@ -67,6 +67,7 @@ module amrex_interface
    ! MLMG Utilities
    !=====================================================================
    public :: amrmlmg_get_niters
+   public :: amrmlmg_get_fluxes
 
    !=====================================================================
    ! MultiFab Averaging (single-direction wrappers, not in AMReX Fortran)
@@ -331,6 +332,16 @@ module amrex_interface
          import :: c_int,c_ptr
          type(c_ptr), value :: mlmg
       end function amrmlmg_get_niters
+
+      !> Get face-centered fluxes from MLMG using solver's C/F stencils
+      !> For (alpha*A - beta*div(B*grad))phi = rhs, flux = -B*grad(phi)
+      subroutine amrmlmg_get_fluxes(mlmg, sol_mfs, flux_x, flux_y, flux_z, nlevs) bind(c)
+         import :: c_ptr, c_int
+         type(c_ptr), value :: mlmg
+         type(c_ptr), intent(in) :: sol_mfs(*)
+         type(c_ptr), intent(in) :: flux_x(*), flux_y(*), flux_z(*)
+         integer(c_int), value :: nlevs
+      end subroutine amrmlmg_get_fluxes
 
       !====================================================================
       ! MultiFab Averaging (C bindings - private, called by wrappers below)

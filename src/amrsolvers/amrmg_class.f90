@@ -67,6 +67,7 @@ module amrmg_class
       procedure :: setup
       procedure :: solve
       procedure :: solve_level
+      procedure :: get_fluxes
       procedure :: destroy
       procedure :: print_short
       procedure :: print => print_long
@@ -370,6 +371,53 @@ contains
          end if
       end block log_result
    end subroutine solve_level
+
+   !> Get face-centered fluxes using solver's C/F-consistent stencils
+   !> For (alpha*A - beta*div(B*grad))phi = rhs, flux = -B*grad(phi)
+   !> This uses the solver's internal quadratic interpolation which is
+   !> consistent at C/F interfaces (unlike FillPatch's linear interpolation).
+   !> Works for both cstcoef (Poisson) and varcoef (ABecLaplacian).
+   !> @param phi Solution field
+   !> @param flux_x X-face-centered flux output
+   !> @param flux_y Y-face-centered flux output
+   !> @param flux_z Z-face-centered flux output
+   subroutine get_fluxes(this, phi, flux_x, flux_y, flux_z)
+      use iso_c_binding, only: c_ptr
+      use messager, only: die
+      use amrex_interface, only: amrmlmg_get_fluxes
+      class(amrmg), intent(in) :: this
+      type(amrdata), intent(in) :: phi
+      type(amrdata), intent(inout) :: flux_x, flux_y, flux_z
+
+      type(c_ptr), dimension(:), allocatable :: sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs
+      integer :: lev, nlevs
+
+      if (.not. this%setup_done) call die('[amrmg get_fluxes] Solver not setup')
+
+      nlevs = this%amr%clvl() + 1
+
+      ! Build pointer arrays
+      allocate(sol_ptrs(0:this%amr%clvl()))
+      allocate(fx_ptrs(0:this%amr%clvl()))
+      allocate(fy_ptrs(0:this%amr%clvl()))
+      allocate(fz_ptrs(0:this%amr%clvl()))
+
+      do lev = 0, this%amr%clvl()
+         sol_ptrs(lev) = phi%mf(lev)%p
+         fx_ptrs(lev) = flux_x%mf(lev)%p
+         fy_ptrs(lev) = flux_y%mf(lev)%p
+         fz_ptrs(lev) = flux_z%mf(lev)%p
+      end do
+
+      ! Call C++ wrapper - works for both Poisson and ABecLaplacian
+      call amrmlmg_get_fluxes(this%multigrid%p, sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs, nlevs)
+
+      ! Deallocate pointer arrays
+      deallocate(sol_ptrs)
+      deallocate(fx_ptrs)
+      deallocate(fy_ptrs)
+      deallocate(fz_ptrs)
+   end subroutine get_fluxes
 
    !> Destroy solver internals - call before setup when operator changes
    subroutine destroy(this)

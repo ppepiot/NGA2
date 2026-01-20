@@ -1,10 +1,11 @@
 !> Test amrincomp solver - 3-level projection with random velocity and geometric tagger
 module mod_test_amrincomp
    use precision,         only: WP
-   use mathtools,         only: Pi
-   use amrviz_class,     only: amrviz
+   use random,            only: random_uniform
+   use amrviz_class,      only: amrviz
    use amrgrid_class,     only: amrgrid
    use amrincomp_class,   only: amrincomp
+   use amrdata_class,     only: amrdata, amrex_interp_none
    use amrex_amr_module,  only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
    &                            amrex_mfiter_build, amrex_mfiter_destroy
    implicit none
@@ -15,6 +16,7 @@ module mod_test_amrincomp
    type(amrgrid), allocatable, target :: amr
    type(amrincomp), allocatable, target :: fs
    type(amrviz), allocatable :: viz
+   type(amrdata), allocatable :: dPdx, dPdy, dPdz  ! Workspace for pressure gradients
 
 contains
 
@@ -38,32 +40,32 @@ contains
          pV => solver%V%mf(lvl)%dataptr(mfi)
          pW => solver%W%mf(lvl)%dataptr(mfi)
 
-         ! U (x-faces): nodaltilebox in x
+         ! U (x-faces): random values in [-1, 1]
          fbx = mfi%nodaltilebox(1)
          do k = fbx%lo(3), fbx%hi(3)
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
-                  pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)/32.0_WP)
+                  pU(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
                end do
             end do
          end do
 
-         ! V (y-faces): nodaltilebox in y
+         ! V (y-faces): random values in [-1, 1]
          fbx = mfi%nodaltilebox(2)
          do k = fbx%lo(3), fbx%hi(3)
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
-                  pV(i,j,k,1) = sin(2.0_WP*Pi*real(j,WP)/32.0_WP)
+                  pV(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
                end do
             end do
          end do
 
-         ! W (z-faces): nodaltilebox in z
+         ! W (z-faces): random values in [-1, 1]
          fbx = mfi%nodaltilebox(3)
          do k = fbx%lo(3), fbx%hi(3)
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
-                  pW(i,j,k,1) = sin(2.0_WP*Pi*real(k,WP)/32.0_WP)
+                  pW(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
                end do
             end do
          end do
@@ -111,7 +113,7 @@ contains
                do i = bx%lo(1), bx%hi(1)
                   x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
                   ! Tag if inside sphere
-                  if (sqrt((x-xc)**2 + (y-yc)**2 + (z-zc)**2) < radius) then
+                  if (sqrt((x-xc)**2 + (y-yc)**2 + (z-zc)**2) .lt. radius) then
                      tagarr(i,j,k,1) = SETtag
                   end if
                end do
@@ -161,6 +163,11 @@ contains
       fs%user_tagging => geometric_tagger ! Set tagging callback
       call log("Flow solver initialized, rho="//trim(rtoa(fs%rho)))
 
+      ! Create workspace for pressure gradients
+      allocate(dPdx); call dPdx%initialize(amr, name='dPdx', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none); call dPdx%register()
+      allocate(dPdy); call dPdy%initialize(amr, name='dPdy', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_none); call dPdy%register()
+      allocate(dPdz); call dPdz%initialize(amr, name='dPdz', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none); call dPdz%register()
+
       ! Initialize visualization
       allocate(viz); call viz%initialize(amr, 'test_incomp')
       call viz%add_scalar(fs%P, 1, 'pressure')
@@ -173,16 +180,16 @@ contains
       call amr%init_from_scratch(time=time)
       call log("Grid built: "//trim(itoa(amr%nlevels))//" levels")
 
-      ! Fill velocity ghosts after initialization (required before get_div)
+      ! Average down velocity first to make coarse consistent with fine
+      call fs%average_down_velocity()
+
+      ! Now fill velocity ghosts (fine level will interpolate from corrected coarse)
       do lvl = 0, amr%clvl()
          call fs%U%fill(lvl, time)
          call fs%V%fill(lvl, time)
          call fs%W%fill(lvl, time)
       end do
-
-      ! Average down velocity for C/F consistency before computing divergence
-      call fs%average_down_velocity()
-      call log("Velocity ghosts filled and averaged down")
+      call log("Velocity averaged down and ghosts filled")
 
       ! Setup pressure solver with verbose output for debugging
       fs%psolver%verbose = 2
@@ -196,6 +203,8 @@ contains
       divmax_before = fs%divmax
       call log("Before projection: divmax = "//trim(rtoa(divmax_before)))
 
+      call viz%write(time=0.0_WP)
+
       ! 2. Scale RHS: rhs = rho/dt * div
       factor = fs%rho / dt
       do lvl = 0, amr%clvl()
@@ -203,67 +212,72 @@ contains
       end do
 
       ! 3. Solve pressure Poisson equation
+      call log("RHS norm0 (after scaling) = "//trim(rtoa(fs%div%mf(0)%norm0(1))))
       call fs%psolver%solve(rhs=fs%div, phi=fs%P)
       call log("Pressure solved, P norm0 = "//trim(rtoa(fs%P%mf(0)%norm0(1))))
       call log("Pressure solver residual = "//trim(rtoa(fs%psolver%res)))
 
       ! 4. Fill pressure ghosts before gradient computation
-      do lvl = 0, amr%clvl()
-         call fs%P%fill(lvl, time)
-      end do
+      !do lvl = 0, amr%clvl()
+      !   call fs%P%fill(lvl, time)
+      !end do
 
-
-
-      ! 5. Correct velocity: U = U - dt/rho * dP/dx (manual gradient)
+      ! 5. Get C/F-consistent gradients and correct velocity
+      ! get_fluxes returns -grad(P) for Poisson, so U = U + (dt/rho)*flux
+      call fs%psolver%get_fluxes(fs%P, dPdx, dPdy, dPdz)
+      call log("dPdx norm0 = "//trim(rtoa(dPdx%mf(0)%norm0(1)))//", dPdz norm0 = "//trim(rtoa(dPdz%mf(0)%norm0(1))))
       factor = dt / fs%rho
-      do lvl = 0, amr%clvl()
-         dxi = 1.0_WP / amr%dx(lvl)
-         dyi = 1.0_WP / amr%dy(lvl)
-         dzi = 1.0_WP / amr%dz(lvl)
 
-         ! Correct velocity using cell-centered mfiter with nodalize
+      ! Correct velocity: U = U - (dt/rho) * grad(P) = U + factor * dPdx
+      do lvl = 0, amr%clvl()
          call amr%mfiter_build(lvl, mfi)
          do while (mfi%next())
-            bx = mfi%tilebox()
             pU => fs%U%mf(lvl)%dataptr(mfi)
             pV => fs%V%mf(lvl)%dataptr(mfi)
             pW => fs%W%mf(lvl)%dataptr(mfi)
-            pP => fs%P%mf(lvl)%dataptr(mfi)
 
-            ! U correction (x-faces): nodaltilebox in x
-            fbx = mfi%nodaltilebox(1)
-            do k = fbx%lo(3), fbx%hi(3)
-               do j = fbx%lo(2), fbx%hi(2)
-                  do i = fbx%lo(1), fbx%hi(1)
-                     pU(i,j,k,1) = pU(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i-1,j,k,1)) * dxi
+            ! Get pointers to flux workspace
+            block
+               real(WP), dimension(:,:,:,:), contiguous, pointer :: pdPdx, pdPdy, pdPdz
+               pdPdx => dPdx%mf(lvl)%dataptr(mfi)
+               pdPdy => dPdy%mf(lvl)%dataptr(mfi)
+               pdPdz => dPdz%mf(lvl)%dataptr(mfi)
+
+               ! U correction (x-faces)
+               fbx = mfi%nodaltilebox(1)
+               do k = fbx%lo(3), fbx%hi(3)
+                  do j = fbx%lo(2), fbx%hi(2)
+                     do i = fbx%lo(1), fbx%hi(1)
+                        pU(i,j,k,1) = pU(i,j,k,1) + factor * pdPdx(i,j,k,1)
+                     end do
                   end do
                end do
-            end do
 
-            ! V correction (y-faces): nodaltilebox in y
-            fbx = mfi%nodaltilebox(2)
-            do k = fbx%lo(3), fbx%hi(3)
-               do j = fbx%lo(2), fbx%hi(2)
-                  do i = fbx%lo(1), fbx%hi(1)
-                     pV(i,j,k,1) = pV(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i,j-1,k,1)) * dyi
+               ! V correction (y-faces)
+               fbx = mfi%nodaltilebox(2)
+               do k = fbx%lo(3), fbx%hi(3)
+                  do j = fbx%lo(2), fbx%hi(2)
+                     do i = fbx%lo(1), fbx%hi(1)
+                        pV(i,j,k,1) = pV(i,j,k,1) + factor * pdPdy(i,j,k,1)
+                     end do
                   end do
                end do
-            end do
 
-            ! W correction (z-faces): nodaltilebox in z
-            fbx = mfi%nodaltilebox(3)
-            do k = fbx%lo(3), fbx%hi(3)
-               do j = fbx%lo(2), fbx%hi(2)
-                  do i = fbx%lo(1), fbx%hi(1)
-                     pW(i,j,k,1) = pW(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i,j,k-1,1)) * dzi
+               ! W correction (z-faces)
+               fbx = mfi%nodaltilebox(3)
+               do k = fbx%lo(3), fbx%hi(3)
+                  do j = fbx%lo(2), fbx%hi(2)
+                     do i = fbx%lo(1), fbx%hi(1)
+                        pW(i,j,k,1) = pW(i,j,k,1) + factor * pdPdz(i,j,k,1)
+                     end do
                   end do
                end do
-            end do
+            end block
          end do
          call amr%mfiter_destroy(mfi)
       end do
       call log("Velocity corrected")
-
+      call viz%write(time=0.5_WP)
       ! Multi-level sync: use proper MAC face averaging from fine to coarse
       call fs%average_down_velocity()
 
@@ -287,7 +301,7 @@ contains
       end if
 
       ! Write visualization output
-      call viz%write(time)
+      call viz%write(time=1.0_WP)
       call log("Visualization written to amrviz/test_incomp/")
 
       ! Cleanup

@@ -2,5 +2,5 @@
 # Run with: mpiexec -n 2 ./amr_tester.*.exe -i input
 
 # Select which test to run
-# Valid options: amrdata, amrscalar, amrmg, amrops, all
-Test: all
+# Valid options: amrdata, amrscalar, amrincomp, amrmg, amrops, all
+Test: amrincomp

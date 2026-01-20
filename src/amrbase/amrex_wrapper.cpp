@@ -610,6 +610,34 @@ int amrmlmg_get_niters(void *mlmg) {
   return static_cast<amrex::MLMG *>(mlmg)->getNumIters();
 }
 
+// Get face-centered fluxes from MLMG solution using solver's C/F stencils
+// For (alpha*A - beta*div(B*grad))phi = rhs, flux = -B*grad(phi)
+//   mlmg - pointer to MLMG object (must have valid solution from solve)
+//   sol_mfs - array of solution MultiFab pointers (one per level)
+//   flux_x, flux_y, flux_z - arrays of flux MultiFab pointers (one per level)
+//   nlevs - number of AMR levels
+void amrmlmg_get_fluxes(void *mlmg, void **sol_mfs, void **flux_x,
+                        void **flux_y, void **flux_z, int nlevs) {
+  auto *mg = static_cast<amrex::MLMG *>(mlmg);
+
+  // Build solution vector
+  amrex::Vector<amrex::MultiFab *> sol(nlevs);
+  for (int lev = 0; lev < nlevs; ++lev) {
+    sol[lev] = static_cast<amrex::MultiFab *>(sol_mfs[lev]);
+  }
+
+  // Build flux vector of arrays (one Array<MultiFab*,3> per level)
+  amrex::Vector<amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM>> fluxes(nlevs);
+  for (int lev = 0; lev < nlevs; ++lev) {
+    fluxes[lev][0] = static_cast<amrex::MultiFab *>(flux_x[lev]);
+    fluxes[lev][1] = static_cast<amrex::MultiFab *>(flux_y[lev]);
+    fluxes[lev][2] = static_cast<amrex::MultiFab *>(flux_z[lev]);
+  }
+
+  // Call MLMG getFluxes with solution - uses solver's C/F stencils
+  mg->getFluxes(fluxes, sol, amrex::MLMG::Location::FaceCenter);
+}
+
 //=============================================================================
 // MultiFab Averaging Utilities
 // These wrap AMReX's single-direction averaging functions that use IndexType
