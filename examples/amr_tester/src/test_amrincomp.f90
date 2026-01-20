@@ -2,6 +2,7 @@
 module mod_test_amrincomp
    use precision,         only: WP
    use mathtools,         only: Pi
+   use amrviz_class,     only: amrviz
    use amrgrid_class,     only: amrgrid
    use amrincomp_class,   only: amrincomp
    use amrex_amr_module,  only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
@@ -13,6 +14,7 @@ module mod_test_amrincomp
    ! Module-level objects
    type(amrgrid), allocatable, target :: amr
    type(amrincomp), allocatable, target :: fs
+   type(amrviz), allocatable :: viz
 
 contains
 
@@ -159,6 +161,12 @@ contains
       fs%user_tagging => geometric_tagger ! Set tagging callback
       call log("Flow solver initialized, rho="//trim(rtoa(fs%rho)))
 
+      ! Initialize visualization
+      allocate(viz); call viz%initialize(amr, 'test_incomp')
+      call viz%add_scalar(fs%P, 1, 'pressure')
+      call viz%add_scalar(fs%div, 1, 'divergence')
+      call viz%add_vector(fs%U, 1, fs%V, 1, fs%W, 1, 'velocity')
+
       ! Build grid - triggers on_init + user_init callbacks, creates all levels
       call amr%init_from_scratch(time=time)
       call log("Grid built: "//trim(itoa(amr%nlevels))//" levels")
@@ -276,10 +284,15 @@ contains
          call log("TEST FAILED: Divergence not sufficiently reduced")
       end if
 
+      ! Write visualization output
+      call viz%write(time)
+      call log("Visualization written to amrviz/test_incomp/")
+
       ! Cleanup
+      call viz%finalize()
       call fs%finalize()
       call amr%finalize()
-      deallocate(fs, amr)
+      deallocate(viz, fs, amr)
 
       call log("Test complete")
 
