@@ -24,49 +24,44 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: ptr
+      type(amrex_box) :: bx, fbx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
       integer :: i, j, k
 
-      ! Initialize U (x-faces) - use mfiter built from U's MultiFab
-      call amrex_mfiter_build(mfi, solver%U%mf(lvl), tiling=solver%amr%default_tiling)
+      ! Build mfiter from cell-centered ba/dm (passed during regrid)
+      call amrex_mfiter_build(mfi, ba, dm, tiling=solver%amr%default_tiling)
       do while (mfi%next())
          bx = mfi%tilebox()
-         ptr => solver%U%mf(lvl)%dataptr(mfi)
-         do k = bx%lo(3), bx%hi(3)
-            do j = bx%lo(2), bx%hi(2)
-               do i = bx%lo(1), bx%hi(1)
-                  ptr(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)/32.0_WP)
+         pU => solver%U%mf(lvl)%dataptr(mfi)
+         pV => solver%V%mf(lvl)%dataptr(mfi)
+         pW => solver%W%mf(lvl)%dataptr(mfi)
+
+         ! U (x-faces): nodaltilebox in x
+         fbx = mfi%nodaltilebox(1)
+         do k = fbx%lo(3), fbx%hi(3)
+            do j = fbx%lo(2), fbx%hi(2)
+               do i = fbx%lo(1), fbx%hi(1)
+                  pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)/32.0_WP)
                end do
             end do
          end do
-      end do
-      call amrex_mfiter_destroy(mfi)
 
-      ! Initialize V (y-faces) - use mfiter built from V's MultiFab
-      call amrex_mfiter_build(mfi, solver%V%mf(lvl), tiling=solver%amr%default_tiling)
-      do while (mfi%next())
-         bx = mfi%tilebox()
-         ptr => solver%V%mf(lvl)%dataptr(mfi)
-         do k = bx%lo(3), bx%hi(3)
-            do j = bx%lo(2), bx%hi(2)
-               do i = bx%lo(1), bx%hi(1)
-                  ptr(i,j,k,1) = sin(2.0_WP*Pi*real(j,WP)/32.0_WP)
+         ! V (y-faces): nodaltilebox in y
+         fbx = mfi%nodaltilebox(2)
+         do k = fbx%lo(3), fbx%hi(3)
+            do j = fbx%lo(2), fbx%hi(2)
+               do i = fbx%lo(1), fbx%hi(1)
+                  pV(i,j,k,1) = sin(2.0_WP*Pi*real(j,WP)/32.0_WP)
                end do
             end do
          end do
-      end do
-      call amrex_mfiter_destroy(mfi)
 
-      ! Initialize W (z-faces) - use mfiter built from W's MultiFab
-      call amrex_mfiter_build(mfi, solver%W%mf(lvl), tiling=solver%amr%default_tiling)
-      do while (mfi%next())
-         bx = mfi%tilebox()
-         ptr => solver%W%mf(lvl)%dataptr(mfi)
-         do k = bx%lo(3), bx%hi(3)
-            do j = bx%lo(2), bx%hi(2)
-               do i = bx%lo(1), bx%hi(1)
-                  ptr(i,j,k,1) = sin(2.0_WP*Pi*real(k,WP)/32.0_WP)
+         ! W (z-faces): nodaltilebox in z
+         fbx = mfi%nodaltilebox(3)
+         do k = fbx%lo(3), fbx%hi(3)
+            do j = fbx%lo(2), fbx%hi(2)
+               do i = fbx%lo(1), fbx%hi(1)
+                  pW(i,j,k,1) = sin(2.0_WP*Pi*real(k,WP)/32.0_WP)
                end do
             end do
          end do
@@ -132,7 +127,7 @@ contains
       real(WP) :: divmax_before, divmax_after, dt, time, factor
       integer :: lvl, i, j, k
       type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
+      type(amrex_box) :: bx, fbx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW, pP
       real(WP) :: dxi, dyi, dzi
 
@@ -216,53 +211,46 @@ contains
          dyi = 1.0_WP / amr%dy(lvl)
          dzi = 1.0_WP / amr%dz(lvl)
 
-         ! U correction (x-faces)
-         call amrex_mfiter_build(mfi, fs%U%mf(lvl), tiling=amr%default_tiling)
+         ! Correct velocity using cell-centered mfiter with nodalize
+         call amr%mfiter_build(lvl, mfi)
          do while (mfi%next())
             bx = mfi%tilebox()
             pU => fs%U%mf(lvl)%dataptr(mfi)
+            pV => fs%V%mf(lvl)%dataptr(mfi)
+            pW => fs%W%mf(lvl)%dataptr(mfi)
             pP => fs%P%mf(lvl)%dataptr(mfi)
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
+
+            ! U correction (x-faces): nodaltilebox in x
+            fbx = mfi%nodaltilebox(1)
+            do k = fbx%lo(3), fbx%hi(3)
+               do j = fbx%lo(2), fbx%hi(2)
+                  do i = fbx%lo(1), fbx%hi(1)
                      pU(i,j,k,1) = pU(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i-1,j,k,1)) * dxi
                   end do
                end do
             end do
-         end do
-         call amrex_mfiter_destroy(mfi)
 
-         ! V correction (y-faces)
-         call amrex_mfiter_build(mfi, fs%V%mf(lvl), tiling=amr%default_tiling)
-         do while (mfi%next())
-            bx = mfi%tilebox()
-            pV => fs%V%mf(lvl)%dataptr(mfi)
-            pP => fs%P%mf(lvl)%dataptr(mfi)
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
+            ! V correction (y-faces): nodaltilebox in y
+            fbx = mfi%nodaltilebox(2)
+            do k = fbx%lo(3), fbx%hi(3)
+               do j = fbx%lo(2), fbx%hi(2)
+                  do i = fbx%lo(1), fbx%hi(1)
                      pV(i,j,k,1) = pV(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i,j-1,k,1)) * dyi
                   end do
                end do
             end do
-         end do
-         call amrex_mfiter_destroy(mfi)
 
-         ! W correction (z-faces)
-         call amrex_mfiter_build(mfi, fs%W%mf(lvl), tiling=amr%default_tiling)
-         do while (mfi%next())
-            bx = mfi%tilebox()
-            pW => fs%W%mf(lvl)%dataptr(mfi)
-            pP => fs%P%mf(lvl)%dataptr(mfi)
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
+            ! W correction (z-faces): nodaltilebox in z
+            fbx = mfi%nodaltilebox(3)
+            do k = fbx%lo(3), fbx%hi(3)
+               do j = fbx%lo(2), fbx%hi(2)
+                  do i = fbx%lo(1), fbx%hi(1)
                      pW(i,j,k,1) = pW(i,j,k,1) - factor * (pP(i,j,k,1) - pP(i,j,k-1,1)) * dzi
                   end do
                end do
             end do
          end do
-         call amrex_mfiter_destroy(mfi)
+         call amr%mfiter_destroy(mfi)
       end do
       call log("Velocity corrected")
 
