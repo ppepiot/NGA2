@@ -208,20 +208,18 @@ contains
       call fs%get_div()
       divmax_before = fs%divmax
       call log("Before projection: divmax = "//trim(rtoa(divmax_before)))
-      call log("RHS sum = "//trim(rtoa(fs%div%mf(0)%sum(1))))
+      call log("RHS sum = "//trim(rtoa(fs%div%get_sum(lvl=0))))
 
       call viz%write(time=0.0_WP)
 
       ! 2. Scale RHS: rhs = rho/dt * div
       factor = fs%rho / dt
-      do lvl = 0, amr%clvl()
-         call fs%div%mf(lvl)%mult(factor, 1, 1, 0)
-      end do
+      call fs%div%mult(val=factor)
 
       ! 3. Solve pressure Poisson equation
-      call log("RHS norm0 (after scaling) = "//trim(rtoa(fs%div%mf(0)%norm0(1))))
+      call log("RHS norm0 (after scaling) = "//trim(rtoa(fs%div%norm0(lvl=0))))
       call fs%psolver%solve(rhs=fs%div, phi=fs%P)
-      call log("Pressure solved, P norm0 = "//trim(rtoa(fs%P%mf(0)%norm0(1))))
+      call log("Pressure solved, P norm0 = "//trim(rtoa(fs%P%norm0(lvl=0))))
       call log("Pressure solver residual = "//trim(rtoa(fs%psolver%res)))
 
       ! 4. Fill pressure ghosts before gradient computation
@@ -232,16 +230,13 @@ contains
       ! 5. Get C/F-consistent gradients and correct velocity
       ! get_fluxes returns -grad(P) for Poisson, so U = U + (dt/rho)*flux
       call fs%psolver%get_fluxes(fs%P, dPdx, dPdy, dPdz)
-      call log("dPdx norm0 = "//trim(rtoa(dPdx%mf(0)%norm0(1)))//", dPdz norm0 = "//trim(rtoa(dPdz%mf(0)%norm0(1))))
-      factor = dt / fs%rho
+      call log("dPdx norm0 = "//trim(rtoa(dPdx%norm0(lvl=0)))//", dPdz norm0 = "//trim(rtoa(dPdz%norm0(lvl=0))))
 
       ! 6. Correct velocity: U = U + (dt/rho) * flux
       factor = dt / fs%rho
-      do lvl = 0, amr%clvl()
-         call fs%U%mf(lvl)%saxpy(a=factor, srcmf=dPdx%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
-         call fs%V%mf(lvl)%saxpy(a=factor, srcmf=dPdy%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
-         call fs%W%mf(lvl)%saxpy(a=factor, srcmf=dPdz%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
-      end do
+      call fs%U%saxpy(a=factor, src=dPdx)
+      call fs%V%saxpy(a=factor, src=dPdy)
+      call fs%W%saxpy(a=factor, src=dPdz)
       call log("Velocity corrected")
 
       ! 6. Average down for C/F consistency

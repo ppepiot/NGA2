@@ -55,6 +55,26 @@ module amrdata_class
       procedure :: sync             !< Lightweight same-level ghost sync (+ reconcile for faces)
       procedure :: average_down     !< Average from finest to coarsest level
       procedure :: average_downto   !< Average level lvl+1 down to level lvl
+      ! Scalar operations (Y = op(Y, scalar))
+      procedure :: setval           !< Y = val
+      procedure :: plus             !< Y = Y + val
+      procedure :: mult             !< Y = Y * val
+      ! Binary operations (Y = op(Y, X))
+      procedure :: add              !< Y = Y + X
+      procedure :: subtract         !< Y = Y - X
+      procedure :: multiply         !< Y = Y * X (element-wise)
+      procedure :: divide           !< Y = Y / X (element-wise)
+      procedure :: copy             !< Y = X
+      ! BLAS-like operations
+      procedure :: saxpy            !< Y = aX + Y
+      procedure :: lincomb          !< Y = aX1 + bX2
+      ! Reduction operations (require explicit lvl)
+      procedure :: get_min          !< min value at level
+      procedure :: get_max          !< max value at level
+      procedure :: get_sum          !< sum at level
+      procedure :: norm0            !< L-infinity norm at level
+      procedure :: norm1            !< L1 norm at level
+      procedure :: norm2            !< L2 norm at level
       ! Iteration helper
       procedure :: mfiter_build     !< Build MFIter from this data's MultiFab
    end type amrdata
@@ -574,5 +594,292 @@ contains
          &   scomp=1, ncomp=this%ncomp, rr=this%amr%rref(lvl))
       end select
    end subroutine average_downto
+
+   ! ============================================================================
+   ! SCALAR OPERATIONS
+   ! ============================================================================
+
+   !> Set all values to val
+   !> @param val Value to set
+   !> @param lvl Optional: single level to operate on
+   !> @param lbase Optional: lowest level (operates on lbase to clvl)
+   subroutine setval(this, val, lvl, lbase)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: val
+      integer, intent(in), optional :: lvl, lbase
+      integer :: l, l0, l1
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      do l = l0, l1
+         call this%mf(l)%setval(val)
+      end do
+   end subroutine setval
+
+   !> Add scalar: Y = Y + val
+   subroutine plus(this, val, lvl, lbase, comp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: val
+      integer, intent(in), optional :: lvl, lbase, comp, ncomp, nghost
+      integer :: l, l0, l1, ic, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      ic = 1; if (present(comp)) ic = comp
+      nc = this%ncomp; if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%plus(val, ic, nc, ng)
+      end do
+   end subroutine plus
+
+   !> Multiply by scalar: Y = Y * val
+   subroutine mult(this, val, lvl, lbase, comp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: val
+      integer, intent(in), optional :: lvl, lbase, comp, ncomp, nghost
+      integer :: l, l0, l1, ic, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      ic = 1; if (present(comp)) ic = comp
+      nc = this%ncomp; if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%mult(val, ic, nc, ng)
+      end do
+   end subroutine mult
+
+   ! ============================================================================
+   ! BINARY OPERATIONS
+   ! ============================================================================
+
+   !> Add: Y = Y + X
+   subroutine add(this, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%add(src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine add
+
+   !> Subtract: Y = Y - X
+   subroutine subtract(this, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%subtract(src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine subtract
+
+   !> Multiply element-wise: Y = Y * X
+   subroutine multiply(this, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%multiply(src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine multiply
+
+   !> Divide element-wise: Y = Y / X
+   subroutine divide(this, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%divide(src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine divide
+
+   !> Copy: Y = X
+   subroutine copy(this, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%copy(src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine copy
+
+   ! ============================================================================
+   ! BLAS-LIKE OPERATIONS
+   ! ============================================================================
+
+   !> SAXPY: Y = a*X + Y
+   subroutine saxpy(this, a, src, lvl, lbase, srccomp, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: a
+      class(amrdata), intent(in) :: src
+      integer, intent(in), optional :: lvl, lbase, srccomp, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc = 1; if (present(srccomp)) sc = srccomp
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%saxpy(a, src%mf(l), sc, dc, nc, ng)
+      end do
+   end subroutine saxpy
+
+   !> Linear combination: Y = a*X1 + b*X2
+   subroutine lincomb(this, a, src1, b, src2, lvl, lbase, srccomp1, srccomp2, dstcomp, ncomp, nghost)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: a, b
+      class(amrdata), intent(in) :: src1, src2
+      integer, intent(in), optional :: lvl, lbase, srccomp1, srccomp2, dstcomp, ncomp, nghost
+      integer :: l, l0, l1, sc1, sc2, dc, nc, ng
+      if (.not.associated(this%amr)) return
+      call get_level_range(this, lvl, lbase, l0, l1)
+      sc1 = 1; if (present(srccomp1)) sc1 = srccomp1
+      sc2 = 1; if (present(srccomp2)) sc2 = srccomp2
+      dc = 1; if (present(dstcomp)) dc = dstcomp
+      nc = min(this%ncomp, min(src1%ncomp, src2%ncomp)); if (present(ncomp)) nc = ncomp
+      ng = 0; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call this%mf(l)%lincomb(a, src1%mf(l), sc1, b, src2%mf(l), sc2, dc, nc, ng)
+      end do
+   end subroutine lincomb
+
+   ! ============================================================================
+   ! REDUCTION OPERATIONS (require explicit lvl)
+   ! ============================================================================
+
+   !> Get minimum value at level
+   function get_min(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%min(ic)
+   end function get_min
+
+   !> Get maximum value at level
+   function get_max(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%max(ic)
+   end function get_max
+
+   !> Get sum at level
+   function get_sum(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%sum(ic)
+   end function get_sum
+
+   !> Get L-infinity norm (max abs) at level
+   function norm0(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%norm0(ic)
+   end function norm0
+
+   !> Get L1 norm at level
+   function norm1(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%norm1(ic)
+   end function norm1
+
+   !> Get L2 norm at level
+   function norm2(this, lvl, comp) result(val)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in) :: lvl
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = this%mf(lvl)%norm2(ic)
+   end function norm2
+
+   ! ============================================================================
+   ! HELPER ROUTINES
+   ! ============================================================================
+
+   !> Compute level range from optional lvl and lbase arguments
+   subroutine get_level_range(this, lvl, lbase, l0, l1)
+      implicit none
+      class(amrdata), intent(in) :: this
+      integer, intent(in), optional :: lvl, lbase
+      integer, intent(out) :: l0, l1
+      if (present(lvl)) then
+         l0 = lvl; l1 = lvl
+      else if (present(lbase)) then
+         l0 = lbase; l1 = this%amr%clvl()
+      else
+         l0 = 0; l1 = this%amr%clvl()
+      end if
+   end subroutine get_level_range
 
 end module amrdata_class
