@@ -140,7 +140,7 @@ contains
       call log("========================================")
 
       time = 0.0_WP
-      dt = 1.0_WP
+      dt = 1.0e-2_WP
 
       ! Create amrgrid
       allocate(amr)
@@ -150,7 +150,7 @@ contains
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
       amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
-      amr%maxlvl = 0!2  ! 3 levels: 0, 1, 2
+      amr%maxlvl = 2  ! 3 levels: 0, 1, 2
       call amr%initialize()
       call log("Grid initialized: "//trim(itoa(amr%nx))//"x"//trim(itoa(amr%ny))//"x"//trim(itoa(amr%nz)))
       call log("Max levels: "//trim(itoa(amr%maxlvl+1)))
@@ -193,11 +193,14 @@ contains
       call log("Pressure solver setup complete")
 
       ! ===== USER-DRIVEN PROJECTION SEQUENCE =====
-
+      call fs%U%mf(0)%override_sync(amr%geom(0))
+      call fs%V%mf(0)%override_sync(amr%geom(0))
+      call fs%W%mf(0)%override_sync(amr%geom(0))
       ! 1. Compute divergence (assumes velocity ghosts filled)
       call fs%get_div()
       divmax_before = fs%divmax
       call log("Before projection: divmax = "//trim(rtoa(divmax_before)))
+      call log("RHS sum = "//trim(rtoa(fs%div%mf(0)%sum(1))))
 
       call viz%write(time=0.0_WP)
 
@@ -278,7 +281,7 @@ contains
       call fs%average_down_velocity()
 
       ! Sync periodic ghosts AFTER average_down, then check divergence
-      !call fs%fill_velocity(time)
+      call fs%fill_velocity(time)
       call fs%get_div()
       divmax_after = fs%divmax
       call log("After projection: divmax = "//trim(rtoa(divmax_after)))

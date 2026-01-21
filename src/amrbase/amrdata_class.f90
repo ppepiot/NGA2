@@ -52,6 +52,7 @@ module amrdata_class
       procedure :: fill_from_coarse !< Interpolate from coarse level only
       procedure :: fill             !< Fill ghost cells and coarse-fine boundary data
       procedure :: fill_mfab        !< Fill into a target MultiFab
+      procedure :: sync             !< Lightweight same-level ghost sync (+ reconcile for faces)
       procedure :: average_down     !< Average from finest to coarsest level
       procedure :: average_downto   !< Average level lvl+1 down to level lvl
       ! Iteration helper
@@ -474,6 +475,8 @@ contains
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
          &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if
+      ! For nodal/face data: reconcile shared valid faces
+      if (any(this%nodal)) call this%mf(lvl)%override_sync(this%amr%geom(lvl))
    end subroutine fill
 
    !> Fill into a target MultiFab from this amrdata (for regrid callbacks)
@@ -509,7 +512,21 @@ contains
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
          &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if
+      ! For nodal/face data: reconcile shared valid faces
+      if (any(this%nodal)) call dest%override_sync(this%amr%geom(lvl))
    end subroutine fill_mfab
+
+   !> Lightweight same-level ghost sync (no C/F, no BCs except periodic)
+   !> For nodal/face data, also reconciles shared valid faces
+   subroutine sync(this, lvl)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      integer, intent(in) :: lvl
+      ! For nodal/face data: reconcile shared valid faces first
+      if (any(this%nodal)) call this%mf(lvl)%override_sync(this%amr%geom(lvl))
+      ! Then fill ghosts from valid cells (same level only)
+      call this%mf(lvl)%fill_boundary(this%amr%geom(lvl))
+   end subroutine sync
 
    !> Average down from finest level to coarsest (ensures level consistency)
    !> Simply calls average_downto in a loop from finest to coarsest
