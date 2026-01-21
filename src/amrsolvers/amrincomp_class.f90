@@ -235,14 +235,14 @@ contains
       call this%P%reset_level(lvl, ba, dm)
       call this%div%reset_level(lvl, ba, dm)
       ! Set to zero
-      call this%U%mf(lvl)%setval(0.0_WP)
-      call this%V%mf(lvl)%setval(0.0_WP)
-      call this%W%mf(lvl)%setval(0.0_WP)
-      call this%Uold%mf(lvl)%setval(0.0_WP)
-      call this%Vold%mf(lvl)%setval(0.0_WP)
-      call this%Wold%mf(lvl)%setval(0.0_WP)
-      call this%P%mf(lvl)%setval(0.0_WP)
-      call this%div%mf(lvl)%setval(0.0_WP)
+      call this%U%setval(val=0.0_WP, lvl=lvl)
+      call this%V%setval(val=0.0_WP, lvl=lvl)
+      call this%W%setval(val=0.0_WP, lvl=lvl)
+      call this%Uold%setval(val=0.0_WP, lvl=lvl)
+      call this%Vold%setval(val=0.0_WP, lvl=lvl)
+      call this%Wold%setval(val=0.0_WP, lvl=lvl)
+      call this%P%setval(val=0.0_WP, lvl=lvl)
+      call this%div%setval(val=0.0_WP, lvl=lvl)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -399,7 +399,7 @@ contains
       ! Update divmax
       this%divmax = 0.0_WP
       do lvl = 0, this%amr%clvl()
-         this%divmax = max(this%divmax, this%div%mf(lvl)%norm0(1))
+         this%divmax = max(this%divmax, this%div%norm0(lvl=lvl))
       end do
    end subroutine get_div
 

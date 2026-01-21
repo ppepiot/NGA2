@@ -130,7 +130,7 @@ contains
       ! Build the MultiFab
       call this%reset_level(lvl, ba, dm)
       ! Fill with 1.0 - demonstrates we can access 'this' properly
-      call this%mf(lvl)%setval(1.0_WP)
+      call this%setval(val=1.0_WP, lvl=lvl)
       call log("    custom_on_init_fill_one: filled level with 1.0")
    end subroutine custom_on_init_fill_one
 
@@ -158,7 +158,7 @@ contains
       else
          call warn("    custom_on_init_from_parent: parent not associated!")
       end if
-      call this%mf(lvl)%setval(fill_val)
+      call this%setval(val=fill_val, lvl=lvl)
    end subroutine custom_on_init_from_parent
 
    !> Custom user_init for data5: fills MultiFab with a 3D Gaussian bump
@@ -207,8 +207,8 @@ contains
       end do
       call amrex_mfiter_destroy(mfi)
       call log("    custom_user_init_gaussian: level " // trim(itoa(lvl)) // &
-      &        " min=" // trim(rtoa(this%mf(lvl)%min(1))) // &
-      &        " max=" // trim(rtoa(this%mf(lvl)%max(1))))
+      &        " min=" // trim(rtoa(this%get_min(lvl=lvl))) // &
+      &        " max=" // trim(rtoa(this%get_max(lvl=lvl))))
    end subroutine custom_user_init_gaussian
 
    !> Main test routine - multiple amrdata with varying configurations
@@ -335,11 +335,11 @@ contains
 
       ! Check data2 allocated and has correct value
       if (c_associated(data2%mf(0)%p)) then
-         if (abs(data2%mf(0)%min(1) - 1.0_WP) < 1.0e-10_WP) then
+         if (abs(data2%get_min(lvl=0) - 1.0_WP) < 1.0e-10_WP) then
             call log("PASS: data2%mf(0) filled with 1.0")
             npassed = npassed + 1
          else
-            call warn("FAIL: data2%mf(0) has wrong value: " // trim(rtoa(data2%mf(0)%min(1))))
+            call warn("FAIL: data2%mf(0) has wrong value: " // trim(rtoa(data2%get_min(lvl=0))))
             nfailed = nfailed + 1
          end if
       else
@@ -349,11 +349,11 @@ contains
 
       ! Check data3 allocated and has value from parent (42.0)
       if (c_associated(data3%mf(0)%p)) then
-         if (abs(data3%mf(0)%min(1) - 42.0_WP) < 1.0e-10_WP) then
+         if (abs(data3%get_min(lvl=0) - 42.0_WP) < 1.0e-10_WP) then
             call log("PASS: data3%mf(0) filled with parent value 42.0")
             npassed = npassed + 1
          else
-            call warn("FAIL: data3%mf(0) has wrong value: " // trim(rtoa(data3%mf(0)%min(1))) // " (expected 42.0)")
+            call warn("FAIL: data3%mf(0) has wrong value: " // trim(rtoa(data3%get_min(lvl=0))) // " (expected 42.0)")
             nfailed = nfailed + 1
          end if
       else
@@ -390,9 +390,9 @@ contains
 
       ! Check data5 Gaussian bump: max should be ~0.8+ at center (coarse grid), min should be small
       if (c_associated(data5%mf(0)%p)) then
-         if (data5%mf(0)%max(1) > 0.8_WP .and. data5%mf(0)%min(1) < 0.1_WP) then
-            call log("PASS: data5%mf(0) Gaussian bump (max=" // trim(rtoa(data5%mf(0)%max(1))) // &
-            &        ", min=" // trim(rtoa(data5%mf(0)%min(1))) // ")")
+         if (data5%get_max(lvl=0) > 0.8_WP .and. data5%get_min(lvl=0) < 0.1_WP) then
+            call log("PASS: data5%mf(0) Gaussian bump (max=" // trim(rtoa(data5%get_max(lvl=0))) // &
+            &        ", min=" // trim(rtoa(data5%get_min(lvl=0))) // ")")
             npassed = npassed + 1
          else
             call warn("FAIL: data5%mf(0) unexpected Gaussian values")

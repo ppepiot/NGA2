@@ -164,7 +164,6 @@ contains
       type(monitor) :: mfile
       type(timetracker) :: time
       type(event) :: regrid_evt,hdf5_evt
-      integer :: lvl
       real(WP) :: int0,intF
 
       call log("--------------------------------------------------------")
@@ -262,17 +261,13 @@ contains
          call time%increment()
 
          ! Copy to old
-         call sc%copy2old()
+         call sc%SCold%copy(src=sc%SC)
 
          ! Calculate dSC/dt for all levels (all-level API)
          call sc%get_dSCdt(U=U, V=V, W=W, SC=sc%SCold, dSCdt=dSCdt)
 
-         ! Forward Euler step (per-level lincomb)
-         do lvl = 0, amr%clvl()
-            call sc%SC%mf(lvl)%lincomb(a=1.0_WP, srcmf1=sc%SCold%mf(lvl), srccomp1=1, &
-            &                          b=time%dt, srcmf2=dSCdt%mf(lvl), srccomp2=1, &
-            &                          dstcomp=1, nc=1, ng=0)
-         end do
+         ! Forward Euler step
+         call sc%SC%lincomb(a=1.0_WP, src1=sc%SCold, b=time%dt, src2=dSCdt)
 
          ! Reflux (only applies if use_refluxing=.true.) and average down
          call sc%reflux(dt=time%dt)
@@ -322,9 +317,7 @@ contains
       call log("  Before zero: SCint="//trim(rtoa(int0)))
 
       ! Zero out SC data
-      do lvl = 0, amr%clvl()
-         call sc%SC%mf(lvl)%setval(0.0_WP)
-      end do
+      call sc%SC%setval(val=0.0_WP)
       call sc%get_info()
       call log("  After zero: SCint="//trim(rtoa(sc%SCint(1))))
 

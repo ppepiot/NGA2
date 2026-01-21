@@ -128,7 +128,7 @@ contains
       write(msg,'(a,es12.5,a)') '  Setup time: ', tmr%time, ' s'; call log(msg)
 
       ! Solve with zero initial guess
-      call phi%mf(0)%setval(0.0_WP)
+      call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
       call solver%solve(phi=phi, rhs=rhs)
       call tmr%stop()
@@ -302,7 +302,7 @@ contains
       write(msg,'(a,es12.5,a)') '  Setup time: ', tmr%time, ' s'; call log(msg)
 
       ! First solve
-      call phi%mf(0)%setval(0.0_WP)
+      call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
       call solver%solve(phi=phi, rhs=rhs)
       call tmr%stop()
@@ -310,7 +310,7 @@ contains
       call log(msg)
 
       ! Second solve (reuse test)
-      call phi%mf(0)%setval(0.0_WP)
+      call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
       call solver%solve(phi=phi, rhs=rhs)
       call tmr%stop()
@@ -545,7 +545,6 @@ contains
       type(timer) :: tmr
       character(len=str_long) :: msg
       logical :: passed
-      integer :: lvl
 
       call log('')
       call log('--- Testing solve_level (per-level solve with C/F BC) ---')
@@ -613,9 +612,7 @@ contains
 
       ! Step 2: Zero out phi on levels 1 and 2
       call log('  Step 2: Zero out phi on levels 1 and 2')
-      do lvl = 1, amr%clvl()
-         call phi%mf(lvl)%setval(0.0_WP)
-      end do
+      call phi%setval(val=0.0_WP, lbase=1)
 
       ! Step 3: solve_level on level 1 only (use level 0 as coarse BC)
       call log('  Step 3: solve_level on level 1 only (with C/F BC from level 0)')

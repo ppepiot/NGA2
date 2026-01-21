@@ -64,7 +64,6 @@ module amrscalar_class
 
       ! Physics procedures (all-level API)
       procedure :: get_dSCdt
-      procedure :: copy2old
       procedure :: reflux           ! Needs to be called before amerage_down if use_refluxing=.true.
       procedure :: average_down
    end type amrscalar
@@ -243,8 +242,8 @@ contains
       call this%SC%reset_level(lvl, ba, dm)
       call this%SCold%reset_level(lvl, ba, dm)
       ! Set to zero
-      call this%SC%mf(lvl)%setval(0.0_WP)
-      call this%SCold%mf(lvl)%setval(0.0_WP)
+      call this%SC%setval(val=0.0_WP, lvl=lvl)
+      call this%SCold%setval(val=0.0_WP, lvl=lvl)
       ! Reset flux register for fine levels (if using refluxing)
       if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
    end subroutine on_init
@@ -333,10 +332,10 @@ contains
       this%SCint = 0.0_WP
       do nsc = 1, this%nscalar
          do lvl = 0, this%amr%clvl()
-            this%SCmin(nsc) = min(this%SCmin(nsc), this%SC%mf(lvl)%min(comp=nsc))
-            this%SCmax(nsc) = max(this%SCmax(nsc), this%SC%mf(lvl)%max(comp=nsc))
+            this%SCmin(nsc) = min(this%SCmin(nsc), this%SC%get_min(lvl=lvl, comp=nsc))
+            this%SCmax(nsc) = max(this%SCmax(nsc), this%SC%get_max(lvl=lvl, comp=nsc))
          end do
-         this%SCint(nsc) = this%SC%mf(0)%sum(comp=nsc) * (this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)) / this%amr%vol
+         this%SCint(nsc) = this%SC%get_sum(lvl=0, comp=nsc) * (this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)) / this%amr%vol
       end do
    end subroutine get_info
 
@@ -480,17 +479,6 @@ contains
 
 
    end subroutine get_dSCdt
-
-
-   !> Copy SC into SCold for all levels
-   subroutine copy2old(this)
-      implicit none
-      class(amrscalar), intent(inout) :: this
-      integer :: lvl
-      do lvl = 0, this%amr%clvl()
-         call this%SCold%mf(lvl)%copy(srcmf=this%SC%mf(lvl), srccomp=1, dstcomp=1, nc=this%nscalar, ng=0)
-      end do
-   end subroutine copy2old
 
 
    !> Apply flux register correction (only if use_refluxing=.true.)
