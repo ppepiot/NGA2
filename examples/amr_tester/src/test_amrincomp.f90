@@ -222,17 +222,12 @@ contains
       call log("Pressure solved, P norm0 = "//trim(rtoa(fs%P%norm0(lvl=0))))
       call log("Pressure solver residual = "//trim(rtoa(fs%psolver%res)))
 
-      ! 4. Fill pressure ghosts before gradient computation
-      !do lvl = 0, amr%clvl()
-      !   call fs%P%fill(lvl, time)
-      !end do
-
-      ! 5. Get C/F-consistent gradients and correct velocity
+      ! 4. Get C/F-consistent gradients and correct velocity
       ! get_fluxes returns -grad(P) for Poisson, so U = U + (dt/rho)*flux
       call fs%psolver%get_fluxes(fs%P, dPdx, dPdy, dPdz)
       call log("dPdx norm0 = "//trim(rtoa(dPdx%norm0(lvl=0)))//", dPdz norm0 = "//trim(rtoa(dPdz%norm0(lvl=0))))
 
-      ! 6. Correct velocity: U = U + (dt/rho) * flux
+      ! 5. Correct velocity: U = U + (dt/rho) * flux
       factor = dt / fs%rho
       call fs%U%saxpy(a=factor, src=dPdx)
       call fs%V%saxpy(a=factor, src=dPdy)

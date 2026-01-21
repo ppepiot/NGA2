@@ -230,8 +230,6 @@ contains
       time%dt=0.0025_WP
       time%dtmax=time%dt
       time%tmax=2.0_WP*Pi  ! Full circle rotation
-      time%t=0.0_WP
-      time%n=0
 
       ! Setup regrid event (every 10 steps)
       regrid_evt=event(time=time,name='Regrid')
@@ -260,13 +258,13 @@ contains
       do while (.not.time%done())
          call time%increment()
 
-         ! Copy to old
+         ! Copy to old: SCold=SC
          call sc%SCold%copy(src=sc%SC)
 
-         ! Calculate dSC/dt for all levels (all-level API)
+         ! Calculate dSC/dt for all levels
          call sc%get_dSCdt(U=U, V=V, W=W, SC=sc%SCold, dSCdt=dSCdt)
 
-         ! Forward Euler step
+         ! Forward Euler step: SC=1.0_WP*SCold+dt*dSCdt
          call sc%SC%lincomb(a=1.0_WP, src1=sc%SCold, b=time%dt, src2=dSCdt)
 
          ! Reflux (only applies if use_refluxing=.true.) and average down
@@ -279,7 +277,6 @@ contains
             call amr%regrid(baselvl=0,time=time%t)
             call log("  Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
          end if
-
 
          ! Write HDF5 output
          if (hdf5_evt%occurs()) then
