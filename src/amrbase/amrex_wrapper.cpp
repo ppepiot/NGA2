@@ -665,4 +665,18 @@ void amrmfab_average_down_edge(void *fine_mf, void *crse_mf, int ref_ratio) {
   amrex::average_down_edges(*fmf, *cmf, ratio, 0);
 }
 
+// Compute divergence of face-centered velocity into cell-centered MultiFab
+// Uses AMReX's computeDivergence from MultiFabUtil
+void amrmfab_compute_divergence(void *divu, void *umac_x, void *umac_y,
+                                void *umac_z, void *geom) {
+  auto *div = static_cast<amrex::MultiFab *>(divu);
+  auto const *ux = static_cast<amrex::MultiFab const *>(umac_x);
+  auto const *uy = static_cast<amrex::MultiFab const *>(umac_y);
+  auto const *uz = static_cast<amrex::MultiFab const *>(umac_z);
+  auto const *g = static_cast<amrex::Geometry const *>(geom);
+
+  amrex::Array<amrex::MultiFab const *, AMREX_SPACEDIM> umac = {ux, uy, uz};
+  amrex::computeDivergence(*div, umac, *g);
+}
+
 } // extern "C"

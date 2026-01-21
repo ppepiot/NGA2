@@ -51,6 +51,7 @@ module amrincomp_class
       procedure :: on_remake
       procedure :: on_clear
       procedure :: post_regrid
+      procedure :: fill_velocity              !< Fill velocity ghosts on all levels
       procedure :: average_down_velocity     !< Average down MAC velocity for C/F consistency
       procedure :: average_down_velocity_to  !< Average down MAC velocity for single level
       procedure :: average_down_pressure     !< Average down pressure for C/F consistency
@@ -329,6 +330,19 @@ contains
       end do
    end subroutine average_down_velocity
 
+   !> Fill velocity ghost cells on all levels
+   !> @param time Time for interpolation (used by FillPatch)
+   subroutine fill_velocity(this, time)
+      class(amrincomp), intent(inout) :: this
+      real(WP), intent(in) :: time
+      integer :: lvl
+      do lvl = 0, this%amr%clvl()
+         call this%U%fill(lvl, time)
+         call this%V%fill(lvl, time)
+         call this%W%fill(lvl, time)
+      end do
+   end subroutine fill_velocity
+
    !> Average down pressure for a single level (lvl+1 -> lvl)
    !> Uses amrdata infrastructure which handles cell-centered averaging correctly
    subroutine average_down_pressure_to(this, lvl)
@@ -373,39 +387,15 @@ contains
 
    !> Compute divergence of velocity into internal div field, update divmax
    subroutine get_div(this)
+      use amrex_interface, only: amrmfab_compute_divergence
       class(amrincomp), intent(inout) :: this
-      integer :: lvl, i, j, k
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW, pDiv
-      real(WP) :: dxi, dyi, dzi
-
+      integer :: lvl
+      ! Use our wrapper to amrex's 2nd order staggered divergence
       do lvl = 0, this%amr%clvl()
-         dxi = 1.0_WP / this%amr%dx(lvl)
-         dyi = 1.0_WP / this%amr%dy(lvl)
-         dzi = 1.0_WP / this%amr%dz(lvl)
-
-         call this%amr%mfiter_build(lvl, mfi)
-         do while (mfi%next())
-            bx = mfi%tilebox()
-            pU   => this%U%mf(lvl)%dataptr(mfi)
-            pV   => this%V%mf(lvl)%dataptr(mfi)
-            pW   => this%W%mf(lvl)%dataptr(mfi)
-            pDiv => this%div%mf(lvl)%dataptr(mfi)
-
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
-                     pDiv(i,j,k,1) = (pU(i+1,j,k,1) - pU(i,j,k,1)) * dxi &
-                     &             + (pV(i,j+1,k,1) - pV(i,j,k,1)) * dyi &
-                     &             + (pW(i,j,k+1,1) - pW(i,j,k,1)) * dzi
-                  end do
-               end do
-            end do
-         end do
-         call this%amr%mfiter_destroy(mfi)
+         call amrmfab_compute_divergence(this%div%mf(lvl), &
+            this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
+            this%amr%geom(lvl))
       end do
-
       ! Update divmax
       this%divmax = 0.0_WP
       do lvl = 0, this%amr%clvl()

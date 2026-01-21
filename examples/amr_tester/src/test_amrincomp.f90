@@ -140,7 +140,7 @@ contains
       call log("========================================")
 
       time = 0.0_WP
-      dt = 0.01_WP
+      dt = 1.0_WP
 
       ! Create amrgrid
       allocate(amr)
@@ -150,7 +150,7 @@ contains
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
       amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
-      amr%maxlvl = 2  ! 3 levels: 0, 1, 2
+      amr%maxlvl = 0!2  ! 3 levels: 0, 1, 2
       call amr%initialize()
       call log("Grid initialized: "//trim(itoa(amr%nx))//"x"//trim(itoa(amr%ny))//"x"//trim(itoa(amr%nz)))
       call log("Max levels: "//trim(itoa(amr%maxlvl+1)))
@@ -184,11 +184,7 @@ contains
       call fs%average_down_velocity()
 
       ! Now fill velocity ghosts (fine level will interpolate from corrected coarse)
-      do lvl = 0, amr%clvl()
-         call fs%U%fill(lvl, time)
-         call fs%V%fill(lvl, time)
-         call fs%W%fill(lvl, time)
-      end do
+      call fs%fill_velocity(time)
       call log("Velocity averaged down and ghosts filled")
 
       ! Setup pressure solver with verbose output for debugging
@@ -282,11 +278,7 @@ contains
       call fs%average_down_velocity()
 
       ! Sync periodic ghosts AFTER average_down, then check divergence
-      do lvl = 0, amr%clvl()
-         call fs%U%fill(lvl, time)
-         call fs%V%fill(lvl, time)
-         call fs%W%fill(lvl, time)
-      end do
+      !call fs%fill_velocity(time)
       call fs%get_div()
       divmax_after = fs%divmax
       call log("After projection: divmax = "//trim(rtoa(divmax_after)))

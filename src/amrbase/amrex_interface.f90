@@ -74,6 +74,7 @@ module amrex_interface
    !=====================================================================
    public :: amrmfab_average_down_face  ! Face-centered (nodal_count=1)
    public :: amrmfab_average_down_edge  ! Edge-centered (nodal_count=2)
+   public :: amrmfab_compute_divergence ! Compute div(u) from face velocities
 
    interface
 
@@ -359,6 +360,13 @@ module amrex_interface
          integer(c_int), value :: ref_ratio
       end subroutine amrmfab_average_down_edge_c
 
+      !> Compute divergence of face-centered velocity into cell-centered MultiFab
+      subroutine amrmfab_compute_divergence_c(divu, umac_x, umac_y, umac_z, geom) &
+         bind(c, name='amrmfab_compute_divergence')
+         import :: c_ptr
+         type(c_ptr), value :: divu, umac_x, umac_y, umac_z, geom
+      end subroutine amrmfab_compute_divergence_c
+
    end interface
 
 contains
@@ -386,6 +394,16 @@ contains
       integer, intent(in) :: rr
       call amrmfab_average_down_edge_c(fmf%p, cmf%p, rr)
    end subroutine amrmfab_average_down_edge
+
+   !> Compute divergence of face-centered velocity into cell-centered MultiFab
+   subroutine amrmfab_compute_divergence(divu, umac_x, umac_y, umac_z, geom)
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: divu
+      type(amrex_multifab), intent(in) :: umac_x, umac_y, umac_z
+      type(amrex_geometry), intent(in) :: geom
+      call amrmfab_compute_divergence_c(divu%p, umac_x%p, umac_y%p, umac_z%p, geom%p)
+   end subroutine amrmfab_compute_divergence
 
 end module amrex_interface
 
