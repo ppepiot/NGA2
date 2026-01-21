@@ -51,7 +51,8 @@ module amrincomp_class
       procedure :: on_remake
       procedure :: on_clear
       procedure :: post_regrid
-      procedure :: fill_velocity              !< Fill velocity ghosts on all levels
+      procedure :: fill_velocity_lvl         !< Fill velocity ghosts at single level
+      procedure :: fill_velocity             !< Fill velocity ghosts on all levels
       procedure :: average_down_velocity     !< Average down MAC velocity for C/F consistency
       procedure :: average_down_velocity_to  !< Average down MAC velocity for single level
       procedure :: average_down_pressure     !< Average down pressure for C/F consistency
@@ -60,6 +61,8 @@ module amrincomp_class
       procedure :: get_info
       procedure :: register_checkpoint
       procedure :: restore_checkpoint
+      ! Physics procedures
+      procedure :: get_dmomdt                 !< Compute momentum advection RHS
    end type amrincomp
 
    !> Abstract interface for user-overridable on_init callback
@@ -178,7 +181,7 @@ contains
       ! Store amrgrid pointer
       this%amr => amr
 
-      ! Initialize velocity fields (face-centered)
+      ! Initialize staggered velocity (do we need ghosts?)
       call this%U%initialize(amr, name='U', ncomp=1, ng=1, nodal=[.true., .false., .false.])
       call this%V%initialize(amr, name='V', ncomp=1, ng=1, nodal=[.false., .true., .false.])
       call this%W%initialize(amr, name='W', ncomp=1, ng=1, nodal=[.false., .false., .true.])
@@ -186,7 +189,7 @@ contains
       call this%Vold%initialize(amr, name='Vold', ncomp=1, ng=1, nodal=[.false., .true., .false.])
       call this%Wold%initialize(amr, name='Wold', ncomp=1, ng=1, nodal=[.false., .false., .true.])
 
-      ! Initialize pressure (cell-centered)
+      ! Initialize pressure (cell-centered) (do we need ghosts?)
       call this%P%initialize(amr, name='P', ncomp=1, ng=1)
 
       ! Initialize divergence (cell-centered, no ghosts needed)
@@ -330,16 +333,23 @@ contains
       end do
    end subroutine average_down_velocity
 
+   !> Fill velocity ghost cells at a single level
+   subroutine fill_velocity_lvl(this, lvl, time)
+      class(amrincomp), intent(inout) :: this
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      call this%U%fill_lvl(lvl, time)
+      call this%V%fill_lvl(lvl, time)
+      call this%W%fill_lvl(lvl, time)
+   end subroutine fill_velocity_lvl
+
    !> Fill velocity ghost cells on all levels
-   !> @param time Time for interpolation (used by FillPatch)
    subroutine fill_velocity(this, time)
       class(amrincomp), intent(inout) :: this
       real(WP), intent(in) :: time
       integer :: lvl
       do lvl = 0, this%amr%clvl()
-         call this%U%fill(lvl, time)
-         call this%V%fill(lvl, time)
-         call this%W%fill(lvl, time)
+         call this%fill_velocity_lvl(lvl, time)
       end do
    end subroutine fill_velocity
 
@@ -470,5 +480,77 @@ contains
       call io%read_data(dirname, this%W, 'W')
       call io%read_data(dirname, this%P, 'P')
    end subroutine restore_checkpoint
+
+   !> Compute momentum advection RHS for all levels
+   !> drhoUdt = -∇·(ρuu), drhoVdt = -∇·(ρuv), drhoWdt = -∇·(ρuw)
+   !> Uses flux averaging at C/F interfaces for conservation
+   subroutine get_dmomdt(this, U, V, W, drhoUdt, drhoVdt, drhoWdt)
+      use amrex_amr_module, only: amrex_multifab, amrex_multifab_destroy, amrex_mfiter, amrex_box
+      class(amrincomp), intent(inout) :: this
+      class(amrdata), intent(inout) :: U, V, W                          !< Velocity state (face-centered)
+      class(amrdata), intent(inout) :: drhoUdt, drhoVdt, drhoWdt        !< Output: momentum RHS (face-centered)
+      type(amrex_multifab), dimension(0:this%amr%maxlvl) :: FUx, FUy, FUz
+      type(amrex_multifab), dimension(0:this%amr%maxlvl) :: FVx, FVy, FVz
+      type(amrex_multifab), dimension(0:this%amr%maxlvl) :: FWx, FWy, FWz
+      type(amrex_multifab) :: Ufill, Vfill, Wfill
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      integer :: lvl
+
+      ! Phase 1: Compute fluxes on all levels
+      do lvl = 0, this%amr%clvl()
+         ! FUx, FVy, FWz: cell-centered
+         call this%amr%mfab_build(lvl, FUx(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
+         call this%amr%mfab_build(lvl, FVy(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
+         call this%amr%mfab_build(lvl, FWz(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
+         ! FUy, FVx: xy-edge
+         call this%amr%mfab_build(lvl, FUy(lvl), ncomp=1, nover=1, atface=[.true. ,.true. ,.false.])
+         call this%amr%mfab_build(lvl, FVx(lvl), ncomp=1, nover=1, atface=[.true. ,.true. ,.false.])
+         ! FUz, FWx: xz-edge
+         call this%amr%mfab_build(lvl, FUz(lvl), ncomp=1, nover=1, atface=[.true. ,.false.,.true. ])
+         call this%amr%mfab_build(lvl, FWx(lvl), ncomp=1, nover=1, atface=[.true. ,.false.,.true. ])
+         ! FVz, FWy: yz-edge
+         call this%amr%mfab_build(lvl, FVz(lvl), ncomp=1, nover=1, atface=[.false.,.true. ,.true. ])
+         call this%amr%mfab_build(lvl, FWy(lvl), ncomp=1, nover=1, atface=[.false.,.true. ,.true. ])
+
+         ! Build velocity fills with ghost cells
+         call this%amr%mfab_build(lvl, Ufill, ncomp=1, nover=1, atface=[.true. ,.false.,.false.])
+         call this%amr%mfab_build(lvl, Vfill, ncomp=1, nover=1, atface=[.false.,.true. ,.false.])
+         call this%amr%mfab_build(lvl, Wfill, ncomp=1, nover=1, atface=[.false.,.false.,.true. ])
+         call U%fill_mfab(Ufill, lvl, 0.0_WP)
+         call V%fill_mfab(Vfill, lvl, 0.0_WP)
+         call W%fill_mfab(Wfill, lvl, 0.0_WP)
+
+         ! MFIter loop: compute fluxes
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            ! TODO: 2nd-order centered flux computation
+         end do
+         call this%amr%mfiter_destroy(mfi)
+
+         ! Destroy velocity fills
+         call amrex_multifab_destroy(Ufill)
+         call amrex_multifab_destroy(Vfill)
+         call amrex_multifab_destroy(Wfill)
+      end do
+
+      ! Phase 2: Average down fluxes
+      ! Phase 3: Divergence
+
+      ! Cleanup
+      do lvl = 0, this%amr%clvl()
+         call amrex_multifab_destroy(FUx(lvl))
+         call amrex_multifab_destroy(FUy(lvl))
+         call amrex_multifab_destroy(FUz(lvl))
+         call amrex_multifab_destroy(FVx(lvl))
+         call amrex_multifab_destroy(FVy(lvl))
+         call amrex_multifab_destroy(FVz(lvl))
+         call amrex_multifab_destroy(FWx(lvl))
+         call amrex_multifab_destroy(FWy(lvl))
+         call amrex_multifab_destroy(FWz(lvl))
+      end do
+
+   end subroutine get_dmomdt
 
 end module amrincomp_class

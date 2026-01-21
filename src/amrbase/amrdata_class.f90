@@ -49,10 +49,12 @@ module amrdata_class
       procedure :: reset_level      !< Regenerates mfab at level
       procedure :: clear_level      !< Clears mfab at level
       ! Fill operations
-      procedure :: fill_from_coarse !< Interpolate from coarse level only
-      procedure :: fill             !< Fill ghost cells and coarse-fine boundary data
-      procedure :: fill_mfab        !< Fill into a target MultiFab
-      procedure :: sync             !< Lightweight same-level ghost sync (+ reconcile for faces)
+      procedure :: fill_from_coarse !< Interpolate from coarse level only (single level)
+      procedure :: fill_lvl         !< Fill ghost cells at single level
+      procedure :: fill             !< Fill ghost cells on all levels
+      procedure :: fill_mfab        !< Fill into a target MultiFab (single level)
+      procedure :: sync_lvl         !< Lightweight same-level ghost sync (single level)
+      procedure :: sync             !< Lightweight ghost sync on all levels
       procedure :: average_down     !< Average from finest to coarsest level
       procedure :: average_downto   !< Average level lvl+1 down to level lvl
       ! Scalar operations (Y = op(Y, scalar))
@@ -462,10 +464,10 @@ contains
       &   1, 1, this%ncomp, this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
    end subroutine fill_from_coarse
 
-   !> Fill ghost cells and coarse-fine boundary data
+   !> Fill ghost cells and coarse-fine boundary data at a single level
    !> For lvl=0: fills ghost cells using boundary conditions
    !> For lvl>0: interpolates from coarser level and fills ghosts
-   subroutine fill(this, lvl, time)
+   subroutine fill_lvl(this, lvl, time)
       use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
       use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two
       implicit none
@@ -497,6 +499,17 @@ contains
       end if
       ! For nodal/face data: reconcile shared valid faces
       if (any(this%nodal)) call this%mf(lvl)%override_sync(this%amr%geom(lvl))
+   end subroutine fill_lvl
+
+   !> Fill ghost cells and coarse-fine boundary data on all levels
+   subroutine fill(this, time)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in) :: time
+      integer :: lvl
+      do lvl = 0, this%amr%clvl()
+         call this%fill_lvl(lvl, time)
+      end do
    end subroutine fill
 
    !> Fill into a target MultiFab from this amrdata (for regrid callbacks)
@@ -536,9 +549,9 @@ contains
       if (any(this%nodal)) call dest%override_sync(this%amr%geom(lvl))
    end subroutine fill_mfab
 
-   !> Lightweight same-level ghost sync (no C/F, no BCs except periodic)
+   !> Lightweight same-level ghost sync at a single level (no C/F, no BCs except periodic)
    !> For nodal/face data, also reconciles shared valid faces
-   subroutine sync(this, lvl)
+   subroutine sync_lvl(this, lvl)
       implicit none
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
@@ -546,6 +559,16 @@ contains
       if (any(this%nodal)) call this%mf(lvl)%override_sync(this%amr%geom(lvl))
       ! Then fill ghosts from valid cells (same level only)
       call this%mf(lvl)%fill_boundary(this%amr%geom(lvl))
+   end subroutine sync_lvl
+
+   !> Lightweight same-level ghost sync on all levels
+   subroutine sync(this)
+      implicit none
+      class(amrdata), intent(inout) :: this
+      integer :: lvl
+      do lvl = 0, this%amr%clvl()
+         call this%sync_lvl(lvl)
+      end do
    end subroutine sync
 
    !> Average down from finest level to coarsest (ensures level consistency)
