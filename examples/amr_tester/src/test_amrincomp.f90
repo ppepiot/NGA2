@@ -144,11 +144,7 @@ contains
       use string,   only: itoa, rtoa
       use iso_c_binding, only: c_char
       real(WP) :: divmax_before, divmax_after, dt, time, factor
-      integer :: lvl, i, j, k
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx, fbx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW, pP
-      real(WP) :: dxi, dyi, dzi
+      integer :: lvl
 
       call log("========================================")
       call log("TEST: amrincomp 3-level projection")
@@ -239,61 +235,22 @@ contains
       call log("dPdx norm0 = "//trim(rtoa(dPdx%mf(0)%norm0(1)))//", dPdz norm0 = "//trim(rtoa(dPdz%mf(0)%norm0(1))))
       factor = dt / fs%rho
 
-      ! Correct velocity: U = U - (dt/rho) * grad(P) = U + factor * dPdx
+      ! 6. Correct velocity: U = U + (dt/rho) * flux
+      factor = dt / fs%rho
       do lvl = 0, amr%clvl()
-         call amr%mfiter_build(lvl, mfi)
-         do while (mfi%next())
-            pU => fs%U%mf(lvl)%dataptr(mfi)
-            pV => fs%V%mf(lvl)%dataptr(mfi)
-            pW => fs%W%mf(lvl)%dataptr(mfi)
-
-            ! Get pointers to flux workspace
-            block
-               real(WP), dimension(:,:,:,:), contiguous, pointer :: pdPdx, pdPdy, pdPdz
-               pdPdx => dPdx%mf(lvl)%dataptr(mfi)
-               pdPdy => dPdy%mf(lvl)%dataptr(mfi)
-               pdPdz => dPdz%mf(lvl)%dataptr(mfi)
-
-               ! U correction (x-faces)
-               fbx = mfi%nodaltilebox(1)
-               do k = fbx%lo(3), fbx%hi(3)
-                  do j = fbx%lo(2), fbx%hi(2)
-                     do i = fbx%lo(1), fbx%hi(1)
-                        pU(i,j,k,1) = pU(i,j,k,1) + factor * pdPdx(i,j,k,1)
-                     end do
-                  end do
-               end do
-
-               ! V correction (y-faces)
-               fbx = mfi%nodaltilebox(2)
-               do k = fbx%lo(3), fbx%hi(3)
-                  do j = fbx%lo(2), fbx%hi(2)
-                     do i = fbx%lo(1), fbx%hi(1)
-                        pV(i,j,k,1) = pV(i,j,k,1) + factor * pdPdy(i,j,k,1)
-                     end do
-                  end do
-               end do
-
-               ! W correction (z-faces)
-               fbx = mfi%nodaltilebox(3)
-               do k = fbx%lo(3), fbx%hi(3)
-                  do j = fbx%lo(2), fbx%hi(2)
-                     do i = fbx%lo(1), fbx%hi(1)
-                        pW(i,j,k,1) = pW(i,j,k,1) + factor * pdPdz(i,j,k,1)
-                     end do
-                  end do
-               end do
-            end block
-         end do
-         call amr%mfiter_destroy(mfi)
+         call fs%U%mf(lvl)%saxpy(a=factor, srcmf=dPdx%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
+         call fs%V%mf(lvl)%saxpy(a=factor, srcmf=dPdy%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
+         call fs%W%mf(lvl)%saxpy(a=factor, srcmf=dPdz%mf(lvl), srccomp=1, dstcomp=1, nc=1, ng=0)
       end do
       call log("Velocity corrected")
-      call viz%write(time=0.5_WP)
-      ! Multi-level sync: use proper MAC face averaging from fine to coarse
+
+      ! 6. Average down for C/F consistency
       call fs%average_down_velocity()
 
-      ! Sync periodic ghosts AFTER average_down, then check divergence
+      ! 7. Fill ghosts (includes override_sync for faces)
       call fs%fill_velocity(time)
+
+      ! 8. Check divergence
       call fs%get_div()
       divmax_after = fs%divmax
       call log("After projection: divmax = "//trim(rtoa(divmax_after)))
