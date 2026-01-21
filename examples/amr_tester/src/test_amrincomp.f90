@@ -22,6 +22,7 @@ contains
 
    !> User-provided initialization callback for velocity - sinusoidal values
    subroutine velocity_init(solver, lvl, time, ba, dm)
+      use mathtools, only: Pi
       class(amrincomp), intent(inout) :: solver
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -31,6 +32,14 @@ contains
       type(amrex_box) :: bx, fbx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
       integer :: i, j, k
+
+      ! For fine levels: fill from coarse (no direct computation)
+      !if (lvl > 0) then
+      !   call solver%U%fill_from_coarse(lvl, time)
+      !   call solver%V%fill_from_coarse(lvl, time)
+      !   call solver%W%fill_from_coarse(lvl, time)
+      !   return
+      !end if
 
       ! Build mfiter from cell-centered ba/dm (passed during regrid)
       call amrex_mfiter_build(mfi, ba, dm, tiling=solver%amr%default_tiling)
@@ -46,6 +55,8 @@ contains
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
                   pU(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
+                  !pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)*solver%amr%dx(lvl))
+                  !pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)*solver%amr%dx(lvl)) * cos(2.0_WP*Pi*(real(j,WP)+0.5_WP)*solver%amr%dy(lvl))
                end do
             end do
          end do
@@ -56,6 +67,8 @@ contains
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
                   pV(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
+                  !pV(i,j,k,1) = sin(2.0_WP*Pi*real(j,WP)*solver%amr%dy(lvl))
+                  !pV(i,j,k,1) = -cos(2.0_WP*Pi*(real(i,WP)+0.5_WP)*solver%amr%dx(lvl)) * sin(2.0_WP*Pi*real(j,WP)*solver%amr%dy(lvl))
                end do
             end do
          end do
@@ -66,6 +79,8 @@ contains
             do j = fbx%lo(2), fbx%hi(2)
                do i = fbx%lo(1), fbx%hi(1)
                   pW(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
+                  !pW(i,j,k,1) = sin(2.0_WP*Pi*real(k,WP)*solver%amr%dz(lvl))
+                  !pW(i,j,k,1) = 0.0_WP
                end do
             end do
          end do
@@ -193,9 +208,6 @@ contains
       call log("Pressure solver setup complete")
 
       ! ===== USER-DRIVEN PROJECTION SEQUENCE =====
-      call fs%U%mf(0)%override_sync(amr%geom(0))
-      call fs%V%mf(0)%override_sync(amr%geom(0))
-      call fs%W%mf(0)%override_sync(amr%geom(0))
       ! 1. Compute divergence (assumes velocity ghosts filled)
       call fs%get_div()
       divmax_before = fs%divmax
