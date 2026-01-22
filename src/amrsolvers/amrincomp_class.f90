@@ -9,7 +9,8 @@ module amrincomp_class
    use amrsolver_class,  only: amrsolver
    use amrmg_class,      only: amrmg, amrmg_cstcoef
    use amrex_amr_module, only: amrex_multifab, amrex_mfiter, amrex_box, &
-   &                           amrex_boxarray, amrex_distromap
+   &                           amrex_boxarray, amrex_distromap, amrex_geometry, &
+   &                           amrex_interp_face_divfree
    implicit none
    private
 
@@ -40,6 +41,9 @@ module amrincomp_class
       ! Monitoring quantities
       real(WP) :: divmax = 0.0_WP !< Maximum divergence
 
+      ! Velocity interpolation method (for C/F interface fills)
+      integer :: interp = amrex_interp_face_divfree
+
    contains
       procedure :: initialize
       procedure :: finalize
@@ -53,6 +57,10 @@ module amrincomp_class
       procedure :: post_regrid
       procedure :: fill_velocity_lvl         !< Fill velocity ghosts at single level
       procedure :: fill_velocity             !< Fill velocity ghosts on all levels
+      procedure :: fill_velocity_from_coarse !< Fill velocity from coarse using divergence-free interpolation
+      procedure :: sync_velocity_lvl         !< Sync velocity ghosts at single level
+      procedure :: sync_velocity             !< Sync velocity ghosts on all levels
+      procedure :: fill_velocity_mfab        !< Fill dest MultiFabs for regridding
       procedure :: average_down_velocity     !< Average down MAC velocity for C/F consistency
       procedure :: average_down_velocity_to  !< Average down MAC velocity for single level
       procedure :: average_down_pressure     !< Average down pressure for C/F consistency
@@ -201,6 +209,11 @@ contains
       this%P%parent => this
       this%div%parent => this
 
+      ! Set velocity fillbc callbacks to shared handler (current velocity only)
+      this%U%fillbc => velocity_fillbc
+      this%V%fillbc => velocity_fillbc
+      this%W%fillbc => velocity_fillbc
+
       ! Initialize pressure solver
       call this%psolver%initialize(amr, type=amrmg_cstcoef)
 
@@ -248,42 +261,61 @@ contains
       call this%div%setval(val=0.0_WP, lvl=lvl)
    end subroutine on_init
 
-   !> Override on_coarse: create new fine level from coarse
+   !> Override on_coarse: create new fine level from coarse using divergence-free interpolation
    subroutine on_coarse(this, lvl, time, ba, dm)
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
-      ! Velocity gets interpolated from coarse
-      call this%U%on_coarse(this%U, lvl, time, ba, dm)
-      call this%V%on_coarse(this%V, lvl, time, ba, dm)
-      call this%W%on_coarse(this%W, lvl, time, ba, dm)
+      ! Velocity: allocate then fill with divergence-free interpolation
+      call this%U%reset_level(lvl, ba, dm)
+      call this%V%reset_level(lvl, ba, dm)
+      call this%W%reset_level(lvl, ba, dm)
+      call this%fill_velocity_from_coarse(lvl, time)
       ! Old velocity just needs geometry
       call this%Uold%reset_level(lvl, ba, dm)
       call this%Vold%reset_level(lvl, ba, dm)
       call this%Wold%reset_level(lvl, ba, dm)
-      ! Pressure
+      ! Pressure on coarse
       call this%P%on_coarse(this%P, lvl, time, ba, dm)
       ! Divergence just needs geometry
       call this%div%reset_level(lvl, ba, dm)
    end subroutine on_coarse
 
-   !> Override on_remake: migrate data on regrid
+   !> Override on_remake: migrate data on regrid using divergence-free interpolation
    subroutine on_remake(this, lvl, time, ba, dm)
+      use amrex_amr_module, only: amrex_multifab_build, amrex_multifab_destroy
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
-      ! Delegate to amrdata on_remake
-      call this%U%on_remake(this%U, lvl, time, ba, dm)
-      call this%V%on_remake(this%V, lvl, time, ba, dm)
-      call this%W%on_remake(this%W, lvl, time, ba, dm)
+      type(amrex_multifab) :: Utmp, Vtmp, Wtmp
+      ! Build temp MultiFabs with new layout (0 ghost cells for FillPatch)
+      call amrex_multifab_build(Utmp, ba, dm, 1, 0, this%U%nodal)
+      call amrex_multifab_build(Vtmp, ba, dm, 1, 0, this%V%nodal)
+      call amrex_multifab_build(Wtmp, ba, dm, 1, 0, this%W%nodal)
+      ! Fill temps from old data via coupled FillPatch
+      call this%fill_velocity_mfab(Utmp, Vtmp, Wtmp, lvl, time)
+      ! Reset levels and copy from temps
+      call this%U%reset_level(lvl, ba, dm)
+      call this%V%reset_level(lvl, ba, dm)
+      call this%W%reset_level(lvl, ba, dm)
+      call this%U%mf(lvl)%copy(Utmp, 1, 1, 1, 0)
+      call this%V%mf(lvl)%copy(Vtmp, 1, 1, 1, 0)
+      call this%W%mf(lvl)%copy(Wtmp, 1, 1, 1, 0)
+      ! Destroy temps
+      call amrex_multifab_destroy(Utmp)
+      call amrex_multifab_destroy(Vtmp)
+      call amrex_multifab_destroy(Wtmp)
+      ! Old velocity just needs geometry
       call this%Uold%reset_level(lvl, ba, dm)
       call this%Vold%reset_level(lvl, ba, dm)
       call this%Wold%reset_level(lvl, ba, dm)
+      ! Pressure remake
       call this%P%on_remake(this%P, lvl, time, ba, dm)
+      ! Divergence just needs geometry
       call this%div%reset_level(lvl, ba, dm)
    end subroutine on_remake
 
@@ -333,14 +365,54 @@ contains
       end do
    end subroutine average_down_velocity
 
-   !> Fill velocity ghost cells at a single level
+   !> Fill velocity ghost cells at a single level using divergence-free interpolation
    subroutine fill_velocity_lvl(this, lvl, time)
-      class(amrincomp), intent(inout) :: this
+      use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
+      use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two_faces
+      use amrdata_class, only: amrdata_fillbc
+      class(amrincomp), target, intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
-      call this%U%fill_lvl(lvl, time)
-      call this%V%fill_lvl(lvl, time)
-      call this%W%fill_lvl(lvl, time)
+      type(c_ptr) :: ctx_u, ctx_v, ctx_w
+      type(c_funptr) :: bc_dispatch
+      integer :: rr, lo_bc(9), hi_bc(9)
+      real(WP) :: t_old, t_new
+
+      ! Get contexts for each velocity component
+      ctx_u = c_loc(this%U); ctx_v = c_loc(this%V); ctx_w = c_loc(this%W)
+      bc_dispatch = c_funloc(amrdata_fillbc)
+      t_old = time - 1.0e200_WP
+      t_new = time
+
+      if (lvl .eq. 0) then
+         ! Level 0: single-level fill (just physical BCs)
+         call amrmfab_fillpatch_single(this%U%mf(0), time, this%U%mf(0), &
+         &   time, this%U%mf(0), this%amr%geom(0), ctx_u, bc_dispatch, time, 1, 1, 1)
+         call amrmfab_fillpatch_single(this%V%mf(0), time, this%V%mf(0), &
+         &   time, this%V%mf(0), this%amr%geom(0), ctx_v, bc_dispatch, time, 1, 1, 1)
+         call amrmfab_fillpatch_single(this%W%mf(0), time, this%W%mf(0), &
+         &   time, this%W%mf(0), this%amr%geom(0), ctx_w, bc_dispatch, time, 1, 1, 1)
+      else
+         ! Build combined BC array: [U_x,U_y,U_z, V_x,V_y,V_z, W_x,W_y,W_z]
+         lo_bc(1:3) = this%U%lo_bc(:,1)
+         lo_bc(4:6) = this%V%lo_bc(:,1)
+         lo_bc(7:9) = this%W%lo_bc(:,1)
+         hi_bc(1:3) = this%U%hi_bc(:,1)
+         hi_bc(4:6) = this%V%hi_bc(:,1)
+         hi_bc(7:9) = this%W%hi_bc(:,1)
+         rr = this%amr%rref(lvl-1)
+         ! Call 3-component divfree FillPatch from two levels
+         call amrmfab_fillpatch_two_faces( &
+         &   this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), time, &
+         &   t_old, this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
+         &   t_new, this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
+         &   this%amr%geom(lvl-1), &
+         &   t_old, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
+         &   t_new, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
+         &   this%amr%geom(lvl), &
+         &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
+         &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+      end if
    end subroutine fill_velocity_lvl
 
    !> Fill velocity ghost cells on all levels
@@ -352,6 +424,108 @@ contains
          call this%fill_velocity_lvl(lvl, time)
       end do
    end subroutine fill_velocity
+
+   !> Fill new fine level velocity from coarse using divergence-free interpolation
+   !> Used during MakeNewLevelFromCoarse (creation of new fine levels)
+   subroutine fill_velocity_from_coarse(this, lvl, time)
+      use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
+      use amrex_interface, only: amrmfab_fillcoarsepatch_faces
+      use amrdata_class, only: amrdata_fillbc
+      class(amrincomp), target, intent(inout) :: this
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(c_ptr) :: ctx_u, ctx_v, ctx_w
+      type(c_funptr) :: bc_dispatch
+      integer :: rr, lo_bc(9), hi_bc(9)
+      ! Get contexts for each velocity component
+      ctx_u = c_loc(this%U); ctx_v = c_loc(this%V); ctx_w = c_loc(this%W)
+      bc_dispatch = c_funloc(amrdata_fillbc)
+      ! Build combined BC array: [U_x,U_y,U_z, V_x,V_y,V_z, W_x,W_y,W_z]
+      lo_bc(1:3) = this%U%lo_bc(:,1)
+      lo_bc(4:6) = this%V%lo_bc(:,1)
+      lo_bc(7:9) = this%W%lo_bc(:,1)
+      hi_bc(1:3) = this%U%hi_bc(:,1)
+      hi_bc(4:6) = this%V%hi_bc(:,1)
+      hi_bc(7:9) = this%W%hi_bc(:,1)
+      rr = this%amr%rref(lvl-1)
+      ! Call 3-component divfree FillCoarsePatch
+      call amrmfab_fillcoarsepatch_faces( &
+      &   this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), time, &
+      &   this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
+      &   this%amr%geom(lvl-1), this%amr%geom(lvl), &
+      &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
+      &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+   end subroutine fill_velocity_from_coarse
+
+   !> Sync velocity ghost cells at a single level (lightweight, no C/F interpolation)
+   subroutine sync_velocity_lvl(this, lvl)
+      class(amrincomp), intent(inout) :: this
+      integer, intent(in) :: lvl
+      call this%U%sync_lvl(lvl)
+      call this%V%sync_lvl(lvl)
+      call this%W%sync_lvl(lvl)
+   end subroutine sync_velocity_lvl
+
+   !> Sync velocity ghost cells on all levels
+   subroutine sync_velocity(this)
+      class(amrincomp), intent(inout) :: this
+      integer :: lvl
+      do lvl = 0, this%amr%clvl()
+         call this%sync_velocity_lvl(lvl)
+      end do
+   end subroutine sync_velocity
+
+   !> Fill destination MultiFabs with velocity using divergence-free interpolation
+   !> Used during regridding (on_remake) to fill new layout MultiFabs
+   subroutine fill_velocity_mfab(this, Udest, Vdest, Wdest, lvl, time)
+      use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
+      use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two_faces
+      use amrdata_class, only: amrdata_fillbc
+      class(amrincomp), target, intent(inout) :: this
+      type(amrex_multifab), intent(inout) :: Udest, Vdest, Wdest
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(c_ptr) :: ctx_u, ctx_v, ctx_w
+      type(c_funptr) :: bc_dispatch
+      integer :: rr, lo_bc(9), hi_bc(9)
+      real(WP) :: t_old, t_new
+
+      ! Get contexts for each velocity component
+      ctx_u = c_loc(this%U); ctx_v = c_loc(this%V); ctx_w = c_loc(this%W)
+      bc_dispatch = c_funloc(amrdata_fillbc)
+      t_old = time - 1.0e200_WP
+      t_new = time
+
+      if (lvl .eq. 0) then
+         ! Level 0: single-level fill (just physical BCs)
+         call amrmfab_fillpatch_single(Udest, t_old, this%U%mf(0), &
+         &   t_new, this%U%mf(0), this%amr%geom(0), ctx_u, bc_dispatch, time, 1, 1, 1)
+         call amrmfab_fillpatch_single(Vdest, t_old, this%V%mf(0), &
+         &   t_new, this%V%mf(0), this%amr%geom(0), ctx_v, bc_dispatch, time, 1, 1, 1)
+         call amrmfab_fillpatch_single(Wdest, t_old, this%W%mf(0), &
+         &   t_new, this%W%mf(0), this%amr%geom(0), ctx_w, bc_dispatch, time, 1, 1, 1)
+      else
+         ! Build combined BC array
+         lo_bc(1:3) = this%U%lo_bc(:,1)
+         lo_bc(4:6) = this%V%lo_bc(:,1)
+         lo_bc(7:9) = this%W%lo_bc(:,1)
+         hi_bc(1:3) = this%U%hi_bc(:,1)
+         hi_bc(4:6) = this%V%hi_bc(:,1)
+         hi_bc(7:9) = this%W%hi_bc(:,1)
+         rr = this%amr%rref(lvl-1)
+         ! Call 3-component divfree FillPatch
+         call amrmfab_fillpatch_two_faces( &
+         &   Udest, Vdest, Wdest, time, &
+         &   t_old, this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
+         &   t_new, this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
+         &   this%amr%geom(lvl-1), &
+         &   t_old, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
+         &   t_new, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
+         &   this%amr%geom(lvl), &
+         &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
+         &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+      end if
+   end subroutine fill_velocity_mfab
 
    !> Average down pressure for a single level (lvl+1 -> lvl)
    !> Uses amrdata infrastructure which handles cell-centered averaging correctly
@@ -552,5 +726,42 @@ contains
       end do
 
    end subroutine get_dmomdt
+
+   !> Velocity boundary condition callback (shared by U, V, W)
+   !> Identifies component by its name and applies appropriate BCs
+   !> TODO: Study incflo BC implementation for proper face-centered velocity BCs
+   subroutine velocity_fillbc(this, mf, scomp, ncomp, time, geom)
+      use amrex_amr_module, only: amrex_filcc, amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy
+      class(amrdata), intent(inout) :: this
+      type(amrex_multifab), intent(inout) :: mf
+      integer, intent(in) :: scomp, ncomp
+      real(WP), intent(in) :: time
+      type(amrex_geometry), intent(in) :: geom
+      type(amrex_mfiter) :: mfi
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
+      integer, dimension(4) :: plo, phi
+
+      ! Access solver and check for all-periodic (skip if so)
+      select type (solver => this%parent)
+       class is (amrincomp)
+         if (solver%amr%xper .and. solver%amr%yper .and. solver%amr%zper) return
+      end select
+
+      ! Loop over boxes and apply BCs
+      ! Component identified by this%name: 'U', 'V', or 'W'
+      call amrex_mfiter_build(mfi, mf, tiling=.false.)
+      do while (mfi%next())
+         p => mf%dataptr(mfi)
+         if (.not.geom%domain%contains(p)) then
+            plo = lbound(p); phi = ubound(p)
+            ! Apply BCs using this amrdata's lo_bc/hi_bc
+            ! Note: amrex_filcc is designed for cell-centered data
+            ! TODO: Implement proper face-centered BC logic (see incflo)
+            call amrex_filcc(p, plo, phi, geom%domain%lo, geom%domain%hi, geom%dx, &
+            &   geom%get_physical_location(plo), this%lo_bc, this%hi_bc)
+         end if
+      end do
+      call amrex_mfiter_destroy(mfi)
+   end subroutine velocity_fillbc
 
 end module amrincomp_class

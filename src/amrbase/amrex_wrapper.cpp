@@ -679,4 +679,154 @@ void amrmfab_compute_divergence(void *divu, void *umac_x, void *umac_y,
   amrex::computeDivergence(*div, umac, *g);
 }
 
+// =============================================================================
+// 3-Component Face FillPatch Wrappers
+// These wrappers call AMReX's coupled FillPatchTwoLevels/InterpFromCoarseLevel
+// for face-centered data using the specified face interpolator.
+// Note: Only face_divfree_interp (type=8) is currently supported for the
+// coupled 3-component array versions - other face interps don't have interp_arr
+// =============================================================================
+
+// FillPatch from coarse level only (used during MakeNewLevelFromCoarse)
+// Takes 3 MultiFabs (U,V,W) and fills them with interpolated coarse data
+// interp_type: 8 = face_divfree (required for coupled divfree interpolation)
+
+void amrmfab_fillcoarsepatch_faces(
+    void *mf_u, void *mf_v, void *mf_w, double time, void *cmf_u, void *cmf_v,
+    void *cmf_w, void *geom_c_ptr, void *geom_f_ptr, void *ctx_u, void *ctx_v,
+    void *ctx_w, nga2::FillPatchBCDispatcher bc_u,
+    nga2::FillPatchBCDispatcher bc_v, nga2::FillPatchBCDispatcher bc_w,
+    int scomp, int dcomp, int ncomp, int ref_ratio, int interp_type, int *lo_bc,
+    int *hi_bc) {
+  // Only face_divfree_interp (type=8) is supported for 3-component array fills
+  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(interp_type == 8,
+                                   "Only face_divfree interpolation (type=8) "
+                                   "is supported for 3-component face fills");
+  amrex::ignore_unused(interp_type);
+
+  auto *u = static_cast<amrex::MultiFab *>(mf_u);
+  auto *v = static_cast<amrex::MultiFab *>(mf_v);
+  auto *w = static_cast<amrex::MultiFab *>(mf_w);
+  auto *cu = static_cast<amrex::MultiFab *>(cmf_u);
+  auto *cv = static_cast<amrex::MultiFab *>(cmf_v);
+  auto *cw = static_cast<amrex::MultiFab *>(cmf_w);
+  auto *geom_c = static_cast<amrex::Geometry *>(geom_c_ptr);
+  auto *geom_f = static_cast<amrex::Geometry *>(geom_f_ptr);
+
+  amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> mf_arr = {u, v, w};
+  amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> cmf_arr = {cu, cv, cw};
+
+  // Build BCRecs per dimension (each dimension has ncomp components)
+  amrex::Array<amrex::Vector<amrex::BCRec>, AMREX_SPACEDIM> bcs;
+  for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+    for (int i = 0; i < ncomp; ++i) {
+      int base = d * 3;
+      bcs[d].emplace_back(lo_bc[base], lo_bc[base + 1], lo_bc[base + 2],
+                          hi_bc[base], hi_bc[base + 1], hi_bc[base + 2]);
+    }
+  }
+
+  // BC functors per dimension
+  nga2::NGA2BCFunctor bc_functor_c_u(ctx_u, bc_u, geom_c);
+  nga2::NGA2BCFunctor bc_functor_c_v(ctx_v, bc_v, geom_c);
+  nga2::NGA2BCFunctor bc_functor_c_w(ctx_w, bc_w, geom_c);
+  nga2::NGA2BCFunctor bc_functor_f_u(ctx_u, bc_u, geom_f);
+  nga2::NGA2BCFunctor bc_functor_f_v(ctx_v, bc_v, geom_f);
+  nga2::NGA2BCFunctor bc_functor_f_w(ctx_w, bc_w, geom_f);
+
+  amrex::Array<nga2::NGA2BCFunctor, AMREX_SPACEDIM> cbc = {
+      bc_functor_c_u, bc_functor_c_v, bc_functor_c_w};
+  amrex::Array<nga2::NGA2BCFunctor, AMREX_SPACEDIM> fbc = {
+      bc_functor_f_u, bc_functor_f_v, bc_functor_f_w};
+
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+
+  amrex::InterpFromCoarseLevel(mf_arr, time, cmf_arr, scomp, dcomp, ncomp,
+                               *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
+                               &amrex::face_divfree_interp, bcs, 0);
+}
+
+// FillPatch from two levels (used during regular FillPatch operations)
+// Takes 3 destination MultiFabs and source data from both coarse and fine
+// levels
+void amrmfab_fillpatch_two_faces(
+    void *mf_u, void *mf_v, void *mf_w, double time,
+    // Coarse level: old and new states
+    double time_old_c, void *mf_old_c_u, void *mf_old_c_v, void *mf_old_c_w,
+    double time_new_c, void *mf_new_c_u, void *mf_new_c_v, void *mf_new_c_w,
+    void *geom_c_ptr,
+    // Fine level: old and new states
+    double time_old_f, void *mf_old_f_u, void *mf_old_f_v, void *mf_old_f_w,
+    double time_new_f, void *mf_new_f_u, void *mf_new_f_v, void *mf_new_f_w,
+    void *geom_f_ptr,
+    // BC callbacks and contexts
+    void *ctx_u, void *ctx_v, void *ctx_w, nga2::FillPatchBCDispatcher bc_u,
+    nga2::FillPatchBCDispatcher bc_v, nga2::FillPatchBCDispatcher bc_w,
+    int scomp, int dcomp, int ncomp, int ref_ratio, int interp_type, int *lo_bc,
+    int *hi_bc) {
+  // Only face_divfree_interp (type=8) is supported for 3-component array fills
+  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(interp_type == 8,
+                                   "Only face_divfree interpolation (type=8) "
+                                   "is supported for 3-component face fills");
+  amrex::ignore_unused(interp_type);
+
+  auto *u = static_cast<amrex::MultiFab *>(mf_u);
+  auto *v = static_cast<amrex::MultiFab *>(mf_v);
+  auto *w = static_cast<amrex::MultiFab *>(mf_w);
+  auto *geom_c = static_cast<amrex::Geometry *>(geom_c_ptr);
+  auto *geom_f = static_cast<amrex::Geometry *>(geom_f_ptr);
+
+  // Destination array
+  amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> mf_arr = {u, v, w};
+
+  // Build coarse source arrays
+  amrex::Vector<amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM>> cmf(2);
+  cmf[0] = {static_cast<amrex::MultiFab *>(mf_old_c_u),
+            static_cast<amrex::MultiFab *>(mf_old_c_v),
+            static_cast<amrex::MultiFab *>(mf_old_c_w)};
+  cmf[1] = {static_cast<amrex::MultiFab *>(mf_new_c_u),
+            static_cast<amrex::MultiFab *>(mf_new_c_v),
+            static_cast<amrex::MultiFab *>(mf_new_c_w)};
+  amrex::Vector<amrex::Real> ctime = {time_old_c, time_new_c};
+
+  // Build fine source arrays
+  amrex::Vector<amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM>> fmf(2);
+  fmf[0] = {static_cast<amrex::MultiFab *>(mf_old_f_u),
+            static_cast<amrex::MultiFab *>(mf_old_f_v),
+            static_cast<amrex::MultiFab *>(mf_old_f_w)};
+  fmf[1] = {static_cast<amrex::MultiFab *>(mf_new_f_u),
+            static_cast<amrex::MultiFab *>(mf_new_f_v),
+            static_cast<amrex::MultiFab *>(mf_new_f_w)};
+  amrex::Vector<amrex::Real> ftime = {time_old_f, time_new_f};
+
+  // Build BCRecs per dimension
+  amrex::Array<amrex::Vector<amrex::BCRec>, AMREX_SPACEDIM> bcs;
+  for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+    for (int i = 0; i < ncomp; ++i) {
+      int base = d * 3;
+      bcs[d].emplace_back(lo_bc[base], lo_bc[base + 1], lo_bc[base + 2],
+                          hi_bc[base], hi_bc[base + 1], hi_bc[base + 2]);
+    }
+  }
+
+  // BC functors per dimension
+  nga2::NGA2BCFunctor bc_functor_c_u(ctx_u, bc_u, geom_c);
+  nga2::NGA2BCFunctor bc_functor_c_v(ctx_v, bc_v, geom_c);
+  nga2::NGA2BCFunctor bc_functor_c_w(ctx_w, bc_w, geom_c);
+  nga2::NGA2BCFunctor bc_functor_f_u(ctx_u, bc_u, geom_f);
+  nga2::NGA2BCFunctor bc_functor_f_v(ctx_v, bc_v, geom_f);
+  nga2::NGA2BCFunctor bc_functor_f_w(ctx_w, bc_w, geom_f);
+
+  amrex::Array<nga2::NGA2BCFunctor, AMREX_SPACEDIM> cbc = {
+      bc_functor_c_u, bc_functor_c_v, bc_functor_c_w};
+  amrex::Array<nga2::NGA2BCFunctor, AMREX_SPACEDIM> fbc = {
+      bc_functor_f_u, bc_functor_f_v, bc_functor_f_w};
+
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+
+  amrex::FillPatchTwoLevels(mf_arr, time, cmf, ctime, fmf, ftime, scomp, dcomp,
+                            ncomp, *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
+                            &amrex::face_divfree_interp, bcs, 0);
+}
+
 } // extern "C"

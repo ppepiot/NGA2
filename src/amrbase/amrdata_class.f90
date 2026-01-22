@@ -459,8 +459,8 @@ contains
       end select
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call C++ wrapper
-      call amrmfab_fillcoarsepatch(this%mf(lvl)%p, time, this%mf(lvl-1)%p, &
-      &   this%amr%geom(lvl-1)%p, this%amr%geom(lvl)%p, data_ctx, bc_dispatch_ptr, &
+      call amrmfab_fillcoarsepatch(this%mf(lvl), time, this%mf(lvl-1), &
+      &   this%amr%geom(lvl-1), this%amr%geom(lvl), data_ctx, bc_dispatch_ptr, &
       &   1, 1, this%ncomp, this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
    end subroutine fill_from_coarse
 
@@ -487,13 +487,13 @@ contains
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call appropriate FillPatch (scomp/dcomp use 1-indexed Fortran convention)
       if (lvl .eq. 0) then
-         call amrmfab_fillpatch_single(this%mf(0)%p, t_old, this%mf(0)%p, &
-         &   t_new, this%mf(0)%p, this%amr%geom(0)%p, data_ctx, bc_dispatch_ptr, &
+         call amrmfab_fillpatch_single(this%mf(0), t_old, this%mf(0), &
+         &   t_new, this%mf(0), this%amr%geom(0), data_ctx, bc_dispatch_ptr, &
          &   time, 1, 1, this%ncomp)
       else
-         call amrmfab_fillpatch_two(this%mf(lvl)%p, t_old, this%mf(lvl-1)%p, &
-         &   t_new, this%mf(lvl-1)%p, this%amr%geom(lvl-1)%p, &
-         &   t_old, this%mf(lvl)%p, t_new, this%mf(lvl)%p, this%amr%geom(lvl)%p, &
+         call amrmfab_fillpatch_two(this%mf(lvl), t_old, this%mf(lvl-1), &
+         &   t_new, this%mf(lvl-1), this%amr%geom(lvl-1), &
+         &   t_old, this%mf(lvl), t_new, this%mf(lvl), this%amr%geom(lvl), &
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
          &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if
@@ -535,13 +535,13 @@ contains
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call appropriate FillPatch
       if (lvl .eq. 0) then
-         call amrmfab_fillpatch_single(dest%p, t_old, this%mf(0)%p, &
-         &   t_new, this%mf(0)%p, this%amr%geom(0)%p, data_ctx, bc_dispatch_ptr, &
+         call amrmfab_fillpatch_single(dest, t_old, this%mf(0), &
+         &   t_new, this%mf(0), this%amr%geom(0), data_ctx, bc_dispatch_ptr, &
          &   time, 1, 1, this%ncomp)
       else
-         call amrmfab_fillpatch_two(dest%p, t_old, this%mf(lvl-1)%p, &
-         &   t_new, this%mf(lvl-1)%p, this%amr%geom(lvl-1)%p, &
-         &   t_old, this%mf(lvl)%p, t_new, this%mf(lvl)%p, this%amr%geom(lvl)%p, &
+         call amrmfab_fillpatch_two(dest, t_old, this%mf(lvl-1), &
+         &   t_new, this%mf(lvl-1), this%amr%geom(lvl-1), &
+         &   t_old, this%mf(lvl), t_new, this%mf(lvl), this%amr%geom(lvl), &
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
          &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if

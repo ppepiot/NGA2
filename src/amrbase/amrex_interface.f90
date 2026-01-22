@@ -45,6 +45,8 @@ module amrex_interface
    public :: amrmfab_fillpatch_single
    public :: amrmfab_fillpatch_two
    public :: amrmfab_fillcoarsepatch
+   public :: amrmfab_fillcoarsepatch_faces  ! 3-component
+   public :: amrmfab_fillpatch_two_faces    ! 3-component
 
    !=====================================================================
    ! Plotfile Output
@@ -210,19 +212,21 @@ module amrex_interface
       !------------------------------------------------------------------
 
       !> FillPatch for level 0 (single level, physical BCs only)
-      subroutine amrmfab_fillpatch_single(mf,t_old,mf_old,t_new,mf_new, &
-      &   geom,solver_ctx,bc_dispatch,time,scomp,dcomp,ncomp) bind(c)
+      subroutine amrmfab_fillpatch_single_c(mf,t_old,mf_old,t_new,mf_new, &
+      &   geom,solver_ctx,bc_dispatch,time,scomp,dcomp,ncomp) &
+      &   bind(c, name='amrmfab_fillpatch_single')
          import :: c_ptr,c_funptr,c_double,c_int
          type(c_ptr), value :: mf,mf_old,mf_new,geom,solver_ctx
          type(c_funptr), value :: bc_dispatch
          real(c_double), value :: t_old,t_new,time
          integer(c_int), value :: scomp,dcomp,ncomp
-      end subroutine amrmfab_fillpatch_single
+      end subroutine amrmfab_fillpatch_single_c
 
       !> FillPatch for fine levels (two-level interpolation + BCs)
-      subroutine amrmfab_fillpatch_two(mf,t_old_c,mf_old_c,t_new_c,mf_new_c,geom_c, &
+      subroutine amrmfab_fillpatch_two_c(mf,t_old_c,mf_old_c,t_new_c,mf_new_c,geom_c, &
       &   t_old_f,mf_old_f,t_new_f,mf_new_f,geom_f,solver_ctx,bc_dispatch, &
-      &   time,scomp,dcomp,ncomp,ref_ratio,interp_type,lo_bc,hi_bc,nbc) bind(c)
+      &   time,scomp,dcomp,ncomp,ref_ratio,interp_type,lo_bc,hi_bc,nbc) &
+      &   bind(c, name='amrmfab_fillpatch_two')
          import :: c_ptr,c_funptr,c_double,c_int
          type(c_ptr), value :: mf,mf_old_c,mf_new_c,geom_c
          type(c_ptr), value :: mf_old_f,mf_new_f,geom_f,solver_ctx
@@ -230,18 +234,60 @@ module amrex_interface
          real(c_double), value :: t_old_c,t_new_c,t_old_f,t_new_f,time
          integer(c_int), value :: scomp,dcomp,ncomp,ref_ratio,interp_type,nbc
          integer(c_int), intent(in) :: lo_bc(*),hi_bc(*)
-      end subroutine amrmfab_fillpatch_two
+      end subroutine amrmfab_fillpatch_two_c
 
       !> FillCoarsePatch - fill fine level from coarse only (for new levels)
-      subroutine amrmfab_fillcoarsepatch(mf_f,time,mf_c,geom_c,geom_f,solver_ctx, &
-      &   bc_dispatch,scomp,dcomp,ncomp,ref_ratio,interp_type,lo_bc,hi_bc,nbc) bind(c)
+      subroutine amrmfab_fillcoarsepatch_c(mf_f,time,mf_c,geom_c,geom_f,solver_ctx, &
+      &   bc_dispatch,scomp,dcomp,ncomp,ref_ratio,interp_type,lo_bc,hi_bc,nbc) &
+      &   bind(c, name='amrmfab_fillcoarsepatch')
          import :: c_ptr,c_funptr,c_double,c_int
          type(c_ptr), value :: mf_f,mf_c,geom_c,geom_f,solver_ctx
          type(c_funptr), value :: bc_dispatch
          real(c_double), value :: time
          integer(c_int), value :: scomp,dcomp,ncomp,ref_ratio,interp_type,nbc
          integer(c_int), intent(in) :: lo_bc(*),hi_bc(*)
-      end subroutine amrmfab_fillcoarsepatch
+      end subroutine amrmfab_fillcoarsepatch_c
+
+
+      !> FillCoarsePatch for 3-component face-centered velocity
+      subroutine amrmfab_fillcoarsepatch_faces_c(mf_u, mf_v, mf_w, time, &
+      &   cmf_u, cmf_v, cmf_w, geom_c, geom_f, &
+      &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+      &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc) &
+      &   bind(c, name='amrmfab_fillcoarsepatch_faces')
+         import :: c_ptr, c_funptr, c_double, c_int
+         type(c_ptr), value :: mf_u, mf_v, mf_w
+         type(c_ptr), value :: cmf_u, cmf_v, cmf_w
+         type(c_ptr), value :: geom_c, geom_f
+         type(c_ptr), value :: ctx_u, ctx_v, ctx_w
+         type(c_funptr), value :: bc_u, bc_v, bc_w
+         real(c_double), value :: time
+         integer(c_int), value :: scomp, dcomp, ncomp, ref_ratio, interp_type
+         integer(c_int), intent(in) :: lo_bc(*), hi_bc(*)
+      end subroutine amrmfab_fillcoarsepatch_faces_c
+
+      !> FillPatch for 3-component face-centered velocity from two levels
+      subroutine amrmfab_fillpatch_two_faces_c(mf_u, mf_v, mf_w, time, &
+      &   t_old_c, mf_old_c_u, mf_old_c_v, mf_old_c_w, &
+      &   t_new_c, mf_new_c_u, mf_new_c_v, mf_new_c_w, geom_c, &
+      &   t_old_f, mf_old_f_u, mf_old_f_v, mf_old_f_w, &
+      &   t_new_f, mf_new_f_u, mf_new_f_v, mf_new_f_w, geom_f, &
+      &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+      &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc) &
+      &   bind(c, name='amrmfab_fillpatch_two_faces')
+         import :: c_ptr, c_funptr, c_double, c_int
+         type(c_ptr), value :: mf_u, mf_v, mf_w
+         type(c_ptr), value :: mf_old_c_u, mf_old_c_v, mf_old_c_w
+         type(c_ptr), value :: mf_new_c_u, mf_new_c_v, mf_new_c_w
+         type(c_ptr), value :: mf_old_f_u, mf_old_f_v, mf_old_f_w
+         type(c_ptr), value :: mf_new_f_u, mf_new_f_v, mf_new_f_w
+         type(c_ptr), value :: geom_c, geom_f
+         type(c_ptr), value :: ctx_u, ctx_v, ctx_w
+         type(c_funptr), value :: bc_u, bc_v, bc_w
+         real(c_double), value :: time, t_old_c, t_new_c, t_old_f, t_new_f
+         integer(c_int), value :: scomp, dcomp, ncomp, ref_ratio, interp_type
+         integer(c_int), intent(in) :: lo_bc(*), hi_bc(*)
+      end subroutine amrmfab_fillpatch_two_faces_c
 
       !====================================================================
       ! Plotfile Output
@@ -404,6 +450,116 @@ contains
       type(amrex_geometry), intent(in) :: geom
       call amrmfab_compute_divergence_c(divu%p, umac_x%p, umac_y%p, umac_z%p, geom%p)
    end subroutine amrmfab_compute_divergence
+
+   !> Fill coarse patch for 3-component face-centered velocity
+   subroutine amrmfab_fillcoarsepatch_faces(mf_u, mf_v, mf_w, time, &
+   &   cmf_u, cmf_v, cmf_w, geom_c, geom_f, &
+   &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+   &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc)
+      use iso_c_binding, only: c_ptr, c_funptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: mf_u, mf_v, mf_w
+      type(amrex_multifab), intent(in) :: cmf_u, cmf_v, cmf_w
+      type(amrex_geometry), intent(in) :: geom_c, geom_f
+      type(c_ptr), intent(in) :: ctx_u, ctx_v, ctx_w
+      type(c_funptr), intent(in) :: bc_u, bc_v, bc_w
+      real(8), intent(in) :: time
+      integer, intent(in) :: scomp, dcomp, ncomp, ref_ratio, interp_type
+      integer, intent(in) :: lo_bc(*), hi_bc(*)
+      call amrmfab_fillcoarsepatch_faces_c(mf_u%p, mf_v%p, mf_w%p, time, &
+      &   cmf_u%p, cmf_v%p, cmf_w%p, geom_c%p, geom_f%p, &
+      &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+      &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc)
+   end subroutine amrmfab_fillcoarsepatch_faces
+
+   !> FillPatch for 3-component face-centered velocity from two levels
+   subroutine amrmfab_fillpatch_two_faces(mf_u, mf_v, mf_w, time, &
+   &   t_old_c, mf_old_c_u, mf_old_c_v, mf_old_c_w, &
+   &   t_new_c, mf_new_c_u, mf_new_c_v, mf_new_c_w, geom_c, &
+   &   t_old_f, mf_old_f_u, mf_old_f_v, mf_old_f_w, &
+   &   t_new_f, mf_new_f_u, mf_new_f_v, mf_new_f_w, geom_f, &
+   &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+   &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc)
+      use iso_c_binding, only: c_ptr, c_funptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: mf_u, mf_v, mf_w
+      type(amrex_multifab), intent(in) :: mf_old_c_u, mf_old_c_v, mf_old_c_w
+      type(amrex_multifab), intent(in) :: mf_new_c_u, mf_new_c_v, mf_new_c_w
+      type(amrex_multifab), intent(in) :: mf_old_f_u, mf_old_f_v, mf_old_f_w
+      type(amrex_multifab), intent(in) :: mf_new_f_u, mf_new_f_v, mf_new_f_w
+      type(amrex_geometry), intent(in) :: geom_c, geom_f
+      type(c_ptr), intent(in) :: ctx_u, ctx_v, ctx_w
+      type(c_funptr), intent(in) :: bc_u, bc_v, bc_w
+      real(8), intent(in) :: time, t_old_c, t_new_c, t_old_f, t_new_f
+      integer, intent(in) :: scomp, dcomp, ncomp, ref_ratio, interp_type
+      integer, intent(in) :: lo_bc(*), hi_bc(*)
+      call amrmfab_fillpatch_two_faces_c(mf_u%p, mf_v%p, mf_w%p, time, &
+      &   t_old_c, mf_old_c_u%p, mf_old_c_v%p, mf_old_c_w%p, &
+      &   t_new_c, mf_new_c_u%p, mf_new_c_v%p, mf_new_c_w%p, geom_c%p, &
+      &   t_old_f, mf_old_f_u%p, mf_old_f_v%p, mf_old_f_w%p, &
+      &   t_new_f, mf_new_f_u%p, mf_new_f_v%p, mf_new_f_w%p, geom_f%p, &
+      &   ctx_u, ctx_v, ctx_w, bc_u, bc_v, bc_w, &
+      &   scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc)
+   end subroutine amrmfab_fillpatch_two_faces
+
+   !> FillPatch for level 0 (single level, physical BCs only)
+   subroutine amrmfab_fillpatch_single(mf, t_old, mf_old, t_new, mf_new, &
+   &   geom, solver_ctx, bc_dispatch, time, scomp, dcomp, ncomp)
+      use iso_c_binding, only: c_ptr, c_funptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: mf
+      type(amrex_multifab), intent(in) :: mf_old, mf_new
+      type(amrex_geometry), intent(in) :: geom
+      type(c_ptr), intent(in) :: solver_ctx
+      type(c_funptr), intent(in) :: bc_dispatch
+      real(8), intent(in) :: t_old, t_new, time
+      integer, intent(in) :: scomp, dcomp, ncomp
+      call amrmfab_fillpatch_single_c(mf%p, t_old, mf_old%p, t_new, mf_new%p, &
+      &   geom%p, solver_ctx, bc_dispatch, time, scomp, dcomp, ncomp)
+   end subroutine amrmfab_fillpatch_single
+
+   !> FillPatch for fine levels (two-level interpolation + BCs)
+   subroutine amrmfab_fillpatch_two(mf, t_old_c, mf_old_c, t_new_c, mf_new_c, geom_c, &
+   &   t_old_f, mf_old_f, t_new_f, mf_new_f, geom_f, solver_ctx, bc_dispatch, &
+   &   time, scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc, nbc)
+      use iso_c_binding, only: c_ptr, c_funptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: mf
+      type(amrex_multifab), intent(in) :: mf_old_c, mf_new_c, mf_old_f, mf_new_f
+      type(amrex_geometry), intent(in) :: geom_c, geom_f
+      type(c_ptr), intent(in) :: solver_ctx
+      type(c_funptr), intent(in) :: bc_dispatch
+      real(8), intent(in) :: t_old_c, t_new_c, t_old_f, t_new_f, time
+      integer, intent(in) :: scomp, dcomp, ncomp, ref_ratio, interp_type, nbc
+      integer, intent(in) :: lo_bc(*), hi_bc(*)
+      call amrmfab_fillpatch_two_c(mf%p, t_old_c, mf_old_c%p, t_new_c, mf_new_c%p, &
+      &   geom_c%p, t_old_f, mf_old_f%p, t_new_f, mf_new_f%p, geom_f%p, &
+      &   solver_ctx, bc_dispatch, time, scomp, dcomp, ncomp, ref_ratio, &
+      &   interp_type, lo_bc, hi_bc, nbc)
+   end subroutine amrmfab_fillpatch_two
+
+   !> FillCoarsePatch - fill fine level from coarse only (for new levels)
+   subroutine amrmfab_fillcoarsepatch(mf_f, time, mf_c, geom_c, geom_f, solver_ctx, &
+   &   bc_dispatch, scomp, dcomp, ncomp, ref_ratio, interp_type, lo_bc, hi_bc, nbc)
+      use iso_c_binding, only: c_ptr, c_funptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(inout) :: mf_f
+      type(amrex_multifab), intent(in) :: mf_c
+      type(amrex_geometry), intent(in) :: geom_c, geom_f
+      type(c_ptr), intent(in) :: solver_ctx
+      type(c_funptr), intent(in) :: bc_dispatch
+      real(8), intent(in) :: time
+      integer, intent(in) :: scomp, dcomp, ncomp, ref_ratio, interp_type, nbc
+      integer, intent(in) :: lo_bc(*), hi_bc(*)
+      call amrmfab_fillcoarsepatch_c(mf_f%p, time, mf_c%p, geom_c%p, geom_f%p, &
+      &   solver_ctx, bc_dispatch, scomp, dcomp, ncomp, ref_ratio, interp_type, &
+      &   lo_bc, hi_bc, nbc)
+   end subroutine amrmfab_fillcoarsepatch
 
 end module amrex_interface
 
