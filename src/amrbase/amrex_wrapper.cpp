@@ -698,12 +698,6 @@ void amrmfab_fillcoarsepatch_faces(
     nga2::FillPatchBCDispatcher bc_v, nga2::FillPatchBCDispatcher bc_w,
     int scomp, int dcomp, int ncomp, int ref_ratio, int interp_type, int *lo_bc,
     int *hi_bc) {
-  // Only face_divfree_interp (type=8) is supported for 3-component array fills
-  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(interp_type == 8,
-                                   "Only face_divfree interpolation (type=8) "
-                                   "is supported for 3-component face fills");
-  amrex::ignore_unused(interp_type);
-
   auto *u = static_cast<amrex::MultiFab *>(mf_u);
   auto *v = static_cast<amrex::MultiFab *>(mf_v);
   auto *w = static_cast<amrex::MultiFab *>(mf_w);
@@ -741,9 +735,19 @@ void amrmfab_fillcoarsepatch_faces(
 
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
 
-  amrex::InterpFromCoarseLevel(mf_arr, time, cmf_arr, scomp, dcomp, ncomp,
-                               *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
-                               &amrex::face_divfree_interp, bcs, 0);
+  // Call with appropriate interpolator based on type
+  // Convert from 1-indexed (Fortran) to 0-indexed (C++)
+  if (interp_type == 8) {
+    amrex::InterpFromCoarseLevel(mf_arr, time, cmf_arr, scomp - 1, dcomp - 1,
+                                 ncomp, *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
+                                 &amrex::face_divfree_interp, bcs, 0);
+  } else if (interp_type == 9) {
+    amrex::InterpFromCoarseLevel(mf_arr, time, cmf_arr, scomp - 1, dcomp - 1,
+                                 ncomp, *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
+                                 &amrex::face_linear_interp, bcs, 0);
+  } else {
+    amrex::Abort("amrmfab_fillcoarsepatch_faces: unsupported interp_type");
+  }
 }
 
 // FillPatch from two levels (used during regular FillPatch operations)
@@ -764,12 +768,6 @@ void amrmfab_fillpatch_two_faces(
     nga2::FillPatchBCDispatcher bc_v, nga2::FillPatchBCDispatcher bc_w,
     int scomp, int dcomp, int ncomp, int ref_ratio, int interp_type, int *lo_bc,
     int *hi_bc) {
-  // Only face_divfree_interp (type=8) is supported for 3-component array fills
-  AMREX_ALWAYS_ASSERT_WITH_MESSAGE(interp_type == 8,
-                                   "Only face_divfree interpolation (type=8) "
-                                   "is supported for 3-component face fills");
-  amrex::ignore_unused(interp_type);
-
   auto *u = static_cast<amrex::MultiFab *>(mf_u);
   auto *v = static_cast<amrex::MultiFab *>(mf_v);
   auto *w = static_cast<amrex::MultiFab *>(mf_w);
@@ -824,9 +822,19 @@ void amrmfab_fillpatch_two_faces(
 
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
 
-  amrex::FillPatchTwoLevels(mf_arr, time, cmf, ctime, fmf, ftime, scomp, dcomp,
-                            ncomp, *geom_c, *geom_f, cbc, 0, fbc, 0, ratio,
-                            &amrex::face_divfree_interp, bcs, 0);
+  // Call with appropriate interpolator based on type
+  // Convert from 1-indexed (Fortran) to 0-indexed (C++)
+  if (interp_type == 8) {
+    amrex::FillPatchTwoLevels(mf_arr, time, cmf, ctime, fmf, ftime, scomp - 1,
+                              dcomp - 1, ncomp, *geom_c, *geom_f, cbc, 0, fbc,
+                              0, ratio, &amrex::face_divfree_interp, bcs, 0);
+  } else if (interp_type == 9) {
+    amrex::FillPatchTwoLevels(mf_arr, time, cmf, ctime, fmf, ftime, scomp - 1,
+                              dcomp - 1, ncomp, *geom_c, *geom_f, cbc, 0, fbc,
+                              0, ratio, &amrex::face_linear_interp, bcs, 0);
+  } else {
+    amrex::Abort("amrmfab_fillpatch_two_faces: unsupported interp_type");
+  }
 }
 
 } // extern "C"

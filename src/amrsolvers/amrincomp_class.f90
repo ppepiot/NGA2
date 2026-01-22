@@ -57,7 +57,7 @@ module amrincomp_class
       procedure :: post_regrid
       procedure :: fill_velocity_lvl         !< Fill velocity ghosts at single level
       procedure :: fill_velocity             !< Fill velocity ghosts on all levels
-      procedure :: fill_velocity_from_coarse !< Fill velocity from coarse using divergence-free interpolation
+      procedure :: fill_velocity_from_coarse !< Fill velocity from coarse
       procedure :: sync_velocity_lvl         !< Sync velocity ghosts at single level
       procedure :: sync_velocity             !< Sync velocity ghosts on all levels
       procedure :: fill_velocity_mfab        !< Fill dest MultiFabs for regridding
@@ -209,7 +209,7 @@ contains
       this%P%parent => this
       this%div%parent => this
 
-      ! Set velocity fillbc callbacks to shared handler (current velocity only)
+      ! Set velocity fillbc callbacks to shared handler
       this%U%fillbc => velocity_fillbc
       this%V%fillbc => velocity_fillbc
       this%W%fillbc => velocity_fillbc
