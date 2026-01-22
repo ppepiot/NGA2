@@ -24,6 +24,7 @@ module amrincomp_class
       ! User-configurable callbacks
       procedure(incomp_init_iface), pointer, nopass :: user_init => null()
       procedure(incomp_tagging_iface), pointer, nopass :: user_tagging => null()
+      procedure(incomp_dirichlet_iface), pointer, nopass :: user_dirichlet => null()
 
       ! Flow data (solver owns these)
       type(amrdata) :: U, V, W          !< Current face velocities
@@ -94,6 +95,21 @@ module amrincomp_class
          type(c_ptr), intent(in) :: tags
          real(WP), intent(in) :: time
       end subroutine incomp_tagging_iface
+   end interface
+
+   !> Abstract interface for user-provided Dirichlet velocity BC values
+   !> User receives a boundary box and fills it efficiently (e.g., Poiseuille profile)
+   abstract interface
+      subroutine incomp_dirichlet_iface(solver, bx, p, comp, face, time, geom)
+         import :: amrincomp, amrex_box, amrex_geometry, WP
+         class(amrincomp), intent(in) :: solver
+         type(amrex_box), intent(in) :: bx          !< Boundary region to fill
+         real(WP), dimension(:,:,:,:), intent(inout) :: p
+         character(len=1), intent(in) :: comp       !< 'U', 'V', or 'W'
+         integer, intent(in) :: face                !< 1=xlo,2=xhi,3=ylo,4=yhi,5=zlo,6=zhi
+         real(WP), intent(in) :: time
+         type(amrex_geometry), intent(in) :: geom
+      end subroutine incomp_dirichlet_iface
    end interface
 
 contains
@@ -740,40 +756,253 @@ contains
    end subroutine get_dmomdt
 
    !> Velocity boundary condition callback (shared by U, V, W)
-   !> Identifies component by its name and applies appropriate BCs
-   !> TODO: Study incflo BC implementation for proper face-centered velocity BCs
+   !> Handles staggering-aware BC fills for face-centered velocity data
+   !> - ext_dir: calls user_dirichlet callback for Dirichlet values
+   !> - foextrap: copies from interior (Neumann, zero gradient)
+   !> - hoextrap: higher-order extrapolation
+   !> - reflect_even/odd: symmetry/anti-symmetry
    subroutine velocity_fillbc(this, mf, scomp, ncomp, time, geom)
-      use amrex_amr_module, only: amrex_filcc, amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy
+      use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, &
+      &   amrex_bc_ext_dir, amrex_bc_foextrap, amrex_bc_hoextrap, amrex_bc_reflect_even, amrex_bc_reflect_odd
       class(amrdata), intent(inout) :: this
       type(amrex_multifab), intent(inout) :: mf
       integer, intent(in) :: scomp, ncomp
       real(WP), intent(in) :: time
       type(amrex_geometry), intent(in) :: geom
       type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: p
-      integer, dimension(4) :: plo, phi
+      integer :: i, j, k, dlo(3), dhi(3), flo(3), fhi(3), bnd
+      integer :: ilo, ihi, jlo, jhi, klo, khi
+      character(len=1) :: comp
+      logical :: xper, yper, zper
 
-      ! Access solver and check for all-periodic (skip if so)
+      ! Access solver for periodicity and user callback
       select type (solver => this%parent)
        class is (amrincomp)
-         if (solver%amr%xper .and. solver%amr%yper .and. solver%amr%zper) return
+         xper = solver%amr%xper; yper = solver%amr%yper; zper = solver%amr%zper
+         if (xper .and. yper .and. zper) return
       end select
 
-      ! Loop over boxes and apply BCs
-      ! Component identified by this%name: 'U', 'V', or 'W'
+      ! Get domain bounds and component ID
+      dlo = geom%domain%lo
+      dhi = geom%domain%hi
+      comp = this%name(1:1)  ! 'U', 'V', or 'W'
+
+      ! Compute staggered domain bounds for this component
+      ! Cell domain: [dlo, dhi]. Face domains extend by 1 in staggered direction.
+      flo = dlo; fhi = dhi
+      select case (comp)
+       case ('U'); fhi(1) = dhi(1) + 1
+       case ('V'); fhi(2) = dhi(2) + 1
+       case ('W'); fhi(3) = dhi(3) + 1
+      end select
+
+      ! Loop over FABs
       call amrex_mfiter_build(mfi, mf, tiling=.false.)
       do while (mfi%next())
          p => mf%dataptr(mfi)
-         if (.not.geom%domain%contains(p)) then
-            plo = lbound(p); phi = ubound(p)
-            ! Apply BCs using this amrdata's lo_bc/hi_bc
-            ! Note: amrex_filcc is designed for cell-centered data
-            ! TODO: Implement proper face-centered BC logic (see incflo)
-            call amrex_filcc(p, plo, phi, geom%domain%lo, geom%domain%hi, geom%dx, &
-            &   geom%get_physical_location(plo), this%lo_bc, this%hi_bc)
-         end if
+         ilo = lbound(p,1); ihi = ubound(p,1)
+         jlo = lbound(p,2); jhi = ubound(p,2)
+         klo = lbound(p,3); khi = ubound(p,3)
+
+         ! Skip if FAB entirely within staggered domain
+         if (ilo .ge. flo(1) .and. ihi .le. fhi(1) .and. &
+         &   jlo .ge. flo(2) .and. jhi .le. fhi(2) .and. &
+         &   klo .ge. flo(3) .and. khi .le. fhi(3)) cycle
+
+         select type (solver => this%parent)
+          class is (amrincomp)
+
+            ! X-LOW BOUNDARY
+            if (.not.xper .and. ilo .lt. flo(1)) then
+               bnd = flo(1)
+               call apply_vel_bc_lo(p, 1, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%lo_bc(1,1), solver, comp, 1, time, geom)
+            end if
+
+            ! X-HIGH BOUNDARY
+            if (.not.xper .and. ihi .gt. fhi(1)) then
+               bnd = fhi(1)
+               call apply_vel_bc_hi(p, 1, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%hi_bc(1,1), solver, comp, 2, time, geom)
+            end if
+
+            ! Y-LOW BOUNDARY
+            if (.not.yper .and. jlo .lt. flo(2)) then
+               bnd = flo(2)
+               call apply_vel_bc_lo(p, 2, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%lo_bc(2,1), solver, comp, 3, time, geom)
+            end if
+
+            ! Y-HIGH BOUNDARY
+            if (.not.yper .and. jhi .gt. fhi(2)) then
+               bnd = fhi(2)
+               call apply_vel_bc_hi(p, 2, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%hi_bc(2,1), solver, comp, 4, time, geom)
+            end if
+
+            ! Z-LOW BOUNDARY
+            if (.not.zper .and. klo .lt. flo(3)) then
+               bnd = flo(3)
+               call apply_vel_bc_lo(p, 3, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%lo_bc(3,1), solver, comp, 5, time, geom)
+            end if
+
+            ! Z-HIGH BOUNDARY
+            if (.not.zper .and. khi .gt. fhi(3)) then
+               bnd = fhi(3)
+               call apply_vel_bc_hi(p, 3, bnd, ilo, ihi, jlo, jhi, klo, khi, &
+               &   this%hi_bc(3,1), solver, comp, 6, time, geom)
+            end if
+
+         end select
       end do
       call amrex_mfiter_destroy(mfi)
+
+   contains
+
+      !> Apply BC at low boundary in direction dir
+      subroutine apply_vel_bc_lo(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
+         real(WP), dimension(:,:,:,:), intent(inout) :: p
+         integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
+         class(amrincomp), intent(in) :: solver
+         character(len=1), intent(in) :: comp
+         real(WP), intent(in) :: time
+         type(amrex_geometry), intent(in) :: geom
+         type(amrex_box) :: bc_bx
+         integer :: ii, jj, kk
+
+         select case (bctype)
+          case (amrex_bc_ext_dir)
+            ! Dirichlet: fill boundary + ghosts via user callback
+            if (associated(solver%user_dirichlet)) then
+               select case (dir)
+                case (1); bc_bx = amrex_box([ilo, jlo, klo], [bnd, jhi, khi])
+                case (2); bc_bx = amrex_box([ilo, jlo, klo], [ihi, bnd, khi])
+                case (3); bc_bx = amrex_box([ilo, jlo, klo], [ihi, jhi, bnd])
+               end select
+               call solver%user_dirichlet(solver, bc_bx, p, comp, face, time, geom)
+            else
+               ! Default to zero if no callback provided
+               select case (dir)
+                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+               end select
+            end if
+
+          case (amrex_bc_foextrap)
+            ! Neumann: copy from first interior cell (boundary face + ghosts)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd; p(ii,jj,kk,1)=p(bnd+1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,bnd+1,kk,1); end do; end do; end do
+             case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,bnd+1,1); end do; end do; end do
+            end select
+
+          case (amrex_bc_hoextrap)
+            ! Higher-order extrapolation (boundary face + ghosts)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd
+                        p(ii,jj,kk,1) = 2.0_WP*p(bnd+1,jj,kk,1) - p(bnd+2,jj,kk,1)
+                     end do; end do; end do
+             case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,bnd+1,kk,1) - p(ii,bnd+2,kk,1)
+                     end do; end do; end do
+             case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,bnd+1,1) - p(ii,jj,bnd+2,1)
+                     end do; end do; end do
+            end select
+
+          case (amrex_bc_reflect_even)
+            ! Symmetry: F(-n) = F(n)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd-1; p(ii,jj,kk,1)=p(2*bnd-ii-1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=jlo,bnd-1; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,2*bnd-jj-1,kk,1); end do; end do; end do
+             case (3); do kk=klo,bnd-1; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,2*bnd-kk-1,1); end do; end do; end do
+            end select
+
+          case (amrex_bc_reflect_odd)
+            ! Anti-symmetry: F(-n) = -F(n)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd-1; p(ii,jj,kk,1)=-p(2*bnd-ii-1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=jlo,bnd-1; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,2*bnd-jj-1,kk,1); end do; end do; end do
+             case (3); do kk=klo,bnd-1; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,jj,2*bnd-kk-1,1); end do; end do; end do
+            end select
+
+         end select
+      end subroutine apply_vel_bc_lo
+
+      !> Apply BC at high boundary in direction dir
+      subroutine apply_vel_bc_hi(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
+         real(WP), dimension(:,:,:,:), intent(inout) :: p
+         integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
+         class(amrincomp), intent(in) :: solver
+         character(len=1), intent(in) :: comp
+         real(WP), intent(in) :: time
+         type(amrex_geometry), intent(in) :: geom
+         type(amrex_box) :: bc_bx
+         integer :: ii, jj, kk
+
+         select case (bctype)
+          case (amrex_bc_ext_dir)
+            ! Dirichlet: fill boundary + ghosts via user callback
+            if (associated(solver%user_dirichlet)) then
+               select case (dir)
+                case (1); bc_bx = amrex_box([bnd, jlo, klo], [ihi, jhi, khi])
+                case (2); bc_bx = amrex_box([ilo, bnd, klo], [ihi, jhi, khi])
+                case (3); bc_bx = amrex_box([ilo, jlo, bnd], [ihi, jhi, khi])
+               end select
+               call solver%user_dirichlet(solver, bc_bx, p, comp, face, time, geom)
+            else
+               select case (dir)
+                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+               end select
+            end if
+
+          case (amrex_bc_foextrap)
+            ! Neumann: copy from last interior cell (boundary face + ghosts)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi; p(ii,jj,kk,1)=p(bnd-1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,bnd-1,kk,1); end do; end do; end do
+             case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,bnd-1,1); end do; end do; end do
+            end select
+
+          case (amrex_bc_hoextrap)
+            ! Higher-order extrapolation (boundary face + ghosts)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(bnd-1,jj,kk,1) - p(bnd-2,jj,kk,1)
+                     end do; end do; end do
+             case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,bnd-1,kk,1) - p(ii,bnd-2,kk,1)
+                     end do; end do; end do
+             case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,bnd-1,1) - p(ii,jj,bnd-2,1)
+                     end do; end do; end do
+            end select
+
+          case (amrex_bc_reflect_even)
+            ! Symmetry: F(-n) = F(n)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd+1,ihi; p(ii,jj,kk,1)=p(2*bnd-ii+1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=bnd+1,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,2*bnd-jj+1,kk,1); end do; end do; end do
+             case (3); do kk=bnd+1,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,2*bnd-kk+1,1); end do; end do; end do
+            end select
+
+          case (amrex_bc_reflect_odd)
+            ! Anti-symmetry: F(-n) = -F(n)
+            select case (dir)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd+1,ihi; p(ii,jj,kk,1)=-p(2*bnd-ii+1,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=bnd+1,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,2*bnd-jj+1,kk,1); end do; end do; end do
+             case (3); do kk=bnd+1,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,jj,2*bnd-kk+1,1); end do; end do; end do
+            end select
+
+         end select
+      end subroutine apply_vel_bc_hi
+
    end subroutine velocity_fillbc
 
 end module amrincomp_class
