@@ -863,6 +863,8 @@ contains
    contains
 
       !> Apply BC at low boundary in direction dir
+      !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
+      !> For TANGENT component (e.g., V in x): fills ghosts only
       subroutine apply_vel_bc_lo(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
          real(WP), dimension(:,:,:,:), intent(inout) :: p
          integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
@@ -871,51 +873,67 @@ contains
          real(WP), intent(in) :: time
          type(amrex_geometry), intent(in) :: geom
          type(amrex_box) :: bc_bx
-         integer :: ii, jj, kk
+         integer :: ii, jj, kk, fill_to, src_from
+         logical :: is_normal
+
+         ! Check if this is a normal component (U in x, V in y, W in z)
+         is_normal = (comp .eq. 'U' .and. dir .eq. 1) .or. &
+         &           (comp .eq. 'V' .and. dir .eq. 2) .or. &
+         &           (comp .eq. 'W' .and. dir .eq. 3)
+
+         ! For normal: fill up to bnd (includes boundary face), source from bnd+1
+         ! For tangent: fill up to bnd-1 (ghosts only), source from bnd
+         if (is_normal) then
+            fill_to = bnd
+            src_from = bnd + 1
+         else
+            fill_to = bnd - 1
+            src_from = bnd
+         end if
 
          select case (bctype)
           case (amrex_bc_ext_dir)
-            ! Dirichlet: fill boundary + ghosts via user callback
+            ! Dirichlet: fill via user callback
             if (associated(solver%user_dirichlet)) then
                select case (dir)
-                case (1); bc_bx = amrex_box([ilo, jlo, klo], [bnd, jhi, khi])
-                case (2); bc_bx = amrex_box([ilo, jlo, klo], [ihi, bnd, khi])
-                case (3); bc_bx = amrex_box([ilo, jlo, klo], [ihi, jhi, bnd])
+                case (1); bc_bx = amrex_box([ilo, jlo, klo], [fill_to, jhi, khi])
+                case (2); bc_bx = amrex_box([ilo, jlo, klo], [ihi, fill_to, khi])
+                case (3); bc_bx = amrex_box([ilo, jlo, klo], [ihi, jhi, fill_to])
                end select
                call solver%user_dirichlet(solver, bc_bx, p, comp, face, time, geom)
             else
                ! Default to zero if no callback provided
                select case (dir)
-                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
-                case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
-                case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,fill_to; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (2); do kk=klo,khi; do jj=jlo,fill_to; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (3); do kk=klo,fill_to; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
                end select
             end if
 
           case (amrex_bc_foextrap)
-            ! Neumann: copy from first interior cell (boundary face + ghosts)
+            ! Neumann: copy from interior
             select case (dir)
-             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd; p(ii,jj,kk,1)=p(bnd+1,jj,kk,1); end do; end do; end do
-             case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,bnd+1,kk,1); end do; end do; end do
-             case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,bnd+1,1); end do; end do; end do
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,fill_to; p(ii,jj,kk,1)=p(src_from,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=jlo,fill_to; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,src_from,kk,1); end do; end do; end do
+             case (3); do kk=klo,fill_to; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,src_from,1); end do; end do; end do
             end select
 
           case (amrex_bc_hoextrap)
-            ! Higher-order extrapolation (boundary face + ghosts)
+            ! Higher-order extrapolation
             select case (dir)
-             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd
-                        p(ii,jj,kk,1) = 2.0_WP*p(bnd+1,jj,kk,1) - p(bnd+2,jj,kk,1)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,fill_to
+                        p(ii,jj,kk,1) = 2.0_WP*p(src_from,jj,kk,1) - p(src_from+1,jj,kk,1)
                      end do; end do; end do
-             case (2); do kk=klo,khi; do jj=jlo,bnd; do ii=ilo,ihi
-                        p(ii,jj,kk,1) = 2.0_WP*p(ii,bnd+1,kk,1) - p(ii,bnd+2,kk,1)
+             case (2); do kk=klo,khi; do jj=jlo,fill_to; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,src_from,kk,1) - p(ii,src_from+1,kk,1)
                      end do; end do; end do
-             case (3); do kk=klo,bnd; do jj=jlo,jhi; do ii=ilo,ihi
-                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,bnd+1,1) - p(ii,jj,bnd+2,1)
+             case (3); do kk=klo,fill_to; do jj=jlo,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,src_from,1) - p(ii,jj,src_from+1,1)
                      end do; end do; end do
             end select
 
           case (amrex_bc_reflect_even)
-            ! Symmetry: F(-n) = F(n)
+            ! Symmetry: F(-n) = F(n) - always ghosts only (bnd-1)
             select case (dir)
              case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd-1; p(ii,jj,kk,1)=p(2*bnd-ii-1,jj,kk,1); end do; end do; end do
              case (2); do kk=klo,khi; do jj=jlo,bnd-1; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,2*bnd-jj-1,kk,1); end do; end do; end do
@@ -923,7 +941,7 @@ contains
             end select
 
           case (amrex_bc_reflect_odd)
-            ! Anti-symmetry: F(-n) = -F(n)
+            ! Anti-symmetry: F(-n) = -F(n) - always ghosts only (bnd-1)
             select case (dir)
              case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=ilo,bnd-1; p(ii,jj,kk,1)=-p(2*bnd-ii-1,jj,kk,1); end do; end do; end do
              case (2); do kk=klo,khi; do jj=jlo,bnd-1; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,2*bnd-jj-1,kk,1); end do; end do; end do
@@ -934,6 +952,8 @@ contains
       end subroutine apply_vel_bc_lo
 
       !> Apply BC at high boundary in direction dir
+      !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
+      !> For TANGENT component (e.g., V in x): fills ghosts only
       subroutine apply_vel_bc_hi(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
          real(WP), dimension(:,:,:,:), intent(inout) :: p
          integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
@@ -942,50 +962,66 @@ contains
          real(WP), intent(in) :: time
          type(amrex_geometry), intent(in) :: geom
          type(amrex_box) :: bc_bx
-         integer :: ii, jj, kk
+         integer :: ii, jj, kk, fill_from, src_from
+         logical :: is_normal
+
+         ! Check if this is a normal component (U in x, V in y, W in z)
+         is_normal = (comp .eq. 'U' .and. dir .eq. 1) .or. &
+         &           (comp .eq. 'V' .and. dir .eq. 2) .or. &
+         &           (comp .eq. 'W' .and. dir .eq. 3)
+
+         ! For normal: fill from bnd (includes boundary face), source from bnd-1
+         ! For tangent: fill from bnd+1 (ghosts only), source from bnd
+         if (is_normal) then
+            fill_from = bnd
+            src_from = bnd - 1
+         else
+            fill_from = bnd + 1
+            src_from = bnd
+         end if
 
          select case (bctype)
           case (amrex_bc_ext_dir)
-            ! Dirichlet: fill boundary + ghosts via user callback
+            ! Dirichlet: fill via user callback
             if (associated(solver%user_dirichlet)) then
                select case (dir)
-                case (1); bc_bx = amrex_box([bnd, jlo, klo], [ihi, jhi, khi])
-                case (2); bc_bx = amrex_box([ilo, bnd, klo], [ihi, jhi, khi])
-                case (3); bc_bx = amrex_box([ilo, jlo, bnd], [ihi, jhi, khi])
+                case (1); bc_bx = amrex_box([fill_from, jlo, klo], [ihi, jhi, khi])
+                case (2); bc_bx = amrex_box([ilo, fill_from, klo], [ihi, jhi, khi])
+                case (3); bc_bx = amrex_box([ilo, jlo, fill_from], [ihi, jhi, khi])
                end select
                call solver%user_dirichlet(solver, bc_bx, p, comp, face, time, geom)
             else
                select case (dir)
-                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
-                case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
-                case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=fill_from,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (2); do kk=klo,khi; do jj=fill_from,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
+                case (3); do kk=fill_from,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=0.0_WP; end do; end do; end do
                end select
             end if
 
           case (amrex_bc_foextrap)
-            ! Neumann: copy from last interior cell (boundary face + ghosts)
+            ! Neumann: copy from interior
             select case (dir)
-             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi; p(ii,jj,kk,1)=p(bnd-1,jj,kk,1); end do; end do; end do
-             case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,bnd-1,kk,1); end do; end do; end do
-             case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,bnd-1,1); end do; end do; end do
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=fill_from,ihi; p(ii,jj,kk,1)=p(src_from,jj,kk,1); end do; end do; end do
+             case (2); do kk=klo,khi; do jj=fill_from,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,src_from,kk,1); end do; end do; end do
+             case (3); do kk=fill_from,khi; do jj=jlo,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,jj,src_from,1); end do; end do; end do
             end select
 
           case (amrex_bc_hoextrap)
-            ! Higher-order extrapolation (boundary face + ghosts)
+            ! Higher-order extrapolation
             select case (dir)
-             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd,ihi
-                        p(ii,jj,kk,1) = 2.0_WP*p(bnd-1,jj,kk,1) - p(bnd-2,jj,kk,1)
+             case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=fill_from,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(src_from,jj,kk,1) - p(src_from-1,jj,kk,1)
                      end do; end do; end do
-             case (2); do kk=klo,khi; do jj=bnd,jhi; do ii=ilo,ihi
-                        p(ii,jj,kk,1) = 2.0_WP*p(ii,bnd-1,kk,1) - p(ii,bnd-2,kk,1)
+             case (2); do kk=klo,khi; do jj=fill_from,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,src_from,kk,1) - p(ii,src_from-1,kk,1)
                      end do; end do; end do
-             case (3); do kk=bnd,khi; do jj=jlo,jhi; do ii=ilo,ihi
-                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,bnd-1,1) - p(ii,jj,bnd-2,1)
+             case (3); do kk=fill_from,khi; do jj=jlo,jhi; do ii=ilo,ihi
+                        p(ii,jj,kk,1) = 2.0_WP*p(ii,jj,src_from,1) - p(ii,jj,src_from-1,1)
                      end do; end do; end do
             end select
 
           case (amrex_bc_reflect_even)
-            ! Symmetry: F(-n) = F(n)
+            ! Symmetry: F(-n) = F(n) - always ghosts only (bnd+1)
             select case (dir)
              case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd+1,ihi; p(ii,jj,kk,1)=p(2*bnd-ii+1,jj,kk,1); end do; end do; end do
              case (2); do kk=klo,khi; do jj=bnd+1,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=p(ii,2*bnd-jj+1,kk,1); end do; end do; end do
@@ -993,7 +1029,7 @@ contains
             end select
 
           case (amrex_bc_reflect_odd)
-            ! Anti-symmetry: F(-n) = -F(n)
+            ! Anti-symmetry: F(-n) = -F(n) - always ghosts only (bnd+1)
             select case (dir)
              case (1); do kk=klo,khi; do jj=jlo,jhi; do ii=bnd+1,ihi; p(ii,jj,kk,1)=-p(2*bnd-ii+1,jj,kk,1); end do; end do; end do
              case (2); do kk=klo,khi; do jj=bnd+1,jhi; do ii=ilo,ihi; p(ii,jj,kk,1)=-p(ii,2*bnd-jj+1,kk,1); end do; end do; end do
