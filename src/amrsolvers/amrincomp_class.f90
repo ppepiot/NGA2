@@ -42,7 +42,7 @@ module amrincomp_class
       real(WP) :: divmax = 0.0_WP !< Maximum divergence
 
       ! Velocity interpolation method (for C/F interface fills)
-      integer :: interp = amrex_interp_face_divfree
+      integer :: interp_vel = amrex_interp_face_divfree
 
    contains
       procedure :: initialize
@@ -411,8 +411,12 @@ contains
          &   t_new, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
          &   this%amr%geom(lvl), &
          &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
-         &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+         &   1, 1, 1, rr, this%interp_vel, lo_bc, hi_bc)
       end if
+      ! Reconcile shared face values at box boundaries
+      call this%U%mf(lvl)%override_sync(this%amr%geom(lvl))
+      call this%V%mf(lvl)%override_sync(this%amr%geom(lvl))
+      call this%W%mf(lvl)%override_sync(this%amr%geom(lvl))
    end subroutine fill_velocity_lvl
 
    !> Fill velocity ghost cells on all levels
@@ -454,7 +458,11 @@ contains
       &   this%U%mf(lvl-1), this%V%mf(lvl-1), this%W%mf(lvl-1), &
       &   this%amr%geom(lvl-1), this%amr%geom(lvl), &
       &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
-      &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+      &   1, 1, 1, rr, this%interp_vel, lo_bc, hi_bc)
+      ! Reconcile shared face values at box boundaries
+      call this%U%mf(lvl)%override_sync(this%amr%geom(lvl))
+      call this%V%mf(lvl)%override_sync(this%amr%geom(lvl))
+      call this%W%mf(lvl)%override_sync(this%amr%geom(lvl))
    end subroutine fill_velocity_from_coarse
 
    !> Sync velocity ghost cells at a single level (lightweight, no C/F interpolation)
@@ -523,8 +531,12 @@ contains
          &   t_new, this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
          &   this%amr%geom(lvl), &
          &   ctx_u, ctx_v, ctx_w, bc_dispatch, bc_dispatch, bc_dispatch, &
-         &   1, 1, 1, rr, this%interp, lo_bc, hi_bc)
+         &   1, 1, 1, rr, this%interp_vel, lo_bc, hi_bc)
       end if
+      ! Reconcile shared face values at box boundaries
+      call Udest%override_sync(this%amr%geom(lvl))
+      call Vdest%override_sync(this%amr%geom(lvl))
+      call Wdest%override_sync(this%amr%geom(lvl))
    end subroutine fill_velocity_mfab
 
    !> Average down pressure for a single level (lvl+1 -> lvl)
