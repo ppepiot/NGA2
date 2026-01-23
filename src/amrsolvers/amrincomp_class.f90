@@ -730,9 +730,7 @@ contains
          call this%amr%mfab_build(lvl, Ufill, ncomp=1, nover=1, atface=[.true. ,.false.,.false.])
          call this%amr%mfab_build(lvl, Vfill, ncomp=1, nover=1, atface=[.false.,.true. ,.false.])
          call this%amr%mfab_build(lvl, Wfill, ncomp=1, nover=1, atface=[.false.,.false.,.true. ])
-         call U%fill_mfab(Ufill, lvl, 0.0_WP)
-         call V%fill_mfab(Vfill, lvl, 0.0_WP)
-         call W%fill_mfab(Wfill, lvl, 0.0_WP)
+         call this%fill_velocity_mfab(Udest=Ufill, Vdest=Vfill, Wdest=Wfill, lvl=lvl, time=0.0_WP)
 
          ! MFIter loop: compute all 9 fluxes
          call this%amr%mfiter_build(lvl, mfi)
@@ -756,26 +754,25 @@ contains
             pFWz => FWz(lvl)%dataptr(mfi)
 
             ! Diagonal fluxes
-            do k = bx%lo(3)-1, bx%hi(3)+1
-               do j = bx%lo(2)-1, bx%hi(2)+1
-                  do i = bx%lo(1)-1, bx%hi(1)+1
-                     pFUx(i,j,k,1) = 0.25_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))**2
-                     pFVy(i,j,k,1) = 0.25_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))**2
-                     pFWz(i,j,k,1) = 0.25_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))**2
-                  end do
-               end do
-            end do
+            do k = bx%lo(3)-1, bx%hi(3)+1; do j = bx%lo(2)-1, bx%hi(2)+1; do i = bx%lo(1)-1, bx%hi(1)+1
+               pFUx(i,j,k,1) = 0.25_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))**2
+               pFVy(i,j,k,1) = 0.25_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))**2
+               pFWz(i,j,k,1) = 0.25_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))**2
+            end do; end do; end do
 
-            ! Edge cross-fluxes
-            do k = bx%lo(3), bx%hi(3)+1
-               do j = bx%lo(2), bx%hi(2)+1
-                  do i = bx%lo(1), bx%hi(1)+1
-                     pFUy(i,j,k,1) = 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)); pFVx(i,j,k,1) = pFUy(i,j,k,1)
-                     pFVz(i,j,k,1) = 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)); pFWy(i,j,k,1) = pFVz(i,j,k,1)
-                     pFWx(i,j,k,1) = 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)); pFUz(i,j,k,1) = pFWx(i,j,k,1)
-                  end do
-               end do
-            end do
+            ! Edge cross-fluxes with proper bounds for each type
+            ! xy-edge (FUy, FVx): nodal in x,y; cell in z -> [lo,hi] in z; [lo,hi+1] in x,y
+            do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)+1
+               pFUy(i,j,k,1) = 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)); pFVx(i,j,k,1) = pFUy(i,j,k,1)
+            end do; end do; end do
+            ! yz-edge (FVz, FWy): nodal in y,z; cell in x -> [lo,hi] in x; [lo,hi+1] in y,z
+            do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)
+               pFVz(i,j,k,1) = 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)); pFWy(i,j,k,1) = pFVz(i,j,k,1)
+            end do; end do; end do
+            ! zx-edge (FWx, FUz): nodal in z,x; cell in y -> [lo,hi] in y; [lo,hi+1] in z,x
+            do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)+1
+               pFWx(i,j,k,1) = 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)); pFUz(i,j,k,1) = pFWx(i,j,k,1)
+            end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
 
@@ -787,14 +784,12 @@ contains
 
       ! ========================================================================
       ! Phase 2: Average down fluxes (fine -> coarse) for conservation
-      ! ngcrse=1 ensures fine fluxes are averaged into coarse ghost cells
-      ! at C/F interfaces for proper momentum conservation
       ! ========================================================================
       do lvl = this%amr%clvl(), 1, -1
          ! Cell-centered fluxes
-         call amrmfab_average_down_cell(fmf=FUx(lvl), cmf=FUx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_cell(fmf=FVy(lvl), cmf=FVy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_cell(fmf=FWz(lvl), cmf=FWz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
+         call amrmfab_average_down_cell(fmf=FUx(lvl), cmf=FUx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_cell(fmf=FVy(lvl), cmf=FVy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_cell(fmf=FWz(lvl), cmf=FWz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
          ! Edge-centered fluxes
          call amrmfab_average_down_edge(fmf=FUy(lvl), cmf=FUy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
          call amrmfab_average_down_edge(fmf=FVx(lvl), cmf=FVx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)

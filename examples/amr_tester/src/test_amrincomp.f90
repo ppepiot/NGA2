@@ -5,8 +5,6 @@ module mod_test_amrincomp
    use amrgrid_class,     only: amrgrid
    use amrincomp_class,   only: amrincomp
    use amrdata_class,     only: amrdata, amrex_interp_none
-   use amrex_amr_module,  only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
-   &                            amrex_mfiter_build, amrex_mfiter_destroy
    implicit none
    private
    public :: test_amrincomp
@@ -22,6 +20,7 @@ contains
 
    !> User-provided initialization callback for velocity - uniform flow with perturbation
    subroutine velocity_init(solver, lvl, time, ba, dm)
+      use amrex_amr_module,  only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, amrex_mfiter_build, amrex_mfiter_destroy
       use mathtools, only: Pi
       class(amrincomp), intent(inout) :: solver
       integer, intent(in) :: lvl
@@ -46,20 +45,19 @@ contains
          pV => solver%V%mf(lvl)%dataptr(mfi)
          pW => solver%W%mf(lvl)%dataptr(mfi)
 
-         ! U (x-faces): uniform + sinusoidal perturbation
+         ! U (x-faces): uniform + Gaussian perturbation
          fbx = mfi%nodaltilebox(1)
          do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
             x = solver%amr%xlo + real(i,WP) * dx
             y = solver%amr%ylo + (real(j,WP) + 0.5_WP) * dy
-            pU(i,j,k,1) = 1.0_WP + 0.1_WP * sin(2.0_WP * Pi * y / Ly)
+            z = solver%amr%zlo + (real(k,WP) + 0.5_WP) * dz
+            pU(i,j,k,1) = 1.0_WP + 0.5_WP * exp(-((x-0.5_WP)**2 + (y-0.5_WP)**2 + (z-0.5_WP)**2) / 0.1_WP**2)
          end do; end do; end do
 
-         ! V (y-faces): zero with sinusoidal perturbation
+         ! V (y-faces): zero
          fbx = mfi%nodaltilebox(2)
          do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-            x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
-            y = solver%amr%ylo + real(j,WP) * dy
-            pV(i,j,k,1) = 0.1_WP * sin(2.0_WP * Pi * x / Lx)
+            pV(i,j,k,1) = 0.0_WP
          end do; end do; end do
 
          ! W (z-faces): zero
@@ -74,7 +72,7 @@ contains
    !> Geometric tagger: refine center box
    subroutine geometric_tagger(solver, lvl, tags_ptr, time)
       use iso_c_binding,    only: c_ptr, c_char
-      use amrex_amr_module, only: amrex_tagboxarray
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_tagboxarray
       use amrgrid_class,    only: SETtag
       class(amrincomp), intent(inout) :: solver
       integer, intent(in) :: lvl
@@ -126,17 +124,18 @@ contains
 
       time = 0.0_WP
       time_end = 1.0_WP
-      CFL = 0.5_WP
+      CFL = 0.2_WP
 
       ! Create amrgrid
       allocate(amr)
       amr%name = 'advect_test'
       amr%nx = 32; amr%ny = 32; amr%nz = 32
+      !amr%nx = 128; amr%ny = 128; amr%nz = 128
       amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
       amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
-      amr%maxlvl = 1  ! 2 levels: 0, 1
+      amr%maxlvl = 2  ! 3 levels: 0, 1, 2
       call amr%initialize()
       call log("Grid: "//trim(itoa(amr%nx))//"^3, maxlvl="//trim(itoa(amr%maxlvl)))
 
@@ -146,7 +145,7 @@ contains
       fs%rho = 1.0_WP
       fs%user_init => velocity_init
       fs%user_tagging => geometric_tagger
-      call log("Flow solver initialized, rho="//trim(rtoa(fs%rho)))
+      call log("Flow solver initialized")
 
       ! Create workspace for pressure gradients and momentum RHS
       allocate(dPdx); call dPdx%initialize(amr, name='dPdx', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none); call dPdx%register()
@@ -213,11 +212,12 @@ contains
          ! Advance time
          time = time + dt
 
-         ! Log progress
+         ! Log progress and write output
          if (mod(step, 10) .eq. 0 .or. time .ge. time_end) then
             call fs%get_div()
             call log("Step "//trim(itoa(step))//": t="//trim(rtoa(time))// &
-               &     ", dt="//trim(rtoa(dt))//", divmax="//trim(rtoa(fs%divmax)))
+            &     ", dt="//trim(rtoa(dt))//", divmax="//trim(rtoa(fs%divmax)))
+            call viz%write(time=time)
          end if
       end do
 
