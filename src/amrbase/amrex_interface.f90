@@ -72,10 +72,12 @@ module amrex_interface
    public :: amrmlmg_get_fluxes
 
    !=====================================================================
-   ! MultiFab Averaging (single-direction wrappers, not in AMReX Fortran)
+   ! MultiFab Averaging (unified API - not in AMReX Fortran interface)
    !=====================================================================
-   public :: amrmfab_average_down_face  ! Face-centered (nodal_count=1)
-   public :: amrmfab_average_down_edge  ! Edge-centered (nodal_count=2)
+   public :: amrmfab_average_down_cell  ! Cell-centered
+   public :: amrmfab_average_down_face  ! Face-centered (nodal in 1 dir)
+   public :: amrmfab_average_down_edge  ! Edge-centered (nodal in 2 dirs)
+   public :: amrmfab_average_down_node  ! Node-centered (nodal in 3 dirs)
    public :: amrmfab_compute_divergence ! Compute div(u) from face velocities
 
    interface
@@ -391,20 +393,38 @@ module amrex_interface
       end subroutine amrmlmg_get_fluxes
 
       !====================================================================
-      ! MultiFab Averaging (C bindings - private, called by wrappers below)
+      ! MultiFab Averaging (C bindings - unified API for all 4 types)
+      ! Signature: (fine, crse, geom, ratio, ngcrse)
+      ! geom can be null (c_null_ptr) to skip periodic fix-up
       !====================================================================
 
-      subroutine amrmfab_average_down_face_c(fine_mf, crse_mf, crse_geom, ref_ratio) bind(c, name='amrmfab_average_down_face')
+      subroutine amrmfab_average_down_cell_c(fine_mf, crse_mf, crse_geom, ref_ratio, ngcrse) &
+         bind(c, name='amrmfab_average_down_cell')
          import :: c_ptr, c_int
          type(c_ptr), value :: fine_mf, crse_mf, crse_geom
-         integer(c_int), value :: ref_ratio
+         integer(c_int), value :: ref_ratio, ngcrse
+      end subroutine amrmfab_average_down_cell_c
+
+      subroutine amrmfab_average_down_face_c(fine_mf, crse_mf, crse_geom, ref_ratio, ngcrse) &
+         bind(c, name='amrmfab_average_down_face')
+         import :: c_ptr, c_int
+         type(c_ptr), value :: fine_mf, crse_mf, crse_geom
+         integer(c_int), value :: ref_ratio, ngcrse
       end subroutine amrmfab_average_down_face_c
 
-      subroutine amrmfab_average_down_edge_c(fine_mf, crse_mf, ref_ratio) bind(c, name='amrmfab_average_down_edge')
+      subroutine amrmfab_average_down_edge_c(fine_mf, crse_mf, crse_geom, ref_ratio, ngcrse) &
+         bind(c, name='amrmfab_average_down_edge')
          import :: c_ptr, c_int
-         type(c_ptr), value :: fine_mf, crse_mf
-         integer(c_int), value :: ref_ratio
+         type(c_ptr), value :: fine_mf, crse_mf, crse_geom
+         integer(c_int), value :: ref_ratio, ngcrse
       end subroutine amrmfab_average_down_edge_c
+
+      subroutine amrmfab_average_down_node_c(fine_mf, crse_mf, crse_geom, ref_ratio, ngcrse) &
+         bind(c, name='amrmfab_average_down_node')
+         import :: c_ptr, c_int
+         type(c_ptr), value :: fine_mf, crse_mf, crse_geom
+         integer(c_int), value :: ref_ratio, ngcrse
+      end subroutine amrmfab_average_down_node_c
 
       !> Compute divergence of face-centered velocity into cell-centered MultiFab
       subroutine amrmfab_compute_divergence_c(divu, umac_x, umac_y, umac_z, geom) &
@@ -418,28 +438,88 @@ module amrex_interface
 contains
 
    !====================================================================
-   ! MultiFab Averaging Wrappers (accept amrex types, like AMReX routines)
+   ! MultiFab Averaging Wrappers (Unified API)
+   ! All 4 types have identical signature:
+   !   (fmf, cmf, rr, cgeom, ngcrse)
+   ! cgeom and ngcrse are optional. If cgeom provided, FillBoundary is
+   ! called in C++ for periodic ghost fix-up.
    !====================================================================
 
-   !> Average down face-centered MultiFab (nodal in 1 dir, cell in 2)
-   subroutine amrmfab_average_down_face(fmf, cmf, cgeom, rr)
+   !> Average down cell-centered MultiFab
+   subroutine amrmfab_average_down_cell(fmf, cmf, rr, cgeom, ngcrse)
+      use iso_c_binding, only: c_null_ptr
       use amrex_multifab_module, only: amrex_multifab
       use amrex_geometry_module, only: amrex_geometry
       type(amrex_multifab), intent(in) :: fmf
       type(amrex_multifab), intent(inout) :: cmf
-      type(amrex_geometry), intent(in) :: cgeom
       integer, intent(in) :: rr
-      call amrmfab_average_down_face_c(fmf%p, cmf%p, cgeom%p, rr)
-   end subroutine amrmfab_average_down_face
+      type(amrex_geometry), intent(in), optional :: cgeom
+      integer, intent(in), optional :: ngcrse
+      integer :: ng
+      ng = 0; if (present(ngcrse)) ng = ngcrse
+      if (present(cgeom)) then
+         call amrmfab_average_down_cell_c(fmf%p, cmf%p, cgeom%p, rr, ng)
+      else
+         call amrmfab_average_down_cell_c(fmf%p, cmf%p, c_null_ptr, rr, ng)
+      end if
+   end subroutine amrmfab_average_down_cell
 
-   !> Average down edge-centered MultiFab (nodal in 2 dirs, cell in 1)
-   subroutine amrmfab_average_down_edge(fmf, cmf, rr)
+   !> Average down face-centered MultiFab (nodal in 1 dir, cell in 2)
+   subroutine amrmfab_average_down_face(fmf, cmf, rr, cgeom, ngcrse)
+      use iso_c_binding, only: c_null_ptr
       use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
       type(amrex_multifab), intent(in) :: fmf
       type(amrex_multifab), intent(inout) :: cmf
       integer, intent(in) :: rr
-      call amrmfab_average_down_edge_c(fmf%p, cmf%p, rr)
+      type(amrex_geometry), intent(in), optional :: cgeom
+      integer, intent(in), optional :: ngcrse
+      integer :: ng
+      ng = 0; if (present(ngcrse)) ng = ngcrse
+      if (present(cgeom)) then
+         call amrmfab_average_down_face_c(fmf%p, cmf%p, cgeom%p, rr, ng)
+      else
+         call amrmfab_average_down_face_c(fmf%p, cmf%p, c_null_ptr, rr, ng)
+      end if
+   end subroutine amrmfab_average_down_face
+
+   !> Average down edge-centered MultiFab (nodal in 2 dirs, cell in 1)
+   subroutine amrmfab_average_down_edge(fmf, cmf, rr, cgeom, ngcrse)
+      use iso_c_binding, only: c_null_ptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(in) :: fmf
+      type(amrex_multifab), intent(inout) :: cmf
+      integer, intent(in) :: rr
+      type(amrex_geometry), intent(in), optional :: cgeom
+      integer, intent(in), optional :: ngcrse
+      integer :: ng
+      ng = 0; if (present(ngcrse)) ng = ngcrse
+      if (present(cgeom)) then
+         call amrmfab_average_down_edge_c(fmf%p, cmf%p, cgeom%p, rr, ng)
+      else
+         call amrmfab_average_down_edge_c(fmf%p, cmf%p, c_null_ptr, rr, ng)
+      end if
    end subroutine amrmfab_average_down_edge
+
+   !> Average down node-centered MultiFab (nodal in all dirs)
+   subroutine amrmfab_average_down_node(fmf, cmf, rr, cgeom, ngcrse)
+      use iso_c_binding, only: c_null_ptr
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      type(amrex_multifab), intent(in) :: fmf
+      type(amrex_multifab), intent(inout) :: cmf
+      integer, intent(in) :: rr
+      type(amrex_geometry), intent(in), optional :: cgeom
+      integer, intent(in), optional :: ngcrse
+      integer :: ng
+      ng = 0; if (present(ngcrse)) ng = ngcrse
+      if (present(cgeom)) then
+         call amrmfab_average_down_node_c(fmf%p, cmf%p, cgeom%p, rr, ng)
+      else
+         call amrmfab_average_down_node_c(fmf%p, cmf%p, c_null_ptr, rr, ng)
+      end if
+   end subroutine amrmfab_average_down_node
 
    !> Compute divergence of face-centered velocity into cell-centered MultiFab
    subroutine amrmfab_compute_divergence(divu, umac_x, umac_y, umac_z, geom)

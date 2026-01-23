@@ -639,30 +639,99 @@ void amrmlmg_get_fluxes(void *mlmg, void **sol_mfs, void **flux_x,
 }
 
 //=============================================================================
-// MultiFab Averaging Utilities
-// These wrap AMReX's single-direction averaging functions that use IndexType
-// to determine the data centering (not exposed in AMReX's Fortran interface).
-// Signature: (fine_mf, crse_mf, crse_geom, ref_ratio)
+// MultiFab Averaging Utilities (Unified API)
+// All 4 types (cell, face, edge, node) have the same signature pattern:
+//   (fine_mf, crse_mf, crse_geom, ref_ratio, ngcrse)
+// When crse_geom is provided (non-null), FillBoundary is called for periodic
+// ghost fix-up. ngcrse controls how many ghost cells to average into.
 //=============================================================================
 
-// Average down a single face-direction MultiFab (nodal in 1 dir, cell in 2)
-// Uses AMReX's average_down_faces which handles periodicity via geometry
-void amrmfab_average_down_face(void *fine_mf, void *crse_mf, void *crse_geom,
-                               int ref_ratio) {
+// Average down cell-centered MultiFab
+// If crse_geom is provided, FillBoundary is called for periodic fix-up
+void amrmfab_average_down_cell(void *fine_mf, void *crse_mf, void *crse_geom,
+                               int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
   auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
-  auto *geom = static_cast<amrex::Geometry *>(crse_geom);
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
-  amrex::average_down_faces(*fmf, *cmf, ratio, *geom);
+  int ncomp = cmf->nComp();
+
+  if (amrex::isMFIterSafe(*fmf, *cmf)) {
+    for (amrex::MFIter mfi(*cmf, amrex::TilingIfNotGPU()); mfi.isValid();
+         ++mfi) {
+      amrex::Box const &bx = mfi.growntilebox(ngcrse);
+      auto const &crsearr = cmf->array(mfi);
+      auto const &finearr = fmf->const_array(mfi);
+      amrex::ParallelFor(
+          bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            amrex::amrex_avgdown(i, j, k, n, crsearr, finearr, 0, 0, ratio);
+          });
+    }
+  } else {
+    amrex::BoxArray crse_fine_BA = fmf->boxArray();
+    crse_fine_BA.coarsen(ratio);
+    amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
+    for (amrex::MFIter mfi(ctmp, amrex::TilingIfNotGPU()); mfi.isValid();
+         ++mfi) {
+      amrex::Box const &bx = mfi.growntilebox(ngcrse);
+      auto const &crsearr = ctmp.array(mfi);
+      auto const &finearr = fmf->const_array(mfi);
+      amrex::ParallelFor(
+          bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            amrex::amrex_avgdown(i, j, k, n, crsearr, finearr, 0, 0, ratio);
+          });
+    }
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
+  }
+  // Periodic fix-up if geometry provided
+  if (crse_geom) {
+    auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->FillBoundary(cg->periodicity());
+  }
 }
 
-// Average down a single edge-direction MultiFab (nodal in 2 dirs, cell in 1)
-// Uses AMReX's average_down_edges (no geometry version - simple averaging)
-void amrmfab_average_down_edge(void *fine_mf, void *crse_mf, int ref_ratio) {
+// Average down face-centered MultiFab (nodal in 1 dir, cell in 2)
+// If crse_geom is provided, FillBoundary is called for periodic fix-up
+void amrmfab_average_down_face(void *fine_mf, void *crse_mf, void *crse_geom,
+                               int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
   auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
-  amrex::average_down_edges(*fmf, *cmf, ratio, 0);
+  amrex::average_down_faces(*fmf, *cmf, ratio, ngcrse);
+  // Periodic fix-up if geometry provided
+  if (crse_geom) {
+    auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->FillBoundary(cg->periodicity());
+  }
+}
+
+// Average down edge-centered MultiFab (nodal in 2 dirs, cell in 1)
+// If crse_geom is provided, FillBoundary is called for periodic fix-up
+void amrmfab_average_down_edge(void *fine_mf, void *crse_mf, void *crse_geom,
+                               int ref_ratio, int ngcrse) {
+  auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
+  auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+  amrex::average_down_edges(*fmf, *cmf, ratio, ngcrse);
+  // Periodic fix-up if geometry provided
+  if (crse_geom) {
+    auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->FillBoundary(cg->periodicity());
+  }
+}
+
+// Average down node-centered MultiFab (nodal in all dirs)
+// If crse_geom is provided, FillBoundary is called for periodic fix-up
+void amrmfab_average_down_node(void *fine_mf, void *crse_mf, void *crse_geom,
+                               int ref_ratio, int ngcrse) {
+  auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
+  auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
+  amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
+  amrex::average_down_nodal(*fmf, *cmf, ratio, ngcrse);
+  // Periodic fix-up if geometry provided
+  if (crse_geom) {
+    auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->FillBoundary(cg->periodicity());
+  }
 }
 
 // Compute divergence of face-centered velocity into cell-centered MultiFab
