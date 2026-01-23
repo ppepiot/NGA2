@@ -711,6 +711,10 @@ contains
       ! Phase 1: Compute fluxes on all levels
       ! ========================================================================
       do lvl = 0, this%amr%clvl()
+         dxi = 1.0_WP / this%amr%dx(lvl)
+         dyi = 1.0_WP / this%amr%dy(lvl)
+         dzi = 1.0_WP / this%amr%dz(lvl)
+
          ! Build momentum flux MultiFabs
          ! FUx, FVy, FWz: cell-centered (diagonal fluxes)
          call this%amr%mfab_build(lvl, FUx(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
@@ -755,23 +759,29 @@ contains
 
             ! Diagonal fluxes
             do k = bx%lo(3)-1, bx%hi(3)+1; do j = bx%lo(2)-1, bx%hi(2)+1; do i = bx%lo(1)-1, bx%hi(1)+1
-               pFUx(i,j,k,1) = 0.25_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))**2
-               pFVy(i,j,k,1) = 0.25_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))**2
-               pFWz(i,j,k,1) = 0.25_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))**2
+               pFUx(i,j,k,1) = - 0.25_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))**2 + 2.0_WP * this%visc * (pU(i+1,j,k,1) - pU(i,j,k,1)) * dxi
+               pFVy(i,j,k,1) = - 0.25_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))**2 + 2.0_WP * this%visc * (pV(i,j+1,k,1) - pV(i,j,k,1)) * dyi
+               pFWz(i,j,k,1) = - 0.25_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))**2 + 2.0_WP * this%visc * (pW(i,j,k+1,1) - pW(i,j,k,1)) * dzi
             end do; end do; end do
 
             ! Edge cross-fluxes with proper bounds for each type
             ! xy-edge (FUy, FVx): nodal in x,y; cell in z -> [lo,hi] in z; [lo,hi+1] in x,y
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)+1
-               pFUy(i,j,k,1) = 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)); pFVx(i,j,k,1) = pFUy(i,j,k,1)
+               pFUy(i,j,k,1) = - 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)) &
+               &              + this%visc * ((pU(i,j,k,1) - pU(i,j-1,k,1)) * dyi + (pV(i,j,k,1) - pV(i-1,j,k,1)) * dxi)
+               pFVx(i,j,k,1) = pFUy(i,j,k,1)
             end do; end do; end do
             ! yz-edge (FVz, FWy): nodal in y,z; cell in x -> [lo,hi] in x; [lo,hi+1] in y,z
             do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)
-               pFVz(i,j,k,1) = 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)); pFWy(i,j,k,1) = pFVz(i,j,k,1)
+               pFVz(i,j,k,1) = - 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)) &
+               &              + this%visc * ((pV(i,j,k,1) - pV(i,j,k-1,1)) * dzi + (pW(i,j,k,1) - pW(i,j-1,k,1)) * dyi)
+               pFWy(i,j,k,1) = pFVz(i,j,k,1)
             end do; end do; end do
             ! zx-edge (FWx, FUz): nodal in z,x; cell in y -> [lo,hi] in y; [lo,hi+1] in z,x
             do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)+1
-               pFWx(i,j,k,1) = 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)); pFUz(i,j,k,1) = pFWx(i,j,k,1)
+               pFWx(i,j,k,1) = - 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)) &
+               &              + this%visc * ((pW(i,j,k,1) - pW(i-1,j,k,1)) * dxi + (pU(i,j,k,1) - pU(i,j,k-1,1)) * dzi)
+               pFUz(i,j,k,1) = pFWx(i,j,k,1)
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
@@ -828,25 +838,25 @@ contains
             ! U-momentum RHS at x-faces: -d(FUx)/dx - d(FUy)/dy - d(FUz)/dz
             bx = mfi%nodaltilebox(1)
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-               pdUdt(i,j,k,1) = -dxi * (pFUx(i,j,k,1) - pFUx(i-1,j,k,1)) &
-               &                -dyi * (pFUy(i,j+1,k,1) - pFUy(i,j,k,1)) &
-               &                -dzi * (pFUz(i,j,k+1,1) - pFUz(i,j,k,1))
+               pdUdt(i,j,k,1) = dxi * (pFUx(i,j,k,1) - pFUx(i-1,j,k,1)) &
+               &              + dyi * (pFUy(i,j+1,k,1) - pFUy(i,j,k,1)) &
+               &              + dzi * (pFUz(i,j,k+1,1) - pFUz(i,j,k,1))
             end do; end do; end do
 
             ! V-momentum RHS at y-faces: -d(FVx)/dx - d(FVy)/dy - d(FVz)/dz
             bx = mfi%nodaltilebox(2)
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-               pdVdt(i,j,k,1) = -dxi * (pFVx(i+1,j,k,1) - pFVx(i,j,k,1)) &
-               &                -dyi * (pFVy(i,j,k,1) - pFVy(i,j-1,k,1)) &
-               &                -dzi * (pFVz(i,j,k+1,1) - pFVz(i,j,k,1))
+               pdVdt(i,j,k,1) = dxi * (pFVx(i+1,j,k,1) - pFVx(i,j,k,1)) &
+               &              + dyi * (pFVy(i,j,k,1) - pFVy(i,j-1,k,1)) &
+               &              + dzi * (pFVz(i,j,k+1,1) - pFVz(i,j,k,1))
             end do; end do; end do
 
             ! W-momentum RHS at z-faces: -d(FWx)/dx - d(FWy)/dy - d(FWz)/dz
             bx = mfi%nodaltilebox(3)
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-               pdWdt(i,j,k,1) = -dxi * (pFWx(i+1,j,k,1) - pFWx(i,j,k,1)) &
-               &                -dyi * (pFWy(i,j+1,k,1) - pFWy(i,j,k,1)) &
-               &                -dzi * (pFWz(i,j,k,1) - pFWz(i,j,k-1,1))
+               pdWdt(i,j,k,1) = dxi * (pFWx(i+1,j,k,1) - pFWx(i,j,k,1)) &
+               &              + dyi * (pFWy(i,j+1,k,1) - pFWy(i,j,k,1)) &
+               &              + dzi * (pFWz(i,j,k,1) - pFWz(i,j,k-1,1))
             end do; end do; end do
 
          end do

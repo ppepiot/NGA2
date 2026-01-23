@@ -143,6 +143,7 @@ contains
       allocate(fs)
       call fs%initialize(amr, name='advect_fs')
       fs%rho = 1.0_WP
+      fs%visc = 0.001_WP
       fs%user_init => velocity_init
       fs%user_tagging => geometric_tagger
       call log("Flow solver initialized")
