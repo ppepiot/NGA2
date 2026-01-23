@@ -1,7 +1,6 @@
-!> Test amrincomp solver - 3-level projection with random velocity and geometric tagger
+!> Test amrincomp solver - advection test with time loop
 module mod_test_amrincomp
    use precision,         only: WP
-   use random,            only: random_uniform
    use amrviz_class,      only: amrviz
    use amrgrid_class,     only: amrgrid
    use amrincomp_class,   only: amrincomp
@@ -16,11 +15,12 @@ module mod_test_amrincomp
    type(amrgrid), allocatable, target :: amr
    type(amrincomp), allocatable, target :: fs
    type(amrviz), allocatable :: viz
-   type(amrdata), allocatable :: dPdx, dPdy, dPdz  ! Workspace for pressure gradients
+   type(amrdata), allocatable :: dPdx, dPdy, dPdz
+   type(amrdata), allocatable :: drhoUdt, drhoVdt, drhoWdt
 
 contains
 
-   !> User-provided initialization callback for velocity - sinusoidal values
+   !> User-provided initialization callback for velocity - uniform flow with perturbation
    subroutine velocity_init(solver, lvl, time, ba, dm)
       use mathtools, only: Pi
       class(amrincomp), intent(inout) :: solver
@@ -29,61 +29,44 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx, fbx
+      type(amrex_box) :: fbx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      real(WP) :: x, y, z, dx, dy, dz, Lx, Ly, Lz
       integer :: i, j, k
 
-      ! For fine levels: fill from coarse (no direct computation)
-      !if (lvl > 0) then
-      !   call solver%U%fill_from_coarse(lvl, time)
-      !   call solver%V%fill_from_coarse(lvl, time)
-      !   call solver%W%fill_from_coarse(lvl, time)
-      !   return
-      !end if
+      dx = solver%amr%dx(lvl); dy = solver%amr%dy(lvl); dz = solver%amr%dz(lvl)
+      Lx = solver%amr%xhi - solver%amr%xlo
+      Ly = solver%amr%yhi - solver%amr%ylo
+      Lz = solver%amr%zhi - solver%amr%zlo
 
       ! Build mfiter from cell-centered ba/dm (passed during regrid)
       call amrex_mfiter_build(mfi, ba, dm, tiling=solver%amr%default_tiling)
       do while (mfi%next())
-         bx = mfi%tilebox()
          pU => solver%U%mf(lvl)%dataptr(mfi)
          pV => solver%V%mf(lvl)%dataptr(mfi)
          pW => solver%W%mf(lvl)%dataptr(mfi)
 
-         ! U (x-faces): random values in [-1, 1]
+         ! U (x-faces): uniform + sinusoidal perturbation
          fbx = mfi%nodaltilebox(1)
-         do k = fbx%lo(3), fbx%hi(3)
-            do j = fbx%lo(2), fbx%hi(2)
-               do i = fbx%lo(1), fbx%hi(1)
-                  pU(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
-                  !pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)*solver%amr%dx(lvl))
-                  !pU(i,j,k,1) = sin(2.0_WP*Pi*real(i,WP)*solver%amr%dx(lvl)) * cos(2.0_WP*Pi*(real(j,WP)+0.5_WP)*solver%amr%dy(lvl))
-               end do
-            end do
-         end do
+         do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+            x = solver%amr%xlo + real(i,WP) * dx
+            y = solver%amr%ylo + (real(j,WP) + 0.5_WP) * dy
+            pU(i,j,k,1) = 1.0_WP + 0.1_WP * sin(2.0_WP * Pi * y / Ly)
+         end do; end do; end do
 
-         ! V (y-faces): random values in [-1, 1]
+         ! V (y-faces): zero with sinusoidal perturbation
          fbx = mfi%nodaltilebox(2)
-         do k = fbx%lo(3), fbx%hi(3)
-            do j = fbx%lo(2), fbx%hi(2)
-               do i = fbx%lo(1), fbx%hi(1)
-                  pV(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
-                  !pV(i,j,k,1) = sin(2.0_WP*Pi*real(j,WP)*solver%amr%dy(lvl))
-                  !pV(i,j,k,1) = -cos(2.0_WP*Pi*(real(i,WP)+0.5_WP)*solver%amr%dx(lvl)) * sin(2.0_WP*Pi*real(j,WP)*solver%amr%dy(lvl))
-               end do
-            end do
-         end do
+         do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+            x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
+            y = solver%amr%ylo + real(j,WP) * dy
+            pV(i,j,k,1) = 0.1_WP * sin(2.0_WP * Pi * x / Lx)
+         end do; end do; end do
 
-         ! W (z-faces): random values in [-1, 1]
+         ! W (z-faces): zero
          fbx = mfi%nodaltilebox(3)
-         do k = fbx%lo(3), fbx%hi(3)
-            do j = fbx%lo(2), fbx%hi(2)
-               do i = fbx%lo(1), fbx%hi(1)
-                  pW(i,j,k,1) = random_uniform(lo=-1.0_WP, hi=1.0_WP)
-                  !pW(i,j,k,1) = sin(2.0_WP*Pi*real(k,WP)*solver%amr%dz(lvl))
-                  !pW(i,j,k,1) = 0.0_WP
-               end do
-            end do
-         end do
+         do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+            pW(i,j,k,1) = 0.0_WP
+         end do; end do; end do
       end do
       call amrex_mfiter_destroy(mfi)
    end subroutine velocity_init
@@ -113,27 +96,18 @@ contains
       &                      solver%amr%zhi - solver%amr%zlo)
 
       dx = solver%amr%dx(lvl); dy = solver%amr%dy(lvl); dz = solver%amr%dz(lvl)
-
-      ! Convert c_ptr to tagboxarray
       tags = tags_ptr
 
       call solver%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
          tagarr => tags%dataPtr(mfi)
-         do k = bx%lo(3), bx%hi(3)
+         do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+            x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
+            y = solver%amr%ylo + (real(j,WP) + 0.5_WP) * dy
             z = solver%amr%zlo + (real(k,WP) + 0.5_WP) * dz
-            do j = bx%lo(2), bx%hi(2)
-               y = solver%amr%ylo + (real(j,WP) + 0.5_WP) * dy
-               do i = bx%lo(1), bx%hi(1)
-                  x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
-                  ! Tag if inside sphere
-                  if (sqrt((x-xc)**2 + (y-yc)**2 + (z-zc)**2) .lt. radius) then
-                     tagarr(i,j,k,1) = SETtag
-                  end if
-               end do
-            end do
-         end do
+            if (sqrt((x-xc)**2 + (y-yc)**2 + (z-zc)**2) .lt. radius) tagarr(i,j,k,1) = SETtag
+         end do; end do; end do
       end do
       call solver%amr%mfiter_destroy(mfi)
    end subroutine geometric_tagger
@@ -142,129 +116,146 @@ contains
    subroutine test_amrincomp()
       use messager, only: log
       use string,   only: itoa, rtoa
-      use iso_c_binding, only: c_char
-      real(WP) :: divmax_before, divmax_after, dt, time, factor
-      integer :: lvl
+      real(WP) :: time, dt, time_end, factor, CFL
+      real(WP) :: Umax, divmax
+      integer :: step
 
       call log("========================================")
-      call log("TEST: amrincomp 3-level projection")
+      call log("TEST: amrincomp advection time loop")
       call log("========================================")
 
       time = 0.0_WP
-      dt = 1.0e-2_WP
+      time_end = 1.0_WP
+      CFL = 0.5_WP
 
       ! Create amrgrid
       allocate(amr)
-      amr%name = 'incomp_test'
+      amr%name = 'advect_test'
       amr%nx = 32; amr%ny = 32; amr%nz = 32
       amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
       amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
       amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
       amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
-      amr%maxlvl = 2  ! 3 levels: 0, 1, 2
+      amr%maxlvl = 1  ! 2 levels: 0, 1
       call amr%initialize()
-      call log("Grid initialized: "//trim(itoa(amr%nx))//"x"//trim(itoa(amr%ny))//"x"//trim(itoa(amr%nz)))
-      call log("Max levels: "//trim(itoa(amr%maxlvl+1)))
+      call log("Grid: "//trim(itoa(amr%nx))//"^3, maxlvl="//trim(itoa(amr%maxlvl)))
 
       ! Create flow solver
       allocate(fs)
-      call fs%initialize(amr, name='test_fs')
-      fs%rho = 1.0_WP   ! Set density directly
-      fs%user_init => velocity_init       ! Set velocity init callback
-      fs%user_tagging => geometric_tagger ! Set tagging callback
+      call fs%initialize(amr, name='advect_fs')
+      fs%rho = 1.0_WP
+      fs%user_init => velocity_init
+      fs%user_tagging => geometric_tagger
       call log("Flow solver initialized, rho="//trim(rtoa(fs%rho)))
 
-      ! Create workspace for pressure gradients
+      ! Create workspace for pressure gradients and momentum RHS
       allocate(dPdx); call dPdx%initialize(amr, name='dPdx', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none); call dPdx%register()
       allocate(dPdy); call dPdy%initialize(amr, name='dPdy', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_none); call dPdy%register()
       allocate(dPdz); call dPdz%initialize(amr, name='dPdz', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none); call dPdz%register()
+      allocate(drhoUdt); call drhoUdt%initialize(amr, name='drhoUdt', ncomp=1, ng=0, nodal=[.true., .false., .false.], interp=amrex_interp_none); call drhoUdt%register()
+      allocate(drhoVdt); call drhoVdt%initialize(amr, name='drhoVdt', ncomp=1, ng=0, nodal=[.false., .true., .false.], interp=amrex_interp_none); call drhoVdt%register()
+      allocate(drhoWdt); call drhoWdt%initialize(amr, name='drhoWdt', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none); call drhoWdt%register()
 
       ! Initialize visualization
-      allocate(viz); call viz%initialize(amr, 'test_incomp')
+      allocate(viz); call viz%initialize(amr, 'test_advect')
       call viz%add_scalar(fs%P, 1, 'pressure')
       call viz%add_scalar(fs%div, 1, 'divergence')
       call viz%add_scalar(fs%U, 1, 'U')
       call viz%add_scalar(fs%V, 1, 'V')
       call viz%add_scalar(fs%W, 1, 'W')
 
-      ! Build grid - triggers on_init + user_init callbacks, creates all levels
+      ! Build grid and initialize velocity
       call amr%init_from_scratch(time=time)
+      call fs%average_down_velocity()
+      call fs%fill_velocity(time)
       call log("Grid built: "//trim(itoa(amr%nlevels))//" levels")
 
-      ! Average down velocity first to make coarse consistent with fine
-      call fs%average_down_velocity()
-
-      ! Now fill velocity ghosts (fine level will interpolate from corrected coarse)
-      call fs%fill_velocity(time)
-      call log("Velocity averaged down and ghosts filled")
-
-      ! Setup pressure solver with verbose output for debugging
-      fs%psolver%verbose = 2
+      ! Setup pressure solver
+      fs%psolver%verbose = 0
       call fs%psolver%setup()
-      call log("Pressure solver setup complete")
 
-      ! ===== USER-DRIVEN PROJECTION SEQUENCE =====
-      ! 1. Compute divergence (assumes velocity ghosts filled)
+      ! Initial projection to make velocity divergence-free
       call fs%get_div()
-      divmax_before = fs%divmax
-      call log("Before projection: divmax = "//trim(rtoa(divmax_before)))
-      call log("RHS sum = "//trim(rtoa(fs%div%get_sum(lvl=0))))
-
-      call viz%write(time=0.0_WP)
-
-      ! 2. Scale RHS: rhs = rho/dt * div
-      factor = fs%rho / dt
-      call fs%div%mult(val=factor)
-
-      ! 3. Solve pressure Poisson equation
-      call log("RHS norm0 (after scaling) = "//trim(rtoa(fs%div%norm0(lvl=0))))
-      call fs%psolver%solve(rhs=fs%div, phi=fs%P)
-      call log("Pressure solved, P norm0 = "//trim(rtoa(fs%P%norm0(lvl=0))))
-      call log("Pressure solver residual = "//trim(rtoa(fs%psolver%res)))
-
-      ! 4. Get C/F-consistent gradients and correct velocity
-      ! get_fluxes returns -grad(P) for Poisson, so U = U + (dt/rho)*flux
-      call fs%psolver%get_fluxes(fs%P, dPdx, dPdy, dPdz)
-      call log("dPdx norm0 = "//trim(rtoa(dPdx%norm0(lvl=0)))//", dPdz norm0 = "//trim(rtoa(dPdz%norm0(lvl=0))))
-
-      ! 5. Correct velocity: U = U + (dt/rho) * flux
-      factor = dt / fs%rho
-      call fs%U%saxpy(a=factor, src=dPdx)
-      call fs%V%saxpy(a=factor, src=dPdy)
-      call fs%W%saxpy(a=factor, src=dPdz)
-      call log("Velocity corrected")
-
-      ! 6. Average down for C/F consistency
-      call fs%average_down_velocity()
-
-      ! 7. Fill ghosts (includes override_sync for faces)
-      call fs%fill_velocity(time)
-
-      ! 8. Check divergence
+      call log("Initial divmax = "//trim(rtoa(fs%divmax)))
+      call project_velocity(dt_proj=1.0_WP)
       call fs%get_div()
-      divmax_after = fs%divmax
-      call log("After projection: divmax = "//trim(rtoa(divmax_after)))
+      call log("After projection divmax = "//trim(rtoa(fs%divmax)))
 
-      ! Report result
-      if (divmax_after .lt. 1.0e-9_WP) then
-         call log("TEST PASSED: Velocity is divergence-free (divmax < 1e-9)")
-      else if (divmax_after .lt. divmax_before * 1.0e-6_WP) then
-         call log("TEST PASSED: Divergence reduced by > 6 orders of magnitude")
-      else
-         call log("TEST FAILED: Divergence not sufficiently reduced")
-      end if
+      ! Write initial state
+      call viz%write(time=time)
 
-      ! Write visualization output
-      call viz%write(time=1.0_WP)
-      call log("Visualization written to amrviz/test_incomp/")
+      ! ========================================
+      ! TIME LOOP
+      ! ========================================
+      step = 0
+      do while (time .lt. time_end)
+         step = step + 1
+
+         ! Compute CFL-based timestep
+         Umax = max(fs%U%norm0(lvl=0), fs%V%norm0(lvl=0), fs%W%norm0(lvl=0))
+         dt = CFL * amr%dx(amr%clvl()) / max(Umax, 1.0e-10_WP)
+         if (time + dt .gt. time_end) dt = time_end - time
+
+         ! Compute advective momentum RHS: drhoUdt = -div(rho*u*u)
+         call fs%get_dmomdt(fs%U, fs%V, fs%W, drhoUdt, drhoVdt, drhoWdt)
+
+         ! Update velocity: U_star = U + dt/rho * drhoUdt
+         factor = dt / fs%rho
+         call fs%U%saxpy(a=factor, src=drhoUdt)
+         call fs%V%saxpy(a=factor, src=drhoVdt)
+         call fs%W%saxpy(a=factor, src=drhoWdt)
+
+         ! Project to enforce divergence-free
+         call fs%average_down_velocity()
+         call fs%fill_velocity(time)
+         call project_velocity(dt_proj=dt)
+
+         ! Advance time
+         time = time + dt
+
+         ! Log progress
+         if (mod(step, 10) .eq. 0 .or. time .ge. time_end) then
+            call fs%get_div()
+            call log("Step "//trim(itoa(step))//": t="//trim(rtoa(time))// &
+               &     ", dt="//trim(rtoa(dt))//", divmax="//trim(rtoa(fs%divmax)))
+         end if
+      end do
+
+      ! Write final state
+      call viz%write(time=time)
+      call log("Final time: "//trim(rtoa(time))//", steps: "//trim(itoa(step)))
 
       ! Cleanup
       call viz%finalize()
       call fs%finalize()
       call amr%finalize()
-      deallocate(viz, fs, amr)
+      deallocate(viz, fs, amr, dPdx, dPdy, dPdz, drhoUdt, drhoVdt, drhoWdt)
 
-      call log("Test complete")
+      call log("Advection test complete")
+
+   contains
+
+      !> Helper: project velocity to be divergence-free
+      subroutine project_velocity(dt_proj)
+         real(WP), intent(in) :: dt_proj
+         real(WP) :: factor_proj
+         ! Compute divergence
+         call fs%get_div()
+         ! Scale RHS: rhs = rho/dt * div
+         factor_proj = fs%rho / dt_proj
+         call fs%div%mult(val=factor_proj)
+         ! Solve pressure Poisson
+         call fs%psolver%solve(rhs=fs%div, phi=fs%P)
+         ! Get gradients and correct velocity
+         call fs%psolver%get_fluxes(fs%P, dPdx, dPdy, dPdz)
+         factor_proj = dt_proj / fs%rho
+         call fs%U%saxpy(a=factor_proj, src=dPdx)
+         call fs%V%saxpy(a=factor_proj, src=dPdy)
+         call fs%W%saxpy(a=factor_proj, src=dPdz)
+         ! Average down and fill ghosts
+         call fs%average_down_velocity()
+         call fs%fill_velocity(time)
+      end subroutine project_velocity
 
    end subroutine test_amrincomp
 

@@ -18,6 +18,7 @@ contains
       use mod_test_amrdata,   only: test_amrdata
       use mod_test_amrscalar, only: test_amrscalar
       use mod_test_amrmg,     only: test_amrmg
+      use mod_test_project,   only: test_project
       use mod_test_amrincomp, only: test_amrincomp
       character(len=32) :: test_name
 
@@ -35,15 +36,18 @@ contains
          call test_amrscalar()
        case ('amrmg')
          call test_amrmg()
+       case ('project')
+         call test_project()
        case ('amrincomp')
          call test_amrincomp()
        case ('all')
          call test_amrdata()
          call test_amrscalar()
          call test_amrmg()
+         call test_project()
          call test_amrincomp()
        case default
-         call die('Unknown test: '//trim(test_name)//'. Valid: amrdata, amrscalar, amrmg, amrincomp, all')
+         call die('Unknown test: '//trim(test_name)//'. Valid: amrdata, amrscalar, amrmg, project, amrincomp, all')
       end select
    end subroutine simulation_run
 
