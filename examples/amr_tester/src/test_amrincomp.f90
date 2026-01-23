@@ -26,14 +26,17 @@ module mod_test_amrincomp
    type(amrviz), allocatable :: viz
    type(event) :: viz_evt
 
-   ! Regrid event
+   ! Regrid parameters
    type(event) :: regrid_evt
+   real(WP) :: tstart_regrid
+   real(WP) :: vort_threshold=huge(1.0_WP)
 
    ! HIT forcing
-   real(WP) :: K_target, tau_forcing
+   real(WP) :: K_target
+   real(WP) :: tau_forcing
 
    ! Monitoring
-   type(monitor) :: mfile, cflfile, consfile
+   type(monitor) :: mfile, cflfile, consfile, gridfile
 
 contains
 
@@ -119,6 +122,65 @@ contains
       call solver%amr%mfiter_destroy(mfi)
    end subroutine geometric_tagger
 
+   !> Vorticity-based tagger: refine where vorticity magnitude exceeds threshold
+   subroutine vorticity_tagger(solver, lvl, tags_ptr, time)
+      use iso_c_binding,    only: c_ptr, c_char
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_tagboxarray
+      use amrgrid_class,    only: SETtag
+      class(amrincomp), intent(inout) :: solver
+      integer, intent(in) :: lvl
+      type(c_ptr), intent(in) :: tags_ptr
+      real(WP), intent(in) :: time
+      type(amrex_tagboxarray) :: tags
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      real(WP) :: dx, dy, dz
+      real(WP) :: dudy, dudz, dvdx, dvdz, dwdx, dwdy
+      real(WP) :: omega_x, omega_y, omega_z, vort_mag
+      integer :: i, j, k
+      dx = solver%amr%dx(lvl)
+      dy = solver%amr%dy(lvl)
+      dz = solver%amr%dz(lvl)
+      tags = tags_ptr
+      call solver%amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         tagarr => tags%dataPtr(mfi)
+         pU => solver%U%mf(lvl)%dataptr(mfi)
+         pV => solver%V%mf(lvl)%dataptr(mfi)
+         pW => solver%W%mf(lvl)%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3)
+            do j = bx%lo(2), bx%hi(2)
+               do i = bx%lo(1), bx%hi(1)
+                  ! du/dy at cell center
+                  dudy = 0.25_WP*(pU(i,j+1,k,1)+pU(i+1,j+1,k,1)-pU(i,j-1,k,1)-pU(i+1,j-1,k,1))/(2.0_WP*dy)
+                  ! du/dz at cell center
+                  dudz = 0.25_WP*(pU(i,j,k+1,1)+pU(i+1,j,k+1,1)-pU(i,j,k-1,1)-pU(i+1,j,k-1,1))/(2.0_WP*dz)
+                  ! dv/dx at cell center
+                  dvdx = 0.25_WP*(pV(i+1,j,k,1)+pV(i+1,j+1,k,1)-pV(i-1,j,k,1)-pV(i-1,j+1,k,1))/(2.0_WP*dx)
+                  ! dv/dz at cell center
+                  dvdz = 0.25_WP*(pV(i,j,k+1,1)+pV(i,j+1,k+1,1)-pV(i,j,k-1,1)-pV(i,j+1,k-1,1))/(2.0_WP*dz)
+                  ! dw/dx at cell center
+                  dwdx = 0.25_WP*(pW(i+1,j,k,1)+pW(i+1,j,k+1,1)-pW(i-1,j,k,1)-pW(i-1,j,k+1,1))/(2.0_WP*dx)
+                  ! dw/dy at cell center
+                  dwdy = 0.25_WP*(pW(i,j+1,k,1)+pW(i,j+1,k+1,1)-pW(i,j-1,k,1)-pW(i,j-1,k+1,1))/(2.0_WP*dy)
+                  ! Vorticity components
+                  omega_x = dwdy - dvdz
+                  omega_y = dudz - dwdx
+                  omega_z = dvdx - dudy
+                  ! Vorticity magnitude
+                  vort_mag = sqrt(omega_x**2 + omega_y**2 + omega_z**2)
+                  ! Tag if above threshold
+                  if (vort_mag .gt. vort_threshold) tagarr(i,j,k,1) = SETtag
+               end do
+            end do
+         end do
+      end do
+      call solver%amr%mfiter_destroy(mfi)
+   end subroutine vorticity_tagger
+
    !> Main test routine
    subroutine test_amrincomp()
       implicit none
@@ -159,7 +221,7 @@ contains
          fs%psolver%max_iter = 20
          fs%psolver%tol_rel = 1.0e-6_WP
          fs%user_init => velocity_init
-         fs%user_tagging => geometric_tagger
+         fs%user_tagging => vorticity_tagger
          call fs%initialize(amr, name='advect_fs')
       end block create_flow_solver
 
@@ -199,12 +261,17 @@ contains
          if (viz_evt%occurs()) call viz%write(time=time%t)
       end block create_visualization
 
-      ! Initialize regridding event
-      create_regrid_event: block
+      ! Regridding parameters
+      regrid_setup: block
          use param, only: param_read
+         ! Create regridding event
          regrid_evt = event(time=time, name='Regrid')
          call param_read('Regrid nsteps', regrid_evt%nper)
-      end block create_regrid_event
+         ! Set regridding start time
+         call param_read('Regrid start', tstart_regrid)
+         ! Set vorticity threshold
+         call param_read('Vorticity threshold', vort_threshold)
+      end block regrid_setup
 
       ! Create monitor
       create_monitor: block
@@ -244,6 +311,15 @@ contains
          call consfile%add_column(fs%rhoWint, 'rhoWint')
          call consfile%add_column(fs%rhoKint, 'rhoKint')
          call consfile%write()
+         ! Create grid monitor
+         gridfile = monitor(amRoot=amr%amRoot, name='grid')
+         call gridfile%add_column(time%n, 'Timestep')
+         call gridfile%add_column(time%t, 'Time')
+         call gridfile%add_column(amr%nlevels, 'Nlvl')
+         call gridfile%add_column(amr%nboxes, 'Nbox')
+         call gridfile%add_column(amr%ncells, 'Ncell')
+         call gridfile%add_column(amr%compression, 'Compression')
+         call gridfile%write()
       end block create_monitor
 
       ! Time integration loop
@@ -317,10 +393,9 @@ contains
          end do
 
          ! Regrid if event triggers
-         if (regrid_evt%occurs()) then
-            call log("Regridding at step "//trim(itoa(time%n)))
+         if (regrid_evt%occurs().and. time%t .gt. tstart_regrid) then
             call amr%regrid(baselvl=0, time=time%t)
-            call log("--> Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
+            call gridfile%write()
          end if
 
          ! Monitor output
@@ -342,8 +417,10 @@ contains
          call mfile%finalize()
          call cflfile%finalize()
          call consfile%finalize()
+         call gridfile%finalize()
          call time%finalize()
          call viz_evt%finalize()
+         call regrid_evt%finalize()
          call resU%finalize()
          call resV%finalize()
          call resW%finalize()
