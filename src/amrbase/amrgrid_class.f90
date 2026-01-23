@@ -157,6 +157,8 @@ module amrgrid_class
       ! Various tools and accessors
       procedure :: get_boxarray              !< Obtain box array at a given level
       procedure :: get_distromap             !< Obtain distromap at a given level
+      procedure :: ba => get_boxarray        !< Short alias for get_boxarray
+      procedure :: dm => get_distromap       !< Short alias for get_distromap
       procedure :: mfiter_build              !< Build mfiter at a given level
       procedure :: mfiter_destroy            !< Destroy mfiter
       procedure :: clvl                      !< Return current finest level

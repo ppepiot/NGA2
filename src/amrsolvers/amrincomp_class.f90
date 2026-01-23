@@ -670,11 +670,20 @@ contains
       end do
    end subroutine get_pgrad
 
-   !> Get solver information: min/max velocity, min/max pressure, divergence, momentum
+   !> Get solver information: min/max velocity, min/max pressure, divergence, momentum, TKE
    subroutine get_info(this)
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_imultifab, amrex_imultifab_build, amrex_imultifab_destroy
+      use amrex_interface, only: amrmask_make_fine
+      use parallel, only: MPI_REAL_WP
+      use mpi_f08
       class(amrincomp), intent(inout) :: this
-      integer :: lvl
-      real(WP) :: vol
+      integer :: lvl, i, j, k, ierr
+      real(WP) :: vol, dV, Uc, Vc, Wc
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      type(amrex_imultifab) :: mask
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      integer, dimension(:,:,:,:), contiguous, pointer :: pMask
 
       ! First compute divergence (this updates divmax)
       call this%get_div()
@@ -685,7 +694,7 @@ contains
       this%Wmax = -huge(1.0_WP)
       this%Pmax = -huge(1.0_WP)
 
-      ! Loop over all levels
+      ! Loop over all levels for min/max
       do lvl = 0, this%amr%clvl()
          this%Umax = max(this%Umax, this%U%norm0(lvl=lvl))
          this%Vmax = max(this%Vmax, this%V%norm0(lvl=lvl))
@@ -699,9 +708,50 @@ contains
       this%rhoVint = this%rho * this%V%get_sum(lvl=0) * vol
       this%rhoWint = this%rho * this%W%get_sum(lvl=0) * vol
 
-      ! Kinetic energy integrals (rho * U^2 * vol, summed over cells)
-      vol = (this%amr%xhi - this%amr%xlo) * (this%amr%yhi - this%amr%ylo) * (this%amr%zhi - this%amr%zlo)
-      this%rhoKint = 0.5_WP * (this%rhoUint**2 + this%rhoVint**2 + this%rhoWint**2) / vol
+      ! Kinetic energy integral: 0.5 * rho * (Uc^2 + Vc^2 + Wc^2) * dV
+      ! Uses composite integration with fine masking to avoid double-counting
+      this%rhoKint = 0.0_WP
+      do lvl = 0, this%amr%clvl()
+         dV = this%amr%dx(lvl) * this%amr%dy(lvl) * this%amr%dz(lvl)
+
+         ! Build fine mask for this level (if not finest)
+         if (lvl .lt. this%amr%clvl()) then
+            call amrex_imultifab_build(mask, this%amr%ba(lvl), this%amr%dm(lvl), 1, 0)
+            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rref(lvl), this%amr%rref(lvl), this%amr%rref(lvl)], 0, 1)
+         end if
+
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pU => this%U%mf(lvl)%dataptr(mfi)
+            pV => this%V%mf(lvl)%dataptr(mfi)
+            pW => this%W%mf(lvl)%dataptr(mfi)
+            if (lvl .lt. this%amr%clvl()) pMask => mask%dataptr(mfi)
+
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
+                     ! Skip cells covered by finer level
+                     if (lvl .lt. this%amr%clvl()) then
+                        if (pMask(i,j,k,1) .eq. 0) cycle
+                     end if
+                     ! Interpolate face velocities to cell center
+                     Uc = 0.5_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))
+                     Vc = 0.5_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))
+                     Wc = 0.5_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))
+                     ! Accumulate kinetic energy
+                     this%rhoKint = this%rhoKint + 0.5_WP * this%rho * (Uc**2 + Vc**2 + Wc**2) * dV
+                  end do
+               end do
+            end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+
+         if (lvl .lt. this%amr%clvl()) call amrex_imultifab_destroy(mask)
+      end do
+
+      ! Reduce across MPI ranks
+      call MPI_ALLREDUCE(MPI_IN_PLACE, this%rhoKint, 1, MPI_REAL_WP, MPI_SUM, this%amr%comm, ierr)
    end subroutine get_info
 
    !> Compute CFL numbers (convective and viscous)

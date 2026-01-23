@@ -459,6 +459,23 @@ double amrmfab_sum_unique(void *mf_ptr, void *geom_ptr, int comp) {
 }
 
 //-----------------------------------------------------------------------------
+// Make fine mask - identifies cells covered by finer level
+//-----------------------------------------------------------------------------
+
+void amrmask_make_fine(void *mask_ptr, void *ba_fine_ptr, int *ref_ratio,
+                       int covered_val, int notcovered_val) {
+  auto *mask = static_cast<amrex::iMultiFab *>(mask_ptr);
+  auto *ba_fine = static_cast<amrex::BoxArray *>(ba_fine_ptr);
+  amrex::IntVect rr(AMREX_D_DECL(ref_ratio[0], ref_ratio[1], ref_ratio[2]));
+  // Use makeFineMask to fill the mask
+  // covered_val = value where fine grids exist
+  // notcovered_val = value where no fine grids
+  auto fine_mask = amrex::makeFineMask(*mask, *ba_fine, rr, notcovered_val, covered_val);
+  // Copy result into provided mask
+  amrex::iMultiFab::Copy(*mask, fine_mask, 0, 0, 1, 0);
+}
+
+//-----------------------------------------------------------------------------
 // Plotfile Output (Native and HDF5)
 //-----------------------------------------------------------------------------
 

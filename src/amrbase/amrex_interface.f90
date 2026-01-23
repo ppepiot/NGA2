@@ -80,7 +80,7 @@ module amrex_interface
    public :: amrmfab_average_down_node  ! Node-centered (nodal in 3 dirs)
    public :: amrmfab_compute_divergence ! Compute div(u) from face velocities
    public :: amrmfab_sum_unique         ! Sum for face/nodal data (no double-counting)
-
+   public :: amrmask_make_fine          ! Create mask for cells covered by finer level
 
    interface
 
@@ -443,6 +443,15 @@ module amrex_interface
          integer(c_int), value :: comp
       end function amrmfab_sum_unique_c
 
+      !> Create mask identifying cells covered by finer level
+      subroutine amrmask_make_fine_c(mask, ba_fine, ref_ratio, covered_val, notcovered_val) &
+         bind(c, name='amrmask_make_fine')
+         import :: c_ptr, c_int
+         type(c_ptr), value :: mask, ba_fine
+         integer(c_int), intent(in) :: ref_ratio(3)
+         integer(c_int), value :: covered_val, notcovered_val
+      end subroutine amrmask_make_fine_c
+
    end interface
 
 contains
@@ -554,6 +563,19 @@ contains
       ic = 1; if (present(comp)) ic = comp
       val = amrmfab_sum_unique_c(mf%p, geom%p, ic)
    end function amrmfab_sum_unique
+
+   !> Create integer mask identifying cells covered by finer level
+   !> mask must already be built with same BA/DM as coarse level
+   !> After call: mask(i,j,k) = notcovered_val where valid, covered_val where fine exists
+   subroutine amrmask_make_fine(mask, ba_fine, ref_ratio, covered_val, notcovered_val)
+      use amrex_multifab_module, only: amrex_imultifab
+      use amrex_boxarray_module, only: amrex_boxarray
+      type(amrex_imultifab), intent(inout) :: mask
+      type(amrex_boxarray), intent(in) :: ba_fine
+      integer, intent(in) :: ref_ratio(3)
+      integer, intent(in) :: covered_val, notcovered_val
+      call amrmask_make_fine_c(mask%p, ba_fine%p, ref_ratio, covered_val, notcovered_val)
+   end subroutine amrmask_make_fine
 
    !> Fill coarse patch for 3-component face-centered velocity
    subroutine amrmfab_fillcoarsepatch_faces(mf_u, mf_v, mf_w, time, &
