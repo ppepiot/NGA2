@@ -6,15 +6,18 @@ Base nx: 64
 Base ny: 64
 Base nz: 64
 Max level: 1
+Regrid nsteps: 10
 
 # Flow parameters
 Density: 1.0
 Viscosity: 5e-4
+Target TKE: 0.2
+Forcing timescale: 0.1
 
 # Time integration
 Max time: 100.0
-Max dt: 2e-3
-Max CFL: 0.5
+Max dt: 5e-3
+Max CFL: 0.9
 
 # Output
 Output period: 0.1

@@ -678,7 +678,7 @@ contains
       use mpi_f08
       class(amrincomp), intent(inout) :: this
       integer :: lvl, i, j, k, ierr
-      real(WP) :: vol, dV, Uc, Vc, Wc
+      real(WP) :: dV, Uc, Vc, Wc
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       type(amrex_imultifab) :: mask
@@ -702,11 +702,10 @@ contains
          this%Pmax = max(this%Pmax, this%P%norm0(lvl=lvl))
       end do
 
-      ! Momentum integrals (rho * U * vol, summed over cells)
-      vol = this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
-      this%rhoUint = this%rho * this%U%get_sum(lvl=0) * vol
-      this%rhoVint = this%rho * this%V%get_sum(lvl=0) * vol
-      this%rhoWint = this%rho * this%W%get_sum(lvl=0) * vol
+      ! Momentum integrals (rho * U * dV, summed over cells at level 0)
+      this%rhoUint = this%rho * this%U%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
+      this%rhoVint = this%rho * this%V%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
+      this%rhoWint = this%rho * this%W%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
 
       ! Kinetic energy integral: 0.5 * rho * (Uc^2 + Vc^2 + Wc^2) * dV
       ! Uses composite integration with fine masking to avoid double-counting

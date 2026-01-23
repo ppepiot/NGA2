@@ -26,6 +26,12 @@ module mod_test_amrincomp
    type(amrviz), allocatable :: viz
    type(event) :: viz_evt
 
+   ! Regrid event
+   type(event) :: regrid_evt
+
+   ! HIT forcing
+   real(WP) :: K_target, tau_forcing
+
    ! Monitoring
    type(monitor) :: mfile, cflfile, consfile
 
@@ -141,6 +147,7 @@ contains
          call param_read('Max dt',time%dtmax)
          call param_read('Max CFL',time%cflmax)
          time%dt = time%dtmax
+         time%itmax=2
       end block initialize_timetracker
 
       ! Create flow solver
@@ -163,30 +170,17 @@ contains
          allocate(resW); call resW%initialize(amr, name='resW', ncomp=1, ng=0, nodal=[.false., .false., .true.], interp=amrex_interp_none); call resW%register()
       end block create_workspace
 
-      ! Build grid and initialize
+      ! Initialize grid
       initialize: block
-         ! Initialize grid
          call amr%init_from_scratch(time=time%t)
-         ! Initialize flow solver
-         !call fs%average_down_velocity()
-         !call fs%fill_velocity(time%t)
-         ! Initial projection
-         !call fs%get_div()
-         !call log("Initial divmax = "//trim(rtoa(fs%divmax)))
-         ! Solve pressure Poisson
-         !call fs%psolver%solve(rhs=fs%div, phi=fs%P)
-         ! Get gradients and correct velocity
-         !call fs%psolver%get_fluxes(fs%P, resU, resV, resW)
-         !call fs%U%add(src=resU)
-         !call fs%V%add(src=resV)
-         !call fs%W%add(src=resW)
-         ! Average down and fill ghosts
-         !call fs%average_down_velocity()
-         !call fs%fill_velocity(time%t)
-         ! Check divergence
-         !call fs%get_div()
-         !call log("After projection divmax = "//trim(rtoa(fs%divmax)))
       end block initialize
+
+      ! Initialize HIT forcing
+      initialize_forcing: block
+         use param, only: param_read
+         call param_read('Target TKE', K_target)
+         call param_read('Forcing timescale', tau_forcing)
+      end block initialize_forcing
 
       ! Initialize visualization
       create_visualization: block
@@ -204,6 +198,13 @@ contains
          ! Write initial state
          if (viz_evt%occurs()) call viz%write(time=time%t)
       end block create_visualization
+
+      ! Initialize regridding event
+      create_regrid_event: block
+         use param, only: param_read
+         regrid_evt = event(time=time, name='Regrid')
+         call param_read('Regrid nsteps', regrid_evt%nper)
+      end block create_regrid_event
 
       ! Create monitor
       create_monitor: block
@@ -253,39 +254,74 @@ contains
          call time%adjust_dt()
          call time%increment()
 
-         ! Compute advective momentum RHS
-         call fs%get_dmomdt(U=fs%U, V=fs%V, W=fs%W, drhoUdt=resU, drhoVdt=resV, drhoWdt=resW)
+         ! Store old velocity
+         call fs%Uold%copy(src=fs%U)
+         call fs%Vold%copy(src=fs%V)
+         call fs%Wold%copy(src=fs%W)
 
-         ! Add linear forcing
-         call resU%saxpy(a=fs%rho, src=fs%U)
-         call resV%saxpy(a=fs%rho, src=fs%V)
-         call resW%saxpy(a=fs%rho, src=fs%W)
+         ! Sub-iterations
+         do while (time%it .le. time%itmax)
 
-         ! Update velocity: U_star = U + dt/rho * drhoUdt
-         call fs%U%saxpy(a=time%dt/fs%rho, src=resU)
-         call fs%V%saxpy(a=time%dt/fs%rho, src=resV)
-         call fs%W%saxpy(a=time%dt/fs%rho, src=resW)
+            ! Build mid-time velocity: U^{mid} = 0.5*(U + Uold)
+            call fs%U%lincomb(a=0.5_WP, src1=fs%U, b=0.5_WP, src2=fs%Uold)
+            call fs%V%lincomb(a=0.5_WP, src1=fs%V, b=0.5_WP, src2=fs%Vold)
+            call fs%W%lincomb(a=0.5_WP, src1=fs%W, b=0.5_WP, src2=fs%Wold)
 
-         ! Average down and fill ghosts
-         call fs%average_down_velocity()
-         call fs%fill_velocity(time%t)
+            ! Compute advective momentum RHS
+            call fs%get_dmomdt(U=fs%U, V=fs%V, W=fs%W, drhoUdt=resU, drhoVdt=resV, drhoWdt=resW)
 
-         ! Compute divergence
-         call fs%get_div()
+            ! Add TKE-targeting linear forcing: F = A * rho * (U - U_mean)
+            ! Forces only fluctuations, ensuring zero net momentum injection
+            tke_target_forcing: block
+               real(WP) :: A_forcing
+               if (fs%rhoKint .gt. 1.0e-10_WP) then
+                  A_forcing = (K_target - fs%rhoKint) / (2.0_WP * fs%rhoKint * tau_forcing)
+               else
+                  A_forcing = 1.0_WP       ! Strong forcing if TKE is near zero
+               end if
+               ! Force fluctuations: F = A * rho * (U - Umean)
+               call resU%saxpy(a=A_forcing*fs%rho, src=fs%U); call resU%plus(val=-A_forcing*fs%rhoUint/fs%amr%vol)
+               call resV%saxpy(a=A_forcing*fs%rho, src=fs%V); call resV%plus(val=-A_forcing*fs%rhoVint/fs%amr%vol)
+               call resW%saxpy(a=A_forcing*fs%rho, src=fs%W); call resW%plus(val=-A_forcing*fs%rhoWint/fs%amr%vol)
+            end block tke_target_forcing
 
-         ! Solve pressure Poisson
-         call fs%div%mult(val=fs%rho/time%dt)
-         call fs%psolver%solve(rhs=fs%div, phi=fs%P)
+            ! Increment velocity
+            call fs%U%lincomb(a=1.0_WP, src1=fs%Uold, b=time%dt/fs%rho, src2=resU)
+            call fs%V%lincomb(a=1.0_WP, src1=fs%Vold, b=time%dt/fs%rho, src2=resV)
+            call fs%W%lincomb(a=1.0_WP, src1=fs%Wold, b=time%dt/fs%rho, src2=resW)
 
-         ! Get gradients and correct velocity
-         call fs%psolver%get_fluxes(phi=fs%P, flux_x=resU, flux_y=resV, flux_z=resW)
-         call fs%U%saxpy(a=time%dt/fs%rho, src=resU)
-         call fs%V%saxpy(a=time%dt/fs%rho, src=resV)
-         call fs%W%saxpy(a=time%dt/fs%rho, src=resW)
+            ! Average down and fill ghosts
+            call fs%average_down_velocity()
+            call fs%fill_velocity(time%t)
 
-         ! Average down and fill ghosts
-         call fs%average_down_velocity()
-         call fs%fill_velocity(time%t)
+            ! Compute divergence
+            call fs%get_div()
+
+            ! Solve pressure Poisson
+            call fs%div%mult(val=fs%rho/time%dt)
+            call fs%psolver%solve(rhs=fs%div, phi=fs%P)
+
+            ! Get gradients and correct velocity
+            call fs%psolver%get_fluxes(phi=fs%P, flux_x=resU, flux_y=resV, flux_z=resW)
+            call fs%U%saxpy(a=time%dt/fs%rho, src=resU)
+            call fs%V%saxpy(a=time%dt/fs%rho, src=resV)
+            call fs%W%saxpy(a=time%dt/fs%rho, src=resW)
+
+            ! Average down and fill ghosts
+            call fs%average_down_velocity()
+            call fs%fill_velocity(time%t)
+
+            ! Increment sub-iteration counter
+            time%it = time%it + 1
+
+         end do
+
+         ! Regrid if event triggers
+         if (regrid_evt%occurs()) then
+            call log("Regridding at step "//trim(itoa(time%n)))
+            call amr%regrid(baselvl=0, time=time%t)
+            call log("--> Grid: "//trim(itoa(amr%nlevels))//" levels, "//trim(itoa(amr%nboxes))//" boxes")
+         end if
 
          ! Monitor output
          call fs%get_info()
