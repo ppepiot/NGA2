@@ -832,8 +832,9 @@ contains
       val = this%mf(lvl)%max(ic)
    end function get_max
 
-   !> Get sum at level
+   !> Get sum at level (uses sum_unique for nodal data to avoid double-counting)
    function get_sum(this, lvl, comp) result(val)
+      use amrex_interface, only: amrmfab_sum_unique
       implicit none
       class(amrdata), intent(in) :: this
       integer, intent(in) :: lvl
@@ -841,7 +842,12 @@ contains
       real(WP) :: val
       integer :: ic
       ic = 1; if (present(comp)) ic = comp
-      val = this%mf(lvl)%sum(ic)
+      ! Use sum_unique for nodal data to avoid double-counting at periodic boundaries
+      if (any(this%nodal)) then
+         val = amrmfab_sum_unique(this%mf(lvl), this%amr%geom(lvl), ic)
+      else
+         val = this%mf(lvl)%sum(ic)
+      end if
    end function get_sum
 
    !> Get L-infinity norm (max abs) at level

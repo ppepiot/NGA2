@@ -446,8 +446,22 @@ void amrmfab_fillcoarsepatch(void *mf_f_ptr, double time, void *mf_c_ptr,
 }
 
 //-----------------------------------------------------------------------------
+// MultiFab sum_unique - avoids double counting at shared nodes/faces
+//-----------------------------------------------------------------------------
+
+double amrmfab_sum_unique(void *mf_ptr, void *geom_ptr, int comp) {
+  auto *mf = static_cast<amrex::MultiFab *>(mf_ptr);
+  auto *geom = static_cast<amrex::Geometry *>(geom_ptr);
+  // Build periodicity from geometry
+  amrex::Periodicity period = geom->periodicity();
+  // Use sum_unique with 0-indexed component
+  return mf->sum_unique(comp - 1, false, period);
+}
+
+//-----------------------------------------------------------------------------
 // Plotfile Output (Native and HDF5)
 //-----------------------------------------------------------------------------
+
 
 void amrplotfile_write_native(const char *name, int nlevels, void **mf_ptrs,
                               const char **varnames, int ncomp,

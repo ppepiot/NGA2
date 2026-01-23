@@ -79,6 +79,8 @@ module amrex_interface
    public :: amrmfab_average_down_edge  ! Edge-centered (nodal in 2 dirs)
    public :: amrmfab_average_down_node  ! Node-centered (nodal in 3 dirs)
    public :: amrmfab_compute_divergence ! Compute div(u) from face velocities
+   public :: amrmfab_sum_unique         ! Sum for face/nodal data (no double-counting)
+
 
    interface
 
@@ -433,6 +435,14 @@ module amrex_interface
          type(c_ptr), value :: divu, umac_x, umac_y, umac_z, geom
       end subroutine amrmfab_compute_divergence_c
 
+      !> Sum MultiFab avoiding double-counting at shared nodes/faces (for periodic)
+      real(c_double) function amrmfab_sum_unique_c(mf, geom, comp) &
+         bind(c, name='amrmfab_sum_unique')
+         import :: c_ptr, c_double, c_int
+         type(c_ptr), value :: mf, geom
+         integer(c_int), value :: comp
+      end function amrmfab_sum_unique_c
+
    end interface
 
 contains
@@ -530,6 +540,20 @@ contains
       type(amrex_geometry), intent(in) :: geom
       call amrmfab_compute_divergence_c(divu%p, umac_x%p, umac_y%p, umac_z%p, geom%p)
    end subroutine amrmfab_compute_divergence
+
+   !> Sum MultiFab avoiding double-counting at shared nodes/faces (for periodic)
+   function amrmfab_sum_unique(mf, geom, comp) result(val)
+      use amrex_multifab_module, only: amrex_multifab
+      use amrex_geometry_module, only: amrex_geometry
+      use precision, only: WP
+      type(amrex_multifab), intent(in) :: mf
+      type(amrex_geometry), intent(in) :: geom
+      integer, intent(in), optional :: comp
+      real(WP) :: val
+      integer :: ic
+      ic = 1; if (present(comp)) ic = comp
+      val = amrmfab_sum_unique_c(mf%p, geom%p, ic)
+   end function amrmfab_sum_unique
 
    !> Fill coarse patch for 3-component face-centered velocity
    subroutine amrmfab_fillcoarsepatch_faces(mf_u, mf_v, mf_w, time, &

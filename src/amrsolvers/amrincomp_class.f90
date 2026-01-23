@@ -40,7 +40,18 @@ module amrincomp_class
       real(WP) :: visc = 0.0_WP   !< Dynamic viscosity
 
       ! Monitoring quantities
-      real(WP) :: divmax = 0.0_WP !< Maximum divergence
+      real(WP) :: Umax = 0.0_WP                 !< Max U velocity
+      real(WP) :: Vmax = 0.0_WP                 !< Max V velocity
+      real(WP) :: Wmax = 0.0_WP                 !< Max W velocity
+      real(WP) :: Pmax = 0.0_WP                 !< Max pressure
+      real(WP) :: divmax = 0.0_WP               !< Maximum divergence
+      real(WP) :: rhoUint = 0.0_WP              !< Integral of rho*U
+      real(WP) :: rhoVint = 0.0_WP              !< Integral of rho*V
+      real(WP) :: rhoWint = 0.0_WP              !< Integral of rho*W
+      real(WP) :: rhoKint = 0.0_WP              !< Integral of rho*K
+      real(WP) :: CFLc_x = 0.0_WP, CFLc_y = 0.0_WP, CFLc_z = 0.0_WP  !< Convective CFL
+      real(WP) :: CFLv_x = 0.0_WP, CFLv_y = 0.0_WP, CFLv_z = 0.0_WP  !< Viscous CFL
+      real(WP) :: CFL = 0.0_WP                  !< Maximum CFL
 
       ! Velocity interpolation method (for C/F interface fills)
       integer :: interp_vel = amrex_interp_face_divfree
@@ -72,6 +83,8 @@ module amrincomp_class
       procedure :: restore_checkpoint
       ! Physics procedures
       procedure :: get_dmomdt                 !< Compute momentum advection RHS
+      procedure :: get_cfl                    !< Compute CFL numbers
+      procedure :: print => amrincomp_print   !< Print solver info
    end type amrincomp
 
    !> Abstract interface for user-overridable on_init callback
@@ -244,6 +257,9 @@ contains
          call this%amr%add_postregrid(amrincomp_postregrid, c_loc(this))
       end select
 
+      ! Print solver info
+      call this%print()
+
    end subroutine initialize
 
    ! ============================================================================
@@ -356,6 +372,8 @@ contains
       real(WP), intent(in) :: time
       call this%average_down_velocity(lbase)
       call this%average_down_pressure(lbase)
+      ! Rebuild pressure solver operators for new grid
+      call this%psolver%setup()
    end subroutine post_regrid
 
    !> Average down MAC velocity for a single level (lvl+1 -> lvl)
@@ -652,13 +670,86 @@ contains
       end do
    end subroutine get_pgrad
 
-   !> Get solver information (max velocity, divergence, etc.)
+   !> Get solver information: min/max velocity, min/max pressure, divergence, momentum
    subroutine get_info(this)
       class(amrincomp), intent(inout) :: this
-      ! Compute divmax (call get_div to update it)
+      integer :: lvl
+      real(WP) :: vol
+
+      ! First compute divergence (this updates divmax)
       call this%get_div()
-      ! TODO: Compute Umax, Vmax, Wmax
+
+      ! Initialize min/max values
+      this%Umax = -huge(1.0_WP)
+      this%Vmax = -huge(1.0_WP)
+      this%Wmax = -huge(1.0_WP)
+      this%Pmax = -huge(1.0_WP)
+
+      ! Loop over all levels
+      do lvl = 0, this%amr%clvl()
+         this%Umax = max(this%Umax, this%U%norm0(lvl=lvl))
+         this%Vmax = max(this%Vmax, this%V%norm0(lvl=lvl))
+         this%Wmax = max(this%Wmax, this%W%norm0(lvl=lvl))
+         this%Pmax = max(this%Pmax, this%P%norm0(lvl=lvl))
+      end do
+
+      ! Momentum integrals (rho * U * vol, summed over cells)
+      vol = this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
+      this%rhoUint = this%rho * this%U%get_sum(lvl=0) * vol
+      this%rhoVint = this%rho * this%V%get_sum(lvl=0) * vol
+      this%rhoWint = this%rho * this%W%get_sum(lvl=0) * vol
+
+      ! Kinetic energy integrals (rho * U^2 * vol, summed over cells)
+      vol = (this%amr%xhi - this%amr%xlo) * (this%amr%yhi - this%amr%ylo) * (this%amr%zhi - this%amr%zlo)
+      this%rhoKint = 0.5_WP * (this%rhoUint**2 + this%rhoVint**2 + this%rhoWint**2) / vol
    end subroutine get_info
+
+   !> Compute CFL numbers (convective and viscous)
+   subroutine get_cfl(this, dt, cfl, cflc)
+      class(amrincomp), intent(inout) :: this
+      real(WP), intent(in)  :: dt
+      real(WP), intent(out) :: cfl
+      real(WP), intent(out), optional :: cflc
+      integer :: lvl
+      real(WP) :: dx, Umax_lvl, Vmax_lvl, Wmax_lvl, visc_cfl
+      ! Reset CFLs
+      this%CFLc_x = 0.0_WP; this%CFLc_y = 0.0_WP; this%CFLc_z = 0.0_WP
+      this%CFLv_x = 0.0_WP; this%CFLv_y = 0.0_WP; this%CFLv_z = 0.0_WP
+      ! Compute CFL at each level (finest level determines dt)
+      do lvl = 0, this%amr%clvl()
+         Umax_lvl = this%U%norm0(lvl=lvl)
+         Vmax_lvl = this%V%norm0(lvl=lvl)
+         Wmax_lvl = this%W%norm0(lvl=lvl)
+         ! Convective CFL
+         this%CFLc_x = max(this%CFLc_x, dt * Umax_lvl / this%amr%dx(lvl))
+         this%CFLc_y = max(this%CFLc_y, dt * Vmax_lvl / this%amr%dy(lvl))
+         this%CFLc_z = max(this%CFLc_z, dt * Wmax_lvl / this%amr%dz(lvl))
+         ! Viscous CFL (explicit stability: dt < dx^2 / (4*nu))
+         dx = min(this%amr%dx(lvl), this%amr%dy(lvl), this%amr%dz(lvl))
+         visc_cfl = 4.0_WP * this%visc * dt / (this%rho * dx**2)
+         this%CFLv_x = max(this%CFLv_x, visc_cfl)
+         this%CFLv_y = max(this%CFLv_y, visc_cfl)
+         this%CFLv_z = max(this%CFLv_z, visc_cfl)
+      end do
+      ! Compute max overall CFL
+      this%CFL = max(this%CFLc_x, this%CFLc_y, this%CFLc_z, this%CFLv_x, this%CFLv_y, this%CFLv_z)
+      ! Return max overall CFL
+      cfl = this%CFL
+      ! Optionally return max convective CFL
+      if (present(cflc)) cflc = max(this%CFLc_x, this%CFLc_y, this%CFLc_z)
+   end subroutine get_cfl
+
+   !> Print solver info to screen
+   subroutine amrincomp_print(this)
+      use messager, only: log
+      use string, only: str_long
+      class(amrincomp), intent(in) :: this
+      character(len=str_long) :: message
+      call log("Incompressible solver: "//trim(this%name))
+      write(message,'("  rho = ",ES12.5,", visc = ",ES12.5)') this%rho, this%visc
+      call log(trim(message))
+      call log("  Grid: "//trim(this%amr%name))
+   end subroutine amrincomp_print
 
    !> Register solver data for checkpoint
    subroutine register_checkpoint(this, io)

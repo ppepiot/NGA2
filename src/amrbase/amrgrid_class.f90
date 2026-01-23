@@ -173,6 +173,7 @@ contains
    !> Initialization of an amrgrid object
    subroutine initialize(this,name)
       use messager, only: die
+      use param,    only: verbose
       implicit none
       class(amrgrid), target, intent(inout) :: this
       character(len=*), intent(in), optional :: name
@@ -277,6 +278,8 @@ contains
          ! Smallest mesh size
          this%min_meshsize=min(this%dx(this%maxlvl),this%dy(this%maxlvl),this%dz(this%maxlvl))
       end block compute_shortcuts
+      ! Print info
+      if (verbose.gt.1) call this%print()
    end subroutine initialize
 
 
