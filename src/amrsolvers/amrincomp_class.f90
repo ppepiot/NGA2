@@ -717,14 +717,14 @@ contains
          call this%amr%mfab_build(lvl, FVy(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
          call this%amr%mfab_build(lvl, FWz(lvl), ncomp=1, nover=1, atface=[.false.,.false.,.false.])
          ! FUy, FVx: xy-edge (cross-fluxes)
-         call this%amr%mfab_build(lvl, FUy(lvl), ncomp=1, nover=1, atface=[.true. ,.true. ,.false.])
-         call this%amr%mfab_build(lvl, FVx(lvl), ncomp=1, nover=1, atface=[.true. ,.true. ,.false.])
+         call this%amr%mfab_build(lvl, FUy(lvl), ncomp=1, nover=0, atface=[.true. ,.true. ,.false.])
+         call this%amr%mfab_build(lvl, FVx(lvl), ncomp=1, nover=0, atface=[.true. ,.true. ,.false.])
          ! FUz, FWx: xz-edge (cross-fluxes)
-         call this%amr%mfab_build(lvl, FUz(lvl), ncomp=1, nover=1, atface=[.true. ,.false.,.true. ])
-         call this%amr%mfab_build(lvl, FWx(lvl), ncomp=1, nover=1, atface=[.true. ,.false.,.true. ])
+         call this%amr%mfab_build(lvl, FUz(lvl), ncomp=1, nover=0, atface=[.true. ,.false.,.true. ])
+         call this%amr%mfab_build(lvl, FWx(lvl), ncomp=1, nover=0, atface=[.true. ,.false.,.true. ])
          ! FVz, FWy: yz-edge (cross-fluxes)
-         call this%amr%mfab_build(lvl, FVz(lvl), ncomp=1, nover=1, atface=[.false.,.true. ,.true. ])
-         call this%amr%mfab_build(lvl, FWy(lvl), ncomp=1, nover=1, atface=[.false.,.true. ,.true. ])
+         call this%amr%mfab_build(lvl, FVz(lvl), ncomp=1, nover=0, atface=[.false.,.true. ,.true. ])
+         call this%amr%mfab_build(lvl, FWy(lvl), ncomp=1, nover=0, atface=[.false.,.true. ,.true. ])
 
          ! Build velocity fills with ghost cells (need 1 ghost for interpolation)
          call this%amr%mfab_build(lvl, Ufill, ncomp=1, nover=1, atface=[.true. ,.false.,.false.])
@@ -772,7 +772,7 @@ contains
                   do i = bx%lo(1), bx%hi(1)+1
                      pFUy(i,j,k,1) = 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)); pFVx(i,j,k,1) = pFUy(i,j,k,1)
                      pFVz(i,j,k,1) = 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)); pFWy(i,j,k,1) = pFVz(i,j,k,1)
-                     pFWx(i,j,k,1) = 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) *(pW(i-1,j,k,1) + pW(i,j,k,1)); pFUz(i,j,k,1) = pFWx(i,j,k,1)
+                     pFWx(i,j,k,1) = 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)); pFUz(i,j,k,1) = pFWx(i,j,k,1)
                   end do
                end do
             end do
@@ -796,12 +796,12 @@ contains
          call amrmfab_average_down_cell(fmf=FVy(lvl), cmf=FVy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
          call amrmfab_average_down_cell(fmf=FWz(lvl), cmf=FWz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
          ! Edge-centered fluxes
-         call amrmfab_average_down_edge(fmf=FUy(lvl), cmf=FUy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_edge(fmf=FVx(lvl), cmf=FVx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_edge(fmf=FUz(lvl), cmf=FUz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_edge(fmf=FWx(lvl), cmf=FWx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_edge(fmf=FVz(lvl), cmf=FVz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
-         call amrmfab_average_down_edge(fmf=FWy(lvl), cmf=FWy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=1)
+         call amrmfab_average_down_edge(fmf=FUy(lvl), cmf=FUy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FVx(lvl), cmf=FVx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FUz(lvl), cmf=FUz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FWx(lvl), cmf=FWx(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FVz(lvl), cmf=FVz(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FWy(lvl), cmf=FWy(lvl-1), rr=this%amr%rref(lvl-1), cgeom=this%amr%geom(lvl-1), ngcrse=0)
       end do
 
       ! ========================================================================
