@@ -1,5 +1,5 @@
 # Select which test to run
-Test: amrincomp
+Test: project
 
 # Mesh parameters
 Base nx: 64
