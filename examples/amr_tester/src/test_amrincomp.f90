@@ -319,6 +319,9 @@ contains
          call gridfile%add_column(amr%nboxes, 'Nbox')
          call gridfile%add_column(amr%ncells, 'Ncell')
          call gridfile%add_column(amr%compression, 'Compression')
+         call gridfile%add_column(amr%maxRSS,'Maximum RSS')
+         call gridfile%add_column(amr%minRSS,'Minimum RSS')
+         call gridfile%add_column(amr%avgRSS,'Average RSS')
          call gridfile%write()
       end block create_monitor
 

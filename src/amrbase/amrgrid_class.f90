@@ -126,6 +126,9 @@ module amrgrid_class
       integer  :: nboxes =-1            !< Current total number of boxes
       real(WP) :: ncells =-1.0_WP       !< Current total number of cells (real!)
       real(WP) :: compression=-1.0_WP   !< Current compression ratio (ncells/total cells with uniform mesh)
+      real(WP) :: maxRSS=-1.0_WP        !< Maximum RSS
+      real(WP) :: minRSS=-1.0_WP        !< Minimum RSS
+      real(WP) :: avgRSS=-1.0_WP        !< Average RSS
       ! Level callback lists (solvers register their handlers)
       type(level_cb_wrapper), dimension(:), allocatable :: on_init
       type(level_cb_wrapper), dimension(:), allocatable :: on_coarse
@@ -364,6 +367,7 @@ contains
    !> Get info on amrgrid object
    subroutine get_info(this)
       use amrex_amr_module, only: amrex_boxarray,amrex_box
+      use resource_tracker, only: getRSS,maxRSS,minRSS,avgRSS
       implicit none
       class(amrgrid), intent(inout) :: this
       type(amrex_boxarray) :: ba
@@ -396,6 +400,11 @@ contains
       &                this%geom(this%clvl())%dx(2)*&
       &                this%geom(this%clvl())%dx(3)*&
       &                this%ncells/((this%xhi-this%xlo)*(this%yhi-this%ylo)*(this%zhi-this%zlo))
+      ! Check memory usage
+      call getRSS()
+      this%maxRSS=maxRSS
+      this%minRSS=minRSS
+      this%avgRSS=avgRSS
    end subroutine get_info
 
 
