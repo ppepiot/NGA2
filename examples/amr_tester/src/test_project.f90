@@ -71,7 +71,8 @@ contains
       call amrex_mfiter_destroy(mfi)
    end subroutine velocity_init
 
-   !> Geometric tagger: refine center box
+   !> Geometric tagger: refine right half of domain (x > 0.5)
+   !> This creates a C/F interface at the x=0/x=1 periodic boundary
    subroutine geometric_tagger(solver, lvl, tags_ptr, time)
       use iso_c_binding,    only: c_ptr, c_char
       use amrex_amr_module, only: amrex_tagboxarray
@@ -84,18 +85,10 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
-      real(WP) :: xc, yc, zc, x, y, z, dx, dy, dz, radius
+      real(WP) :: x, dx
       integer :: i, j, k
 
-      ! Center and radius for refinement region
-      xc = 0.5_WP * (solver%amr%xlo + solver%amr%xhi)
-      yc = 0.5_WP * (solver%amr%ylo + solver%amr%yhi)
-      zc = 0.5_WP * (solver%amr%zlo + solver%amr%zhi)
-      radius = 0.25_WP * min(solver%amr%xhi - solver%amr%xlo, &
-      &                      solver%amr%yhi - solver%amr%ylo, &
-      &                      solver%amr%zhi - solver%amr%zlo)
-
-      dx = solver%amr%dx(lvl); dy = solver%amr%dy(lvl); dz = solver%amr%dz(lvl)
+      dx = solver%amr%dx(lvl)
 
       ! Convert c_ptr to tagboxarray
       tags = tags_ptr
@@ -106,9 +99,8 @@ contains
          tagarr => tags%dataPtr(mfi)
          do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
             x = solver%amr%xlo + (real(i,WP) + 0.5_WP) * dx
-            y = solver%amr%ylo + (real(j,WP) + 0.5_WP) * dy
-            z = solver%amr%zlo + (real(k,WP) + 0.5_WP) * dz
-            if (sqrt((x-xc)**2 + (y-yc)**2 + (z-zc)**2) .lt. radius) tagarr(i,j,k,1) = SETtag
+            ! Refine strip 0.5 < x < 0.94: buffer should extend right edge to x=1 (periodic boundary)
+            if (x .gt. 0.5_WP .and. x .lt. 0.94_WP) tagarr(i,j,k,1) = SETtag
          end do; end do; end do
       end do
       call solver%amr%mfiter_destroy(mfi)

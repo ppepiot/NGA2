@@ -678,7 +678,8 @@ void amrmlmg_get_fluxes(void *mlmg, void **sol_mfs, void **flux_x,
 //=============================================================================
 
 // Average down cell-centered MultiFab
-// If crse_geom is provided, FillBoundary is called for periodic fix-up
+// If crse_geom is provided, uses ParallelCopy with periodicity to propagate
+// averaged valid cells to periodic partners, then FillBoundary for ghost cells.
 void amrmfab_average_down_cell(void *fine_mf, void *crse_mf, void *crse_geom,
                                int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
@@ -686,82 +687,105 @@ void amrmfab_average_down_cell(void *fine_mf, void *crse_mf, void *crse_geom,
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
   int ncomp = cmf->nComp();
 
-  if (amrex::isMFIterSafe(*fmf, *cmf)) {
-    for (amrex::MFIter mfi(*cmf, amrex::TilingIfNotGPU()); mfi.isValid();
-         ++mfi) {
-      amrex::Box const &bx = mfi.growntilebox(ngcrse);
-      auto const &crsearr = cmf->array(mfi);
-      auto const &finearr = fmf->const_array(mfi);
-      amrex::ParallelFor(
-          bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-            amrex::amrex_avgdown(i, j, k, n, crsearr, finearr, 0, 0, ratio);
-          });
-    }
-  } else {
-    amrex::BoxArray crse_fine_BA = fmf->boxArray();
-    crse_fine_BA.coarsen(ratio);
-    amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
-    for (amrex::MFIter mfi(ctmp, amrex::TilingIfNotGPU()); mfi.isValid();
-         ++mfi) {
-      amrex::Box const &bx = mfi.growntilebox(ngcrse);
-      auto const &crsearr = ctmp.array(mfi);
-      auto const &finearr = fmf->const_array(mfi);
-      amrex::ParallelFor(
-          bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-            amrex::amrex_avgdown(i, j, k, n, crsearr, finearr, 0, 0, ratio);
-          });
-    }
-    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
+  // Always average into temp first, then copy to crse with periodicity
+  amrex::BoxArray crse_fine_BA = fmf->boxArray();
+  crse_fine_BA.coarsen(ratio);
+  amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
+
+  for (amrex::MFIter mfi(ctmp, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    amrex::Box const &bx = mfi.growntilebox(ngcrse);
+    auto const &crsearr = ctmp.array(mfi);
+    auto const &finearr = fmf->const_array(mfi);
+    amrex::ParallelFor(
+        bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+          amrex::amrex_avgdown(i, j, k, n, crsearr, finearr, 0, 0, ratio);
+        });
   }
-  // Periodic fix-up if geometry provided
+
+  // Copy averaged data to crse - with periodicity if geometry provided
   if (crse_geom) {
     auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    // ParallelCopy with periodicity propagates valid cells to periodic partners
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse, cg->periodicity());
+    // FillBoundary syncs ghost cells from valid cells
     cmf->FillBoundary(cg->periodicity());
+  } else {
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
   }
 }
 
 // Average down face-centered MultiFab (nodal in 1 dir, cell in 2)
-// If crse_geom is provided, FillBoundary is called for periodic fix-up
+// If crse_geom is provided, uses ParallelCopy with periodicity to propagate
+// averaged valid cells to periodic partners, then FillBoundary for ghost cells.
 void amrmfab_average_down_face(void *fine_mf, void *crse_mf, void *crse_geom,
                                int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
   auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
-  amrex::average_down_faces(*fmf, *cmf, ratio, ngcrse);
-  // Periodic fix-up if geometry provided
+  int ncomp = cmf->nComp();
+
+  // Average into temp, then copy to crse with periodicity
+  amrex::BoxArray crse_fine_BA = amrex::coarsen(fmf->boxArray(), ratio);
+  amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
+  amrex::average_down_faces(*fmf, ctmp, ratio, ngcrse);
+
+  // Copy averaged data to crse - with periodicity if geometry provided
   if (crse_geom) {
     auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse, cg->periodicity());
     cmf->FillBoundary(cg->periodicity());
+  } else {
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
   }
 }
 
 // Average down edge-centered MultiFab (nodal in 2 dirs, cell in 1)
-// If crse_geom is provided, FillBoundary is called for periodic fix-up
+// If crse_geom is provided, uses ParallelCopy with periodicity to propagate
+// averaged valid cells to periodic partners, then FillBoundary for ghost cells.
 void amrmfab_average_down_edge(void *fine_mf, void *crse_mf, void *crse_geom,
                                int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
   auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
-  amrex::average_down_edges(*fmf, *cmf, ratio, ngcrse);
-  // Periodic fix-up if geometry provided
+  int ncomp = cmf->nComp();
+
+  // Average into temp, then copy to crse with periodicity
+  amrex::BoxArray crse_fine_BA = amrex::coarsen(fmf->boxArray(), ratio);
+  amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
+  amrex::average_down_edges(*fmf, ctmp, ratio, ngcrse);
+
+  // Copy averaged data to crse - with periodicity if geometry provided
   if (crse_geom) {
     auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse, cg->periodicity());
     cmf->FillBoundary(cg->periodicity());
+  } else {
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
   }
 }
 
 // Average down node-centered MultiFab (nodal in all dirs)
-// If crse_geom is provided, FillBoundary is called for periodic fix-up
+// If crse_geom is provided, uses ParallelCopy with periodicity to propagate
+// averaged valid cells to periodic partners, then FillBoundary for ghost cells.
 void amrmfab_average_down_node(void *fine_mf, void *crse_mf, void *crse_geom,
                                int ref_ratio, int ngcrse) {
   auto *fmf = static_cast<amrex::MultiFab *>(fine_mf);
   auto *cmf = static_cast<amrex::MultiFab *>(crse_mf);
   amrex::IntVect ratio(AMREX_D_DECL(ref_ratio, ref_ratio, ref_ratio));
-  amrex::average_down_nodal(*fmf, *cmf, ratio, ngcrse);
-  // Periodic fix-up if geometry provided
+  int ncomp = cmf->nComp();
+
+  // Average into temp, then copy to crse with periodicity
+  amrex::BoxArray crse_fine_BA = amrex::coarsen(fmf->boxArray(), ratio);
+  amrex::MultiFab ctmp(crse_fine_BA, fmf->DistributionMap(), ncomp, ngcrse);
+  amrex::average_down_nodal(*fmf, ctmp, ratio, ngcrse);
+
+  // Copy averaged data to crse - with periodicity if geometry provided
   if (crse_geom) {
     auto *cg = static_cast<amrex::Geometry *>(crse_geom);
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse, cg->periodicity());
     cmf->FillBoundary(cg->periodicity());
+  } else {
+    cmf->ParallelCopy(ctmp, 0, 0, ncomp, ngcrse, ngcrse);
   }
 }
 
