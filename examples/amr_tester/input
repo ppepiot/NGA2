@@ -10,7 +10,7 @@ Max level: 1
 # Regridding parameters
 Regrid nsteps: 10
 Regrid start: 1.0
-Vorticity threshold: 25.0
+Tagging threshold: 35.0
 
 # Flow parameters
 Density: 1.0

@@ -29,7 +29,7 @@ module mod_test_amrincomp
    ! Regrid parameters
    type(event) :: regrid_evt
    real(WP) :: tstart_regrid
-   real(WP) :: vort_threshold=huge(1.0_WP)
+   real(WP) :: tagging_threshold=huge(1.0_WP)
 
    ! HIT forcing
    real(WP) :: K_target
@@ -173,13 +173,62 @@ contains
                   ! Vorticity magnitude
                   vort_mag = sqrt(omega_x**2 + omega_y**2 + omega_z**2)
                   ! Tag if above threshold
-                  if (vort_mag .gt. vort_threshold) tagarr(i,j,k,1) = SETtag
+                  if (vort_mag .gt. tagging_threshold) tagarr(i,j,k,1) = SETtag
                end do
             end do
          end do
       end do
       call solver%amr%mfiter_destroy(mfi)
    end subroutine vorticity_tagger
+
+   !> Velocity gradient magnitude tagger: refine where |∇u| > threshold
+   !> |∇u| = sqrt(sum of all (dui/dxj)²) - captures all gradients equally
+   subroutine gradU_tagger(solver, lvl, tags_ptr, time)
+      use iso_c_binding,    only: c_ptr, c_char
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_tagboxarray
+      use amrgrid_class,    only: SETtag
+      class(amrincomp), intent(inout) :: solver
+      integer, intent(in) :: lvl
+      type(c_ptr), intent(in) :: tags_ptr
+      real(WP), intent(in) :: time
+      type(amrex_tagboxarray) :: tags
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+      real(WP) :: dx, dy, dz
+      real(WP) :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz, gradU_mag
+      integer :: i, j, k
+      dx = solver%amr%dx(lvl); dy = solver%amr%dy(lvl); dz = solver%amr%dz(lvl)
+      tags = tags_ptr
+      call solver%amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         tagarr => tags%dataPtr(mfi)
+         pU => solver%U%mf(lvl)%dataptr(mfi)
+         pV => solver%V%mf(lvl)%dataptr(mfi)
+         pW => solver%W%mf(lvl)%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+            ! Diagonal gradients
+            dudx = (pU(i+1,j,k,1) - pU(i,j,k,1)) / dx
+            dvdy = (pV(i,j+1,k,1) - pV(i,j,k,1)) / dy
+            dwdz = (pW(i,j,k+1,1) - pW(i,j,k,1)) / dz
+            ! Off-diagonal gradients
+            dudy = 0.25_WP*(pU(i,j+1,k,1)+pU(i+1,j+1,k,1)-pU(i,j-1,k,1)-pU(i+1,j-1,k,1))/(2.0_WP*dy)
+            dudz = 0.25_WP*(pU(i,j,k+1,1)+pU(i+1,j,k+1,1)-pU(i,j,k-1,1)-pU(i+1,j,k-1,1))/(2.0_WP*dz)
+            dvdx = 0.25_WP*(pV(i+1,j,k,1)+pV(i+1,j+1,k,1)-pV(i-1,j,k,1)-pV(i-1,j+1,k,1))/(2.0_WP*dx)
+            dvdz = 0.25_WP*(pV(i,j,k+1,1)+pV(i,j+1,k+1,1)-pV(i,j,k-1,1)-pV(i,j+1,k-1,1))/(2.0_WP*dz)
+            dwdx = 0.25_WP*(pW(i+1,j,k,1)+pW(i+1,j,k+1,1)-pW(i-1,j,k,1)-pW(i-1,j,k+1,1))/(2.0_WP*dx)
+            dwdy = 0.25_WP*(pW(i,j+1,k,1)+pW(i,j+1,k+1,1)-pW(i,j-1,k,1)-pW(i,j-1,k+1,1))/(2.0_WP*dy)
+            ! |∇u| = sqrt(sum of all gradients squared)
+            gradU_mag = sqrt(dudx**2 + dudy**2 + dudz**2 + &
+            &                dvdx**2 + dvdy**2 + dvdz**2 + &
+            &                dwdx**2 + dwdy**2 + dwdz**2)
+            if (gradU_mag .gt. tagging_threshold) tagarr(i,j,k,1) = SETtag
+         end do; end do; end do
+      end do
+      call solver%amr%mfiter_destroy(mfi)
+   end subroutine gradU_tagger
 
    !> Main test routine
    subroutine test_amrincomp()
@@ -221,7 +270,7 @@ contains
          fs%psolver%max_iter = 20
          fs%psolver%tol_rel = 1.0e-6_WP
          fs%user_init => velocity_init
-         fs%user_tagging => vorticity_tagger
+         fs%user_tagging => gradU_tagger
          call fs%initialize(amr, name='advect_fs')
       end block create_flow_solver
 
@@ -269,8 +318,8 @@ contains
          call param_read('Regrid nsteps', regrid_evt%nper)
          ! Set regridding start time
          call param_read('Regrid start', tstart_regrid)
-         ! Set vorticity threshold
-         call param_read('Vorticity threshold', vort_threshold)
+         ! Set tagging threshold
+         call param_read('Tagging threshold', tagging_threshold)
       end block regrid_setup
 
       ! Create monitor
