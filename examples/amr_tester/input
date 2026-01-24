@@ -1,5 +1,5 @@
 # Select which test to run
-Test: project
+Test: amrincomp
 
 # Mesh parameters
 Base nx: 64
@@ -8,7 +8,7 @@ Base nz: 64
 Max level: 1
 
 # Regridding parameters
-Regrid nsteps: 100
+Regrid nsteps: 10
 Regrid start: 1.0
 Vorticity threshold: 25.0
 
@@ -24,4 +24,4 @@ Max dt: 5e-3
 Max CFL: 0.9
 
 # Output
-Output period: 0.01
+Output period: 0.1
