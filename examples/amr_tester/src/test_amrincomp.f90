@@ -396,7 +396,7 @@ contains
             call fs%W%lincomb(a=0.5_WP, src1=fs%W, b=0.5_WP, src2=fs%Wold)
 
             ! Compute advective momentum RHS
-            call fs%get_dmomdt(U=fs%U, V=fs%V, W=fs%W, drhoUdt=resU, drhoVdt=resV, drhoWdt=resW)
+            call fs%get_dmomdt(U=fs%U, V=fs%V, W=fs%W, drhoUdt=resU, drhoVdt=resV, drhoWdt=resW, time=time%t)
 
             ! Add TKE-targeting linear forcing: F = A * rho * (U - U_mean)
             ! Forces only fluctuations, ensuring zero net momentum injection

@@ -826,12 +826,13 @@ contains
    !> Compute momentum advection RHS for all levels
    !> drhoUdt = -∇·(ρuu), drhoVdt = -∇·(ρuv), drhoWdt = -∇·(ρuw)
    !> Uses flux averaging at C/F interfaces for conservation
-   subroutine get_dmomdt(this, U, V, W, drhoUdt, drhoVdt, drhoWdt)
+   subroutine get_dmomdt(this, U, V, W, drhoUdt, drhoVdt, drhoWdt, time)
       use amrex_amr_module, only: amrex_multifab, amrex_multifab_destroy, amrex_mfiter, amrex_box
       use amrex_interface,  only: amrmfab_average_down_cell, amrmfab_average_down_edge
       class(amrincomp), intent(inout) :: this
       class(amrdata), intent(inout) :: U, V, W                          !< Velocity state (face-centered)
       class(amrdata), intent(inout) :: drhoUdt, drhoVdt, drhoWdt        !< Output: momentum RHS (face-centered)
+      real(WP), intent(in) :: time
       ! Flux MultiFabs (9 total: 3 CC, 2 xy-edge, 2 xz-edge, 2 yz-edge)
       type(amrex_multifab), dimension(0:this%amr%maxlvl) :: FUx, FUy, FUz
       type(amrex_multifab), dimension(0:this%amr%maxlvl) :: FVx, FVy, FVz
@@ -874,7 +875,7 @@ contains
          call this%amr%mfab_build(lvl, Ufill, ncomp=1, nover=1, atface=[.true. ,.false.,.false.])
          call this%amr%mfab_build(lvl, Vfill, ncomp=1, nover=1, atface=[.false.,.true. ,.false.])
          call this%amr%mfab_build(lvl, Wfill, ncomp=1, nover=1, atface=[.false.,.false.,.true. ])
-         call this%fill_velocity_mfab(Udest=Ufill, Vdest=Vfill, Wdest=Wfill, lvl=lvl, time=0.0_WP)  ! TODO: cascade actual time for time-dependent BCs
+         call this%fill_velocity_mfab(Udest=Ufill, Vdest=Vfill, Wdest=Wfill, lvl=lvl, time=time)
 
          ! MFIter loop: compute all 9 fluxes
          call this%amr%mfiter_build(lvl, mfi)

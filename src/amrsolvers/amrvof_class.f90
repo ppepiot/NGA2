@@ -106,10 +106,11 @@ module amrvof_class
    !> Abstract interface for user-defined VOF boundary condition
    !> User must set VF, Cliq, Cgas, and PLIC consistently in ghost cells
    abstract interface
-      subroutine vof_bc_iface(solver, lvl, dir, side, pVF, pCliq, pCgas, pPLIC, ilo, ihi, jlo, jhi, klo, khi)
+      subroutine vof_bc_iface(solver, lvl, time, dir, side, pVF, pCliq, pCgas, pPLIC, ilo, ihi, jlo, jhi, klo, khi)
          import :: amrvof, WP
          class(amrvof), intent(inout) :: solver
          integer, intent(in) :: lvl       !< Level
+         real(WP), intent(in) :: time     !< Current simulation time
          integer, intent(in) :: dir       !< Direction (1=x, 2=y, 3=z)
          integer, intent(in) :: side      !< Side (-1=lo, +1=hi)
          real(WP), dimension(:,:,:,:), contiguous, intent(inout) :: pVF, pCliq, pCgas, pPLIC
@@ -340,7 +341,7 @@ contains
       ! Call user init to set VF
       if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
       ! Fill moment ghosts (needed for tagging)
-      call this%fill_moments(lvl)
+      call this%fill_moments(lvl, time)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -363,7 +364,7 @@ contains
       call this%Cgasold%reset_level(lvl, ba, dm)
       call this%PLICold%reset_level(lvl, ba, dm)
       ! Fill moment ghosts
-      call this%fill_moments(lvl)
+      call this%fill_moments(lvl, time)
    contains
       !> Set PLIC to trivial planes based on VF
       subroutine set_trivial_plic()
@@ -409,7 +410,7 @@ contains
       call this%Cgasold%reset_level(lvl, ba, dm)
       call this%PLICold%reset_level(lvl, ba, dm)
       ! Fill moment ghosts
-      call this%fill_moments(lvl)
+      call this%fill_moments(lvl, time)
    contains
       !> Set PLIC to trivial for pure cells
       subroutine fix_pure_plic()
@@ -482,9 +483,10 @@ contains
 
    !> Fill VF/Cliq/Cgas ghosts at a level (sync + periodic correction + physical BC)
    !> Also sets PLIC for BC_LIQ/BC_GAS/BC_USER. BC_REFLECT PLIC is deferred to build_plic.
-   subroutine fill_moments(this, lvl)
+   subroutine fill_moments(this, lvl, time)
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
       
       ! Sync ghosts (periodic + MPI)
       call this%VF%sync_lvl(lvl)
@@ -680,39 +682,38 @@ contains
             ! X-boundaries
             if (.not.this%amr%xper) then
                if (ilo.lt.dlo(1)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 1, -1, this%bc_xlo, &
-               &   ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), dx, dy, dz, this%amr%xlo, .false.)
+               &   ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), dx, dy, dz)
                if (ihi.gt.dhi(1)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 1, +1, this%bc_xhi, &
-               &   dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), dx, dy, dz, this%amr%xhi, .false.)
+               &   dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), dx, dy, dz)
             end if
             
             ! Y-boundaries
             if (.not.this%amr%yper) then
                if (jlo.lt.dlo(2)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 2, -1, this%bc_ylo, &
-               &   ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), dx, dy, dz, this%amr%ylo, .false.)
+               &   ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), dx, dy, dz)
                if (jhi.gt.dhi(2)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 2, +1, this%bc_yhi, &
-               &   ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), dx, dy, dz, this%amr%yhi, .false.)
+               &   ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), dx, dy, dz)
             end if
             
             ! Z-boundaries
             if (.not.this%amr%zper) then
                if (klo.lt.dlo(3)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 3, -1, this%bc_zlo, &
-               &   ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), dx, dy, dz, this%amr%zlo, .false.)
+               &   ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), dx, dy, dz)
                if (khi.gt.dhi(3)) call apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, 3, +1, this%bc_zhi, &
-               &   ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), dx, dy, dz, this%amr%zhi, .false.)
+               &   ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), dx, dy, dz)
             end if
             
          end do
          call mfi%destroy()
       end subroutine apply_vof_bc
       
-      !> Apply BC to all four fields on a single face
-      !> set_plic_reflect: if true and BC_REFLECT, also set PLIC (called from build_plic)
+      !> Apply BC to VF/Cliq/Cgas on a single face; PLIC for BC_LIQ/BC_GAS/BC_USER only
+      !> BC_REFLECT PLIC is handled separately in build_plic via apply_reflect_plic
       subroutine apply_vof_bc_face(pVF, pCliq, pCgas, pPLIC, dir, side, bc_type, &
-      &   i1, i2, j1, j2, k1, k2, bnd, dx, dy, dz, x_bnd, set_plic_reflect)
+      &   i1, i2, j1, j2, k1, k2, bnd, dx, dy, dz)
          real(WP), dimension(:,:,:,:), contiguous, intent(inout) :: pVF, pCliq, pCgas, pPLIC
          integer, intent(in) :: dir, side, bc_type, i1, i2, j1, j2, k1, k2, bnd
-         real(WP), intent(in) :: dx, dy, dz, x_bnd
-         logical, intent(in) :: set_plic_reflect
+         real(WP), intent(in) :: dx, dy, dz
          integer :: ig, jg, kg, isrc, jsrc, ksrc
          real(WP), dimension(3) :: center
          
@@ -743,28 +744,20 @@ contains
             end do; end do; end do
             
           case (BC_REFLECT)
-            ! Mirror moments from interior
+            ! Mirror VF/Cliq/Cgas only; PLIC handled by build_plic
             do kg = k1, k2; do jg = j1, j2; do ig = i1, i2
                isrc = ig; jsrc = jg; ksrc = kg
                if (dir.eq.1) isrc = 2*bnd - ig - side
                if (dir.eq.2) jsrc = 2*bnd - jg - side
                if (dir.eq.3) ksrc = 2*bnd - kg - side
-               ! Copy VF (symmetric)
                pVF(ig,jg,kg,1) = pVF(isrc,jsrc,ksrc,1)
-               ! Copy barycenters (will be mirrored)
                pCliq(ig,jg,kg,1:3) = pCliq(isrc,jsrc,ksrc,1:3)
                pCgas(ig,jg,kg,1:3) = pCgas(isrc,jsrc,ksrc,1:3)
-               ! PLIC is only set if requested (after build_plic computes valid PLIC)
-               if (set_plic_reflect) then
-                  pPLIC(ig,jg,kg,1:4) = pPLIC(isrc,jsrc,ksrc,1:4)
-                  pPLIC(ig,jg,kg,dir) = -pPLIC(ig,jg,kg,dir)
-                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) - 2.0_WP*pPLIC(isrc,jsrc,ksrc,dir)*x_bnd
-               end if
             end do; end do; end do
             
           case (BC_USER)
             if (associated(this%user_vof_bc)) then
-               call this%user_vof_bc(this, lvl, dir, side, pVF, pCliq, pCgas, pPLIC, i1, i2, j1, j2, k1, k2)
+               call this%user_vof_bc(this, lvl, time, dir, side, pVF, pCliq, pCgas, pPLIC, i1, i2, j1, j2, k1, k2)
             end if
             
           case default
@@ -1251,19 +1244,18 @@ contains
 
    !> Advect VF using staggered velocity field (U at x-faces, V at y-faces, W at z-faces)
    !> User must provide MultiFabs at finest level with >= 2 ghost cells filled
-   subroutine advance_vof_stag(this, U, V, W, dt)
-      use amrvof_geometry, only: cut_hex_vol
+   subroutine advance_vof_stag(this, U, V, W, dt, time)
+      use amrvof_geometry, only: cut_tet_vol
       use amrex_amr_module, only: amrex_multifab
       class(amrvof), intent(inout) :: this
       type(amrex_multifab), intent(in) :: U, V, W
       real(WP), intent(in) :: dt
+      real(WP), intent(in) :: time
       integer :: lvl, i, j, k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold, pCliqold, pCgasold, pPLICold
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
       real(WP), dimension(:,:,:,:), allocatable :: Fx, Fy, Fz  ! Volume fluxes (Lvol, Gvol, Lbar(3), Gbar(3))
-      real(WP), dimension(3,9) :: face
-      real(WP), dimension(3) :: normal
       real(WP) :: Lvol_old, Gvol_old, Lvol_new, Gvol_new, Lvol_flux, Gvol_flux
       real(WP), dimension(3) :: Lbar_old, Gbar_old, Lbar_new, Gbar_new, Lbar_flux, Gbar_flux
       real(WP) :: dx, dy, dz, vol, face_vel
@@ -1394,7 +1386,7 @@ contains
       call mfi%destroy()
       
       ! Sync and apply BC
-      call this%fill_moments(lvl)
+      call this%fill_moments(lvl, time)
       
    contains
       
@@ -1713,12 +1705,13 @@ contains
 
    !> Advect VF using collocated velocity field (U, V, W all at cell centers)
    !> User must provide MultiFabs at finest level with >= 2 ghost cells filled
-   subroutine advance_vof_col(this, U, V, W, dt)
+   subroutine advance_vof_col(this, U, V, W, dt, time)
       use amrvof_geometry, only: cut_tet_vol
       use amrex_amr_module, only: amrex_multifab
       class(amrvof), intent(inout) :: this
       type(amrex_multifab), intent(in) :: U, V, W
       real(WP), intent(in) :: dt
+      real(WP), intent(in) :: time
       integer :: lvl, i, j, k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold, pCliqold, pCgasold, pPLICold
@@ -1844,7 +1837,7 @@ contains
       end do
       call mfi%destroy()
       
-      call this%fill_moments(lvl)
+      call this%fill_moments(lvl, time)
       
    contains
       
