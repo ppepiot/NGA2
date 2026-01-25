@@ -874,7 +874,7 @@ contains
          call this%amr%mfab_build(lvl, Ufill, ncomp=1, nover=1, atface=[.true. ,.false.,.false.])
          call this%amr%mfab_build(lvl, Vfill, ncomp=1, nover=1, atface=[.false.,.true. ,.false.])
          call this%amr%mfab_build(lvl, Wfill, ncomp=1, nover=1, atface=[.false.,.false.,.true. ])
-         call this%fill_velocity_mfab(Udest=Ufill, Vdest=Vfill, Wdest=Wfill, lvl=lvl, time=0.0_WP)
+         call this%fill_velocity_mfab(Udest=Ufill, Vdest=Vfill, Wdest=Wfill, lvl=lvl, time=0.0_WP)  ! TODO: cascade actual time for time-dependent BCs
 
          ! MFIter loop: compute all 9 fluxes
          call this%amr%mfiter_build(lvl, mfi)
