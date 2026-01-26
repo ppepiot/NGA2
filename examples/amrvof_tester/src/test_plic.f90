@@ -27,9 +27,6 @@ module mod_test_plic
    ! Visualization
    type(amrviz), allocatable :: viz
 
-   ! Monitoring
-   type(monitor) :: mfile
-
    ! Test results
    real(WP) :: min_dot_product, max_dot_product, avg_dot_product
    integer  :: ncells_interface
@@ -277,22 +274,11 @@ contains
          call log("  Visualization output written to plic_test/")
       end block create_visualization
 
-      ! Create summary monitor
-      create_monitor: block
-         mfile = monitor(amRoot=amr%amRoot, name='plic_test')
-         call mfile%add_column(ncells_interface, 'Interface_cells')
-         call mfile%add_column(min_dot_product, 'Min_dot')
-         call mfile%add_column(max_dot_product, 'Max_dot')
-         call mfile%add_column(avg_dot_product, 'Avg_dot')
-         call mfile%write()
-      end block create_monitor
-
       ! Cleanup
       cleanup: block
          call viz%finalize()
          call vof%finalize()
          call amr%finalize()
-         call mfile%finalize()
          call time%finalize()
          deallocate(viz, vof, amr)
       end block cleanup
