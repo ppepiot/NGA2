@@ -258,6 +258,33 @@ contains
          end if
       end block check_normals
 
+      ! Test reset_moments round-trip: PLIC -> reset_moments -> VF should match original
+      test_reset_moments: block
+         real(WP) :: VF_max_err
+         
+         call log("=== Testing reset_moments round-trip ===")
+         
+         ! Copy VF to VFold before reset
+         call vof%VFold%copy(vof%VF)
+         
+         ! Call reset_moments: recomputes VF from PLIC
+         call vof%reset_moments()
+         call log("  Called reset_moments")
+         
+         ! Compute error: VFold = VFold - VF, then get L-inf norm on finest level
+         call vof%VFold%saxpy(-1.0_WP, vof%VF)
+         VF_max_err = vof%VFold%norm0(lvl=amr%clvl())
+         call log("  Max per-cell VF error: "//trim(rtoa(VF_max_err)))
+         
+         if (VF_max_err .lt. 1.0e-12_WP) then
+            call log("  [PASS] reset_moments preserves VF (max cell error < 1e-12)")
+         else if (VF_max_err .lt. 1.0e-6_WP) then
+            call log("  [WARN] reset_moments has small VF error: "//trim(rtoa(VF_max_err)))
+         else
+            call log("  [FAIL] reset_moments does not preserve VF (max error="//trim(rtoa(VF_max_err))//")")
+         end if
+      end block test_reset_moments
+
       ! Create visualization for manual verification
       create_visualization: block
          allocate(viz)
