@@ -14,6 +14,7 @@ contains
    !> Run selected test(s)
    subroutine simulation_run()
       use mod_test_geometry, only: test_geometry
+      use mod_test_plic,     only: test_plic
       character(len=32) :: test_name
 
       call log("Simulation Run: AMRVOF Tester")
@@ -24,10 +25,13 @@ contains
       select case (trim(test_name))
        case ('geometry')
          call test_geometry()
+       case ('plic')
+         call test_plic()
        case ('all')
          call test_geometry()
+         call test_plic()
        case default
-         call die('Unknown test: '//trim(test_name)//'. Valid: geometry, all')
+         call die('Unknown test: '//trim(test_name)//'. Valid: geometry, plic, all')
       end select
    end subroutine simulation_run
 

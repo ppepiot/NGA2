@@ -462,23 +462,23 @@ contains
       call this%average_down_moments(lbase)
    end subroutine post_regrid
 
-   !> Average down VF/Cliq/Cgas from finest to lbase, with ghost fill at each level
+   !> Average down VF/Cliq/Cgas from finest to lbase, then sync ghost cells
    subroutine average_down_moments(this, lbase)
       use amrex_interface, only: amrmfab_average_down_cell
       class(amrvof), intent(inout) :: this
       integer, intent(in), optional :: lbase
-      integer :: lvl, lb, ng
+      integer :: lvl, lb
       lb = 0; if (present(lbase)) lb = lbase
-      ng = this%VF%ng
+      ! Average valid cells from fine to coarse
       do lvl = this%amr%clvl()-1, lb, -1
-         ! Average from fine and fill ghosts using ngcrse
-         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1), cmf=this%VF%mf(lvl), &
-         &   rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl), ngcrse=ng)
-         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1), cmf=this%Cliq%mf(lvl), &
-         &   rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl), ngcrse=ng)
-         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1), cmf=this%Cgas%mf(lvl), &
-         &   rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl), ngcrse=ng)
+         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1)  , cmf=this%VF%mf(lvl)  , rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1), cmf=this%Cliq%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1), cmf=this%Cgas%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
       end do
+      ! Sync ghost cells on all levels (fills from valid neighbors)
+      call this%VF%sync()
+      call this%Cliq%sync()
+      call this%Cgas%sync()
    end subroutine average_down_moments
 
    !> Fill VF/Cliq/Cgas ghosts at a level (sync + periodic correction + physical BC)
