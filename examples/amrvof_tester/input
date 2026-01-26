@@ -1,0 +1,8 @@
+# Select which test to run
+Test: geometry
+
+# Mesh parameters (for future tests)
+Base nx: 32
+Base ny: 32
+Base nz: 32
+Max level: 0

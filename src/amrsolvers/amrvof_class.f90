@@ -2,7 +2,7 @@
 !> Provides Volume-of-Fluid advection for two-phase flow with AMReX
 !> IRL-free implementation using native cutting geometry
 module amrvof_class
-   use iso_c_binding,    only: c_ptr, c_null_ptr, c_loc, c_f_pointer
+   use iso_c_binding,    only: c_ptr, c_null_ptr, c_loc, c_f_pointer, c_char
    use precision,        only: WP
    use string,           only: str_medium
    use amrgrid_class,    only: amrgrid
@@ -192,11 +192,11 @@ contains
       
       ! Tag cells at interface using 3x3x3 stencil
       tba = tags
-      call mfi%build(this%VF%mf(lvl), tiling=.false.)
+      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
       do while (mfi%next())
          bx = mfi%tilebox()
          tagarr => tba%dataPtr(mfi)
-         pVF => this%VF%dataptr(mfi)
+         pVF => this%VF%mf(lvl)%dataptr(mfi)
          
          do k = bx%lo(3), bx%hi(3)
             do j = bx%lo(2), bx%hi(2)
@@ -232,7 +232,7 @@ contains
             end do
          end do
       end do
-      call mfi%destroy()
+      call this%amr%mfiter_destroy(mfi)
       
       ! Call user tagging if provided
       if (associated(this%user_tagging)) call this%user_tagging(this, lvl, tags, time)
@@ -372,11 +372,11 @@ contains
          type(amrex_box) :: bx
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pPLIC
          integer :: i, j, k
-         call mfi%build(this%VF%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
          do while (mfi%next())
             bx = mfi%tilebox()
-            pVF => this%VF%dataptr(mfi)
-            pPLIC => this%PLIC%dataptr(mfi)
+            pVF => this%VF%mf(lvl)%dataptr(mfi)
+            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
             do k = bx%lo(3), bx%hi(3)
                do j = bx%lo(2), bx%hi(2)
                   do i = bx%lo(1), bx%hi(1)
@@ -386,7 +386,7 @@ contains
                end do
             end do
          end do
-         call mfi%destroy()
+         call this%amr%mfiter_destroy(mfi)
       end subroutine set_trivial_plic
    end subroutine on_coarse
 
@@ -419,11 +419,11 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pPLIC
          integer :: i, j, k
          real(WP) :: vf
-         call mfi%build(this%VF%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
          do while (mfi%next())
             bx = mfi%tilebox()
-            pVF => this%VF%dataptr(mfi)
-            pPLIC => this%PLIC%dataptr(mfi)
+            pVF => this%VF%mf(lvl)%dataptr(mfi)
+            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
             do k = bx%lo(3), bx%hi(3)
                do j = bx%lo(2), bx%hi(2)
                   do i = bx%lo(1), bx%hi(1)
@@ -436,7 +436,7 @@ contains
                end do
             end do
          end do
-         call mfi%destroy()
+         call this%amr%mfiter_destroy(mfi)
       end subroutine fix_pure_plic
    end subroutine on_remake
 
@@ -521,10 +521,10 @@ contains
          yL = this%amr%yhi - this%amr%ylo
          zL = this%amr%zhi - this%amr%zlo
          
-         call mfi%build(this%Cliq%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
          do while (mfi%next())
-            pCliq => this%Cliq%dataptr(mfi)
-            pCgas => this%Cgas%dataptr(mfi)
+            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
             ilo = lbound(pCliq,1); ihi = ubound(pCliq,1)
             jlo = lbound(pCliq,2); jhi = ubound(pCliq,2)
             klo = lbound(pCliq,3); khi = ubound(pCliq,3)
@@ -578,7 +578,7 @@ contains
             end if
             
          end do
-         call mfi%destroy()
+         call this%amr%mfiter_destroy(mfi)
       end subroutine correct_periodic_barycenters
       
       !> Correct PLIC plane distance in periodic ghost cells
@@ -599,9 +599,9 @@ contains
          yL = this%amr%yhi - this%amr%ylo
          zL = this%amr%zhi - this%amr%zlo
          
-         call mfi%build(this%PLIC%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
          do while (mfi%next())
-            pP => this%PLIC%dataptr(mfi)
+            pP => this%PLIC%mf(lvl)%dataptr(mfi)
             ilo = lbound(pP,1); ihi = ubound(pP,1)
             jlo = lbound(pP,2); jhi = ubound(pP,2)
             klo = lbound(pP,3); khi = ubound(pP,3)
@@ -649,7 +649,7 @@ contains
             end if
             
          end do
-         call mfi%destroy()
+         call this%amr%mfiter_destroy(mfi)
       end subroutine correct_periodic_plic
       
       !> Apply physical BC to VF/Cliq/Cgas/PLIC at domain boundaries
@@ -669,12 +669,12 @@ contains
          dy = this%amr%dy(lvl)
          dz = this%amr%dz(lvl)
          
-         call mfi%build(this%VF%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
          do while (mfi%next())
-            pVF => this%VF%dataptr(mfi)
-            pCliq => this%Cliq%dataptr(mfi)
-            pCgas => this%Cgas%dataptr(mfi)
-            pPLIC => this%PLIC%dataptr(mfi)
+            pVF => this%VF%mf(lvl)%dataptr(mfi)
+            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
             ilo = lbound(pVF,1); ihi = ubound(pVF,1)
             jlo = lbound(pVF,2); jhi = ubound(pVF,2)
             klo = lbound(pVF,3); khi = ubound(pVF,3)
@@ -704,7 +704,7 @@ contains
             end if
             
          end do
-         call mfi%destroy()
+         call this%amr%mfiter_destroy(mfi)
       end subroutine apply_vof_bc
       
       !> Apply BC to VF/Cliq/Cgas on a single face; PLIC for BC_LIQ/BC_GAS/BC_USER only
@@ -814,15 +814,15 @@ contains
       dz = this%amr%dz(lvl)
       
       ! Iterate over boxes at this level
-      call mfi%build(this%VF%mf(lvl), tiling=this%amr%default_tiling)
+      call this%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
          
          ! Get pointers (with ghost cells for stencil access)
-         pVF   => this%VF%dataptr(mfi)
-         pCliq => this%Cliq%dataptr(mfi)
-         pCgas => this%Cgas%dataptr(mfi)
-         pPLIC => this%PLIC%dataptr(mfi)
+         pVF   => this%VF%mf(lvl)%dataptr(mfi)
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
          
          ! Loop over cells in this box
          do k = bx%lo(3), bx%hi(3)
@@ -953,7 +953,7 @@ contains
          end do
          
       end do
-      call mfi%destroy()
+      call this%amr%mfiter_destroy(mfi)
       
       ! Sync PLIC ghost cells at finest level
       call this%PLIC%sync_lvl(lvl)
@@ -988,9 +988,9 @@ contains
          yL = this%amr%yhi - this%amr%ylo
          zL = this%amr%zhi - this%amr%zlo
          
-         call mfi2%build(this%PLIC%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi2, tiling=.false.)
          do while (mfi2%next())
-            pP => this%PLIC%dataptr(mfi2)
+            pP => this%PLIC%mf(lvl)%dataptr(mfi2)
             ilo = lbound(pP,1); ihi = ubound(pP,1)
             jlo = lbound(pP,2); jhi = ubound(pP,2)
             klo = lbound(pP,3); khi = ubound(pP,3)
@@ -1064,7 +1064,7 @@ contains
             end if
             
          end do
-         call mfi2%destroy()
+         call this%amr%mfiter_destroy(mfi2)
          
       end subroutine correct_periodic_plic
       
@@ -1081,9 +1081,9 @@ contains
          dlo = geom%domain%lo
          dhi = geom%domain%hi
          
-         call mfi3%build(this%PLIC%mf(lvl), tiling=.false.)
+         call this%amr%mfiter_build(lvl, mfi3, tiling=.false.)
          do while (mfi3%next())
-            pP => this%PLIC%dataptr(mfi3)
+            pP => this%PLIC%mf(lvl)%dataptr(mfi3)
             ilo = lbound(pP,1); ihi = ubound(pP,1)
             jlo = lbound(pP,2); jhi = ubound(pP,2)
             klo = lbound(pP,3); khi = ubound(pP,3)
@@ -1119,7 +1119,7 @@ contains
             end if
             
          end do
-         call mfi3%destroy()
+         call this%amr%mfiter_destroy(mfi3)
          
       end subroutine apply_plic_bc
       
@@ -1171,14 +1171,14 @@ contains
       cell_vol = dx * dy * dz
       
       ! Use tiling=.false. to iterate over full FABs including ghosts
-      call mfi%build(this%VF%mf(lvl), tiling=.false.)
+      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
       do while (mfi%next())
          bx = mfi%fabbox()  ! Full box including ghosts
          
-         pVF   => this%VF%dataptr(mfi)
-         pCliq => this%Cliq%dataptr(mfi)
-         pCgas => this%Cgas%dataptr(mfi)
-         pPLIC => this%PLIC%dataptr(mfi)
+         pVF   => this%VF%mf(lvl)%dataptr(mfi)
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
          
          ! Get array bounds (same as bx but from array)
          ilo = lbound(pVF,1); ihi = ubound(pVF,1)
@@ -1235,7 +1235,7 @@ contains
          end do
          
       end do
-      call mfi%destroy()
+      call this%amr%mfiter_destroy(mfi)
       
       ! Average down to coarse levels (uses ghost-capable average_down)
       call this%average_down_moments()
@@ -1262,6 +1262,20 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       integer :: ilo, ihi, jlo, jhi, klo, khi
+      ! Shared variables for internal functions
+      real(WP), dimension(3,9) :: face     ! 4 current + 4 projected + 1 center
+      real(WP) :: dxi, dyi, dzi
+      integer :: ilo_, ihi_, jlo_, jhi_, klo_, khi_  ! Velocity bounds
+      ! 8-tet decomposition of 9-point polyhedron (from noirl)
+      integer, dimension(4,8), parameter :: tet_map = reshape([ &
+         7, 4, 3, 6, &
+         6, 3, 2, 4, &
+         6, 2, 1, 4, &
+         7, 8, 4, 6, &
+         6, 5, 8, 4, &
+         6, 5, 4, 1, &
+         5, 6, 8, 9, &
+         6, 7, 8, 9], shape(tet_map))
       
       ! Only advect at finest level
       lvl = this%amr%clvl()
@@ -1278,19 +1292,19 @@ contains
       vol = dx * dy * dz
       
       ! Iterate over boxes
-      call mfi%build(this%VF%mf(lvl), tiling=.false.)
+      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
       do while (mfi%next())
          bx = mfi%tilebox()
          
          ! Get pointers
-         pVF => this%VF%dataptr(mfi)
-         pCliq => this%Cliq%dataptr(mfi)
-         pCgas => this%Cgas%dataptr(mfi)
-         pPLIC => this%PLIC%dataptr(mfi)
-         pVFold => this%VFold%dataptr(mfi)
-         pCliqold => this%Cliqold%dataptr(mfi)
-         pCgasold => this%Cgasold%dataptr(mfi)
-         pPLICold => this%PLICold%dataptr(mfi)
+         pVF => this%VF%mf(lvl)%dataptr(mfi)
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         pVFold => this%VFold%mf(lvl)%dataptr(mfi)
+         pCliqold => this%Cliqold%mf(lvl)%dataptr(mfi)
+         pCgasold => this%Cgasold%mf(lvl)%dataptr(mfi)
+         pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
          pU => U%dataptr(mfi)
          pV => V%dataptr(mfi)
          pW => W%dataptr(mfi)
@@ -1383,7 +1397,7 @@ contains
          
          deallocate(Fx, Fy, Fz)
       end do
-      call mfi%destroy()
+      call this%amr%mfiter_destroy(mfi)
       
       ! Sync and apply BC
       call this%fill_moments(lvl, time)
@@ -1398,26 +1412,13 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, intent(in) :: pVFold, pCliqold, pCgasold, pPLICold
          real(WP), dimension(:,:,:,:), contiguous, intent(in) :: pU, pV, pW
          real(WP), dimension(8), intent(out) :: flux
-         real(WP), dimension(3,9) :: face     ! 4 current + 4 projected + 1 center
          real(WP), dimension(3,4) :: tetra    ! Single tet for cutting
          real(WP), dimension(3) :: normal, a, b, c
          real(WP) :: d, vol_expected, signed_vol, vol_liq, vol_gas
          real(WP), dimension(3) :: Lbar, Gbar, tet_Lbar, tet_Gbar
          integer :: src_i, src_j, src_k, ntet, nn
-         integer :: ilo_, ihi_, jlo_, jhi_, klo_, khi_  ! Velocity bounds
-         real(WP) :: dxi, dyi, dzi
          real(WP) :: total_Lvol, total_Gvol, tet_sign_val
          real(WP), dimension(3) :: total_Lbar, total_Gbar
-         ! 8-tet decomposition of 9-point polyhedron (from noirl)
-         integer, dimension(4,8), parameter :: tet_map = reshape([ &
-            7, 4, 3, 6, &
-            6, 3, 2, 4, &
-            6, 2, 1, 4, &
-            7, 8, 4, 6, &
-            6, 5, 8, 4, &
-            6, 5, 4, 1, &
-            5, 6, 8, 9, &
-            6, 7, 8, 9], shape(tet_map))
          
          flux = 0.0_WP
          
@@ -1542,164 +1543,162 @@ contains
          flux(3:5) = total_Lbar * total_Lvol
          flux(6:8) = total_Gbar * total_Gvol
          
-      contains
-         
-         !> RK2 vertex projection back in time
-         function project(p1, mydt) result(p2)
-            real(WP), dimension(3), intent(in) :: p1
-            real(WP), intent(in) :: mydt
-            real(WP), dimension(3) :: p2, vel1, vel_mid
-            vel1 = interp_velocity_stag(p1)
-            p2 = p1 + mydt * vel1
-            vel_mid = interp_velocity_stag(0.5_WP * (p1 + p2))
-            p2 = p1 + mydt * vel_mid
-         end function project
-         
-         !> Trilinear interpolation of staggered velocity with index clipping
-         function interp_velocity_stag(pos) result(vel)
-            real(WP), dimension(3), intent(in) :: pos
-            real(WP), dimension(3) :: vel
-            integer :: ipc, jpc, kpc, ipu, jpv, kpw
-            real(WP) :: wxc1, wyc1, wzc1, wxc2, wyc2, wzc2
-            real(WP) :: wxu1, wyv1, wzw1, wxu2, wyv2, wzw2
-            
-            ! Cell-centered indices and weights
-            ipc = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
-            jpc = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
-            kpc = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
-            wxc1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + (real(ipc,WP)+0.5_WP)*dx)) * dxi + 0.5_WP))
-            wyc1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + (real(jpc,WP)+0.5_WP)*dy)) * dyi + 0.5_WP))
-            wzc1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + (real(kpc,WP)+0.5_WP)*dz)) * dzi + 0.5_WP))
-            wxc2 = 1.0_WP - wxc1; wyc2 = 1.0_WP - wyc1; wzc2 = 1.0_WP - wzc1
-            
-            ! Face-centered indices and weights
-            ipu = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
-            jpv = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
-            kpw = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
-            wxu1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + real(ipu,WP)*dx)) * dxi))
-            wyv1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + real(jpv,WP)*dy)) * dyi))
-            wzw1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + real(kpw,WP)*dz)) * dzi))
-            wxu2 = 1.0_WP - wxu1; wyv2 = 1.0_WP - wyv1; wzw2 = 1.0_WP - wzw1
-            
-            ! Trilinear interpolation of U (staggered in x)
-            vel(1) = wzc1*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc+1,1)+wxu2*pU(ipu,jpc+1,kpc+1,1)) + &
-            &             wyc2*(wxu1*pU(ipu+1,jpc  ,kpc+1,1)+wxu2*pU(ipu,jpc  ,kpc+1,1))) + &
-            &        wzc2*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc  ,1)+wxu2*pU(ipu,jpc+1,kpc  ,1)) + &
-            &             wyc2*(wxu1*pU(ipu+1,jpc  ,kpc  ,1)+wxu2*pU(ipu,jpc  ,kpc  ,1)))
-            ! Trilinear interpolation of V (staggered in y)
-            vel(2) = wzc1*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc+1,1)+wxc2*pV(ipc,jpv+1,kpc+1,1)) + &
-            &             wyv2*(wxc1*pV(ipc+1,jpv  ,kpc+1,1)+wxc2*pV(ipc,jpv  ,kpc+1,1))) + &
-            &        wzc2*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc  ,1)+wxc2*pV(ipc,jpv+1,kpc  ,1)) + &
-            &             wyv2*(wxc1*pV(ipc+1,jpv  ,kpc  ,1)+wxc2*pV(ipc,jpv  ,kpc  ,1)))
-            ! Trilinear interpolation of W (staggered in z)
-            vel(3) = wzw1*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw+1,1)+wxc2*pW(ipc,jpc+1,kpw+1,1)) + &
-            &             wyc2*(wxc1*pW(ipc+1,jpc  ,kpw+1,1)+wxc2*pW(ipc,jpc  ,kpw+1,1))) + &
-            &        wzw2*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw  ,1)+wxc2*pW(ipc,jpc+1,kpw  ,1)) + &
-            &             wyc2*(wxc1*pW(ipc+1,jpc  ,kpw  ,1)+wxc2*pW(ipc,jpc  ,kpw  ,1)))
-         end function interp_velocity_stag
-         
-         !> Volume correction for X-flux (analytical from noirl)
-         subroutine volume_correct_x(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: ntet
-            ! Compute current volume mismatch using first 6 tets
-            do ntet = 1, 6
-               va = face(:,tet_map(1,ntet)) - face(:,tet_map(4,ntet))
-               vb = face(:,tet_map(2,ntet)) - face(:,tet_map(4,ntet))
-               vc = face(:,tet_map(3,ntet)) - face(:,tet_map(4,ntet))
-               volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            ! Analytical correction for x-component of 9th point
-            face(1,9) = (-6.0_WP*volume + face(1,5)*((face(2,8)-face(2,9))*(face(3,6)-face(3,9))-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))) + &
-            &   face(2,5)*((face(3,8)-face(3,9))*face(1,6)-(face(3,6)-face(3,9))*face(1,8)) + &
-            &   face(2,9)*((face(3,6)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,6)) + &
-            &   face(3,5)*((face(2,6)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,6)) + &
-            &   face(3,9)*((face(2,8)-face(2,9))*face(1,6)-(face(2,6)-face(2,9))*face(1,8)) + &
-            &   face(1,6)*((face(2,8)-face(2,9))*(face(3,7)-face(3,9))-(face(2,7)-face(2,9))*(face(3,8)-face(3,9))) + &
-            &   face(2,6)*((face(3,8)-face(3,9))*face(1,7)-(face(3,7)-face(3,9))*face(1,8)) + &
-            &   face(2,9)*((face(3,7)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,7)) + &
-            &   face(3,6)*((face(2,7)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,7)) + &
-            &   face(3,9)*((face(2,8)-face(2,9))*face(1,7)-(face(2,7)-face(2,9))*face(1,8))) / &
-            &  (-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,6)-face(3,9)) - &
-            &   face(2,5)*(face(3,6)-face(3,9))+face(2,5)*(face(3,8)-face(3,9))+face(2,9)*(face(3,6)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
-            &   face(3,5)*(face(2,8)-face(2,9))+face(3,5)*(face(2,6)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,6)-face(2,9)) - &
-            &   (face(2,7)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,7)-face(3,9)) - &
-            &   face(2,6)*(face(3,7)-face(3,9))+face(2,6)*(face(3,8)-face(3,9))+face(2,9)*(face(3,7)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
-            &   face(3,6)*(face(2,8)-face(2,9))+face(3,6)*(face(2,7)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,7)-face(2,9)))
-            face(2,9) = 0.25_WP * sum(face(2,5:8))
-            face(3,9) = 0.25_WP * sum(face(3,5:8))
-         end subroutine volume_correct_x
-         
-         !> Volume correction for Y-flux (analytical from noirl)
-         subroutine volume_correct_y(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: ntet
-            ! Compute current volume mismatch (negative sign for Y)
-            do ntet = 1, 6
-               va = face(:,tet_map(1,ntet)) - face(:,tet_map(4,ntet))
-               vb = face(:,tet_map(2,ntet)) - face(:,tet_map(4,ntet))
-               vc = face(:,tet_map(3,ntet)) - face(:,tet_map(4,ntet))
-               volume = volume - (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            ! Analytical correction for y-component of 9th point
-            face(1,9) = 0.25_WP * sum(face(1,5:8))
-            face(2,9) = (6.0_WP*volume + face(1,5)*((face(3,6)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,6)) + &
-            &   face(1,9)*((face(3,8)-face(3,9))*face(2,6)-(face(3,6)-face(3,9))*face(2,8)) + &
-            &   face(2,5)*((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,5)*((face(1,8)-face(1,9))*face(2,6)-(face(1,6)-face(1,9))*face(2,8)) + &
-            &   face(3,9)*((face(1,6)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,6)) + &
-            &   face(1,6)*((face(3,7)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,7)) + &
-            &   face(1,9)*((face(3,8)-face(3,9))*face(2,7)-(face(3,7)-face(3,9))*face(2,8)) + &
-            &   face(2,6)*((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,6)*((face(1,8)-face(1,9))*face(2,7)-(face(1,7)-face(1,9))*face(2,8)) + &
-            &   face(3,9)*((face(1,7)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,7))) / &
-            &  (face(1,5)*((face(3,6)-face(3,9))-(face(3,8)-face(3,9))) + &
-            &   face(1,9)*((face(3,8)-face(3,9))-(face(3,6)-face(3,9))) + &
-            &   ((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,5)*((face(1,8)-face(1,9))-(face(1,6)-face(1,9)))+face(3,9)*((face(1,6)-face(1,9))-(face(1,8)-face(1,9))) + &
-            &   face(1,9)*((face(3,8)-face(3,9))-(face(3,7)-face(3,9))) + &
-            &   ((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,6)*((face(1,8)-face(1,9))-(face(1,7)-face(1,9)))+face(3,9)*((face(1,7)-face(1,9))-(face(1,8)-face(1,9))))
-            face(3,9) = 0.25_WP * sum(face(3,5:8))
-         end subroutine volume_correct_y
-         
-         !> Volume correction for Z-flux (analytical from noirl)
-         subroutine volume_correct_z(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: ntet
-            ! Compute current volume mismatch
-            do ntet = 1, 6
-               va = face(:,tet_map(1,ntet)) - face(:,tet_map(4,ntet))
-               vb = face(:,tet_map(2,ntet)) - face(:,tet_map(4,ntet))
-               vc = face(:,tet_map(3,ntet)) - face(:,tet_map(4,ntet))
-               volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            ! Analytical correction for z-component
-            face(1,9) = 0.25_WP * sum(face(1,5:8))
-            face(2,9) = 0.25_WP * sum(face(2,5:8))
-            face(3,9) = (6.0_WP*volume + &
-            &   face(1,5)*face(2,6)*face(3,8) - face(1,5)*face(3,6)*face(2,8) - &
-            &   face(2,5)*face(1,6)*face(3,8) + face(2,5)*face(3,6)*face(1,8) + &
-            &   face(3,5)*face(1,6)*face(2,8) - face(3,5)*face(2,6)*face(1,8) + &
-            &   face(1,5)*face(3,6)*face(2,5) - face(2,5)*face(3,6)*face(1,5) - &
-            &   face(3,5)*face(1,6)*face(2,5) + face(3,5)*face(2,6)*face(1,5) + &
-            &   face(1,6)*face(2,7)*face(3,8) - face(1,6)*face(3,7)*face(2,8) - &
-            &   face(2,6)*face(1,7)*face(3,8) + face(2,6)*face(3,7)*face(1,8) + &
-            &   face(3,6)*face(1,7)*face(2,8) - face(3,6)*face(2,7)*face(1,8) - &
-            &   face(1,5)*face(3,8)*face(2,5) + face(2,5)*face(3,8)*face(1,5) + &
-            &   face(3,5)*face(1,8)*face(2,5) - face(3,5)*face(2,8)*face(1,5) + &
-            &   face(1,6)*face(3,7)*face(2,5) - face(2,6)*face(3,7)*face(1,5) - &
-            &   face(3,6)*face(1,7)*face(2,5) + face(3,6)*face(2,7)*face(1,5) + &
-            &   face(1,7)*face(3,8)*face(2,5) - face(2,7)*face(3,8)*face(1,5) - &
-            &   face(3,7)*face(1,8)*face(2,5) + face(3,7)*face(2,8)*face(1,5)) / &
-            &  (face(1,5)*face(2,6) - face(2,5)*face(1,6) - face(1,5)*face(2,8) + face(2,5)*face(1,8) + &
-            &   face(1,6)*face(2,7) - face(2,6)*face(1,7) + face(1,7)*face(2,8) - face(2,7)*face(1,8))
-         end subroutine volume_correct_z
-         
       end subroutine compute_flux_stag
+      
+      !> RK2 vertex projection back in time
+      function project(p1, mydt) result(p2)
+         real(WP), dimension(3), intent(in) :: p1
+         real(WP), intent(in) :: mydt
+         real(WP), dimension(3) :: p2, vel1, vel_mid
+         vel1 = interp_velocity_stag(p1)
+         p2 = p1 + mydt * vel1
+         vel_mid = interp_velocity_stag(0.5_WP * (p1 + p2))
+         p2 = p1 + mydt * vel_mid
+      end function project
+      
+      !> Trilinear interpolation of staggered velocity with index clipping
+      function interp_velocity_stag(pos) result(vel)
+         real(WP), dimension(3), intent(in) :: pos
+         real(WP), dimension(3) :: vel
+         integer :: ipc, jpc, kpc, ipu, jpv, kpw
+         real(WP) :: wxc1, wyc1, wzc1, wxc2, wyc2, wzc2
+         real(WP) :: wxu1, wyv1, wzw1, wxu2, wyv2, wzw2
+         
+         ! Cell-centered indices and weights
+         ipc = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
+         jpc = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
+         kpc = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
+         wxc1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + (real(ipc,WP)+0.5_WP)*dx)) * dxi + 0.5_WP))
+         wyc1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + (real(jpc,WP)+0.5_WP)*dy)) * dyi + 0.5_WP))
+         wzc1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + (real(kpc,WP)+0.5_WP)*dz)) * dzi + 0.5_WP))
+         wxc2 = 1.0_WP - wxc1; wyc2 = 1.0_WP - wyc1; wzc2 = 1.0_WP - wzc1
+         
+         ! Face-centered indices and weights
+         ipu = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
+         jpv = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
+         kpw = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
+         wxu1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + real(ipu,WP)*dx)) * dxi))
+         wyv1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + real(jpv,WP)*dy)) * dyi))
+         wzw1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + real(kpw,WP)*dz)) * dzi))
+         wxu2 = 1.0_WP - wxu1; wyv2 = 1.0_WP - wyv1; wzw2 = 1.0_WP - wzw1
+         
+         ! Trilinear interpolation of U (staggered in x)
+         vel(1) = wzc1*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc+1,1)+wxu2*pU(ipu,jpc+1,kpc+1,1)) + &
+         &             wyc2*(wxu1*pU(ipu+1,jpc  ,kpc+1,1)+wxu2*pU(ipu,jpc  ,kpc+1,1))) + &
+         &        wzc2*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc  ,1)+wxu2*pU(ipu,jpc+1,kpc  ,1)) + &
+         &             wyc2*(wxu1*pU(ipu+1,jpc  ,kpc  ,1)+wxu2*pU(ipu,jpc  ,kpc  ,1)))
+         ! Trilinear interpolation of V (staggered in y)
+         vel(2) = wzc1*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc+1,1)+wxc2*pV(ipc,jpv+1,kpc+1,1)) + &
+         &             wyv2*(wxc1*pV(ipc+1,jpv  ,kpc+1,1)+wxc2*pV(ipc,jpv  ,kpc+1,1))) + &
+         &        wzc2*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc  ,1)+wxc2*pV(ipc,jpv+1,kpc  ,1)) + &
+         &             wyv2*(wxc1*pV(ipc+1,jpv  ,kpc  ,1)+wxc2*pV(ipc,jpv  ,kpc  ,1)))
+         ! Trilinear interpolation of W (staggered in z)
+         vel(3) = wzw1*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw+1,1)+wxc2*pW(ipc,jpc+1,kpw+1,1)) + &
+         &             wyc2*(wxc1*pW(ipc+1,jpc  ,kpw+1,1)+wxc2*pW(ipc,jpc  ,kpw+1,1))) + &
+         &        wzw2*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw  ,1)+wxc2*pW(ipc,jpc+1,kpw  ,1)) + &
+         &             wyc2*(wxc1*pW(ipc+1,jpc  ,kpw  ,1)+wxc2*pW(ipc,jpc  ,kpw  ,1)))
+      end function interp_velocity_stag
+      
+      !> Volume correction for X-flux (analytical from noirl)
+      subroutine volume_correct_x(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: ntet_
+         ! Compute current volume mismatch using first 6 tets
+         do ntet_ = 1, 6
+            va = face(:,tet_map(1,ntet_)) - face(:,tet_map(4,ntet_))
+            vb = face(:,tet_map(2,ntet_)) - face(:,tet_map(4,ntet_))
+            vc = face(:,tet_map(3,ntet_)) - face(:,tet_map(4,ntet_))
+            volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         ! Analytical correction for x-component of 9th point
+         face(1,9) = (-6.0_WP*volume + face(1,5)*((face(2,8)-face(2,9))*(face(3,6)-face(3,9))-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))) + &
+         &   face(2,5)*((face(3,8)-face(3,9))*face(1,6)-(face(3,6)-face(3,9))*face(1,8)) + &
+         &   face(2,9)*((face(3,6)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,6)) + &
+         &   face(3,5)*((face(2,6)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,6)) + &
+         &   face(3,9)*((face(2,8)-face(2,9))*face(1,6)-(face(2,6)-face(2,9))*face(1,8)) + &
+         &   face(1,6)*((face(2,8)-face(2,9))*(face(3,7)-face(3,9))-(face(2,7)-face(2,9))*(face(3,8)-face(3,9))) + &
+         &   face(2,6)*((face(3,8)-face(3,9))*face(1,7)-(face(3,7)-face(3,9))*face(1,8)) + &
+         &   face(2,9)*((face(3,7)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,7)) + &
+         &   face(3,6)*((face(2,7)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,7)) + &
+         &   face(3,9)*((face(2,8)-face(2,9))*face(1,7)-(face(2,7)-face(2,9))*face(1,8))) / &
+         &  (-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,6)-face(3,9)) - &
+         &   face(2,5)*(face(3,6)-face(3,9))+face(2,5)*(face(3,8)-face(3,9))+face(2,9)*(face(3,6)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
+         &   face(3,5)*(face(2,8)-face(2,9))+face(3,5)*(face(2,6)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,6)-face(2,9)) - &
+         &   (face(2,7)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,7)-face(3,9)) - &
+         &   face(2,6)*(face(3,7)-face(3,9))+face(2,6)*(face(3,8)-face(3,9))+face(2,9)*(face(3,7)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
+         &   face(3,6)*(face(2,8)-face(2,9))+face(3,6)*(face(2,7)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,7)-face(2,9)))
+         face(2,9) = 0.25_WP * sum(face(2,5:8))
+         face(3,9) = 0.25_WP * sum(face(3,5:8))
+      end subroutine volume_correct_x
+      
+      !> Volume correction for Y-flux (analytical from noirl)
+      subroutine volume_correct_y(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: ntet_
+         ! Compute current volume mismatch (negative sign for Y)
+         do ntet_ = 1, 6
+            va = face(:,tet_map(1,ntet_)) - face(:,tet_map(4,ntet_))
+            vb = face(:,tet_map(2,ntet_)) - face(:,tet_map(4,ntet_))
+            vc = face(:,tet_map(3,ntet_)) - face(:,tet_map(4,ntet_))
+            volume = volume - (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         ! Analytical correction for y-component of 9th point
+         face(1,9) = 0.25_WP * sum(face(1,5:8))
+         face(2,9) = (6.0_WP*volume + face(1,5)*((face(3,6)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,6)) + &
+         &   face(1,9)*((face(3,8)-face(3,9))*face(2,6)-(face(3,6)-face(3,9))*face(2,8)) + &
+         &   face(2,5)*((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
+         &   face(3,5)*((face(1,8)-face(1,9))*face(2,6)-(face(1,6)-face(1,9))*face(2,8)) + &
+         &   face(3,9)*((face(1,6)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,6)) + &
+         &   face(1,6)*((face(3,7)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,7)) + &
+         &   face(1,9)*((face(3,8)-face(3,9))*face(2,7)-(face(3,7)-face(3,9))*face(2,8)) + &
+         &   face(2,6)*((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
+         &   face(3,6)*((face(1,8)-face(1,9))*face(2,7)-(face(1,7)-face(1,9))*face(2,8)) + &
+         &   face(3,9)*((face(1,7)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,7))) / &
+         &  (face(1,5)*((face(3,6)-face(3,9))-(face(3,8)-face(3,9))) + &
+         &   face(1,9)*((face(3,8)-face(3,9))-(face(3,6)-face(3,9))) + &
+         &   ((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
+         &   face(3,5)*((face(1,8)-face(1,9))-(face(1,6)-face(1,9)))+face(3,9)*((face(1,6)-face(1,9))-(face(1,8)-face(1,9))) + &
+         &   face(1,9)*((face(3,8)-face(3,9))-(face(3,7)-face(3,9))) + &
+         &   ((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
+         &   face(3,6)*((face(1,8)-face(1,9))-(face(1,7)-face(1,9)))+face(3,9)*((face(1,7)-face(1,9))-(face(1,8)-face(1,9))))
+         face(3,9) = 0.25_WP * sum(face(3,5:8))
+      end subroutine volume_correct_y
+      
+      !> Volume correction for Z-flux (analytical from noirl)
+      subroutine volume_correct_z(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: ntet_
+         ! Compute current volume mismatch
+         do ntet_ = 1, 6
+            va = face(:,tet_map(1,ntet_)) - face(:,tet_map(4,ntet_))
+            vb = face(:,tet_map(2,ntet_)) - face(:,tet_map(4,ntet_))
+            vc = face(:,tet_map(3,ntet_)) - face(:,tet_map(4,ntet_))
+            volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         ! Analytical correction for z-component
+         face(1,9) = 0.25_WP * sum(face(1,5:8))
+         face(2,9) = 0.25_WP * sum(face(2,5:8))
+         face(3,9) = (6.0_WP*volume + &
+         &   face(1,5)*face(2,6)*face(3,8) - face(1,5)*face(3,6)*face(2,8) - &
+         &   face(2,5)*face(1,6)*face(3,8) + face(2,5)*face(3,6)*face(1,8) + &
+         &   face(3,5)*face(1,6)*face(2,8) - face(3,5)*face(2,6)*face(1,8) + &
+         &   face(1,5)*face(3,6)*face(2,5) - face(2,5)*face(3,6)*face(1,5) - &
+         &   face(3,5)*face(1,6)*face(2,5) + face(3,5)*face(2,6)*face(1,5) + &
+         &   face(1,6)*face(2,7)*face(3,8) - face(1,6)*face(3,7)*face(2,8) - &
+         &   face(2,6)*face(1,7)*face(3,8) + face(2,6)*face(3,7)*face(1,8) + &
+         &   face(3,6)*face(1,7)*face(2,8) - face(3,6)*face(2,7)*face(1,8) - &
+         &   face(1,5)*face(3,8)*face(2,5) + face(2,5)*face(3,8)*face(1,5) + &
+         &   face(3,5)*face(1,8)*face(2,5) - face(3,5)*face(2,8)*face(1,5) + &
+         &   face(1,6)*face(3,7)*face(2,5) - face(2,6)*face(3,7)*face(1,5) - &
+         &   face(3,6)*face(1,7)*face(2,5) + face(3,6)*face(2,7)*face(1,5) + &
+         &   face(1,7)*face(3,8)*face(2,5) - face(2,7)*face(3,8)*face(1,5) - &
+         &   face(3,7)*face(1,8)*face(2,5) + face(3,7)*face(2,8)*face(1,5)) / &
+         &  (face(1,5)*face(2,6) - face(2,5)*face(1,6) - face(1,5)*face(2,8) + face(2,5)*face(1,8) + &
+         &   face(1,6)*face(2,7) - face(2,6)*face(1,7) + face(1,7)*face(2,8) - face(2,7)*face(1,8))
+      end subroutine volume_correct_z
       
    end subroutine advance_vof_stag
 
@@ -1723,6 +1722,20 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       integer :: ilo, ihi, jlo, jhi, klo, khi
+      ! Shared variables for internal functions
+      real(WP), dimension(3,9) :: face_col    ! 4 current + 4 projected + 1 center
+      real(WP) :: dxi, dyi, dzi
+      integer :: ilo_, ihi_, jlo_, jhi_, klo_, khi_  ! Velocity bounds
+      ! 8-tet decomposition of 9-point polyhedron (from noirl)
+      integer, dimension(4,8), parameter :: tet_map = reshape([ &
+         7, 4, 3, 6, &
+         6, 3, 2, 4, &
+         6, 2, 1, 4, &
+         7, 8, 4, 6, &
+         6, 5, 8, 4, &
+         6, 5, 4, 1, &
+         5, 6, 8, 9, &
+         6, 7, 8, 9], shape(tet_map))
       
       ! Only advect at finest level
       lvl = this%amr%clvl()
@@ -1738,18 +1751,18 @@ contains
       vol = dx * dy * dz
       
       ! Iterate over boxes
-      call mfi%build(this%VF%mf(lvl), tiling=.false.)
+      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
       do while (mfi%next())
          bx = mfi%tilebox()
          
-         pVF => this%VF%dataptr(mfi)
-         pCliq => this%Cliq%dataptr(mfi)
-         pCgas => this%Cgas%dataptr(mfi)
-         pPLIC => this%PLIC%dataptr(mfi)
-         pVFold => this%VFold%dataptr(mfi)
-         pCliqold => this%Cliqold%dataptr(mfi)
-         pCgasold => this%Cgasold%dataptr(mfi)
-         pPLICold => this%PLICold%dataptr(mfi)
+         pVF => this%VF%mf(lvl)%dataptr(mfi)
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         pVFold => this%VFold%mf(lvl)%dataptr(mfi)
+         pCliqold => this%Cliqold%mf(lvl)%dataptr(mfi)
+         pCgasold => this%Cgasold%mf(lvl)%dataptr(mfi)
+         pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
          pU => U%dataptr(mfi)
          pV => V%dataptr(mfi)
          pW => W%dataptr(mfi)
@@ -1835,7 +1848,7 @@ contains
          
          deallocate(Fx, Fy, Fz)
       end do
-      call mfi%destroy()
+      call this%amr%mfiter_destroy(mfi)
       
       call this%fill_moments(lvl, time)
       
@@ -1849,7 +1862,7 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, intent(in) :: pVFold, pCliqold, pCgasold, pPLICold
          real(WP), dimension(:,:,:,:), contiguous, intent(in) :: pU, pV, pW
          real(WP), dimension(8), intent(out) :: flux
-         real(WP), dimension(3,9) :: face
+         ! Use face_col from parent scope for flux polyhedron
          real(WP), dimension(3,4) :: tetra
          real(WP), dimension(3) :: normal, a, b, c
          real(WP) :: d, vol_expected, signed_vol, vol_liq, vol_gas
@@ -1898,36 +1911,36 @@ contains
          
          ! Build face vertices
          if (dir .eq. 1) then
-            face(:,1) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-            face(:,2) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-            face(:,4) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
+            face_col(:,1) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
+            face_col(:,2) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
+            face_col(:,3) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
+            face_col(:,4) = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
             vol_expected = -face_vel * dt * dy * dz
          else if (dir .eq. 2) then
-            face(:,1) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-            face(:,2) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-            face(:,4) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
+            face_col(:,1) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
+            face_col(:,2) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
+            face_col(:,3) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
+            face_col(:,4) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
             vol_expected = -face_vel * dt * dx * dz
          else
-            face(:,1) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k,WP)*dz]
-            face(:,2) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k,WP)*dz]
-            face(:,4) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k,WP)*dz]
+            face_col(:,1) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k,WP)*dz]
+            face_col(:,2) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k,WP)*dz]
+            face_col(:,3) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k,WP)*dz]
+            face_col(:,4) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k,WP)*dz]
             vol_expected = -face_vel * dt * dx * dy
          end if
          
          ! Project vertices back with RK2
-         face(:,5) = project(face(:,1), -dt)
-         face(:,6) = project(face(:,2), -dt)
-         face(:,7) = project(face(:,3), -dt)
-         face(:,8) = project(face(:,4), -dt)
-         face(:,9) = 0.25_WP * (face(:,5) + face(:,6) + face(:,7) + face(:,8))
+         face_col(:,5) = project_col(face_col(:,1), -dt)
+         face_col(:,6) = project_col(face_col(:,2), -dt)
+         face_col(:,7) = project_col(face_col(:,3), -dt)
+         face_col(:,8) = project_col(face_col(:,4), -dt)
+         face_col(:,9) = 0.25_WP * (face_col(:,5) + face_col(:,6) + face_col(:,7) + face_col(:,8))
          
          ! Volume correction
-         if (dir .eq. 1) then; call volume_correct_x(vol_expected)
-         else if (dir .eq. 2) then; call volume_correct_y(vol_expected)
-         else; call volume_correct_z(vol_expected); end if
+         if (dir .eq. 1) then; call volume_correct_x_col(vol_expected)
+         else if (dir .eq. 2) then; call volume_correct_y_col(vol_expected)
+         else; call volume_correct_z_col(vol_expected); end if
          
          normal = pPLICold(src_i,src_j,src_k,1:3)
          d = pPLICold(src_i,src_j,src_k,4)
@@ -1937,7 +1950,7 @@ contains
          total_Lbar = 0.0_WP; total_Gbar = 0.0_WP
          
          do ntet = 1, 8
-            do nn = 1, 4; tetra(:,nn) = face(:,tet_map(nn,ntet)); end do
+            do nn = 1, 4; tetra(:,nn) = face_col(:,tet_map(nn,ntet)); end do
             a = tetra(:,1) - tetra(:,4); b = tetra(:,2) - tetra(:,4); c = tetra(:,3) - tetra(:,4)
             signed_vol = (a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
             tet_sign_val = sign(1.0_WP, -signed_vol)
@@ -1954,129 +1967,129 @@ contains
          flux(1) = total_Lvol; flux(2) = total_Gvol
          flux(3:5) = total_Lbar * total_Lvol; flux(6:8) = total_Gbar * total_Gvol
          
-      contains
-         
-         function project(p1, mydt) result(p2)
-            real(WP), dimension(3), intent(in) :: p1
-            real(WP), intent(in) :: mydt
-            real(WP), dimension(3) :: p2, v1, vm
-            v1 = interp_velocity_col(p1); p2 = p1 + mydt * v1
-            vm = interp_velocity_col(0.5_WP * (p1 + p2)); p2 = p1 + mydt * vm
-         end function project
-         
-         !> Trilinear interpolation of collocated (cell-centered) velocity
-         function interp_velocity_col(pos) result(vel)
-            real(WP), dimension(3), intent(in) :: pos
-            real(WP), dimension(3) :: vel
-            integer :: ip, jp, kp
-            real(WP) :: wx1, wy1, wz1, wx2, wy2, wz2
-            ! Cell-centered indices
-            ip = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
-            jp = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
-            kp = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
-            wx1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + (real(ip,WP)+0.5_WP)*dx)) * dxi + 0.5_WP))
-            wy1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + (real(jp,WP)+0.5_WP)*dy)) * dyi + 0.5_WP))
-            wz1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + (real(kp,WP)+0.5_WP)*dz)) * dzi + 0.5_WP))
-            wx2 = 1.0_WP - wx1; wy2 = 1.0_WP - wy1; wz2 = 1.0_WP - wz1
-            vel(1) = wz1*(wy1*(wx1*pU(ip+1,jp+1,kp+1,1)+wx2*pU(ip,jp+1,kp+1,1))+wy2*(wx1*pU(ip+1,jp,kp+1,1)+wx2*pU(ip,jp,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pU(ip+1,jp+1,kp  ,1)+wx2*pU(ip,jp+1,kp  ,1))+wy2*(wx1*pU(ip+1,jp,kp  ,1)+wx2*pU(ip,jp,kp  ,1)))
-            vel(2) = wz1*(wy1*(wx1*pV(ip+1,jp+1,kp+1,1)+wx2*pV(ip,jp+1,kp+1,1))+wy2*(wx1*pV(ip+1,jp,kp+1,1)+wx2*pV(ip,jp,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pV(ip+1,jp+1,kp  ,1)+wx2*pV(ip,jp+1,kp  ,1))+wy2*(wx1*pV(ip+1,jp,kp  ,1)+wx2*pV(ip,jp,kp  ,1)))
-            vel(3) = wz1*(wy1*(wx1*pW(ip+1,jp+1,kp+1,1)+wx2*pW(ip,jp+1,kp+1,1))+wy2*(wx1*pW(ip+1,jp,kp+1,1)+wx2*pW(ip,jp,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pW(ip+1,jp+1,kp  ,1)+wx2*pW(ip,jp+1,kp  ,1))+wy2*(wx1*pW(ip+1,jp,kp  ,1)+wx2*pW(ip,jp,kp  ,1)))
-         end function interp_velocity_col
-         
-         subroutine volume_correct_x(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: nt
-            do nt = 1, 6
-               va = face(:,tet_map(1,nt)) - face(:,tet_map(4,nt))
-               vb = face(:,tet_map(2,nt)) - face(:,tet_map(4,nt))
-               vc = face(:,tet_map(3,nt)) - face(:,tet_map(4,nt))
-               volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            face(1,9) = (-6.0_WP*volume + face(1,5)*((face(2,8)-face(2,9))*(face(3,6)-face(3,9))-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))) + &
-            &   face(2,5)*((face(3,8)-face(3,9))*face(1,6)-(face(3,6)-face(3,9))*face(1,8)) + &
-            &   face(2,9)*((face(3,6)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,6)) + &
-            &   face(3,5)*((face(2,6)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,6)) + &
-            &   face(3,9)*((face(2,8)-face(2,9))*face(1,6)-(face(2,6)-face(2,9))*face(1,8)) + &
-            &   face(1,6)*((face(2,8)-face(2,9))*(face(3,7)-face(3,9))-(face(2,7)-face(2,9))*(face(3,8)-face(3,9))) + &
-            &   face(2,6)*((face(3,8)-face(3,9))*face(1,7)-(face(3,7)-face(3,9))*face(1,8)) + &
-            &   face(2,9)*((face(3,7)-face(3,9))*face(1,8)-(face(3,8)-face(3,9))*face(1,7)) + &
-            &   face(3,6)*((face(2,7)-face(2,9))*face(1,8)-(face(2,8)-face(2,9))*face(1,7)) + &
-            &   face(3,9)*((face(2,8)-face(2,9))*face(1,7)-(face(2,7)-face(2,9))*face(1,8))) / &
-            &  (-(face(2,6)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,6)-face(3,9)) - &
-            &   face(2,5)*(face(3,6)-face(3,9))+face(2,5)*(face(3,8)-face(3,9))+face(2,9)*(face(3,6)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
-            &   face(3,5)*(face(2,8)-face(2,9))+face(3,5)*(face(2,6)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,6)-face(2,9)) - &
-            &   (face(2,7)-face(2,9))*(face(3,8)-face(3,9))+(face(2,8)-face(2,9))*(face(3,7)-face(3,9)) - &
-            &   face(2,6)*(face(3,7)-face(3,9))+face(2,6)*(face(3,8)-face(3,9))+face(2,9)*(face(3,7)-face(3,9))-face(2,9)*(face(3,8)-face(3,9)) - &
-            &   face(3,6)*(face(2,8)-face(2,9))+face(3,6)*(face(2,7)-face(2,9))+face(3,9)*(face(2,8)-face(2,9))-face(3,9)*(face(2,7)-face(2,9)))
-            face(2,9) = 0.25_WP * sum(face(2,5:8)); face(3,9) = 0.25_WP * sum(face(3,5:8))
-         end subroutine volume_correct_x
-         
-         subroutine volume_correct_y(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: nt
-            do nt = 1, 6
-               va = face(:,tet_map(1,nt)) - face(:,tet_map(4,nt))
-               vb = face(:,tet_map(2,nt)) - face(:,tet_map(4,nt))
-               vc = face(:,tet_map(3,nt)) - face(:,tet_map(4,nt))
-               volume = volume - (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            face(1,9) = 0.25_WP * sum(face(1,5:8))
-            face(2,9) = (6.0_WP*volume + face(1,5)*((face(3,6)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,6)) + &
-            &   face(1,9)*((face(3,8)-face(3,9))*face(2,6)-(face(3,6)-face(3,9))*face(2,8)) + &
-            &   face(2,5)*((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,5)*((face(1,8)-face(1,9))*face(2,6)-(face(1,6)-face(1,9))*face(2,8)) + &
-            &   face(3,9)*((face(1,6)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,6)) + &
-            &   face(1,6)*((face(3,7)-face(3,9))*face(2,8)-(face(3,8)-face(3,9))*face(2,7)) + &
-            &   face(1,9)*((face(3,8)-face(3,9))*face(2,7)-(face(3,7)-face(3,9))*face(2,8)) + &
-            &   face(2,6)*((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,6)*((face(1,8)-face(1,9))*face(2,7)-(face(1,7)-face(1,9))*face(2,8)) + &
-            &   face(3,9)*((face(1,7)-face(1,9))*face(2,8)-(face(1,8)-face(1,9))*face(2,7))) / &
-            &  (face(1,5)*((face(3,6)-face(3,9))-(face(3,8)-face(3,9))) + &
-            &   face(1,9)*((face(3,8)-face(3,9))-(face(3,6)-face(3,9))) + &
-            &   ((face(3,8)-face(3,9))*(face(1,6)-face(1,9))-(face(3,6)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,5)*((face(1,8)-face(1,9))-(face(1,6)-face(1,9)))+face(3,9)*((face(1,6)-face(1,9))-(face(1,8)-face(1,9))) + &
-            &   face(1,9)*((face(3,8)-face(3,9))-(face(3,7)-face(3,9))) + &
-            &   ((face(3,8)-face(3,9))*(face(1,7)-face(1,9))-(face(3,7)-face(3,9))*(face(1,8)-face(1,9))) + &
-            &   face(3,6)*((face(1,8)-face(1,9))-(face(1,7)-face(1,9)))+face(3,9)*((face(1,7)-face(1,9))-(face(1,8)-face(1,9))))
-            face(3,9) = 0.25_WP * sum(face(3,5:8))
-         end subroutine volume_correct_y
-         
-         subroutine volume_correct_z(volume)
-            real(WP), intent(inout) :: volume
-            real(WP), dimension(3) :: va, vb, vc
-            integer :: nt
-            do nt = 1, 6
-               va = face(:,tet_map(1,nt)) - face(:,tet_map(4,nt))
-               vb = face(:,tet_map(2,nt)) - face(:,tet_map(4,nt))
-               vc = face(:,tet_map(3,nt)) - face(:,tet_map(4,nt))
-               volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
-            end do
-            face(1,9) = 0.25_WP * sum(face(1,5:8)); face(2,9) = 0.25_WP * sum(face(2,5:8))
-            face(3,9) = (6.0_WP*volume + &
-            &   face(1,5)*face(2,6)*face(3,8) - face(1,5)*face(3,6)*face(2,8) - &
-            &   face(2,5)*face(1,6)*face(3,8) + face(2,5)*face(3,6)*face(1,8) + &
-            &   face(3,5)*face(1,6)*face(2,8) - face(3,5)*face(2,6)*face(1,8) + &
-            &   face(1,5)*face(3,6)*face(2,5) - face(2,5)*face(3,6)*face(1,5) - &
-            &   face(3,5)*face(1,6)*face(2,5) + face(3,5)*face(2,6)*face(1,5) + &
-            &   face(1,6)*face(2,7)*face(3,8) - face(1,6)*face(3,7)*face(2,8) - &
-            &   face(2,6)*face(1,7)*face(3,8) + face(2,6)*face(3,7)*face(1,8) + &
-            &   face(3,6)*face(1,7)*face(2,8) - face(3,6)*face(2,7)*face(1,8) - &
-            &   face(1,5)*face(3,8)*face(2,5) + face(2,5)*face(3,8)*face(1,5) + &
-            &   face(3,5)*face(1,8)*face(2,5) - face(3,5)*face(2,8)*face(1,5) + &
-            &   face(1,6)*face(3,7)*face(2,5) - face(2,6)*face(3,7)*face(1,5) - &
-            &   face(3,6)*face(1,7)*face(2,5) + face(3,6)*face(2,7)*face(1,5) + &
-            &   face(1,7)*face(3,8)*face(2,5) - face(2,7)*face(3,8)*face(1,5) - &
-            &   face(3,7)*face(1,8)*face(2,5) + face(3,7)*face(2,8)*face(1,5)) / &
-            &  (face(1,5)*face(2,6) - face(2,5)*face(1,6) - face(1,5)*face(2,8) + face(2,5)*face(1,8) + &
-            &   face(1,6)*face(2,7) - face(2,6)*face(1,7) + face(1,7)*face(2,8) - face(2,7)*face(1,8))
-         end subroutine volume_correct_z
-         
       end subroutine compute_flux_col
+      
+      !> RK2 vertex projection back in time (collocated version)
+      function project_col(p1, mydt) result(p2)
+         real(WP), dimension(3), intent(in) :: p1
+         real(WP), intent(in) :: mydt
+         real(WP), dimension(3) :: p2, v1, vm
+         v1 = interp_velocity_col(p1); p2 = p1 + mydt * v1
+         vm = interp_velocity_col(0.5_WP * (p1 + p2)); p2 = p1 + mydt * vm
+      end function project_col
+      
+      !> Trilinear interpolation of collocated (cell-centered) velocity
+      function interp_velocity_col(pos) result(vel)
+         real(WP), dimension(3), intent(in) :: pos
+         real(WP), dimension(3) :: vel
+         integer :: ip, jp, kp
+         real(WP) :: wx1, wy1, wz1, wx2, wy2, wz2
+         ! Cell-centered indices
+         ip = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
+         jp = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
+         kp = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
+         wx1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + (real(ip,WP)+0.5_WP)*dx)) * dxi + 0.5_WP))
+         wy1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + (real(jp,WP)+0.5_WP)*dy)) * dyi + 0.5_WP))
+         wz1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + (real(kp,WP)+0.5_WP)*dz)) * dzi + 0.5_WP))
+         wx2 = 1.0_WP - wx1; wy2 = 1.0_WP - wy1; wz2 = 1.0_WP - wz1
+         vel(1) = wz1*(wy1*(wx1*pU(ip+1,jp+1,kp+1,1)+wx2*pU(ip,jp+1,kp+1,1))+wy2*(wx1*pU(ip+1,jp,kp+1,1)+wx2*pU(ip,jp,kp+1,1))) + &
+         &        wz2*(wy1*(wx1*pU(ip+1,jp+1,kp  ,1)+wx2*pU(ip,jp+1,kp  ,1))+wy2*(wx1*pU(ip+1,jp,kp  ,1)+wx2*pU(ip,jp,kp  ,1)))
+         vel(2) = wz1*(wy1*(wx1*pV(ip+1,jp+1,kp+1,1)+wx2*pV(ip,jp+1,kp+1,1))+wy2*(wx1*pV(ip+1,jp,kp+1,1)+wx2*pV(ip,jp,kp+1,1))) + &
+         &        wz2*(wy1*(wx1*pV(ip+1,jp+1,kp  ,1)+wx2*pV(ip,jp+1,kp  ,1))+wy2*(wx1*pV(ip+1,jp,kp  ,1)+wx2*pV(ip,jp,kp  ,1)))
+         vel(3) = wz1*(wy1*(wx1*pW(ip+1,jp+1,kp+1,1)+wx2*pW(ip,jp+1,kp+1,1))+wy2*(wx1*pW(ip+1,jp,kp+1,1)+wx2*pW(ip,jp,kp+1,1))) + &
+         &        wz2*(wy1*(wx1*pW(ip+1,jp+1,kp  ,1)+wx2*pW(ip,jp+1,kp  ,1))+wy2*(wx1*pW(ip+1,jp,kp  ,1)+wx2*pW(ip,jp,kp  ,1)))
+      end function interp_velocity_col
+      
+      subroutine volume_correct_x_col(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: nt
+         do nt = 1, 6
+            va = face_col(:,tet_map(1,nt)) - face_col(:,tet_map(4,nt))
+            vb = face_col(:,tet_map(2,nt)) - face_col(:,tet_map(4,nt))
+            vc = face_col(:,tet_map(3,nt)) - face_col(:,tet_map(4,nt))
+            volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         face_col(1,9) = (-6.0_WP*volume + face_col(1,5)*((face_col(2,8)-face_col(2,9))*(face_col(3,6)-face_col(3,9))-(face_col(2,6)-face_col(2,9))*(face_col(3,8)-face_col(3,9))) + &
+         &   face_col(2,5)*((face_col(3,8)-face_col(3,9))*face_col(1,6)-(face_col(3,6)-face_col(3,9))*face_col(1,8)) + &
+         &   face_col(2,9)*((face_col(3,6)-face_col(3,9))*face_col(1,8)-(face_col(3,8)-face_col(3,9))*face_col(1,6)) + &
+         &   face_col(3,5)*((face_col(2,6)-face_col(2,9))*face_col(1,8)-(face_col(2,8)-face_col(2,9))*face_col(1,6)) + &
+         &   face_col(3,9)*((face_col(2,8)-face_col(2,9))*face_col(1,6)-(face_col(2,6)-face_col(2,9))*face_col(1,8)) + &
+         &   face_col(1,6)*((face_col(2,8)-face_col(2,9))*(face_col(3,7)-face_col(3,9))-(face_col(2,7)-face_col(2,9))*(face_col(3,8)-face_col(3,9))) + &
+         &   face_col(2,6)*((face_col(3,8)-face_col(3,9))*face_col(1,7)-(face_col(3,7)-face_col(3,9))*face_col(1,8)) + &
+         &   face_col(2,9)*((face_col(3,7)-face_col(3,9))*face_col(1,8)-(face_col(3,8)-face_col(3,9))*face_col(1,7)) + &
+         &   face_col(3,6)*((face_col(2,7)-face_col(2,9))*face_col(1,8)-(face_col(2,8)-face_col(2,9))*face_col(1,7)) + &
+         &   face_col(3,9)*((face_col(2,8)-face_col(2,9))*face_col(1,7)-(face_col(2,7)-face_col(2,9))*face_col(1,8))) / &
+         &  (-(face_col(2,6)-face_col(2,9))*(face_col(3,8)-face_col(3,9))+(face_col(2,8)-face_col(2,9))*(face_col(3,6)-face_col(3,9)) - &
+         &   face_col(2,5)*(face_col(3,6)-face_col(3,9))+face_col(2,5)*(face_col(3,8)-face_col(3,9))+face_col(2,9)*(face_col(3,6)-face_col(3,9))-face_col(2,9)*(face_col(3,8)-face_col(3,9)) - &
+         &   face_col(3,5)*(face_col(2,8)-face_col(2,9))+face_col(3,5)*(face_col(2,6)-face_col(2,9))+face_col(3,9)*(face_col(2,8)-face_col(2,9))-face_col(3,9)*(face_col(2,6)-face_col(2,9)) - &
+         &   (face_col(2,7)-face_col(2,9))*(face_col(3,8)-face_col(3,9))+(face_col(2,8)-face_col(2,9))*(face_col(3,7)-face_col(3,9)) - &
+         &   face_col(2,6)*(face_col(3,7)-face_col(3,9))+face_col(2,6)*(face_col(3,8)-face_col(3,9))+face_col(2,9)*(face_col(3,7)-face_col(3,9))-face_col(2,9)*(face_col(3,8)-face_col(3,9)) - &
+         &   face_col(3,6)*(face_col(2,8)-face_col(2,9))+face_col(3,6)*(face_col(2,7)-face_col(2,9))+face_col(3,9)*(face_col(2,8)-face_col(2,9))-face_col(3,9)*(face_col(2,7)-face_col(2,9)))
+         face_col(2,9) = 0.25_WP * sum(face_col(2,5:8)); face_col(3,9) = 0.25_WP * sum(face_col(3,5:8))
+      end subroutine volume_correct_x_col
+      
+      subroutine volume_correct_y_col(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: nt
+         do nt = 1, 6
+            va = face_col(:,tet_map(1,nt)) - face_col(:,tet_map(4,nt))
+            vb = face_col(:,tet_map(2,nt)) - face_col(:,tet_map(4,nt))
+            vc = face_col(:,tet_map(3,nt)) - face_col(:,tet_map(4,nt))
+            volume = volume - (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         face_col(1,9) = 0.25_WP * sum(face_col(1,5:8))
+         face_col(2,9) = (6.0_WP*volume + face_col(1,5)*((face_col(3,6)-face_col(3,9))*face_col(2,8)-(face_col(3,8)-face_col(3,9))*face_col(2,6)) + &
+         &   face_col(1,9)*((face_col(3,8)-face_col(3,9))*face_col(2,6)-(face_col(3,6)-face_col(3,9))*face_col(2,8)) + &
+         &   face_col(2,5)*((face_col(3,8)-face_col(3,9))*(face_col(1,6)-face_col(1,9))-(face_col(3,6)-face_col(3,9))*(face_col(1,8)-face_col(1,9))) + &
+         &   face_col(3,5)*((face_col(1,8)-face_col(1,9))*face_col(2,6)-(face_col(1,6)-face_col(1,9))*face_col(2,8)) + &
+         &   face_col(3,9)*((face_col(1,6)-face_col(1,9))*face_col(2,8)-(face_col(1,8)-face_col(1,9))*face_col(2,6)) + &
+         &   face_col(1,6)*((face_col(3,7)-face_col(3,9))*face_col(2,8)-(face_col(3,8)-face_col(3,9))*face_col(2,7)) + &
+         &   face_col(1,9)*((face_col(3,8)-face_col(3,9))*face_col(2,7)-(face_col(3,7)-face_col(3,9))*face_col(2,8)) + &
+         &   face_col(2,6)*((face_col(3,8)-face_col(3,9))*(face_col(1,7)-face_col(1,9))-(face_col(3,7)-face_col(3,9))*(face_col(1,8)-face_col(1,9))) + &
+         &   face_col(3,6)*((face_col(1,8)-face_col(1,9))*face_col(2,7)-(face_col(1,7)-face_col(1,9))*face_col(2,8)) + &
+         &   face_col(3,9)*((face_col(1,7)-face_col(1,9))*face_col(2,8)-(face_col(1,8)-face_col(1,9))*face_col(2,7))) / &
+         &  (face_col(1,5)*((face_col(3,6)-face_col(3,9))-(face_col(3,8)-face_col(3,9))) + &
+         &   face_col(1,9)*((face_col(3,8)-face_col(3,9))-(face_col(3,6)-face_col(3,9))) + &
+         &   ((face_col(3,8)-face_col(3,9))*(face_col(1,6)-face_col(1,9))-(face_col(3,6)-face_col(3,9))*(face_col(1,8)-face_col(1,9))) + &
+         &   face_col(3,5)*((face_col(1,8)-face_col(1,9))-(face_col(1,6)-face_col(1,9)))+face_col(3,9)*((face_col(1,6)-face_col(1,9))-(face_col(1,8)-face_col(1,9))) + &
+         &   face_col(1,9)*((face_col(3,8)-face_col(3,9))-(face_col(3,7)-face_col(3,9))) + &
+         &   ((face_col(3,8)-face_col(3,9))*(face_col(1,7)-face_col(1,9))-(face_col(3,7)-face_col(3,9))*(face_col(1,8)-face_col(1,9))) + &
+         &   face_col(3,6)*((face_col(1,8)-face_col(1,9))-(face_col(1,7)-face_col(1,9)))+face_col(3,9)*((face_col(1,7)-face_col(1,9))-(face_col(1,8)-face_col(1,9))))
+         face_col(3,9) = 0.25_WP * sum(face_col(3,5:8))
+      end subroutine volume_correct_y_col
+      
+      subroutine volume_correct_z_col(volume)
+         real(WP), intent(inout) :: volume
+         real(WP), dimension(3) :: va, vb, vc
+         integer :: nt
+         do nt = 1, 6
+            va = face_col(:,tet_map(1,nt)) - face_col(:,tet_map(4,nt))
+            vb = face_col(:,tet_map(2,nt)) - face_col(:,tet_map(4,nt))
+            vc = face_col(:,tet_map(3,nt)) - face_col(:,tet_map(4,nt))
+            volume = volume + (va(1)*(vb(2)*vc(3)-vc(2)*vb(3)) - va(2)*(vb(1)*vc(3)-vc(1)*vb(3)) + va(3)*(vb(1)*vc(2)-vc(1)*vb(2))) / 6.0_WP
+         end do
+         face_col(1,9) = 0.25_WP * sum(face_col(1,5:8)); face_col(2,9) = 0.25_WP * sum(face_col(2,5:8))
+         face_col(3,9) = (6.0_WP*volume + &
+         &   face_col(1,5)*face_col(2,6)*face_col(3,8) - face_col(1,5)*face_col(3,6)*face_col(2,8) - &
+         &   face_col(2,5)*face_col(1,6)*face_col(3,8) + face_col(2,5)*face_col(3,6)*face_col(1,8) + &
+         &   face_col(3,5)*face_col(1,6)*face_col(2,8) - face_col(3,5)*face_col(2,6)*face_col(1,8) + &
+         &   face_col(1,5)*face_col(3,6)*face_col(2,5) - face_col(2,5)*face_col(3,6)*face_col(1,5) - &
+         &   face_col(3,5)*face_col(1,6)*face_col(2,5) + face_col(3,5)*face_col(2,6)*face_col(1,5) + &
+         &   face_col(1,6)*face_col(2,7)*face_col(3,8) - face_col(1,6)*face_col(3,7)*face_col(2,8) - &
+         &   face_col(2,6)*face_col(1,7)*face_col(3,8) + face_col(2,6)*face_col(3,7)*face_col(1,8) + &
+         &   face_col(3,6)*face_col(1,7)*face_col(2,8) - face_col(3,6)*face_col(2,7)*face_col(1,8) - &
+         &   face_col(1,5)*face_col(3,8)*face_col(2,5) + face_col(2,5)*face_col(3,8)*face_col(1,5) + &
+         &   face_col(3,5)*face_col(1,8)*face_col(2,5) - face_col(3,5)*face_col(2,8)*face_col(1,5) + &
+         &   face_col(1,6)*face_col(3,7)*face_col(2,5) - face_col(2,6)*face_col(3,7)*face_col(1,5) - &
+         &   face_col(3,6)*face_col(1,7)*face_col(2,5) + face_col(3,6)*face_col(2,7)*face_col(1,5) + &
+         &   face_col(1,7)*face_col(3,8)*face_col(2,5) - face_col(2,7)*face_col(3,8)*face_col(1,5) - &
+         &   face_col(3,7)*face_col(1,8)*face_col(2,5) + face_col(3,7)*face_col(2,8)*face_col(1,5)) / &
+         &  (face_col(1,5)*face_col(2,6) - face_col(2,5)*face_col(1,6) - face_col(1,5)*face_col(2,8) + face_col(2,5)*face_col(1,8) + &
+         &   face_col(1,6)*face_col(2,7) - face_col(2,6)*face_col(1,7) + face_col(1,7)*face_col(2,8) - face_col(2,7)*face_col(1,8))
+      end subroutine volume_correct_z_col
+      
       
    end subroutine advance_vof_col
 
@@ -2097,9 +2110,9 @@ contains
       this%VFint = 0.0_WP
 
       ! Loop over levels
-      do lvl = 0, this%amr%clvl()
-         this%VFmin = min(this%VFmin, this%VF%min(lvl=lvl))
-         this%VFmax = max(this%VFmax, this%VF%norm0(lvl=lvl))
+       do lvl = 0, this%amr%clvl()
+         this%VFmin = min(this%VFmin, this%VF%get_min(lvl=lvl))
+         this%VFmax = max(this%VFmax, this%VF%get_max(lvl=lvl))
       end do
 
       ! Compute volume integral at level 0
@@ -2114,10 +2127,10 @@ contains
       use amrio_class, only: amrio
       class(amrvof), intent(inout) :: this
       class(amrio), intent(inout) :: io
-      call io%add_multifab(this%VF, 'VF')
-      call io%add_multifab(this%Cliq, 'Cliq')
-      call io%add_multifab(this%Cgas, 'Cgas')
-      call io%add_multifab(this%PLIC, 'PLIC')
+      call io%add_data(this%VF, 'VF')
+      call io%add_data(this%Cliq, 'Cliq')
+      call io%add_data(this%Cgas, 'Cgas')
+      call io%add_data(this%PLIC, 'PLIC')
    end subroutine register_checkpoint
 
    !> Restore checkpoint
@@ -2126,10 +2139,10 @@ contains
       class(amrvof), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
-      call io%read_multifab(this%VF, 'VF', dirname)
-      call io%read_multifab(this%Cliq, 'Cliq', dirname)
-      call io%read_multifab(this%Cgas, 'Cgas', dirname)
-      call io%read_multifab(this%PLIC, 'PLIC', dirname)
+      call io%read_data(dirname, this%VF, 'VF')
+      call io%read_data(dirname, this%Cliq, 'Cliq')
+      call io%read_data(dirname, this%Cgas, 'Cgas')
+      call io%read_data(dirname, this%PLIC, 'PLIC')
    end subroutine restore_checkpoint
 
    !> Print solver info to screen
