@@ -39,7 +39,7 @@ contains
    !> Initialize VF field with sphere using levelset-based moments
    subroutine sphere_init(solver, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
-      &                          amrex_mfiter_build, amrex_mfiter_destroy
+      &                           amrex_mfiter_build, amrex_mfiter_destroy
       use mms_geom,         only: initialize_volume_moments
       use amrvof_geometry,  only: VFlo
       class(amrvof), intent(inout) :: solver
@@ -51,7 +51,7 @@ contains
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas
       real(WP) :: dx, dy, dz
-      real(WP), dimension(3) :: lo, hi, BL, BG
+      real(WP), dimension(3) :: BL, BG
       integer :: i, j, k
       
       dx = solver%amr%dx(lvl)
@@ -69,17 +69,10 @@ contains
          do k = bx%lo(3), bx%hi(3)
             do j = bx%lo(2), bx%hi(2)
                do i = bx%lo(1), bx%hi(1)
-                  ! Cell bounds
-                  lo = [solver%amr%xlo + real(i,WP)*dx, &
-                  &     solver%amr%ylo + real(j,WP)*dy, &
-                  &     solver%amr%zlo + real(k,WP)*dz]
-                  hi = lo + [dx, dy, dz]
-                  
-                  ! Compute VF and barycenters from levelset with 4 levels of refinement
-                  call initialize_volume_moments(lo=lo, hi=hi, levelset=sphere_levelset, &
-                  &                              time=time, level=4, VFlo=VFlo, &
-                  &                              VF=pVF(i,j,k,1), BL=BL, BG=BG)
-                  
+                 ! Compute VF and barycenters from levelset with 4 levels of refinement
+                  call initialize_volume_moments(lo=[solver%amr%xlo + real(i  ,WP)*dx, solver%amr%ylo + real(j  ,WP)*dy, solver%amr%zlo + real(k  ,WP)*dz], &
+                  &                              hi=[solver%amr%xlo + real(i+1,WP)*dx, solver%amr%ylo + real(j+1,WP)*dy, solver%amr%zlo + real(k+1,WP)*dz], &
+                  &                              levelset=sphere_levelset, time=time, level=4, VFlo=VFlo, VF=pVF(i,j,k,1), BL=BL, BG=BG)
                   ! Store barycenters
                   pCliq(i,j,k,1:3) = BL
                   pCgas(i,j,k,1:3) = BG
@@ -90,13 +83,17 @@ contains
       call amrex_mfiter_destroy(mfi)
    end subroutine sphere_init
    
-   !> Sphere levelset function: positive inside, negative outside
+   !> Sphere levelset function with periodic distance
    function sphere_levelset(xyz, t) result(G)
       implicit none
       real(WP), dimension(3), intent(in) :: xyz
       real(WP), intent(in) :: t
       real(WP) :: G
-      G = sphere_radius - sqrt((xyz(1) - sphere_xc)**2 + (xyz(2) - sphere_yc)**2 + (xyz(3) - sphere_zc)**2)
+      real(WP), dimension(3) :: d, L
+      L = [amr%xhi - amr%xlo, amr%yhi - amr%ylo, amr%zhi - amr%zlo]
+      d = xyz - [sphere_xc, sphere_yc, sphere_zc]
+      d = d - L * nint(d / L)  ! Nearest image
+      G = sphere_radius - sqrt(sum(d**2))
    end function sphere_levelset
 
 
@@ -151,10 +148,10 @@ contains
                            y = amr%ylo + (real(j,WP) + 0.5_WP) * dy
                            z = amr%zlo + (real(k,WP) + 0.5_WP) * dz
                            
-                           ! Radial direction from sphere center
-                           rx = x - sphere_xc
-                           ry = y - sphere_yc
-                           rz = z - sphere_zc
+                           ! Radial direction from sphere center (periodic)
+                           rx = x - sphere_xc; rx = rx - (amr%xhi-amr%xlo) * nint(rx / (amr%xhi-amr%xlo))
+                           ry = y - sphere_yc; ry = ry - (amr%yhi-amr%ylo) * nint(ry / (amr%yhi-amr%ylo))
+                           rz = z - sphere_zc; rz = rz - (amr%zhi-amr%zlo) * nint(rz / (amr%zhi-amr%zlo))
                            r_mag = sqrt(rx**2 + ry**2 + rz**2)
                            
                            if (r_mag .gt. 1.0e-10_WP) then
@@ -203,7 +200,7 @@ contains
          amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
          amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
          amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
-         amr%xper = .false.; amr%yper = .false.; amr%zper = .false.
+         amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
          call param_read('Max level', amr%maxlvl, default=1)
          call amr%initialize()
       end block create_amrgrid
@@ -220,7 +217,7 @@ contains
       setup_sphere: block
          use param, only: param_read
          call param_read('Sphere radius', sphere_radius, default=0.25_WP)
-         sphere_xc = 0.5_WP * (amr%xlo + amr%xhi)
+         sphere_xc = 0.9_WP  ! Near x=1 boundary to test periodic wrapping
          sphere_yc = 0.5_WP * (amr%ylo + amr%yhi)
          sphere_zc = 0.5_WP * (amr%zlo + amr%zhi)
          call log("  Sphere center: ("//trim(rtoa(sphere_xc))//", "// &

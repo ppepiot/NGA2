@@ -75,6 +75,8 @@ module amrvof_class
       procedure :: advance_vof_stag  !< Advect VF using staggered velocity
       procedure :: advance_vof_col   !< Advect VF using collocated velocity
       procedure :: fill_moments     !< Fill VF/Cliq/Cgas ghosts (sync + BC)
+      procedure :: sync_moments_lvl  !< Sync VF/Cliq/Cgas ghosts at level + fix periodic barycenters
+      procedure :: sync_moments      !< Sync VF/Cliq/Cgas ghosts all levels + fix periodic barycenters
       procedure :: average_down_moments  !< Average down VF/Cliq/Cgas to coarse levels
       procedure :: reset_moments    !< Recompute VF/barycenters from PLIC
       procedure :: print => amrvof_print  !< Print solver info
@@ -340,8 +342,6 @@ contains
       call this%PLICold%setval(val=0.0_WP, lvl=lvl)
       ! Call user init to set VF
       if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
-      ! Fill moment ghosts (needed for tagging)
-      call this%fill_moments(lvl, time)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -475,11 +475,99 @@ contains
          call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1), cmf=this%Cliq%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
          call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1), cmf=this%Cgas%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
       end do
-      ! Sync ghost cells on all levels (fills from valid neighbors)
-      call this%VF%sync()
-      call this%Cliq%sync()
-      call this%Cgas%sync()
+      ! Sync ghost cells on all levels + fix periodic barycenters
+      call this%sync_moments()
    end subroutine average_down_moments
+
+   !> Sync VF/Cliq/Cgas ghosts on all levels + fix periodic barycenters
+   subroutine sync_moments(this)
+      class(amrvof), intent(inout) :: this
+      integer :: lvl
+      do lvl = 0, this%amr%clvl()
+         call this%sync_moments_lvl(lvl)
+      end do
+   end subroutine sync_moments
+
+   !> Sync VF/Cliq/Cgas ghosts at level + fix periodic barycenters
+   subroutine sync_moments_lvl(this, lvl)
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_geometry
+      class(amrvof), intent(inout) :: this
+      integer, intent(in) :: lvl
+      type(amrex_mfiter) :: mfi
+      type(amrex_geometry) :: geom
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pCliq, pCgas
+      integer :: ig, jg, kg, ilo, ihi, jlo, jhi, klo, khi
+      integer :: dlo(3), dhi(3)
+      real(WP) :: xL, yL, zL
+      
+      ! Sync ghosts (periodic + MPI exchange)
+      call this%VF%sync_lvl(lvl)
+      call this%Cliq%sync_lvl(lvl)
+      call this%Cgas%sync_lvl(lvl)
+      
+      ! Fix barycenter positions in periodic ghost cells
+      geom = this%amr%geom(lvl)
+      dlo = geom%domain%lo
+      dhi = geom%domain%hi
+      xL = this%amr%xhi - this%amr%xlo
+      yL = this%amr%yhi - this%amr%ylo
+      zL = this%amr%zhi - this%amr%zlo
+      
+      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
+      do while (mfi%next())
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         ilo = lbound(pCliq,1); ihi = ubound(pCliq,1)
+         jlo = lbound(pCliq,2); jhi = ubound(pCliq,2)
+         klo = lbound(pCliq,3); khi = ubound(pCliq,3)
+         ! X-periodic
+         if (this%amr%xper) then
+            if (ilo .lt. dlo(1)) then
+               do kg = klo, khi; do jg = jlo, jhi; do ig = ilo, dlo(1)-1
+                  pCliq(ig,jg,kg,1) = pCliq(ig,jg,kg,1) - xL
+                  pCgas(ig,jg,kg,1) = pCgas(ig,jg,kg,1) - xL
+               end do; end do; end do
+            end if
+            if (ihi .gt. dhi(1)) then
+               do kg = klo, khi; do jg = jlo, jhi; do ig = dhi(1)+1, ihi
+                  pCliq(ig,jg,kg,1) = pCliq(ig,jg,kg,1) + xL
+                  pCgas(ig,jg,kg,1) = pCgas(ig,jg,kg,1) + xL
+               end do; end do; end do
+            end if
+         end if
+         ! Y-periodic
+         if (this%amr%yper) then
+            if (jlo .lt. dlo(2)) then
+               do kg = klo, khi; do jg = jlo, dlo(2)-1; do ig = ilo, ihi
+                  pCliq(ig,jg,kg,2) = pCliq(ig,jg,kg,2) - yL
+                  pCgas(ig,jg,kg,2) = pCgas(ig,jg,kg,2) - yL
+               end do; end do; end do
+            end if
+            if (jhi .gt. dhi(2)) then
+               do kg = klo, khi; do jg = dhi(2)+1, jhi; do ig = ilo, ihi
+                  pCliq(ig,jg,kg,2) = pCliq(ig,jg,kg,2) + yL
+                  pCgas(ig,jg,kg,2) = pCgas(ig,jg,kg,2) + yL
+               end do; end do; end do
+            end if
+         end if
+         ! Z-periodic
+         if (this%amr%zper) then
+            if (klo .lt. dlo(3)) then
+               do kg = klo, dlo(3)-1; do jg = jlo, jhi; do ig = ilo, ihi
+                  pCliq(ig,jg,kg,3) = pCliq(ig,jg,kg,3) - zL
+                  pCgas(ig,jg,kg,3) = pCgas(ig,jg,kg,3) - zL
+               end do; end do; end do
+            end if
+            if (khi .gt. dhi(3)) then
+               do kg = dhi(3)+1, khi; do jg = jlo, jhi; do ig = ilo, ihi
+                  pCliq(ig,jg,kg,3) = pCliq(ig,jg,kg,3) + zL
+                  pCgas(ig,jg,kg,3) = pCgas(ig,jg,kg,3) + zL
+               end do; end do; end do
+            end if
+         end if
+      end do
+      call this%amr%mfiter_destroy(mfi)
+   end subroutine sync_moments_lvl
 
    !> Fill VF/Cliq/Cgas ghosts at a level (sync + periodic correction + physical BC)
    !> Also sets PLIC for BC_LIQ/BC_GAS/BC_USER. BC_REFLECT PLIC is deferred to build_plic.
@@ -488,98 +576,17 @@ contains
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
       
-      ! Sync ghosts (periodic + MPI)
-      call this%VF%sync_lvl(lvl)
-      call this%Cliq%sync_lvl(lvl)
-      call this%Cgas%sync_lvl(lvl)
-      call this%PLIC%sync_lvl(lvl)
+      ! Sync VF/Cliq/Cgas ghosts + fix periodic barycenters
+      call this%sync_moments_lvl(lvl)
       
-      ! Apply periodic corrections
-      call correct_periodic_barycenters()
+      ! Sync PLIC ghosts + fix periodic PLIC
+      call this%PLIC%sync_lvl(lvl)
       call correct_periodic_plic()
       
       ! Apply physical BC (sets VF/Cliq/Cgas for all types; PLIC for BC_LIQ/BC_GAS/BC_USER)
       call apply_vof_bc()
       
    contains
-      
-      !> Correct barycenter positions in periodic ghost cells
-      subroutine correct_periodic_barycenters()
-         use amrex_amr_module, only: amrex_geometry
-         type(amrex_mfiter) :: mfi
-         type(amrex_geometry) :: geom
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pCliq, pCgas
-         integer :: ig, jg, kg, ilo, ihi, jlo, jhi, klo, khi
-         integer :: dlo(3), dhi(3)
-         real(WP) :: xL, yL, zL
-         
-         geom = this%amr%geom(lvl)
-         dlo = geom%domain%lo
-         dhi = geom%domain%hi
-         
-         xL = this%amr%xhi - this%amr%xlo
-         yL = this%amr%yhi - this%amr%ylo
-         zL = this%amr%zhi - this%amr%zlo
-         
-         call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
-         do while (mfi%next())
-            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
-            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-            ilo = lbound(pCliq,1); ihi = ubound(pCliq,1)
-            jlo = lbound(pCliq,2); jhi = ubound(pCliq,2)
-            klo = lbound(pCliq,3); khi = ubound(pCliq,3)
-            
-            ! X-periodic
-            if (this%amr%xper) then
-               if (ilo .lt. dlo(1)) then
-                  do kg = klo, khi; do jg = jlo, jhi; do ig = ilo, dlo(1)-1
-                     pCliq(ig,jg,kg,1) = pCliq(ig,jg,kg,1) - xL
-                     pCgas(ig,jg,kg,1) = pCgas(ig,jg,kg,1) - xL
-                  end do; end do; end do
-               end if
-               if (ihi .gt. dhi(1)) then
-                  do kg = klo, khi; do jg = jlo, jhi; do ig = dhi(1)+1, ihi
-                     pCliq(ig,jg,kg,1) = pCliq(ig,jg,kg,1) + xL
-                     pCgas(ig,jg,kg,1) = pCgas(ig,jg,kg,1) + xL
-                  end do; end do; end do
-               end if
-            end if
-            
-            ! Y-periodic
-            if (this%amr%yper) then
-               if (jlo .lt. dlo(2)) then
-                  do kg = klo, khi; do jg = jlo, dlo(2)-1; do ig = ilo, ihi
-                     pCliq(ig,jg,kg,2) = pCliq(ig,jg,kg,2) - yL
-                     pCgas(ig,jg,kg,2) = pCgas(ig,jg,kg,2) - yL
-                  end do; end do; end do
-               end if
-               if (jhi .gt. dhi(2)) then
-                  do kg = klo, khi; do jg = dhi(2)+1, jhi; do ig = ilo, ihi
-                     pCliq(ig,jg,kg,2) = pCliq(ig,jg,kg,2) + yL
-                     pCgas(ig,jg,kg,2) = pCgas(ig,jg,kg,2) + yL
-                  end do; end do; end do
-               end if
-            end if
-            
-            ! Z-periodic
-            if (this%amr%zper) then
-               if (klo .lt. dlo(3)) then
-                  do kg = klo, dlo(3)-1; do jg = jlo, jhi; do ig = ilo, ihi
-                     pCliq(ig,jg,kg,3) = pCliq(ig,jg,kg,3) - zL
-                     pCgas(ig,jg,kg,3) = pCgas(ig,jg,kg,3) - zL
-                  end do; end do; end do
-               end if
-               if (khi .gt. dhi(3)) then
-                  do kg = dhi(3)+1, khi; do jg = jlo, jhi; do ig = ilo, ihi
-                     pCliq(ig,jg,kg,3) = pCliq(ig,jg,kg,3) + zL
-                     pCgas(ig,jg,kg,3) = pCgas(ig,jg,kg,3) + zL
-                  end do; end do; end do
-               end if
-            end if
-            
-         end do
-         call this%amr%mfiter_destroy(mfi)
-      end subroutine correct_periodic_barycenters
       
       !> Correct PLIC plane distance in periodic ghost cells
       subroutine correct_periodic_plic()
@@ -1207,6 +1214,18 @@ contains
                   ! Get plane from PLIC (already filled including ghosts)
                   plane(1:3) = pPLIC(i,j,k,1:3)
                   plane(4)   = pPLIC(i,j,k,4)
+                  
+                  ! Skip cutting for full cells (trivial PLIC with large distance)
+                  if (abs(plane(4)) .ge. 1.0e9_WP) then
+                     if (plane(4) .gt. 0.0_WP) then
+                        pVF(i,j,k,1) = 1.0_WP  ! All liquid
+                     else
+                        pVF(i,j,k,1) = 0.0_WP  ! All gas
+                     end if
+                     pCliq(i,j,k,1:3) = cell_center
+                     pCgas(i,j,k,1:3) = cell_center
+                     cycle
+                  end if
                   
                   ! Cut hex by plane
                   call cut_hex_vol(hex, plane, vol_liq, vol_gas, bary_liq, bary_gas)
