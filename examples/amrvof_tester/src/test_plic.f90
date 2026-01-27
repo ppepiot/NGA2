@@ -15,17 +15,17 @@ module mod_test_plic
    public :: test_plic
 
    ! Grid
-   type(amrgrid), allocatable, target :: amr
+   type(amrgrid), target :: amr
 
    ! VOF solver
    type(timetracker) :: time
-   type(amrvof), allocatable, target :: vof
+   type(amrvof), target :: vof
 
    ! Sphere parameters
    real(WP) :: sphere_xc, sphere_yc, sphere_zc, sphere_radius
 
    ! Visualization
-   type(amrviz), allocatable :: viz
+   type(amrviz) :: viz
 
    ! Test results
    real(WP) :: min_dot_product, max_dot_product, avg_dot_product
@@ -189,7 +189,6 @@ contains
       ! Create amrgrid
       create_amrgrid: block
          use param, only: param_read
-         allocate(amr)
          amr%name = 'plic_test'
          call param_read('Base nx', amr%nx, default=32)
          call param_read('Base ny', amr%ny, default=32)
@@ -224,7 +223,6 @@ contains
 
       ! Create VOF solver
       create_vof_solver: block
-         allocate(vof)
          vof%user_init => sphere_init
          call vof%initialize(amr, name='sphere_vof')
       end block create_vof_solver
@@ -287,7 +285,6 @@ contains
 
       ! Create visualization for manual verification
       create_visualization: block
-         allocate(viz)
          call viz%initialize(amr, 'plic_test')
          call viz%add_scalar(vof%VF, 1, 'VF')
          call viz%add_scalar(vof%PLIC, 1, 'PLIC_nx')
@@ -297,8 +294,10 @@ contains
          call viz%add_scalar(vof%Cliq, 1, 'Cliq_x')
          call viz%add_scalar(vof%Cliq, 2, 'Cliq_y')
          call viz%add_scalar(vof%Cliq, 3, 'Cliq_z')
+         call viz%add_surfmesh(vof%smesh, 'plic')
          call viz%write(time=time%t)
-         call log("  Visualization output written to plic_test/")
+         call log("  Visualization output written to amrviz/plic_test/")
+         call log("  PLIC surface mesh: "//trim(itoa(vof%smesh%nPoly))//" polygons, "//trim(itoa(vof%smesh%nVert))//" vertices")
       end block create_visualization
 
       ! Cleanup
@@ -307,7 +306,6 @@ contains
          call vof%finalize()
          call amr%finalize()
          call time%finalize()
-         deallocate(viz, vof, amr)
       end block cleanup
 
       call log("=== PLIC test complete ===")

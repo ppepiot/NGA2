@@ -9,6 +9,7 @@ module amrvof_class
    use amrdata_class,    only: amrdata
    use amrsolver_class,  only: amrsolver
    use amrvof_geometry,  only: VFlo, VFhi
+   use surfmesh_class,   only: surfmesh
    use amrex_amr_module, only: amrex_multifab, amrex_mfiter, amrex_box, &
    &                           amrex_boxarray, amrex_distromap, amrex_geometry
    implicit none
@@ -56,6 +57,9 @@ module amrvof_class
       real(WP) :: VFmin = 0.0_WP    !< Minimum VF
       real(WP) :: VFmax = 0.0_WP    !< Maximum VF
       real(WP) :: VFint = 0.0_WP    !< Integral of VF (liquid volume)
+      
+      ! Surface mesh for visualization (finest level polygons)
+      type(surfmesh) :: smesh
 
    contains
       procedure :: initialize
@@ -71,14 +75,14 @@ module amrvof_class
       procedure :: register_checkpoint
       procedure :: restore_checkpoint
       ! VOF-specific procedures
-      procedure :: build_plic       !< Reconstruct PLIC from VF and barycenters
-      procedure :: advance_vof_stag  !< Advect VF using staggered velocity
-      procedure :: advance_vof_col   !< Advect VF using collocated velocity
-      procedure :: fill_moments     !< Fill VF/Cliq/Cgas ghosts (sync + BC)
-      procedure :: sync_moments_lvl  !< Sync VF/Cliq/Cgas ghosts at level + fix periodic barycenters
-      procedure :: sync_moments      !< Sync VF/Cliq/Cgas ghosts all levels + fix periodic barycenters
-      procedure :: average_down_moments  !< Average down VF/Cliq/Cgas to coarse levels
-      procedure :: reset_moments    !< Recompute VF/barycenters from PLIC
+      procedure :: build_plic             !< Reconstruct PLIC from VF and barycenters
+      procedure :: advance_vof_stag       !< Advect VF using staggered velocity
+      procedure :: advance_vof_col        !< Advect VF using collocated velocity
+      procedure :: fill_moments           !< Fill VF/Cliq/Cgas ghosts (sync + BC)
+      procedure :: sync_moments_lvl       !< Sync VF/Cliq/Cgas ghosts at level + fix periodic barycenters
+      procedure :: sync_moments           !< Sync VF/Cliq/Cgas ghosts all levels + fix periodic barycenters
+      procedure :: average_down_moments   !< Average down VF/Cliq/Cgas to coarse levels
+      procedure :: reset_moments          !< Recompute VF/barycenters from PLIC
       procedure :: print => amrvof_print  !< Print solver info
    end type amrvof
 
@@ -281,6 +285,9 @@ contains
       call this%Cliqold%initialize(amr, name='Cliqold', ncomp=3, ng=1)
       call this%Cgasold%initialize(amr, name='Cgasold', ncomp=3, ng=1)
       call this%PLICold%initialize(amr, name='PLICold', ncomp=4, ng=2)
+      
+      ! Initialize surface mesh for visualization
+      this%smesh%name = trim(this%name)//'_plic'
 
       ! Set parent pointers for callback context access
       this%VF%parent => this
@@ -787,6 +794,7 @@ contains
       call this%Cliqold%finalize()
       call this%Cgasold%finalize()
       call this%PLICold%finalize()
+      call this%smesh%reset()
       nullify(this%amr)
       nullify(this%user_init)
       nullify(this%user_tagging)
@@ -797,20 +805,14 @@ contains
    ! ============================================================================
 
    !> Build PLIC reconstruction from VF and barycenters using PLICnet
+   !> Also extracts PLIC polygons and accumulates them to smesh
    subroutine build_plic(this)
       use plicnet, only: get_normal, reflect_moments
       use mathtools, only: normalize
-      use amrvof_geometry, only: get_plane_dist
+      use amrvof_geometry, only: get_plane_dist, cut_hex_polygon
       class(amrvof), intent(inout) :: this
-      integer :: lvl, i, j, k, ii, jj, kk, direction, direction2
-      real(WP), dimension(0:188) :: moments
-      real(WP), dimension(3) :: normal, center, lo, hi
-      real(WP) :: m000, m100, m010, m001, temp, vf_cell
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
+      integer :: lvl
       real(WP) :: dx, dy, dz
-      logical :: flip
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
       
       ! Only build at finest level
       lvl = this%amr%clvl()
@@ -820,147 +822,158 @@ contains
       dy = this%amr%dy(lvl)
       dz = this%amr%dz(lvl)
       
-      ! Iterate over boxes at this level
-      call this%amr%mfiter_build(lvl, mfi)
-      do while (mfi%next())
-         bx = mfi%tilebox()
+      ! ========== Pass 1: Compute PLIC planes ==========
+      plic_reconstruction: block
+         integer :: i, j, k, ii, jj, kk, direction, direction2
+         real(WP), dimension(0:188) :: moments
+         real(WP), dimension(3) :: normal, center, lo, hi
+         real(WP) :: m000, m100, m010, m001, temp, vf_cell
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
+         logical :: flip
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: bx
          
-         ! Get pointers (with ghost cells for stencil access)
-         pVF   => this%VF%mf(lvl)%dataptr(mfi)
-         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
-         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
          
-         ! Loop over cells in this box
-         do k = bx%lo(3), bx%hi(3)
-            do j = bx%lo(2), bx%hi(2)
-               do i = bx%lo(1), bx%hi(1)
+            ! Get pointers (with ghost cells for stencil access)
+            pVF   => this%VF%mf(lvl)%dataptr(mfi)
+            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         
+            ! Loop over cells in this box
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
                   
-                  vf_cell = pVF(i,j,k,1)
+                     vf_cell = pVF(i,j,k,1)
                   
-                  ! Handle full cells: set trivial plane
-                  if (vf_cell.lt.VFlo .or. vf_cell.gt.VFhi) then
-                     pPLIC(i,j,k,1) = 0.0_WP  ! nx
-                     pPLIC(i,j,k,2) = 0.0_WP  ! ny
-                     pPLIC(i,j,k,3) = 0.0_WP  ! nz
-                     pPLIC(i,j,k,4) = sign(1.0e10_WP, vf_cell - 0.5_WP)  ! d
-                     cycle
-                  end if
+                     ! Handle full cells: set trivial plane
+                     if (vf_cell.lt.VFlo .or. vf_cell.gt.VFhi) then
+                        pPLIC(i,j,k,1) = 0.0_WP  ! nx
+                        pPLIC(i,j,k,2) = 0.0_WP  ! ny
+                        pPLIC(i,j,k,3) = 0.0_WP  ! nz
+                        pPLIC(i,j,k,4) = sign(1.0e10_WP, vf_cell - 0.5_WP)  ! d
+                        cycle
+                     end if
                   
-                  ! Liquid-gas symmetry
-                  flip = .false.
-                  if (vf_cell.ge.0.5_WP) flip = .true.
+                     ! Liquid-gas symmetry
+                     flip = .false.
+                     if (vf_cell.ge.0.5_WP) flip = .true.
                   
-                  ! Initialize geometric moments
-                  m000 = 0.0_WP; m100 = 0.0_WP; m010 = 0.0_WP; m001 = 0.0_WP
+                     ! Initialize geometric moments
+                     m000 = 0.0_WP; m100 = 0.0_WP; m010 = 0.0_WP; m001 = 0.0_WP
                   
-                  ! Construct neighborhood of volume moments (3x3x3 stencil)
-                  if (flip) then
-                     do kk = k-1, k+1
-                        do jj = j-1, j+1
-                           do ii = i-1, i+1
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))   = 1.0_WP - pVF(ii,jj,kk,1)
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1) = (pCgas(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2) = (pCgas(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3) = (pCgas(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+4) = (pCliq(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+5) = (pCliq(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+6) = (pCliq(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
-                              m000 = m000 + moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m100 = m100 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1)+(ii-i)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m010 = m010 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2)+(jj-j)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m001 = m001 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3)+(kk-k)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                     ! Construct neighborhood of volume moments (3x3x3 stencil)
+                     if (flip) then
+                        do kk = k-1, k+1
+                           do jj = j-1, j+1
+                              do ii = i-1, i+1
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))   = 1.0_WP - pVF(ii,jj,kk,1)
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1) = (pCgas(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2) = (pCgas(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3) = (pCgas(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+4) = (pCliq(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+5) = (pCliq(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+6) = (pCliq(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
+                                 m000 = m000 + moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m100 = m100 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1)+(ii-i)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m010 = m010 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2)+(jj-j)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m001 = m001 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3)+(kk-k)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                              end do
                            end do
                         end do
-                     end do
-                  else
-                     do kk = k-1, k+1
-                        do jj = j-1, j+1
-                           do ii = i-1, i+1
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))   = pVF(ii,jj,kk,1)
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1) = (pCliq(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2) = (pCliq(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3) = (pCliq(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+4) = (pCgas(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+5) = (pCgas(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
-                              moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+6) = (pCgas(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
-                              m000 = m000 + moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m100 = m100 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1)+(ii-i)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m010 = m010 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2)+(jj-j)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
-                              m001 = m001 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3)+(kk-k)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                     else
+                        do kk = k-1, k+1
+                           do jj = j-1, j+1
+                              do ii = i-1, i+1
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))   = pVF(ii,jj,kk,1)
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1) = (pCliq(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2) = (pCliq(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3) = (pCliq(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+4) = (pCgas(ii,jj,kk,1) - (this%amr%xlo + (real(ii,WP)+0.5_WP)*dx)) / dx
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+5) = (pCgas(ii,jj,kk,2) - (this%amr%ylo + (real(jj,WP)+0.5_WP)*dy)) / dy
+                                 moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+6) = (pCgas(ii,jj,kk,3) - (this%amr%zlo + (real(kk,WP)+0.5_WP)*dz)) / dz
+                                 m000 = m000 + moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m100 = m100 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+1)+(ii-i)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m010 = m010 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+2)+(jj-j)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                                 m001 = m001 + (moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k))+3)+(kk-k)) * moments(7*((ii+1-i)*9+(jj+1-j)*3+(kk+1-k)))
+                              end do
                            end do
                         end do
-                     end do
-                  end if
+                     end if
                   
-                  ! Geometric center of neighborhood
-                  if (m000.gt.tiny(1.0_WP)) then
-                     center = [m100, m010, m001] / m000
-                  else
-                     center = 0.0_WP
-                  end if
+                     ! Geometric center of neighborhood
+                     if (m000.gt.tiny(1.0_WP)) then
+                        center = [m100, m010, m001] / m000
+                     else
+                        center = 0.0_WP
+                     end if
                   
-                  ! Apply symmetry (48 symmetries via reflect_moments)
-                  call reflect_moments(moments, center, direction, direction2)
+                     ! Apply symmetry (48 symmetries via reflect_moments)
+                     call reflect_moments(moments, center, direction, direction2)
                   
-                  ! Get normal from neural network
-                  call get_normal(moments, normal)
-                  normal = normalize(normal)
+                     ! Get normal from neural network
+                     call get_normal(moments, normal)
+                     normal = normalize(normal)
                   
-                  ! Undo direction2 rotation (axis permutation)
-                  if (direction2.eq.1) then
-                     temp = normal(1); normal(1) = normal(2); normal(2) = temp
-                  else if (direction2.eq.2) then
-                     temp = normal(2); normal(2) = normal(3); normal(3) = temp
-                  else if (direction2.eq.3) then
-                     temp = normal(1); normal(1) = normal(3); normal(3) = temp
-                  else if (direction2.eq.4) then
-                     temp = normal(2); normal(2) = normal(3); normal(3) = temp
-                     temp = normal(1); normal(1) = normal(2); normal(2) = temp
-                  else if (direction2.eq.5) then
-                     temp = normal(1); normal(1) = normal(3); normal(3) = temp
-                     temp = normal(1); normal(1) = normal(2); normal(2) = temp
-                  end if
+                     ! Undo direction2 rotation (axis permutation)
+                     if (direction2.eq.1) then
+                        temp = normal(1); normal(1) = normal(2); normal(2) = temp
+                     else if (direction2.eq.2) then
+                        temp = normal(2); normal(2) = normal(3); normal(3) = temp
+                     else if (direction2.eq.3) then
+                        temp = normal(1); normal(1) = normal(3); normal(3) = temp
+                     else if (direction2.eq.4) then
+                        temp = normal(2); normal(2) = normal(3); normal(3) = temp
+                        temp = normal(1); normal(1) = normal(2); normal(2) = temp
+                     else if (direction2.eq.5) then
+                        temp = normal(1); normal(1) = normal(3); normal(3) = temp
+                        temp = normal(1); normal(1) = normal(2); normal(2) = temp
+                     end if
                   
-                  ! Undo direction reflection (octant)
-                  if (direction.eq.1) then
-                     normal(1) = -normal(1)
-                  else if (direction.eq.2) then
-                     normal(2) = -normal(2)
-                  else if (direction.eq.3) then
-                     normal(3) = -normal(3)
-                  else if (direction.eq.4) then
-                     normal(1) = -normal(1); normal(2) = -normal(2)
-                  else if (direction.eq.5) then
-                     normal(1) = -normal(1); normal(3) = -normal(3)
-                  else if (direction.eq.6) then
-                     normal(2) = -normal(2); normal(3) = -normal(3)
-                  else if (direction.eq.7) then
-                     normal(1) = -normal(1); normal(2) = -normal(2); normal(3) = -normal(3)
-                  end if
+                     ! Undo direction reflection (octant)
+                     if (direction.eq.1) then
+                        normal(1) = -normal(1)
+                     else if (direction.eq.2) then
+                        normal(2) = -normal(2)
+                     else if (direction.eq.3) then
+                        normal(3) = -normal(3)
+                     else if (direction.eq.4) then
+                        normal(1) = -normal(1); normal(2) = -normal(2)
+                     else if (direction.eq.5) then
+                        normal(1) = -normal(1); normal(3) = -normal(3)
+                     else if (direction.eq.6) then
+                        normal(2) = -normal(2); normal(3) = -normal(3)
+                     else if (direction.eq.7) then
+                        normal(1) = -normal(1); normal(2) = -normal(2); normal(3) = -normal(3)
+                     end if
                   
-                  ! Undo liquid-gas flip
-                  if (.not.flip) normal = -normal
+                     ! Undo liquid-gas flip
+                     if (.not.flip) normal = -normal
                   
-                  ! Renormalize
-                  normal = normalize(normal)
+                     ! Renormalize
+                     normal = normalize(normal)
                   
-                  ! Cell bounds
-                  lo = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k,WP)*dz]
-                  hi = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
+                     ! Cell bounds
+                     lo = [this%amr%xlo + real(i,WP)*dx, this%amr%ylo + real(j,WP)*dy, this%amr%zlo + real(k,WP)*dz]
+                     hi = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
                   
-                  ! Store PLIC plane: (nx, ny, nz, d)
-                  pPLIC(i,j,k,1) = normal(1)
-                  pPLIC(i,j,k,2) = normal(2)
-                  pPLIC(i,j,k,3) = normal(3)
-                  pPLIC(i,j,k,4) = get_plane_dist(normal, lo, hi, vf_cell)
+                     ! Store PLIC plane: (nx, ny, nz, d)
+                     pPLIC(i,j,k,1) = normal(1)
+                     pPLIC(i,j,k,2) = normal(2)
+                     pPLIC(i,j,k,3) = normal(3)
+                     pPLIC(i,j,k,4) = get_plane_dist(normal, lo, hi, vf_cell)
                   
+                  end do
                end do
             end do
-         end do
          
-      end do
-      call this%amr%mfiter_destroy(mfi)
+         end do
+         call this%amr%mfiter_destroy(mfi)
+      end block plic_reconstruction
       
       ! Sync PLIC ghost cells at finest level
       call this%PLIC%sync_lvl(lvl)
@@ -970,6 +983,97 @@ contains
       
       ! Apply physical boundary conditions
       call apply_plic_bc()
+      
+      ! ========== Pass 2: Per-FAB polygon extraction ==========
+      call this%smesh%reset()
+      
+      polygon_extraction: block
+         integer :: i, j, k, ii, jj, kk
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pPLIC
+         real(WP), dimension(3) :: lo, hi
+         real(WP), dimension(4) :: plane
+         real(WP), dimension(3,8) :: hex
+         real(WP) :: vf_cell
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: bx, gbx
+         
+         ! Per-FAB polygon storage (allocatable, indexed by cell)
+         real(WP), dimension(:,:,:,:,:), allocatable :: polygon_local  ! (3, 6, ilo:ihi, jlo:jhi, klo:khi)
+         integer, dimension(:,:,:), allocatable :: poly_nv_local       ! (ilo:ihi, jlo:jhi, klo:khi)
+         real(WP), dimension(3,6) :: poly_verts
+         integer :: poly_nv
+         integer :: glo(3), ghi(3)
+         
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            gbx = mfi%growntilebox(2)  ! Grown by 2 for 5x5x5 stencil
+            pVF   => this%VF%mf(lvl)%dataptr(mfi)
+            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+            
+            ! Get bounds for per-FAB allocation
+            glo = gbx%lo
+            ghi = gbx%hi
+            
+            ! ----- Step A: Allocate per-FAB polygon storage -----
+            allocate(polygon_local(1:3, 1:6, glo(1):ghi(1), glo(2):ghi(2), glo(3):ghi(3)))
+            allocate(poly_nv_local(glo(1):ghi(1), glo(2):ghi(2), glo(3):ghi(3)))
+            polygon_local = 0.0_WP
+            poly_nv_local = 0
+            
+            ! ----- Step B: Extract polygons (grown box including ghosts) -----
+            do kk = glo(3), ghi(3)
+               do jj = glo(2), ghi(2)
+                  do ii = glo(1), ghi(1)
+                     vf_cell = pVF(ii,jj,kk,1)
+                     if (vf_cell.lt.VFlo .or. vf_cell.gt.VFhi) cycle
+                     
+                     ! Build hex and plane
+                     lo = [this%amr%xlo + real(ii,WP)*dx, this%amr%ylo + real(jj,WP)*dy, this%amr%zlo + real(kk,WP)*dz]
+                     hi = [this%amr%xlo + real(ii+1,WP)*dx, this%amr%ylo + real(jj+1,WP)*dy, this%amr%zlo + real(kk+1,WP)*dz]
+                     plane = [pPLIC(ii,jj,kk,1), pPLIC(ii,jj,kk,2), pPLIC(ii,jj,kk,3), pPLIC(ii,jj,kk,4)]
+                     hex(:,1) = [hi(1), lo(2), lo(3)]
+                     hex(:,2) = [hi(1), hi(2), lo(3)]
+                     hex(:,3) = [hi(1), hi(2), hi(3)]
+                     hex(:,4) = [hi(1), lo(2), hi(3)]
+                     hex(:,5) = [lo(1), lo(2), lo(3)]
+                     hex(:,6) = [lo(1), hi(2), lo(3)]
+                     hex(:,7) = [lo(1), hi(2), hi(3)]
+                     hex(:,8) = [lo(1), lo(2), hi(3)]
+                     
+                     call cut_hex_polygon(hex, plane, poly_nv, poly_verts)
+                     
+                     ! Store in per-FAB array
+                     poly_nv_local(ii,jj,kk) = poly_nv
+                     if (poly_nv.ge.3) then
+                        polygon_local(:,1:poly_nv,ii,jj,kk) = poly_verts(:,1:poly_nv)
+                     end if
+                  end do
+               end do
+            end do
+            
+            ! ----- Step C: Compute curvature (valid cells, stencil access) -----
+            ! TODO: curvature = f(polygon_local stencil around i,j,k)
+            ! For now, skip curvature computation
+            
+            ! ----- Step D: Append to smesh (valid cells only) -----
+            do k = bx%lo(3), bx%hi(3)
+               do j = bx%lo(2), bx%hi(2)
+                  do i = bx%lo(1), bx%hi(1)
+                     poly_nv = poly_nv_local(i,j,k)
+                     if (poly_nv.ge.3) then
+                        call this%smesh%add_polygon(polygon_local(:,1:poly_nv,i,j,k), poly_nv)
+                     end if
+                  end do
+               end do
+            end do
+            
+            ! ----- Step E: Deallocate per-FAB storage -----
+            deallocate(polygon_local, poly_nv_local)
+            
+         end do
+         call this%amr%mfiter_destroy(mfi)
+      end block polygon_extraction
       
    contains
       

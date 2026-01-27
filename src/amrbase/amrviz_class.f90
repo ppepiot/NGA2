@@ -3,10 +3,13 @@
 !> readable by VisIt (Chombo reader) and ParaView (VisItChomboReader)
 module amrviz_class
    use precision,      only: WP
-   use string,         only: str_medium
+   use string,         only: str_medium,str_long
    use iso_c_binding,  only: c_ptr,c_char,c_int,c_double,c_null_char,c_loc
    use amrgrid_class,  only: amrgrid
    use amrdata_class,  only: amrdata
+   use surfmesh_class, only: surfmesh
+   use mpi_f08,        only: MPI_Comm,MPI_BARRIER,MPI_BCAST,MPI_INTEGER,MPI_COMM_SIZE,MPI_COMM_RANK
+   use parallel,       only: MPI_REAL_WP
    use amrex_interface, only: amrplotfile_write_hdf5,amrplotfile_read_time
    use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box, &
    &                           amrex_multifab_build,amrex_multifab_destroy, &
@@ -25,18 +28,33 @@ module amrviz_class
       logical :: recenter = .true.  !< If true, interpolate to cell centers
    end type scl
 
+   !> Surface mesh registration node
+   type :: srf
+      type(srf), pointer :: next => null()
+      character(len=str_medium) :: name
+      type(surfmesh), pointer :: ptr => null()
+   end type srf
+   
+   ! Base64 encoding table for VTP output
+   character(len=64), parameter :: b64_table = &
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
    !> AMR visualization handler
    type :: amrviz
       class(amrgrid), pointer :: amr => null()   !< Pointer to AMR grid
       character(len=str_medium) :: name          !< Subdirectory name for output
       type(scl), pointer :: first_scl => null()  !< Registered scalars
+      type(srf), pointer :: first_srf => null()  !< Registered surface meshes
       integer :: ntime = 0                       !< File counter for output
       real(WP), allocatable :: time(:)           !< Time values for each file
    contains
       procedure :: initialize                    !< Initialize with grid
       procedure :: add_scalar                    !< Register a scalar field
+      procedure :: add_surfmesh                  !< Register a surface mesh
       procedure :: write                         !< Write all registered fields to single HDF5
       procedure :: finalize                      !< Clean up registered field lists
+      procedure, private :: write_vtp            !< Write surface mesh to VTP
+      procedure, private :: write_pvd            !< Write PVD collection file
    end type amrviz
 
 contains
@@ -157,6 +175,23 @@ contains
    end subroutine add_scalar
 
 
+   !> Register a surface mesh for output (VTP format)
+   subroutine add_surfmesh(this, smesh, name)
+      implicit none
+      class(amrviz), intent(inout) :: this
+      type(surfmesh), target, intent(in) :: smesh
+      character(len=*), intent(in) :: name
+      type(srf), pointer :: new_srf
+
+      ! Create new surface node
+      allocate(new_srf)
+      new_srf%name = trim(adjustl(name))
+      new_srf%ptr => smesh
+
+      ! Insert at front of list
+      new_srf%next => this%first_srf
+      this%first_srf => new_srf
+   end subroutine add_surfmesh
 
    !> Write all registered fields to HDF5 plotfiles
    !> Fields are grouped by centering type - one file per centering
@@ -367,6 +402,16 @@ contains
          deallocate(varnames, varname_ptrs)
       end do
 
+      ! --- Write registered surface meshes to VTP ---
+      write_surfaces: block
+         type(srf), pointer :: my_srf
+         my_srf => this%first_srf
+         do while (associated(my_srf))
+            call this%write_vtp(my_srf%name, my_srf%ptr)
+            my_srf => my_srf%next
+         end do
+      end block write_surfaces
+
    contains
 
       !> Return filename suffix based on centering
@@ -400,6 +445,7 @@ contains
       implicit none
       class(amrviz), intent(inout) :: this
       type(scl), pointer :: cur_scl, next_scl
+      type(srf), pointer :: cur_srf, next_srf
 
       ! Clean up scalar list
       cur_scl => this%first_scl
@@ -410,10 +456,263 @@ contains
       end do
       nullify(this%first_scl)
 
+      ! Clean up surface mesh list
+      cur_srf => this%first_srf
+      do while (associated(cur_srf))
+         next_srf => cur_srf%next
+         deallocate(cur_srf)
+         cur_srf => next_srf
+      end do
+      nullify(this%first_srf)
+
       ! Reset state
       nullify(this%amr)
       this%ntime = 0
       if (allocated(this%time)) deallocate(this%time)
    end subroutine finalize
+
+
+   !> Encode byte array to base64 string for VTP binary output
+   function encode_base64(bytes, nbytes) result(encoded)
+      implicit none
+      integer(1), dimension(:), intent(in) :: bytes
+      integer, intent(in) :: nbytes
+      character(len=:), allocatable :: encoded
+      integer :: i, j, nout, b1, b2, b3, idx
+      integer :: npad
+      
+      ! Calculate output length (4 chars per 3 bytes, rounded up)
+      nout = ((nbytes + 2) / 3) * 4
+      allocate(character(len=nout) :: encoded)
+      
+      j = 1
+      do i = 1, nbytes, 3
+         ! Get up to 3 bytes (use 0 for padding)
+         b1 = iand(int(bytes(i), kind=4), 255)
+         if (i+1 <= nbytes) then
+            b2 = iand(int(bytes(i+1), kind=4), 255)
+         else
+            b2 = 0
+         end if
+         if (i+2 <= nbytes) then
+            b3 = iand(int(bytes(i+2), kind=4), 255)
+         else
+            b3 = 0
+         end if
+         
+         ! Encode to 4 base64 characters
+         idx = ishft(b1, -2) + 1
+         encoded(j:j) = b64_table(idx:idx)
+         
+         idx = ior(ishft(iand(b1, 3), 4), ishft(b2, -4)) + 1
+         encoded(j+1:j+1) = b64_table(idx:idx)
+         
+         idx = ior(ishft(iand(b2, 15), 2), ishft(b3, -6)) + 1
+         encoded(j+2:j+2) = b64_table(idx:idx)
+         
+         idx = iand(b3, 63) + 1
+         encoded(j+3:j+3) = b64_table(idx:idx)
+         
+         j = j + 4
+      end do
+      
+      ! Add padding
+      npad = mod(3 - mod(nbytes, 3), 3)
+      if (npad >= 1) encoded(nout:nout) = '='
+      if (npad >= 2) encoded(nout-1:nout-1) = '='
+      
+   end function encode_base64
+
+
+   !> Write surface mesh to VTP file (binary base64 format)
+   subroutine write_vtp(this, srf_name, smesh)
+      implicit none
+      class(amrviz), intent(in) :: this
+      character(len=*), intent(in) :: srf_name
+      type(surfmesh), intent(in) :: smesh
+      
+      character(len=str_long) :: filename, dirname
+      character(len=str_medium) :: basename
+      character(len=:), allocatable :: b64_data
+      integer :: iunit, ierr, irank, n, v, conn_idx, vert_offset
+      integer :: npts_bytes, nconn_bytes, noff_bytes, nvar_bytes
+      integer(1), dimension(:), allocatable :: buffer
+      integer(4) :: header_size
+      real(WP), dimension(:), allocatable :: pts_data
+      integer(4), dimension(:), allocatable :: conn_data, off_data
+      integer :: nproc, rank
+      
+      ! Get MPI info
+      call MPI_COMM_SIZE(this%amr%comm, nproc, ierr)
+      call MPI_COMM_RANK(this%amr%comm, rank, ierr)
+      
+      ! Construct filename with timestep
+      dirname = 'amrviz/'//trim(this%name)
+      write(basename,'(A,"_",I8.8,".vtp")') trim(srf_name), this%ntime
+      filename = trim(dirname)//'/'//trim(basename)
+      
+      ! Rank 0 creates header
+      if (rank.eq.0) then
+         open(newunit=iunit, file=trim(filename), status='replace', action='write', iostat=ierr)
+         write(iunit,'(a)') '<?xml version="1.0"?>'
+         write(iunit,'(a)') '<VTKFile type="PolyData" version="1.0" byte_order="LittleEndian" header_type="UInt32">'
+         write(iunit,'(a)') '  <PolyData>'
+         close(iunit)
+      end if
+      call MPI_BARRIER(this%amr%comm, ierr)
+      
+      ! Each rank writes its data sequentially
+      do irank = 0, nproc - 1
+         if (irank.eq.rank) then
+            open(newunit=iunit, file=trim(filename), status='old', position='append', action='write', iostat=ierr)
+            
+            ! Write this rank's piece
+            if (smesh%nPoly.gt.0 .and. smesh%nVert.gt.0) then
+               write(iunit,'(a,i0,a,i0,a)') '    <Piece NumberOfPoints="', smesh%nVert, &
+                  '" NumberOfPolys="', smesh%nPoly, '">'
+               
+               ! === Points (base64 binary) ===
+               write(iunit,'(a)') '      <Points>'
+               write(iunit,'(a)', advance='no') '        <DataArray type="Float64" NumberOfComponents="3" format="binary">'
+               
+               ! Pack points into byte buffer: [header(4 bytes)][data]
+               npts_bytes = smesh%nVert * 3 * 8
+               allocate(pts_data(smesh%nVert * 3))
+               do v = 1, smesh%nVert
+                  pts_data((v-1)*3 + 1) = smesh%xVert(v)
+                  pts_data((v-1)*3 + 2) = smesh%yVert(v)
+                  pts_data((v-1)*3 + 3) = smesh%zVert(v)
+               end do
+               allocate(buffer(4 + npts_bytes))
+               header_size = int(npts_bytes, 4)
+               buffer(1:4) = transfer(header_size, buffer(1:4))
+               buffer(5:) = transfer(pts_data, buffer(5:))
+               b64_data = encode_base64(buffer, size(buffer))
+               write(iunit,'(a)', advance='no') b64_data
+               deallocate(buffer, pts_data, b64_data)
+               
+               write(iunit,'(a)') '</DataArray>'
+               write(iunit,'(a)') '      </Points>'
+               
+               ! === Polys (connectivity + offsets) ===
+               write(iunit,'(a)') '      <Polys>'
+               
+               ! Connectivity
+               write(iunit,'(a)', advance='no') '        <DataArray type="Int32" Name="connectivity" format="binary">'
+               nconn_bytes = sum(smesh%polySize(1:smesh%nPoly)) * 4
+               allocate(conn_data(sum(smesh%polySize(1:smesh%nPoly))))
+               conn_idx = 1
+               do n = 1, smesh%nPoly
+                  do v = 1, smesh%polySize(n)
+                     conn_data(conn_idx) = int(smesh%polyConn(conn_idx) - 1, 4)  ! 0-based for VTK
+                     conn_idx = conn_idx + 1
+                  end do
+               end do
+               allocate(buffer(4 + nconn_bytes))
+               header_size = int(nconn_bytes, 4)
+               buffer(1:4) = transfer(header_size, buffer(1:4))
+               buffer(5:) = transfer(conn_data, buffer(5:))
+               b64_data = encode_base64(buffer, size(buffer))
+               write(iunit,'(a)', advance='no') b64_data
+               deallocate(buffer, conn_data, b64_data)
+               write(iunit,'(a)') '</DataArray>'
+               
+               ! Offsets
+               write(iunit,'(a)', advance='no') '        <DataArray type="Int32" Name="offsets" format="binary">'
+               noff_bytes = smesh%nPoly * 4
+               allocate(off_data(smesh%nPoly))
+               vert_offset = 0
+               do n = 1, smesh%nPoly
+                  vert_offset = vert_offset + smesh%polySize(n)
+                  off_data(n) = int(vert_offset, 4)
+               end do
+               allocate(buffer(4 + noff_bytes))
+               header_size = int(noff_bytes, 4)
+               buffer(1:4) = transfer(header_size, buffer(1:4))
+               buffer(5:) = transfer(off_data, buffer(5:))
+               b64_data = encode_base64(buffer, size(buffer))
+               write(iunit,'(a)', advance='no') b64_data
+               deallocate(buffer, off_data, b64_data)
+               write(iunit,'(a)') '</DataArray>'
+               
+               write(iunit,'(a)') '      </Polys>'
+               
+               ! === Cell data (per-polygon variables) ===
+               if (smesh%nvar.gt.0 .and. allocated(smesh%var)) then
+                  write(iunit,'(a)') '      <CellData>'
+                  do v = 1, smesh%nvar
+                     write(iunit,'(a,a,a)', advance='no') '        <DataArray type="Float64" Name="', &
+                        trim(smesh%varname(v)), '" format="binary">'
+                     nvar_bytes = smesh%nPoly * 8
+                     allocate(buffer(4 + nvar_bytes))
+                     header_size = int(nvar_bytes, 4)
+                     buffer(1:4) = transfer(header_size, buffer(1:4))
+                     buffer(5:) = transfer(smesh%var(v,1:smesh%nPoly), buffer(5:))
+                     b64_data = encode_base64(buffer, size(buffer))
+                     write(iunit,'(a)', advance='no') b64_data
+                     deallocate(buffer, b64_data)
+                     write(iunit,'(a)') '</DataArray>'
+                  end do
+                  write(iunit,'(a)') '      </CellData>'
+               end if
+               
+               write(iunit,'(a)') '    </Piece>'
+            end if
+            
+            close(iunit)
+         end if
+         call MPI_BARRIER(this%amr%comm, ierr)
+      end do
+      
+      ! Rank 0 writes footer
+      if (rank.eq.0) then
+         open(newunit=iunit, file=trim(filename), status='old', position='append', action='write', iostat=ierr)
+         write(iunit,'(a)') '  </PolyData>'
+         write(iunit,'(a)') '</VTKFile>'
+         close(iunit)
+      end if
+      call MPI_BARRIER(this%amr%comm, ierr)
+      
+      ! Write PVD collection file
+      call this%write_pvd(srf_name, rank)
+      
+   end subroutine write_vtp
+
+
+   !> Write PVD collection file for time series
+   subroutine write_pvd(this, srf_name, rank)
+      implicit none
+      class(amrviz), intent(in) :: this
+      character(len=*), intent(in) :: srf_name
+      integer, intent(in) :: rank
+      character(len=str_long) :: filename, dirname
+      character(len=str_medium) :: basename
+      integer :: iunit, ierr, n
+      
+      ! Only rank 0 writes PVD
+      if (rank.ne.0) return
+      
+      dirname = 'amrviz/'//trim(this%name)
+      filename = trim(dirname)//'/'//trim(srf_name)//'.pvd'
+      
+      open(newunit=iunit, file=trim(filename), status='replace', action='write', iostat=ierr)
+      
+      write(iunit,'(a)') '<?xml version="1.0"?>'
+      write(iunit,'(a)') '<VTKFile type="Collection" version="1.0" byte_order="LittleEndian">'
+      write(iunit,'(a)') '  <Collection>'
+      
+      do n = 1, this%ntime
+         write(basename,'(A,"_",I8.8,".vtp")') trim(srf_name), n
+         write(iunit,'(a,es18.10,a,a,a)') '    <DataSet timestep="', this%time(n), &
+            '" file="', trim(basename), '"/>'
+      end do
+      
+      write(iunit,'(a)') '  </Collection>'
+      write(iunit,'(a)') '</VTKFile>'
+      
+      close(iunit)
+      
+   end subroutine write_pvd
+
 
 end module amrviz_class
