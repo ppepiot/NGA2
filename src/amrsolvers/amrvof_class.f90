@@ -85,6 +85,7 @@ module amrvof_class
       procedure :: fill_plic_lvl          !< Fill PLIC ghosts at level (sync + BC)
       procedure :: average_down_moments   !< Average down VF/Cliq/Cgas to coarse levels
       procedure :: reset_moments          !< Recompute VF/barycenters from PLIC
+      procedure :: get_cfl                !< Compute advective CFL at finest level
       procedure :: print => amrvof_print  !< Print solver info
    end type amrvof
 
@@ -2059,6 +2060,29 @@ contains
       call io%read_data(dirname, this%Cgas, 'Cgas')
       call io%read_data(dirname, this%PLIC, 'PLIC')
    end subroutine restore_checkpoint
+
+   !> Compute advective CFL at finest level
+   !> Takes external staggered velocity MultiFabs and returns max CFL
+   subroutine get_cfl(this, U, V, W, dt, cfl)
+      class(amrvof), intent(inout) :: this
+      type(amrex_multifab), intent(in) :: U, V, W  !< Staggered velocity at clvl
+      real(WP), intent(in) :: dt
+      real(WP), intent(out) :: cfl
+      real(WP) :: Umax, Vmax, Wmax, CFLx, CFLy, CFLz
+      integer :: lvl
+      ! Get finest level metrics
+      lvl = this%amr%clvl()
+      ! Get max velocity norms
+      Umax = U%norm0()
+      Vmax = V%norm0()
+      Wmax = W%norm0()
+      ! Compute directional CFLs
+      CFLx = dt * Umax / this%amr%dx(lvl)
+      CFLy = dt * Vmax / this%amr%dy(lvl)
+      CFLz = dt * Wmax / this%amr%dz(lvl)
+      ! Return max CFL
+      cfl = max(CFLx, CFLy, CFLz)
+   end subroutine get_cfl
 
    !> Print solver info to screen
    subroutine amrvof_print(this)

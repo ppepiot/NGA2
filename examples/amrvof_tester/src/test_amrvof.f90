@@ -218,12 +218,13 @@ contains
       ! Time integration loop
       time_loop: do while (.not.time%done())
 
-         ! Increment time
+         ! Compute CFL and update dt based on CFL constraint
+         call vof%get_cfl(U=U, V=V, W=W, dt=time%dt, cfl=time%cfl)
          call time%adjust_dt()
          call time%increment()
 
          ! Advect VOF
-         call vof%advance_vof(U, V, W, time%dt, time%t)
+         call vof%advance_vof(U=U, V=V, W=W, dt=time%dt, time=time%t)
 
          ! Rebuild PLIC and reset moments for consistency
          call vof%build_plic(time%t)
