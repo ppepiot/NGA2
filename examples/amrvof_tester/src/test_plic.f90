@@ -234,7 +234,7 @@ contains
 
       ! Build PLIC from VF
       build_plic: block
-         call vof%build_plic()
+         call vof%build_plic(time%t)
          call log("  PLIC constructed on all levels")
       end block build_plic
 
