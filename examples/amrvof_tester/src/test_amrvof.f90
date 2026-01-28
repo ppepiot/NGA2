@@ -190,7 +190,7 @@ contains
          call viz%add_surfmesh(vof%smesh, 'plic')
          ! Create visualization output event
          viz_evt = event(time=time, name='Visualization output')
-         call param_read('Output period', viz_evt%tper, default=0.1_WP)
+         call param_read('Output period', viz_evt%tper)
          ! Write initial state
          if (viz_evt%occurs()) call viz%write(time=time%t)
       end block create_visualization
@@ -222,6 +222,12 @@ contains
          call vof%get_cfl(U=U, V=V, W=W, dt=time%dt, cfl=time%cfl)
          call time%adjust_dt()
          call time%increment()
+
+         ! Store old state
+         call vof%VFold%copy(src=vof%VF)
+         call vof%Cliqold%copy(src=vof%Cliq)
+         call vof%Cgasold%copy(src=vof%Cgas)
+         call vof%PLICold%copy(src=vof%PLIC)
 
          ! Advect VOF
          call vof%advance_vof(U=U, V=V, W=W, dt=time%dt, time=time%t)

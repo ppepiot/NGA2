@@ -15,8 +15,8 @@ Sphere radius: 0.1
 
 # Time integration
 Max time: 1.0
-Max dt: 0.01
-Max CFL: 0.5
+Max dt:   5e-3
+Max CFL:  0.9
 
 # Output
 Output period: 0.1
