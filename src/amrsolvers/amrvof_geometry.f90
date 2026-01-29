@@ -433,16 +433,14 @@ contains
       
    end subroutine cut_tet_vol
    
-   !> Compute signed volume of tetrahedron (for flux orientation)
-   pure function tet_sign(v) result(s)
+   !> Function that calculates the sign of a tet
+   function tet_sign(vert) result(s)
       implicit none
-      real(WP), dimension(3,4), intent(in) :: v
       real(WP) :: s
-      real(WP), dimension(3) :: a, b, c
-      a = v(:,1) - v(:,4)
-      b = v(:,2) - v(:,4)
-      c = v(:,3) - v(:,4)
-      s = sign(1.0_WP, a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2)))
+      real(WP), dimension(3,4), intent(in) :: vert
+      real(WP), dimension(3) :: a,b,c
+      a=vert(:,1)-vert(:,4); b=vert(:,2)-vert(:,4); c=vert(:,3)-vert(:,4)
+      s=sign(1.0_WP,-(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP)
    end function tet_sign
    
    !> Compute signed volume of flux polyhedron

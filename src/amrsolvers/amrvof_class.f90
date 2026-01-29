@@ -1328,7 +1328,6 @@ contains
    !> Advect VF using velocity field (staggered or collocated, auto-detected from nodality)
    !> User must provide MultiFabs at finest level with >= 2 ghost cells filled
    subroutine advance_vof(this, U, V, W, dt, time)
-      use amrvof_geometry, only: cut_tet_vol
       use amrex_amr_module, only: amrex_multifab
       implicit none
       class(amrvof), intent(inout) :: this
@@ -1350,7 +1349,6 @@ contains
       ! Shared variables for internal functions
       real(WP), dimension(3,9) :: face     ! 4 current + 4 projected + 1 center
       real(WP) :: dxi, dyi, dzi
-      integer :: ilo_, ihi_, jlo_, jhi_, klo_, khi_  ! Velocity bounds
 
       ! Check velocity centering and ghost cell requirements
       check_velocity: block
@@ -1391,7 +1389,6 @@ contains
          pVF => this%VF%mf(lvl)%dataptr(mfi)
          pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
          pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
          pVFold => this%VFold%mf(lvl)%dataptr(mfi)
          pCliqold => this%Cliqold%mf(lvl)%dataptr(mfi)
          pCgasold => this%Cgasold%mf(lvl)%dataptr(mfi)
@@ -1518,12 +1515,6 @@ contains
          
          flux = 0.0_WP
          
-         ! Precompute inverse cell sizes and velocity array bounds
-         dxi = 1.0_WP / dx; dyi = 1.0_WP / dy; dzi = 1.0_WP / dz
-         ilo_ = lbound(pU,1); ihi_ = ubound(pU,1) - 1
-         jlo_ = lbound(pU,2); jhi_ = ubound(pU,2) - 1
-         klo_ = lbound(pU,3); khi_ = ubound(pU,3) - 1
-         
          ! Determine upwind cell
          if (dir .eq. 1) then
             if (fv .ge. 0.0_WP) then
@@ -1636,17 +1627,6 @@ contains
          
       end subroutine compute_flux
       
-      !> Compute tet sign (positive = right-handed, negative = left-handed)
-      pure function tet_sign_func(v) result(s)
-         real(WP), dimension(3,4), intent(in) :: v
-         real(WP) :: s
-         real(WP), dimension(3) :: a, b, c
-         a = v(:,1) - v(:,4)
-         b = v(:,2) - v(:,4)
-         c = v(:,3) - v(:,4)
-         s = sign(1.0_WP, -(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP)
-      end function tet_sign_func
-      
       !> Recursive function that cuts a tet by grid planes to compute fluxes
       recursive function tet2flux(mytet, myind) result(myflux)
          use amrvof_geometry, only: cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert
@@ -1717,9 +1697,9 @@ contains
             end if
             vert(:, 4 + n1) = (1.0_WP - mu) * vert(:, v1) + mu * vert(:, v2)
             ! Compute index for interpolated vertex
-            vert_ind(1, 4+n1, 1) = min(max(floor((vert(1, 4+n1) - this%amr%xlo) * dxi), ilo_), ihi_)
-            vert_ind(2, 4+n1, 1) = min(max(floor((vert(2, 4+n1) - this%amr%ylo) * dyi), jlo_), jhi_)
-            vert_ind(3, 4+n1, 1) = min(max(floor((vert(3, 4+n1) - this%amr%zlo) * dzi), klo_), khi_)
+            vert_ind(1, 4+n1, 1) = floor((vert(1, 4+n1) - this%amr%xlo) * dxi)
+            vert_ind(2, 4+n1, 1) = floor((vert(2, 4+n1) - this%amr%ylo) * dyi)
+            vert_ind(3, 4+n1, 1) = floor((vert(3, 4+n1) - this%amr%zlo) * dzi)
             ! Enforce boundedness
             vert_ind(:, 4+n1, 1) = max(vert_ind(:, 4+n1, 1), min(vert_ind(:, v1, 1), vert_ind(:, v2, 1)))
             vert_ind(:, 4+n1, 1) = min(vert_ind(:, 4+n1, 1), max(vert_ind(:, v1, 1), vert_ind(:, v2, 1)))
@@ -1740,7 +1720,7 @@ contains
             b = newtet(:,2) - newtet(:,4)
             c = newtet(:,3) - newtet(:,4)
             my_vol = abs(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
-            if (my_vol .lt. 1.0e-20_WP) cycle
+            if (my_vol .lt. 1.0e-15_WP * vol) cycle
             ! Recursively process sub-tet
             myflux = myflux + tet2flux(newtet, newind)
          end do
@@ -1830,60 +1810,85 @@ contains
       
       !> Trilinear interpolation of velocity (handles staggered or collocated)
       function interp_velocity(pos) result(vel)
+         implicit none
          real(WP), dimension(3), intent(in) :: pos
          real(WP), dimension(3) :: vel
-         integer :: ip, jp, kp
-         real(WP) :: wx1, wy1, wz1, wx2, wy2, wz2
-         integer :: ipu, jpv, kpw
-         real(WP) :: wxu1, wyv1, wzw1, wxu2, wyv2, wzw2
-         
-         ! Cell-centered indices and weights (always needed)
-         ip = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
-         jp = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
-         kp = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
-         wx1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + (real(ip,WP)+0.5_WP)*dx)) * dxi + 0.5_WP))
-         wy1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + (real(jp,WP)+0.5_WP)*dy)) * dyi + 0.5_WP))
-         wz1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + (real(kp,WP)+0.5_WP)*dz)) * dzi + 0.5_WP))
-         wx2 = 1.0_WP - wx1; wy2 = 1.0_WP - wy1; wz2 = 1.0_WP - wz1
+         integer  :: ipc, jpc, kpc   ! Cell-centered indices
+         integer  :: ipu, jpv, kpw   ! Face-centered indices
+         real(WP) :: wxc1, wyc1, wzc1, wxc2, wyc2, wzc2  ! Cell-centered weights
+         real(WP) :: wxu1, wyv1, wzw1, wxu2, wyv2, wzw2  ! Face-centered weights
          
          if (is_staggered) then
-            ! Face-centered indices and weights for each component
-            ipu = max(ilo_, min(ihi_, floor((pos(1) - this%amr%xlo) * dxi)))
-            jpv = max(jlo_, min(jhi_, floor((pos(2) - this%amr%ylo) * dyi)))
-            kpw = max(klo_, min(khi_, floor((pos(3) - this%amr%zlo) * dzi)))
-            wxu1 = max(0.0_WP, min(1.0_WP, (pos(1) - (this%amr%xlo + real(ipu,WP)*dx)) * dxi))
-            wyv1 = max(0.0_WP, min(1.0_WP, (pos(2) - (this%amr%ylo + real(jpv,WP)*dy)) * dyi))
-            wzw1 = max(0.0_WP, min(1.0_WP, (pos(3) - (this%amr%zlo + real(kpw,WP)*dz)) * dzi))
-            wxu2 = 1.0_WP - wxu1; wyv2 = 1.0_WP - wyv1; wzw2 = 1.0_WP - wzw1
-            ! U at x-faces
-            vel(1) = wz1*(wy1*(wxu1*pU(ipu+1,jp+1,kp+1,1)+wxu2*pU(ipu,jp+1,kp+1,1)) + &
-            &             wy2*(wxu1*pU(ipu+1,jp  ,kp+1,1)+wxu2*pU(ipu,jp  ,kp+1,1))) + &
-            &        wz2*(wy1*(wxu1*pU(ipu+1,jp+1,kp  ,1)+wxu2*pU(ipu,jp+1,kp  ,1)) + &
-            &             wy2*(wxu1*pU(ipu+1,jp  ,kp  ,1)+wxu2*pU(ipu,jp  ,kp  ,1)))
-            ! V at y-faces
-            vel(2) = wz1*(wyv1*(wx1*pV(ip+1,jpv+1,kp+1,1)+wx2*pV(ip,jpv+1,kp+1,1)) + &
-            &             wyv2*(wx1*pV(ip+1,jpv  ,kp+1,1)+wx2*pV(ip,jpv  ,kp+1,1))) + &
-            &        wz2*(wyv1*(wx1*pV(ip+1,jpv+1,kp  ,1)+wx2*pV(ip,jpv+1,kp  ,1)) + &
-            &             wyv2*(wx1*pV(ip+1,jpv  ,kp  ,1)+wx2*pV(ip,jpv  ,kp  ,1)))
-            ! W at z-faces
-            vel(3) = wzw1*(wy1*(wx1*pW(ip+1,jp+1,kpw+1,1)+wx2*pW(ip,jp+1,kpw+1,1)) + &
-            &              wy2*(wx1*pW(ip+1,jp  ,kpw+1,1)+wx2*pW(ip,jp  ,kpw+1,1))) + &
-            &        wzw2*(wy1*(wx1*pW(ip+1,jp+1,kpw  ,1)+wx2*pW(ip,jp+1,kpw  ,1)) + &
-            &              wy2*(wx1*pW(ip+1,jp  ,kpw  ,1)+wx2*pW(ip,jp  ,kpw  ,1)))
+            ! Compute raw indices
+            ipc = floor((pos(1) - this%amr%xlo) * dxi - 0.5_WP)
+            jpc = floor((pos(2) - this%amr%ylo) * dyi - 0.5_WP)
+            kpc = floor((pos(3) - this%amr%zlo) * dzi - 0.5_WP)
+            ipu = floor((pos(1) - this%amr%xlo) * dxi)
+            jpv = floor((pos(2) - this%amr%ylo) * dyi)
+            kpw = floor((pos(3) - this%amr%zlo) * dzi)
+            ! Clamp to array bounds (each index clamped for its target array)
+            ipu = max(lbound(pU,1), min(ubound(pU,1)-1, ipu))
+            jpc = max(lbound(pU,2), min(ubound(pU,2)-1, jpc))
+            kpc = max(lbound(pU,3), min(ubound(pU,3)-1, kpc))
+            ipc = max(lbound(pV,1), min(ubound(pV,1)-1, ipc))
+            jpv = max(lbound(pV,2), min(ubound(pV,2)-1, jpv))
+            kpw = max(lbound(pW,3), min(ubound(pW,3)-1, kpw))
+            ! Cell-centered weights
+            wxc1 = (pos(1) - (this%amr%xlo + (real(ipc,WP)+0.5_WP)*dx)) * dxi
+            wyc1 = (pos(2) - (this%amr%ylo + (real(jpc,WP)+0.5_WP)*dy)) * dyi
+            wzc1 = (pos(3) - (this%amr%zlo + (real(kpc,WP)+0.5_WP)*dz)) * dzi
+            wxc1 = max(0.0_WP, min(1.0_WP, wxc1)); wxc2 = 1.0_WP - wxc1
+            wyc1 = max(0.0_WP, min(1.0_WP, wyc1)); wyc2 = 1.0_WP - wyc1
+            wzc1 = max(0.0_WP, min(1.0_WP, wzc1)); wzc2 = 1.0_WP - wzc1
+            ! Face-centered weights
+            wxu1 = (pos(1) - (this%amr%xlo + real(ipu,WP)*dx)) * dxi
+            wyv1 = (pos(2) - (this%amr%ylo + real(jpv,WP)*dy)) * dyi
+            wzw1 = (pos(3) - (this%amr%zlo + real(kpw,WP)*dz)) * dzi
+            wxu1 = max(0.0_WP, min(1.0_WP, wxu1)); wxu2 = 1.0_WP - wxu1
+            wyv1 = max(0.0_WP, min(1.0_WP, wyv1)); wyv2 = 1.0_WP - wyv1
+            wzw1 = max(0.0_WP, min(1.0_WP, wzw1)); wzw2 = 1.0_WP - wzw1
+            ! U at x-faces: face-centered in x, cell-centered in y,z
+            vel(1) = wzc1*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc+1,1)+wxu2*pU(ipu,jpc+1,kpc+1,1)) + &
+            &              wyc2*(wxu1*pU(ipu+1,jpc  ,kpc+1,1)+wxu2*pU(ipu,jpc  ,kpc+1,1))) + &
+            &        wzc2*(wyc1*(wxu1*pU(ipu+1,jpc+1,kpc  ,1)+wxu2*pU(ipu,jpc+1,kpc  ,1)) + &
+            &              wyc2*(wxu1*pU(ipu+1,jpc  ,kpc  ,1)+wxu2*pU(ipu,jpc  ,kpc  ,1)))
+            ! V at y-faces: cell-centered in x, face-centered in y, cell-centered in z
+            vel(2) = wzc1*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc+1,1)+wxc2*pV(ipc,jpv+1,kpc+1,1)) + &
+            &              wyv2*(wxc1*pV(ipc+1,jpv  ,kpc+1,1)+wxc2*pV(ipc,jpv  ,kpc+1,1))) + &
+            &        wzc2*(wyv1*(wxc1*pV(ipc+1,jpv+1,kpc  ,1)+wxc2*pV(ipc,jpv+1,kpc  ,1)) + &
+            &              wyv2*(wxc1*pV(ipc+1,jpv  ,kpc  ,1)+wxc2*pV(ipc,jpv  ,kpc  ,1)))
+            ! W at z-faces: cell-centered in x,y, face-centered in z
+            vel(3) = wzw1*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw+1,1)+wxc2*pW(ipc,jpc+1,kpw+1,1)) + &
+            &              wyc2*(wxc1*pW(ipc+1,jpc  ,kpw+1,1)+wxc2*pW(ipc,jpc  ,kpw+1,1))) + &
+            &        wzw2*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw  ,1)+wxc2*pW(ipc,jpc+1,kpw  ,1)) + &
+            &              wyc2*(wxc1*pW(ipc+1,jpc  ,kpw  ,1)+wxc2*pW(ipc,jpc  ,kpw  ,1)))
          else
-            ! All cell-centered
-            vel(1) = wz1*(wy1*(wx1*pU(ip+1,jp+1,kp+1,1)+wx2*pU(ip,jp+1,kp+1,1)) + &
-            &             wy2*(wx1*pU(ip+1,jp  ,kp+1,1)+wx2*pU(ip,jp  ,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pU(ip+1,jp+1,kp  ,1)+wx2*pU(ip,jp+1,kp  ,1)) + &
-            &             wy2*(wx1*pU(ip+1,jp  ,kp  ,1)+wx2*pU(ip,jp  ,kp  ,1)))
-            vel(2) = wz1*(wy1*(wx1*pV(ip+1,jp+1,kp+1,1)+wx2*pV(ip,jp+1,kp+1,1)) + &
-            &             wy2*(wx1*pV(ip+1,jp  ,kp+1,1)+wx2*pV(ip,jp  ,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pV(ip+1,jp+1,kp  ,1)+wx2*pV(ip,jp+1,kp  ,1)) + &
-            &             wy2*(wx1*pV(ip+1,jp  ,kp  ,1)+wx2*pV(ip,jp  ,kp  ,1)))
-            vel(3) = wz1*(wy1*(wx1*pW(ip+1,jp+1,kp+1,1)+wx2*pW(ip,jp+1,kp+1,1)) + &
-            &             wy2*(wx1*pW(ip+1,jp  ,kp+1,1)+wx2*pW(ip,jp  ,kp+1,1))) + &
-            &        wz2*(wy1*(wx1*pW(ip+1,jp+1,kp  ,1)+wx2*pW(ip,jp+1,kp  ,1)) + &
-            &             wy2*(wx1*pW(ip+1,jp  ,kp  ,1)+wx2*pW(ip,jp  ,kp  ,1)))
+            ! All cell-centered: use U bounds (all arrays have same bounds)
+            ipc = floor((pos(1) - this%amr%xlo) * dxi - 0.5_WP)
+            jpc = floor((pos(2) - this%amr%ylo) * dyi - 0.5_WP)
+            kpc = floor((pos(3) - this%amr%zlo) * dzi - 0.5_WP)
+            ipc = max(lbound(pU,1), min(ubound(pU,1)-1, ipc))
+            jpc = max(lbound(pU,2), min(ubound(pU,2)-1, jpc))
+            kpc = max(lbound(pU,3), min(ubound(pU,3)-1, kpc))
+            ! Cell-centered weights
+            wxc1 = (pos(1) - (this%amr%xlo + (real(ipc,WP)+0.5_WP)*dx)) * dxi
+            wyc1 = (pos(2) - (this%amr%ylo + (real(jpc,WP)+0.5_WP)*dy)) * dyi
+            wzc1 = (pos(3) - (this%amr%zlo + (real(kpc,WP)+0.5_WP)*dz)) * dzi
+            wxc1 = max(0.0_WP, min(1.0_WP, wxc1)); wxc2 = 1.0_WP - wxc1
+            wyc1 = max(0.0_WP, min(1.0_WP, wyc1)); wyc2 = 1.0_WP - wyc1
+            wzc1 = max(0.0_WP, min(1.0_WP, wzc1)); wzc2 = 1.0_WP - wzc1
+            vel(1) = wzc1*(wyc1*(wxc1*pU(ipc+1,jpc+1,kpc+1,1)+wxc2*pU(ipc,jpc+1,kpc+1,1)) + &
+            &              wyc2*(wxc1*pU(ipc+1,jpc  ,kpc+1,1)+wxc2*pU(ipc,jpc  ,kpc+1,1))) + &
+            &        wzc2*(wyc1*(wxc1*pU(ipc+1,jpc+1,kpc  ,1)+wxc2*pU(ipc,jpc+1,kpc  ,1)) + &
+            &              wyc2*(wxc1*pU(ipc+1,jpc  ,kpc  ,1)+wxc2*pU(ipc,jpc  ,kpc  ,1)))
+            vel(2) = wzc1*(wyc1*(wxc1*pV(ipc+1,jpc+1,kpc+1,1)+wxc2*pV(ipc,jpc+1,kpc+1,1)) + &
+            &              wyc2*(wxc1*pV(ipc+1,jpc  ,kpc+1,1)+wxc2*pV(ipc,jpc  ,kpc+1,1))) + &
+            &        wzc2*(wyc1*(wxc1*pV(ipc+1,jpc+1,kpc  ,1)+wxc2*pV(ipc,jpc+1,kpc  ,1)) + &
+            &              wyc2*(wxc1*pV(ipc+1,jpc  ,kpc  ,1)+wxc2*pV(ipc,jpc  ,kpc  ,1)))
+            vel(3) = wzc1*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpc+1,1)+wxc2*pW(ipc,jpc+1,kpc+1,1)) + &
+            &              wyc2*(wxc1*pW(ipc+1,jpc  ,kpc+1,1)+wxc2*pW(ipc,jpc  ,kpc+1,1))) + &
+            &        wzc2*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpc  ,1)+wxc2*pW(ipc,jpc+1,kpc  ,1)) + &
+            &              wyc2*(wxc1*pW(ipc+1,jpc  ,kpc  ,1)+wxc2*pW(ipc,jpc  ,kpc  ,1)))
          end if
       end function interp_velocity
 
