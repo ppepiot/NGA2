@@ -644,7 +644,7 @@ contains
       call get_level_range(this, lvl, lbase, l0, l1)
       ic = 1; if (present(comp)) ic = comp
       nc = this%ncomp; if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = this%ng; if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%plus(val, ic, nc, ng)
       end do
@@ -661,7 +661,7 @@ contains
       call get_level_range(this, lvl, lbase, l0, l1)
       ic = 1; if (present(comp)) ic = comp
       nc = this%ncomp; if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = this%ng; if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%mult(val, ic, nc, ng)
       end do
@@ -683,7 +683,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%add(src%mf(l), sc, dc, nc, ng)
       end do
@@ -701,7 +701,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%subtract(src%mf(l), sc, dc, nc, ng)
       end do
@@ -719,7 +719,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%multiply(src%mf(l), sc, dc, nc, ng)
       end do
@@ -737,7 +737,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%divide(src%mf(l), sc, dc, nc, ng)
       end do
@@ -755,7 +755,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%copy(src%mf(l), sc, dc, nc, ng)
       end do
@@ -778,7 +778,7 @@ contains
       sc = 1; if (present(srccomp)) sc = srccomp
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, src%ncomp); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, src%ng); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%saxpy(a, src%mf(l), sc, dc, nc, ng)
       end do
@@ -798,7 +798,7 @@ contains
       sc2 = 1; if (present(srccomp2)) sc2 = srccomp2
       dc = 1; if (present(dstcomp)) dc = dstcomp
       nc = min(this%ncomp, min(src1%ncomp, src2%ncomp)); if (present(ncomp)) nc = ncomp
-      ng = 0; if (present(nghost)) ng = nghost
+      ng = min(this%ng, min(src1%ng, src2%ng)); if (present(nghost)) ng = nghost
       do l = l0, l1
          call this%mf(l)%lincomb(a, src1%mf(l), sc1, b, src2%mf(l), sc2, dc, nc, ng)
       end do

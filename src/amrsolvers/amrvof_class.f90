@@ -1339,13 +1339,13 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold, pCliqold, pCgasold, pPLICold
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
-      real(WP), dimension(:,:,:,:), allocatable :: Fx, Fy, Fz  ! Volume fluxes (Lvol, Gvol, Lbar(3), Gbar(3))
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pFx, pFy, pFz   ! Pointers into flux MultiFabs
+      type(amrex_multifab) :: Fx_mf, Fy_mf, Fz_mf                          ! Face-centered flux MultiFabs
       real(WP) :: Lvol_old, Gvol_old, Lvol_new, Gvol_new, Lvol_flux, Gvol_flux
       real(WP), dimension(3) :: Lbar_old, Gbar_old, Lbar_new, Gbar_new, Lbar_flux, Gbar_flux
-      real(WP) :: dx, dy, dz, vol, face_vel
+      real(WP) :: dx, dy, dz, vol
       type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      integer :: ilo, ihi, jlo, jhi, klo, khi
+      type(amrex_box) :: bx, fbx
       ! Shared variables for internal functions
       real(WP), dimension(3,9) :: face     ! 4 current + 4 projected + 1 center
       real(WP) :: dxi, dyi, dzi
@@ -1375,77 +1375,85 @@ contains
       lvl = this%amr%clvl()
       
       ! Get cell size
-      dx = this%amr%dx(lvl); dxi=1.0_WP/dx
-      dy = this%amr%dy(lvl); dyi=1.0_WP/dy
-      dz = this%amr%dz(lvl); dzi=1.0_WP/dz
+      dx = this%amr%dx(lvl); dxi = 1.0_WP/dx
+      dy = this%amr%dy(lvl); dyi = 1.0_WP/dy
+      dz = this%amr%dz(lvl); dzi = 1.0_WP/dz
       vol = dx * dy * dz
       
-      ! Iterate over boxes
-      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
+      ! Build face-centered flux MultiFabs (8 components: Lvol, Gvol, Lbar(3), Gbar(3))
+      call this%amr%mfab_build(lvl=lvl, mfab=Fx_mf, ncomp=8, nover=0, atface=[.true. , .false., .false.])
+      call this%amr%mfab_build(lvl=lvl, mfab=Fy_mf, ncomp=8, nover=0, atface=[.false., .true. , .false.])
+      call this%amr%mfab_build(lvl=lvl, mfab=Fz_mf, ncomp=8, nover=0, atface=[.false., .false., .true. ])
+      
+      ! Phase 1: Compute all fluxes
+      call this%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
          
-         ! Get pointers
+         ! Get data pointers
+         pVFold => this%VFold%mf(lvl)%dataptr(mfi)
+         pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
+         pU => U%dataptr(mfi)
+         pV => V%dataptr(mfi)
+         pW => W%dataptr(mfi)
+         
+         ! X-fluxes: loop over nodaltilebox(1)
+         fbx = mfi%nodaltilebox(1)
+         pFx => Fx_mf%dataptr(mfi)
+         if (is_staggered) then
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 1, pU(i,j,k,1), pFx(i,j,k,1:8))
+            end do; end do; end do
+         else
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 1, 0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)), pFx(i,j,k,1:8))
+            end do; end do; end do
+         end if
+         
+         ! Y-fluxes: loop over nodaltilebox(2)
+         fbx = mfi%nodaltilebox(2)
+         pFy => Fy_mf%dataptr(mfi)
+         if (is_staggered) then
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 2, pV(i,j,k,1), pFy(i,j,k,1:8))
+            end do; end do; end do
+         else
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 2, 0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)), pFy(i,j,k,1:8))
+            end do; end do; end do
+         end if
+         
+         ! Z-fluxes: loop over nodaltilebox(3)
+         fbx = mfi%nodaltilebox(3)
+         pFz => Fz_mf%dataptr(mfi)
+         if (is_staggered) then
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 3, pW(i,j,k,1), pFz(i,j,k,1:8))
+            end do; end do; end do
+         else
+            do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
+               call compute_flux(i, j, k, 3, 0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)), pFz(i,j,k,1:8))
+            end do; end do; end do
+         end if
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      
+      ! Phase 2: Update VF from fluxes
+      call this%amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         
+         ! Get data pointers
          pVF => this%VF%mf(lvl)%dataptr(mfi)
          pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
          pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
          pVFold => this%VFold%mf(lvl)%dataptr(mfi)
          pCliqold => this%Cliqold%mf(lvl)%dataptr(mfi)
          pCgasold => this%Cgasold%mf(lvl)%dataptr(mfi)
-         pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
-         pU => U%dataptr(mfi)
-         pV => V%dataptr(mfi)
-         pW => W%dataptr(mfi)
+         pFx => Fx_mf%dataptr(mfi)
+         pFy => Fy_mf%dataptr(mfi)
+         pFz => Fz_mf%dataptr(mfi)
          
-         ilo = lbound(pVF,1); ihi = ubound(pVF,1)
-         jlo = lbound(pVF,2); jhi = ubound(pVF,2)
-         klo = lbound(pVF,3); khi = ubound(pVF,3)
-         
-         ! Allocate flux arrays (8 components: Lvol, Gvol, Lbar(3), Gbar(3))
-         allocate(Fx(8,ilo:ihi+1,jlo:jhi,klo:khi)); Fx = 0.0_WP
-         allocate(Fy(8,ilo:ihi,jlo:jhi+1,klo:khi)); Fy = 0.0_WP
-         allocate(Fz(8,ilo:ihi,jlo:jhi,klo:khi+1)); Fz = 0.0_WP
-         
-         ! Compute fluxes at each face
-         do k = bx%lo(3), bx%hi(3)+1
-            do j = bx%lo(2), bx%hi(2)+1
-               do i = bx%lo(1), bx%hi(1)+1
-                  
-                  ! X-flux at face (i,j,k)
-                  if (i.le.bx%hi(1)+1 .and. j.le.bx%hi(2) .and. k.le.bx%hi(3)) then
-                     if (is_staggered) then
-                        face_vel = pU(i,j,k,1)
-                     else
-                        face_vel = 0.5_WP*(pU(i-1,j,k,1) + pU(i,j,k,1))
-                     end if
-                     call compute_flux(i, j, k, 1, face_vel, Fx(:,i,j,k))
-                  end if
-                  
-                  ! Y-flux at face (i,j,k)
-                  if (i.le.bx%hi(1) .and. j.le.bx%hi(2)+1 .and. k.le.bx%hi(3)) then
-                     if (is_staggered) then
-                        face_vel = pV(i,j,k,1)
-                     else
-                        face_vel = 0.5_WP*(pV(i,j-1,k,1) + pV(i,j,k,1))
-                     end if
-                     call compute_flux(i, j, k, 2, face_vel, Fy(:,i,j,k))
-                  end if
-                  
-                  ! Z-flux at face (i,j,k)
-                  if (i.le.bx%hi(1) .and. j.le.bx%hi(2) .and. k.le.bx%hi(3)+1) then
-                     if (is_staggered) then
-                        face_vel = pW(i,j,k,1)
-                     else
-                        face_vel = 0.5_WP*(pW(i,j,k-1,1) + pW(i,j,k,1))
-                     end if
-                     call compute_flux(i, j, k, 3, face_vel, Fz(:,i,j,k))
-                  end if
-                  
-               end do
-            end do
-         end do
-         
-         ! Update volume moments
          do k = bx%lo(3), bx%hi(3)
             do j = bx%lo(2), bx%hi(2)
                do i = bx%lo(1), bx%hi(1)
@@ -1456,14 +1464,14 @@ contains
                   Gbar_old = pCgasold(i,j,k,1:3)
                   
                   ! Net flux (outflow positive)
-                  Lvol_flux = Fx(1,i+1,j,k) - Fx(1,i,j,k) + Fy(1,i,j+1,k) - Fy(1,i,j,k) + Fz(1,i,j,k+1) - Fz(1,i,j,k)
-                  Gvol_flux = Fx(2,i+1,j,k) - Fx(2,i,j,k) + Fy(2,i,j+1,k) - Fy(2,i,j,k) + Fz(2,i,j,k+1) - Fz(2,i,j,k)
-                  Lbar_flux = Fx(3:5,i+1,j,k) - Fx(3:5,i,j,k) + Fy(3:5,i,j+1,k) - Fy(3:5,i,j,k) + Fz(3:5,i,j,k+1) - Fz(3:5,i,j,k)
-                  Gbar_flux = Fx(6:8,i+1,j,k) - Fx(6:8,i,j,k) + Fy(6:8,i,j+1,k) - Fy(6:8,i,j,k) + Fz(6:8,i,j,k+1) - Fz(6:8,i,j,k)
+                  Lvol_flux = pFx(i+1,j,k,1) - pFx(i,j,k,1) + pFy(i,j+1,k,1) - pFy(i,j,k,1) + pFz(i,j,k+1,1) - pFz(i,j,k,1)
+                  Gvol_flux = pFx(i+1,j,k,2) - pFx(i,j,k,2) + pFy(i,j+1,k,2) - pFy(i,j,k,2) + pFz(i,j,k+1,2) - pFz(i,j,k,2)
+                  Lbar_flux = pFx(i+1,j,k,3:5) - pFx(i,j,k,3:5) + pFy(i,j+1,k,3:5) - pFy(i,j,k,3:5) + pFz(i,j,k+1,3:5) - pFz(i,j,k,3:5)
+                  Gbar_flux = pFx(i+1,j,k,6:8) - pFx(i,j,k,6:8) + pFy(i,j+1,k,6:8) - pFy(i,j,k,6:8) + pFz(i,j,k+1,6:8) - pFz(i,j,k,6:8)
                   
                   ! New volumes
-                  Lvol_new = Lvol_old - Lvol_flux
-                  Gvol_new = Gvol_old - Gvol_flux
+                  Lvol_new = Lvol_old + Lvol_flux
+                  Gvol_new = Gvol_old + Gvol_flux
                   
                   ! New VF
                   pVF(i,j,k,1) = Lvol_new / (Lvol_new + Gvol_new)
@@ -1482,19 +1490,22 @@ contains
                      &                   this%amr%zlo + (real(k,WP)+0.5_WP)*dz]
                      pCgas(i,j,k,1:3) = pCliq(i,j,k,1:3)
                   else
-                     ! Update barycenters from moment conservation
-                     Lbar_new = (Lbar_old * Lvol_old - Lbar_flux) / Lvol_new
-                     Gbar_new = (Gbar_old * Gvol_old - Gbar_flux) / Gvol_new
-                     pCliq(i,j,k,1:3) = Lbar_new
-                     pCgas(i,j,k,1:3) = Gbar_new
+                     ! Update barycenters from moment conservation and project forward
+                     Lbar_new = (Lbar_old * Lvol_old + Lbar_flux) / Lvol_new
+                     Gbar_new = (Gbar_old * Gvol_old + Gbar_flux) / Gvol_new
+                     pCliq(i,j,k,1:3) = project(Lbar_new, dt)
+                     pCgas(i,j,k,1:3) = project(Gbar_new, dt)
                   end if
                end do
             end do
          end do
-         
-         deallocate(Fx, Fy, Fz)
       end do
       call this%amr%mfiter_destroy(mfi)
+      
+      ! Cleanup flux MultiFabs
+      call this%amr%mfab_destroy(Fx_mf)
+      call this%amr%mfab_destroy(Fy_mf)
+      call this%amr%mfab_destroy(Fz_mf)
       
       ! Sync and apply BC
       call this%fill_moments_lvl(lvl, time)
@@ -1503,7 +1514,8 @@ contains
       
       !> Compute flux through a face using full semi-Lagrangian RK2 with recursive tet cutting
       subroutine compute_flux(fi, fj, fk, dir, fv, flux)
-         use amrvof_geometry, only: tet_map, cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert
+         use amrvof_geometry, only: tet_map, cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert, &
+         &                          tet_sign, volume_correct_x, volume_correct_y, volume_correct_z 
          integer, intent(in) :: fi, fj, fk, dir
          real(WP), intent(in) :: fv
          real(WP), dimension(8), intent(out) :: flux
@@ -1536,20 +1548,6 @@ contains
             end if
          end if
          
-         ! Skip pure cells - fast path
-         if (pVFold(src_i,src_j,src_k,1) .lt. VFlo .or. pVFold(src_i,src_j,src_k,1) .gt. VFhi) then
-            vol_expected = abs(fv) * dt
-            if (dir .eq. 1) vol_expected = vol_expected * dy * dz
-            if (dir .eq. 2) vol_expected = vol_expected * dx * dz
-            if (dir .eq. 3) vol_expected = vol_expected * dx * dy
-            if (pVFold(src_i,src_j,src_k,1) .lt. VFlo) then
-               flux(2) = sign(vol_expected, fv)  ! Gas volume
-            else
-               flux(1) = sign(vol_expected, fv)  ! Liquid volume
-            end if
-            return
-         end if
-         
          ! Build face vertices (1-4 at current position, 5-8 projected back)
          if (dir .eq. 1) then
             face(:,1) = [this%amr%xlo + real(fi,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
@@ -1564,14 +1562,14 @@ contains
             face(:,4) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk+1,WP)*dz]
             vol_expected = -fv * dt * dx * dz
          else
-            face(:,1) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
+            face(:,1) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             face(:,2) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
+            face(:,3) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             face(:,4) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             vol_expected = -fv * dt * dx * dy
          end if
          
-         ! Project vertices back in time with RK2
+         ! Project vertices back in time
          face(:,5) = project(face(:,1), -dt)
          face(:,6) = project(face(:,2), -dt)
          face(:,7) = project(face(:,3), -dt)
@@ -1582,11 +1580,11 @@ contains
          
          ! Apply volume correction for exact flux
          if (dir .eq. 1) then
-            call volume_correct_x(vol_expected)
+            call volume_correct_x(face, vol_expected)
          else if (dir .eq. 2) then
-            call volume_correct_y(vol_expected)
+            call volume_correct_y(face, vol_expected)
          else
-            call volume_correct_z(vol_expected)
+            call volume_correct_z(face, vol_expected)
          end if
          
          ! Process each of the 8 tets with recursive cutting
@@ -1596,21 +1594,21 @@ contains
                tetra(:,nn) = face(:,tet_map(nn,ntet))
                if (dir .eq. 1) then
                   myijk(1,nn) = src_i
-                  myijk(2,nn) = min(max(floor((tetra(2,nn) - this%amr%ylo) * dyi), jlo_), jhi_)
-                  myijk(3,nn) = min(max(floor((tetra(3,nn) - this%amr%zlo) * dzi), klo_), khi_)
+                  myijk(2,nn) = floor((tetra(2,nn) - this%amr%ylo) * dyi)
+                  myijk(3,nn) = floor((tetra(3,nn) - this%amr%zlo) * dzi)
                else if (dir .eq. 2) then
-                  myijk(1,nn) = min(max(floor((tetra(1,nn) - this%amr%xlo) * dxi), ilo_), ihi_)
+                  myijk(1,nn) = floor((tetra(1,nn) - this%amr%xlo) * dxi)
                   myijk(2,nn) = src_j
-                  myijk(3,nn) = min(max(floor((tetra(3,nn) - this%amr%zlo) * dzi), klo_), khi_)
+                  myijk(3,nn) = floor((tetra(3,nn) - this%amr%zlo) * dzi)
                else
-                  myijk(1,nn) = min(max(floor((tetra(1,nn) - this%amr%xlo) * dxi), ilo_), ihi_)
-                  myijk(2,nn) = min(max(floor((tetra(2,nn) - this%amr%ylo) * dyi), jlo_), jhi_)
+                  myijk(1,nn) = floor((tetra(1,nn) - this%amr%xlo) * dxi)
+                  myijk(2,nn) = floor((tetra(2,nn) - this%amr%ylo) * dyi)
                   myijk(3,nn) = src_k
                end if
             end do
             
             ! Compute tet sign
-            my_tet_sign = tet_sign_func(tetra)
+            my_tet_sign = tet_sign(tetra)
             
             ! Recursively cut tet by grid and PLIC, accumulate flux
             tet_flux = tet2flux(tetra, myijk)
@@ -1730,6 +1728,7 @@ contains
       !> Cut tet by PLIC and compute flux (base case of recursion)
       function tet2flux_plic(mytet, i0, j0, k0) result(myflux)
          use amrvof_geometry, only: cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert, cut_nntet
+         use messager, only: die
          real(WP), dimension(3,4), intent(in) :: mytet
          integer, intent(in) :: i0, j0, k0
          real(WP), dimension(8) :: myflux
@@ -1740,6 +1739,13 @@ contains
          real(WP) :: denom, mu, my_vol, dist
          
          myflux = 0.0_WP
+         
+         ! Check indices are within PLICold bounds
+         if (i0 .lt. lbound(pPLICold,1) .or. i0 .gt. ubound(pPLICold,1) .or. &
+             j0 .lt. lbound(pPLICold,2) .or. j0 .gt. ubound(pPLICold,2) .or. &
+             k0 .lt. lbound(pPLICold,3) .or. k0 .gt. ubound(pPLICold,3)) then
+            call die('[tet2flux_plic] Index out of bounds - check CFL or ghost cells')
+         end if
          
          ! Get PLIC from this cell
          normal = pPLICold(i0, j0, k0, 1:3)

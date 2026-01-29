@@ -555,7 +555,7 @@ contains
             call volume_correct_z(-W(i,j,k)*dt*this%dx*this%dy)
             ! Cut each tet recursively and calculate flux
             kflux=merge(k-1,k,W(i,j,k).ge.0.0_WP)
-            do n=1,6
+            do n=1,8
                ! Build tet and corresponding indices
                do nn=1,4
                   tetra(:,nn)=face(:,tet_map(nn,n))
