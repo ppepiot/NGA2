@@ -389,11 +389,9 @@ contains
          end do
 
          ! Write HDF5 file for this centering group
-         !print*, 'RANK', this%amr%rank, 'writing HDF5:', trim(filename), 'nlev=', nlev, 'ncomp=', ncomp; flush(6)
          call amrplotfile_write_hdf5(trim(filename)//c_null_char, nlev, mf_ptrs, &
             varname_ptrs, ncomp, geom_ptrs, real(time,c_double), level_steps, &
             ref_ratios, c_null_char)
-         !print*, 'RANK', this%amr%rank, 'HDF5 write complete'; flush(6)
 
          ! Cleanup for this group
          do lev = 0, this%amr%clvl()

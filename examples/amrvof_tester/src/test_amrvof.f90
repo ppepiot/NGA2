@@ -175,7 +175,7 @@ contains
          call amr%mfab_build(lvl, W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true.])
          
          ! Initialize: uniform translation U=1, V=0, W=0
-         call U%setval(1.0_WP)
+         call U%setval(0.1_WP)
          call V%setval(0.0_WP)
          call W%setval(0.0_WP)
          

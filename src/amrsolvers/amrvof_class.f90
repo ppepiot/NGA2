@@ -1129,11 +1129,10 @@ contains
       
       polygon_extraction: block
          integer :: i, j, k, ii, jj, kk
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pPLIC
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC
          real(WP), dimension(3) :: lo, hi
          real(WP), dimension(4) :: plane
          real(WP), dimension(3,8) :: hex
-         real(WP) :: vf_cell
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: bx, gbx
          
@@ -1148,7 +1147,6 @@ contains
          do while (mfi%next())
             bx = mfi%tilebox()
             gbx = mfi%growntilebox(2)  ! Grown by 2 for 5x5x5 stencil
-            pVF   => this%VF%mf(lvl)%dataptr(mfi)
             pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
             
             ! Get bounds for per-FAB allocation
@@ -1165,11 +1163,12 @@ contains
             do kk = glo(3), ghi(3)
                do jj = glo(2), ghi(2)
                   do ii = glo(1), ghi(1)
-                     vf_cell = pVF(ii,jj,kk,1)
-                     if (vf_cell.lt.VFlo .or. vf_cell.gt.VFhi) cycle
+                     
+                     ! Skip cells with no interface
+                     if (abs(pPLIC(ii,jj,kk,4)) .gt. 1.0e+9_WP) cycle
                      
                      ! Build hex and plane
-                     lo = [this%amr%xlo + real(ii,WP)*dx, this%amr%ylo + real(jj,WP)*dy, this%amr%zlo + real(kk,WP)*dz]
+                     lo = [this%amr%xlo + real(ii  ,WP)*dx, this%amr%ylo + real(jj  ,WP)*dy, this%amr%zlo + real(kk  ,WP)*dz]
                      hi = [this%amr%xlo + real(ii+1,WP)*dx, this%amr%ylo + real(jj+1,WP)*dy, this%amr%zlo + real(kk+1,WP)*dz]
                      plane = [pPLIC(ii,jj,kk,1), pPLIC(ii,jj,kk,2), pPLIC(ii,jj,kk,3), pPLIC(ii,jj,kk,4)]
                      hex(:,1) = [hi(1), lo(2), lo(3)]
