@@ -1387,18 +1387,18 @@ contains
       ! Phase 1: Compute all fluxes
       call this%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
-         bx = mfi%tilebox()
          
          ! Get data pointers
-         pVFold => this%VFold%mf(lvl)%dataptr(mfi)
          pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
          pU => U%dataptr(mfi)
          pV => V%dataptr(mfi)
          pW => W%dataptr(mfi)
+         pFx => Fx_mf%dataptr(mfi)
+         pFy => Fy_mf%dataptr(mfi)
+         pFz => Fz_mf%dataptr(mfi)
          
          ! X-fluxes: loop over nodaltilebox(1)
          fbx = mfi%nodaltilebox(1)
-         pFx => Fx_mf%dataptr(mfi)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
                call compute_flux(i, j, k, 1, pU(i,j,k,1), pFx(i,j,k,1:8))
@@ -1411,7 +1411,6 @@ contains
          
          ! Y-fluxes: loop over nodaltilebox(2)
          fbx = mfi%nodaltilebox(2)
-         pFy => Fy_mf%dataptr(mfi)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
                call compute_flux(i, j, k, 2, pV(i,j,k,1), pFy(i,j,k,1:8))
@@ -1424,7 +1423,6 @@ contains
          
          ! Z-fluxes: loop over nodaltilebox(3)
          fbx = mfi%nodaltilebox(3)
-         pFz => Fz_mf%dataptr(mfi)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
                call compute_flux(i, j, k, 3, pW(i,j,k,1), pFz(i,j,k,1:8))
@@ -1520,11 +1518,8 @@ contains
          real(WP), dimension(8), intent(out) :: flux
          real(WP), dimension(3,4) :: tetra
          integer, dimension(3,4) :: myijk
-         real(WP) :: vol_expected, my_tet_sign
+         real(WP) :: vol_expected
          integer :: src_i, src_j, src_k, ntet, nn
-         real(WP), dimension(8) :: tet_flux
-         
-         flux = 0.0_WP
          
          ! Determine upwind cell
          if (dir .eq. 1) then
@@ -1555,15 +1550,15 @@ contains
             face(:,4) = [this%amr%xlo + real(fi,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
             vol_expected = -fv * dt * dy * dz
          else if (dir .eq. 2) then
-            face(:,1) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
-            face(:,2) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk+1,WP)*dz]
-            face(:,4) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk+1,WP)*dz]
-            vol_expected = -fv * dt * dx * dz
+            face(:,1) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk+1,WP)*dz]
+            face(:,2) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk+1,WP)*dz]
+            face(:,3) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
+            face(:,4) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj,WP)*dy, this%amr%zlo + real(fk  ,WP)*dz]
+            vol_expected = -fv * dt * dz * dx
          else
-            face(:,1) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
+            face(:,1) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             face(:,2) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
-            face(:,3) = [this%amr%xlo + real(fi  ,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
+            face(:,3) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj  ,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             face(:,4) = [this%amr%xlo + real(fi+1,WP)*dx, this%amr%ylo + real(fj+1,WP)*dy, this%amr%zlo + real(fk,WP)*dz]
             vol_expected = -fv * dt * dx * dy
          end if
@@ -1586,7 +1581,8 @@ contains
             call volume_correct_z(face, vol_expected)
          end if
          
-         ! Process each of the 8 tets with recursive cutting
+         ! Process each of the 8 tets with recursive cutting and increment flux
+         flux = 0.0_WP
          do ntet = 1, 8
             ! Build tet from face vertices
             do nn = 1, 4
@@ -1606,19 +1602,13 @@ contains
                end if
             end do
             
-            ! Compute tet sign
-            my_tet_sign = tet_sign(tetra)
-            
-            ! Recursively cut tet by grid and PLIC, accumulate flux
-            tet_flux = tet2flux(tetra, myijk)
-            
-            ! Apply flux sign based on direction
+            ! Increment flux
             if (dir .eq. 1) then
-               flux = flux + my_tet_sign * tet_flux
+               flux = flux + tet_sign(tetra) * tet2flux(tetra, myijk)
             else if (dir .eq. 2) then
-               flux = flux - my_tet_sign * tet_flux
+               flux = flux - tet_sign(tetra) * tet2flux(tetra, myijk)
             else
-               flux = flux + my_tet_sign * tet_flux
+               flux = flux + tet_sign(tetra) * tet2flux(tetra, myijk)
             end if
          end do
          
@@ -1822,7 +1812,6 @@ contains
          integer  :: ipu, jpv, kpw   ! Face-centered indices
          real(WP) :: wxc1, wyc1, wzc1, wxc2, wyc2, wzc2  ! Cell-centered weights
          real(WP) :: wxu1, wyv1, wzw1, wxu2, wyv2, wzw2  ! Face-centered weights
-         
          if (is_staggered) then
             ! Compute raw indices
             ipc = floor((pos(1) - this%amr%xlo) * dxi - 0.5_WP)
