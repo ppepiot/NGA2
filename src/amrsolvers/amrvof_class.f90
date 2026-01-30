@@ -1502,12 +1502,14 @@ contains
       type(amrex_multifab), intent(in) :: U, V, W
       real(WP), intent(in) :: dt
       real(WP), intent(in) :: time
+      type(amrex_multifab) :: band
       logical :: is_staggered
       integer :: lvl, i, j, k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold, pCliqold, pCgasold, pPLICold
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFx, pFy, pFz   ! Pointers into flux MultiFabs
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand
       type(amrex_multifab) :: Fx_mf, Fy_mf, Fz_mf                          ! Face-centered flux MultiFabs
       real(WP) :: Lvol_old, Gvol_old, Lvol_new, Gvol_new, Lvol_flux, Gvol_flux
       real(WP), dimension(3) :: Lbar_old, Gbar_old, Lbar_new, Gbar_new, Lbar_flux, Gbar_flux
@@ -1542,6 +1544,55 @@ contains
       ! Only advect at finest level
       lvl = this%amr%clvl()
       
+      ! Build transport band to localize computation
+      build_band: block
+         integer :: n1, n2, n3
+         ! Build MultiFab with 1 ghost cell
+         call this%amr%mfab_build(lvl=lvl, mfab=band, ncomp=1, nover=1)
+         ! Pass 1: Mark interface cells (band=1)
+         call band%setval(0.0_WP)
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pVFold => this%VFold%mf(lvl)%dataptr(mfi)
+            pBand => band%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+               ! Mixed cell
+               if (pVFold(i,j,k,1) .ge. VFlo .and. pVFold(i,j,k,1) .le. VFhi) then
+                  pBand(i,j,k,1) = 1.0_WP
+               ! Implicit interface: pure cell adjacent to opposite phase
+               else
+                  do n3 = -1, 1; do n2 = -1, 1; do n1 = -1, 1
+                     if (n1.eq.0 .and. n2.eq.0 .and. n3.eq.0) cycle
+                     if (pVFold(i,j,k,1) .lt. VFlo .and. pVFold(i+n1,j+n2,k+n3,1) .gt. VFhi) then
+                        pBand(i,j,k,1) = 1.0_WP; exit
+                     end if
+                     if (pVFold(i,j,k,1) .gt. VFhi .and. pVFold(i+n1,j+n2,k+n3,1) .lt. VFlo) then
+                        pBand(i,j,k,1) = 1.0_WP; exit
+                     end if
+                  end do; end do; end do
+               end if
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         ! Synchronize within level
+         call band%fill_boundary(this%amr%geom(lvl))
+         ! Pass 2: Extend by 1 layer (band=2)
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pBand => band%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+               if (pBand(i,j,k,1) .eq. 0.0_WP) then
+                  if (any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.1.0_WP)) pBand(i,j,k,1) = 2.0_WP
+               end if
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         ! Synchronize within level
+         call band%fill_boundary(this%amr%geom(lvl))
+      end block build_band
+
       ! Get cell size
       dx = this%amr%dx(lvl); dxi = 1.0_WP/dx
       dy = this%amr%dy(lvl); dyi = 1.0_WP/dy
@@ -1558,6 +1609,7 @@ contains
       do while (mfi%next())
          
          ! Get data pointers
+         pBand => band%dataptr(mfi)
          pPLICold => this%PLICold%mf(lvl)%dataptr(mfi)
          pU => U%dataptr(mfi)
          pV => V%dataptr(mfi)
@@ -1570,11 +1622,19 @@ contains
          fbx = mfi%nodaltilebox(1)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 1, pU(i,j,k,1), pFx(i,j,k,1:8))
+               if (maxval(pBand(i-1:i,j,k,1)) .eq. 0.0_WP) then
+                  pFx(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 1, pU(i,j,k,1), pFx(i,j,k,1:8))
+               end if
             end do; end do; end do
          else
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 1, 0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)), pFx(i,j,k,1:8))
+               if (maxval(pBand(i-1:i,j,k,1)) .eq. 0.0_WP) then
+                  pFx(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 1, 0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)), pFx(i,j,k,1:8))
+               end if
             end do; end do; end do
          end if
          
@@ -1582,11 +1642,19 @@ contains
          fbx = mfi%nodaltilebox(2)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 2, pV(i,j,k,1), pFy(i,j,k,1:8))
+               if (maxval(pBand(i,j-1:j,k,1)) .eq. 0.0_WP) then
+                  pFy(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 2, pV(i,j,k,1), pFy(i,j,k,1:8))
+               end if
             end do; end do; end do
          else
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 2, 0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)), pFy(i,j,k,1:8))
+               if (maxval(pBand(i,j-1:j,k,1)) .eq. 0.0_WP) then
+                  pFy(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 2, 0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)), pFy(i,j,k,1:8))
+               end if
             end do; end do; end do
          end if
          
@@ -1594,11 +1662,19 @@ contains
          fbx = mfi%nodaltilebox(3)
          if (is_staggered) then
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 3, pW(i,j,k,1), pFz(i,j,k,1:8))
+               if (maxval(pBand(i,j,k-1:k,1)) .eq. 0.0_WP) then
+                  pFz(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 3, pW(i,j,k,1), pFz(i,j,k,1:8))
+               end if
             end do; end do; end do
          else
             do k = fbx%lo(3), fbx%hi(3); do j = fbx%lo(2), fbx%hi(2); do i = fbx%lo(1), fbx%hi(1)
-               call compute_flux(i, j, k, 3, 0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)), pFz(i,j,k,1:8))
+               if (maxval(pBand(i,j,k-1:k,1)) .eq. 0.0_WP) then
+                  pFz(i,j,k,1:8) = 0.0_WP
+               else
+                  call compute_flux(i, j, k, 3, 0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)), pFz(i,j,k,1:8))
+               end if
             end do; end do; end do
          end if
       end do
@@ -1610,6 +1686,7 @@ contains
          bx = mfi%tilebox()
          
          ! Get data pointers
+         pBand => band%dataptr(mfi)
          pVF => this%VF%mf(lvl)%dataptr(mfi)
          pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
          pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
@@ -1623,6 +1700,10 @@ contains
          do k = bx%lo(3), bx%hi(3)
             do j = bx%lo(2), bx%hi(2)
                do i = bx%lo(1), bx%hi(1)
+
+                  ! Skip if cell not in band
+                  if (pBand(i,j,k,1) .eq. 0.0_WP) cycle
+
                   ! Old volumes
                   Lvol_old = pVFold(i,j,k,1) * vol
                   Gvol_old = (1.0_WP - pVFold(i,j,k,1)) * vol
@@ -1672,6 +1753,9 @@ contains
       call this%amr%mfab_destroy(Fx_mf)
       call this%amr%mfab_destroy(Fy_mf)
       call this%amr%mfab_destroy(Fz_mf)
+
+      ! Clean up band multifab
+      call this%amr%mfab_destroy(band)
       
       ! Sync and apply BC
       call this%fill_moments_lvl(lvl, time)
