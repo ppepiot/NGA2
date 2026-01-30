@@ -192,6 +192,7 @@ contains
          call mfile%add_column(time%n, 'Timestep')
          call mfile%add_column(time%t, 'Time')
          call mfile%add_column(time%dt, 'dt')
+         call mfile%add_column(time%cfl, 'CFL')
          call mfile%add_column(vof%VFint, 'VFint')
          call mfile%add_column(vof%VFmin, 'VFmin')
          call mfile%add_column(vof%VFmax, 'VFmax')

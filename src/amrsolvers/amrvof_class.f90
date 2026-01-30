@@ -53,6 +53,9 @@ module amrvof_class
       type(amrdata) :: Cgasold
       type(amrdata) :: PLICold
 
+      ! Tagging parameter
+      integer :: regrid_buffer = 10  !< Number of cells to buffer around interface for tagging
+
       ! Monitoring quantities
       real(WP) :: VFmin = 0.0_WP    !< Minimum VF
       real(WP) :: VFmax = 0.0_WP    !< Maximum VF
@@ -179,70 +182,91 @@ contains
       call this%on_clear(lvl)
    end subroutine amrvof_on_clear
 
-   !> Dispatch tagging: tag cells near interface (3x3x3 stencil check)
+   !> Dispatch tagging: tag cells near interface with regrid_buffer layer growth
    subroutine amrvof_tagging(ctx, lvl, tags, time)
-      use amrex_amr_module, only: amrex_tagboxarray, amrex_mfiter, amrex_box
+      use amrex_amr_module, only: amrex_tagboxarray, amrex_mfiter, amrex_box, amrex_multifab
       use amrgrid_class, only: SETtag
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags
       real(WP), intent(in) :: time
       type(amrvof), pointer :: this
       type(amrex_tagboxarray) :: tba
+      type(amrex_multifab) :: band
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
-      logical :: near_interface
-      integer :: i, j, k, ii, jj, kk
-      real(WP) :: vf_center, vf_neighbor
-      
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pBand
+      integer :: i, j, k, dir, n, layer
+      integer, dimension(3) :: ind
+      integer :: eff_buffer
+   
       call c_f_pointer(ctx, this)
-      
-      ! Tag cells at interface using 3x3x3 stencil
       tba = tags
-      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
+   
+      ! Build band MultiFab with 1 ghost cell
+      call this%amr%mfab_build(lvl=lvl, mfab=band, ncomp=1, nover=1)
+      call band%setval(0.0_WP)
+
+      ! Effective buffer
+      eff_buffer = max(1, this%regrid_buffer / (2**(this%amr%clvl() - lvl)))
+   
+      ! Pass 1: Mark interface cells (band=1)
+      call this%amr%mfiter_build(lvl, mfi)
+      do while (mfi%next())
+         bx = mfi%tilebox()
+         pVF => this%VF%mf(lvl)%dataptr(mfi)
+         pBand => band%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+            ! Flag all obvious mixture cells
+            if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
+               pBand(i,j,k,1)=1.0_WP
+               cycle
+            end if
+            ! We may have missed implicit interfaces, check those
+            do dir=1,3; do n=-1,+1,2
+               ind=[i,j,k]; ind(dir)=ind(dir)+n
+               if (pVF(i,j,k,1).lt.VFlo.and.pVF(ind(1),ind(2),ind(3),1).gt.VFhi.or.&
+               &   pVF(i,j,k,1).gt.VFhi.and.pVF(ind(1),ind(2),ind(3),1).lt.VFlo) then
+                  pBand(i,j,k,1)=1.0_WP
+                  cycle
+               end if
+            end do; end do
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      call band%fill_boundary(this%amr%geom(lvl))
+   
+      ! Pass 2: Grow band by effective buffer layers
+      do layer = 2, eff_buffer
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pBand => band%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+               if (pBand(i,j,k,1).eq.0.0_WP.and.any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.real(layer-1,WP))) pBand(i,j,k,1)=real(layer,WP)
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         call band%fill_boundary(this%amr%geom(lvl))
+      end do
+   
+      ! Pass 3: Set tags from band
+      call this%amr%mfiter_build(lvl, mfi)
       do while (mfi%next())
          bx = mfi%tilebox()
          tagarr => tba%dataPtr(mfi)
-         pVF => this%VF%mf(lvl)%dataptr(mfi)
-         
-         do k = bx%lo(3), bx%hi(3)
-            do j = bx%lo(2), bx%hi(2)
-               do i = bx%lo(1), bx%hi(1)
-                  vf_center = pVF(i,j,k,1)
-                  near_interface = .false.
-                  
-                  ! Check if cell itself is interfacial
-                  if (vf_center .gt. VFlo .and. vf_center .lt. VFhi) then
-                     near_interface = .true.
-                  else
-                     ! Pure cell - check 3x3x3 neighborhood for different phase
-                     stencil: do kk = k-1, k+1
-                        do jj = j-1, j+1
-                           do ii = i-1, i+1
-                              vf_neighbor = pVF(ii,jj,kk,1)
-                              ! If center is pure gas and neighbor has liquid, or vice versa
-                              if (vf_center .lt. VFlo .and. vf_neighbor .gt. VFlo) then
-                                 near_interface = .true.
-                                 exit stencil
-                              end if
-                              if (vf_center .gt. VFhi .and. vf_neighbor .lt. VFhi) then
-                                 near_interface = .true.
-                                 exit stencil
-                              end if
-                           end do
-                        end do
-                     end do stencil
-                  end if
-                  
-                  if (near_interface) tagarr(i,j,k,1) = SETtag
-               end do
-            end do
-         end do
+         pBand => band%dataptr(mfi)
+         do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+            if (pBand(i,j,k,1) .gt. 0.0_WP) tagarr(i,j,k,1) = SETtag
+         end do; end do; end do
       end do
       call this%amr%mfiter_destroy(mfi)
-      
+   
+      ! Cleanup
+      call this%amr%mfab_destroy(band)
+   
       ! Call user tagging if provided
       if (associated(this%user_tagging)) call this%user_tagging(this, lvl, tags, time)
    end subroutine amrvof_tagging
@@ -1546,7 +1570,8 @@ contains
       
       ! Build transport band to localize computation
       build_band: block
-         integer :: n1, n2, n3
+         integer :: dir,n
+         integer, dimension(3) :: ind
          ! Build MultiFab with 1 ghost cell
          call this%amr%mfab_build(lvl=lvl, mfab=band, ncomp=1, nover=1)
          ! Pass 1: Mark interface cells (band=1)
@@ -1562,15 +1587,14 @@ contains
                   pBand(i,j,k,1) = 1.0_WP
                ! Implicit interface: pure cell adjacent to opposite phase
                else
-                  do n3 = -1, 1; do n2 = -1, 1; do n1 = -1, 1
-                     if (n1.eq.0 .and. n2.eq.0 .and. n3.eq.0) cycle
-                     if (pVFold(i,j,k,1) .lt. VFlo .and. pVFold(i+n1,j+n2,k+n3,1) .gt. VFhi) then
-                        pBand(i,j,k,1) = 1.0_WP; exit
+                  do dir = 1, 3; do n = -1, +1, 2
+                     ind = [i,j,k]; ind(dir) = ind(dir) + n
+                     if (pVFold(i,j,k,1).lt.VFlo.and.pVFold(ind(1),ind(2),ind(3),1).gt.VFhi.or.&
+                     &   pVFold(i,j,k,1).gt.VFhi.and.pVFold(ind(1),ind(2),ind(3),1).lt.VFlo) then
+                        pBand(i,j,k,1) = 1.0_WP
+                        cycle
                      end if
-                     if (pVFold(i,j,k,1) .gt. VFhi .and. pVFold(i+n1,j+n2,k+n3,1) .lt. VFlo) then
-                        pBand(i,j,k,1) = 1.0_WP; exit
-                     end if
-                  end do; end do; end do
+                  end do; end do
                end if
             end do; end do; end do
          end do
@@ -1583,9 +1607,7 @@ contains
             bx = mfi%tilebox()
             pBand => band%dataptr(mfi)
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-               if (pBand(i,j,k,1) .eq. 0.0_WP) then
-                  if (any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.1.0_WP)) pBand(i,j,k,1) = 2.0_WP
-               end if
+               if (pBand(i,j,k,1).eq.0.0_WP.and.any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.1.0_WP)) pBand(i,j,k,1) = 2.0_WP
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
