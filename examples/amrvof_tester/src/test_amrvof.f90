@@ -136,14 +136,10 @@ contains
 
       ! Setup sphere parameters
       setup_sphere: block
-         use param, only: param_read
-         call param_read('Sphere radius', sphere_radius)
-         sphere_xc = 0.5_WP * (amr%xlo + amr%xhi)
-         sphere_yc = 0.5_WP * (amr%ylo + amr%yhi)
-         sphere_zc = 0.5_WP * (amr%zlo + amr%zhi)
-         call log("  Sphere center: ("//trim(rtoa(sphere_xc))//", "// &
-         &        trim(rtoa(sphere_yc))//", "//trim(rtoa(sphere_zc))//")")
-         call log("  Sphere radius: "//trim(rtoa(sphere_radius)))
+         sphere_radius = 0.15_WP
+         sphere_xc = 0.35_WP
+         sphere_yc = 0.35_WP
+         sphere_zc = 0.35_WP
       end block setup_sphere
 
       ! Create VOF solver
@@ -214,11 +210,44 @@ contains
       ! Time integration loop
       time_loop: do while (.not.time%done())
 
-         ! Rebuild velocity on new grid
-         call amr%mfab_build(amr%clvl(), U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
-         call amr%mfab_build(amr%clvl(), V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
-         call amr%mfab_build(amr%clvl(), W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
-         call U%setval(0.1_WP); call V%setval(0.2_WP); call W%setval(-1.0_WP)
+         ! Build velocity and set LeVeque vortex field
+         set_velocity: block
+            use amrex_amr_module, only: amrex_mfiter, amrex_box
+            use mathtools, only: Pi
+            type(amrex_mfiter) :: mfi
+            type(amrex_box) :: bx
+            real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
+            real(WP) :: x, y, z, T, dx, dy, dz
+            integer :: i, j, k
+            T = 3.0_WP
+            dx = amr%dx(amr%clvl()); dy = amr%dy(amr%clvl()); dz = amr%dz(amr%clvl())
+            call amr%mfab_build(amr%clvl(), U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
+            call amr%mfab_build(amr%clvl(), V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
+            call amr%mfab_build(amr%clvl(), W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
+            call amr%mfiter_build(amr%clvl(), mfi)
+            do while (mfi%next())
+               pU => U%dataptr(mfi); pV => V%dataptr(mfi); pW => W%dataptr(mfi)
+               ! U faces
+               bx = mfi%grownnodaltilebox(1, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  x = amr%xlo + real(i,WP)*dx; y = amr%ylo + (real(j,WP)+0.5_WP)*dy; z = amr%zlo + (real(k,WP)+0.5_WP)*dz
+                  pU(i,j,k,1) = 2.0_WP*sin(Pi*x)**2*sin(2.0_WP*Pi*y)*sin(2.0_WP*Pi*z)*cos(Pi*time%t/T)
+               end do; end do; end do
+               ! V faces
+               bx = mfi%grownnodaltilebox(2, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx; y = amr%ylo + real(j,WP)*dy; z = amr%zlo + (real(k,WP)+0.5_WP)*dz
+                  pV(i,j,k,1) = -sin(2.0_WP*Pi*x)*sin(Pi*y)**2*sin(2.0_WP*Pi*z)*cos(Pi*time%t/T)
+               end do; end do; end do
+               ! W faces
+               bx = mfi%grownnodaltilebox(3, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx; y = amr%ylo + (real(j,WP)+0.5_WP)*dy; z = amr%zlo + real(k,WP)*dz
+                  pW(i,j,k,1) = -sin(2.0_WP*Pi*x)*sin(2.0_WP*Pi*y)*sin(Pi*z)**2*cos(Pi*time%t/T)
+               end do; end do; end do
+            end do
+            call amr%mfiter_destroy(mfi)
+         end block set_velocity
 
          ! Compute CFL and update dt based on CFL constraint
          call vof%get_cfl(U=U, V=V, W=W, dt=time%dt, cfl=time%cfl)
