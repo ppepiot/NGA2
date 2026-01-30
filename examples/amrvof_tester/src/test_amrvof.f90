@@ -37,7 +37,7 @@ module mod_test_amrvof
    type(event) :: regrid_evt
 
    ! Monitoring
-   type(monitor) :: mfile
+   type(monitor) :: mfile, gridfile
 
 contains
 
@@ -164,25 +164,6 @@ contains
          call log("  Initial PLIC constructed")
       end block build_plic_and_reset_moments
 
-      ! Create velocity MultiFabs at finest level (staggered)
-      create_velocity: block
-         integer :: lvl
-         
-         lvl = amr%clvl()
-         
-         ! Build staggered MultiFabs: U (x-face), V (y-face), W (z-face)
-         call amr%mfab_build(lvl, U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
-         call amr%mfab_build(lvl, V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
-         call amr%mfab_build(lvl, W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
-         
-         ! Initialize: uniform translation U=1, V=0, W=0
-         call U%setval(0.1_WP)
-         call V%setval(0.2_WP)
-         call W%setval(-1.0_WP)
-         
-         call log("  Velocity field initialized: U=1, V=W=0")
-      end block create_velocity
-
       ! Create visualization
       create_visualization: block
          use param, only: param_read
@@ -205,8 +186,9 @@ contains
 
       ! Create monitor
       create_monitor: block
+         ! Create VOF monitor
          call vof%get_info()
-         mfile = monitor(amRoot=amr%amRoot, name='vof_advect')
+         mfile = monitor(amRoot=amr%amRoot, name='simulation')
          call mfile%add_column(time%n, 'Timestep')
          call mfile%add_column(time%t, 'Time')
          call mfile%add_column(time%dt, 'dt')
@@ -214,10 +196,28 @@ contains
          call mfile%add_column(vof%VFmin, 'VFmin')
          call mfile%add_column(vof%VFmax, 'VFmax')
          call mfile%write()
+         ! Create grid monitor
+         gridfile = monitor(amRoot=amr%amRoot, name='grid')
+         call gridfile%add_column(time%n, 'Timestep')
+         call gridfile%add_column(time%t, 'Time')
+         call gridfile%add_column(amr%nlevels, 'Nlvl')
+         call gridfile%add_column(amr%nboxes, 'Nbox')
+         call gridfile%add_column(amr%ncells, 'Ncell')
+         call gridfile%add_column(amr%compression, 'Compression')
+         call gridfile%add_column(amr%maxRSS,'Maximum RSS')
+         call gridfile%add_column(amr%minRSS,'Minimum RSS')
+         call gridfile%add_column(amr%avgRSS,'Average RSS')
+         call gridfile%write()
       end block create_monitor
 
       ! Time integration loop
       time_loop: do while (.not.time%done())
+
+         ! Rebuild velocity on new grid
+         call amr%mfab_build(amr%clvl(), U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
+         call amr%mfab_build(amr%clvl(), V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
+         call amr%mfab_build(amr%clvl(), W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
+         call U%setval(0.1_WP); call V%setval(0.2_WP); call W%setval(-1.0_WP)
 
          ! Compute CFL and update dt based on CFL constraint
          call vof%get_cfl(U=U, V=V, W=W, dt=time%dt, cfl=time%cfl)
@@ -233,6 +233,11 @@ contains
          ! Advect VOF
          call vof%advance_vof(U=U, V=V, W=W, dt=time%dt, time=time%t)
 
+         ! Destroy velocity
+         call amrex_multifab_destroy(U)
+         call amrex_multifab_destroy(V)
+         call amrex_multifab_destroy(W)
+
          ! Rebuild PLIC and reset moments for consistency
          call vof%build_plic(time%t)
          call vof%reset_moments()
@@ -240,6 +245,7 @@ contains
          ! Regrid if event triggers (disabled by default)
          if (regrid_evt%occurs()) then
             call amr%regrid(baselvl=0, time=time%t)
+            call gridfile%write()
          end if
 
          ! Monitor output
@@ -260,9 +266,6 @@ contains
 
       ! Cleanup
       cleanup: block
-         call amrex_multifab_destroy(U)
-         call amrex_multifab_destroy(V)
-         call amrex_multifab_destroy(W)
          call viz%finalize()
          call vof%finalize()
          call amr%finalize()
