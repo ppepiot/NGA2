@@ -112,14 +112,14 @@ contains
       create_amrgrid: block
          use param, only: param_read
          amr%name = 'vof_advect'
-         call param_read('Base nx', amr%nx, default=32)
-         call param_read('Base ny', amr%ny, default=32)
-         call param_read('Base nz', amr%nz, default=32)
+         call param_read('Base nx', amr%nx)
+         call param_read('Base ny', amr%ny)
+         call param_read('Base nz', amr%nz)
          amr%xlo = 0.0_WP; amr%xhi = 1.0_WP
          amr%ylo = 0.0_WP; amr%yhi = 1.0_WP
          amr%zlo = 0.0_WP; amr%zhi = 1.0_WP
          amr%xper = .true.; amr%yper = .true.; amr%zper = .true.
-         call param_read('Max level', amr%maxlvl, default=0)
+         call param_read('Max level', amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
 
@@ -127,9 +127,9 @@ contains
       initialize_timetracker: block
          use param, only: param_read
          time = timetracker(amRoot=amr%amRoot)
-         call param_read('Max time', time%tmax, default=1.0_WP)
-         call param_read('Max dt', time%dtmax, default=0.01_WP)
-         call param_read('Max CFL', time%cflmax, default=0.5_WP)
+         call param_read('Max time', time%tmax)
+         call param_read('Max dt', time%dtmax)
+         call param_read('Max CFL', time%cflmax)
          time%dt = time%dtmax
          time%itmax = 1  ! No sub-iterations
       end block initialize_timetracker
@@ -137,7 +137,7 @@ contains
       ! Setup sphere parameters
       setup_sphere: block
          use param, only: param_read
-         call param_read('Sphere radius', sphere_radius, default=0.25_WP)
+         call param_read('Sphere radius', sphere_radius)
          sphere_xc = 0.5_WP * (amr%xlo + amr%xhi)
          sphere_yc = 0.5_WP * (amr%ylo + amr%yhi)
          sphere_zc = 0.5_WP * (amr%zlo + amr%zhi)
@@ -157,11 +157,12 @@ contains
          call amr%init_from_scratch(time=time%t)
       end block initialize
 
-      ! Build initial PLIC
-      build_initial_plic: block
+      ! Build initial PLIC and reset moments for consistency
+      build_plic_and_reset_moments: block
          call vof%build_plic(time%t)
+         call vof%reset_moments()
          call log("  Initial PLIC constructed")
-      end block build_initial_plic
+      end block build_plic_and_reset_moments
 
       ! Create velocity MultiFabs at finest level (staggered)
       create_velocity: block
@@ -170,14 +171,14 @@ contains
          lvl = amr%clvl()
          
          ! Build staggered MultiFabs: U (x-face), V (y-face), W (z-face)
-         call amr%mfab_build(lvl, U, ncomp=1, nover=vel_ng, atface=[.true., .false., .false.])
-         call amr%mfab_build(lvl, V, ncomp=1, nover=vel_ng, atface=[.false., .true., .false.])
-         call amr%mfab_build(lvl, W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true.])
+         call amr%mfab_build(lvl, U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
+         call amr%mfab_build(lvl, V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
+         call amr%mfab_build(lvl, W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
          
          ! Initialize: uniform translation U=1, V=0, W=0
-         call U%setval(0.0_WP)
-         call V%setval(0.0_WP)
-         call W%setval(1.0_WP)
+         call U%setval(0.1_WP)
+         call V%setval(0.2_WP)
+         call W%setval(-1.0_WP)
          
          call log("  Velocity field initialized: U=1, V=W=0")
       end block create_velocity
