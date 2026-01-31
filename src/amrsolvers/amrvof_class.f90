@@ -1844,6 +1844,7 @@ contains
          face(:,8) = project(face(:,4), -dt)
          
          ! Adjust center point to match expected volume
+         !face(:,9) = 0.25_WP * (face(:,5) + face(:,6) + face(:,7) + face(:,8))
          if (dir .eq. 1) then
             call volume_correct(face=face, target_volume=vol_expected, winding=+1.0_WP)
          else if (dir .eq. 2) then

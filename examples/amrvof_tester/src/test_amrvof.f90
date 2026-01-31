@@ -213,7 +213,7 @@ contains
          ! Build velocity and set LeVeque vortex field
          set_velocity: block
             use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_multifab
-            use mathtools, only: Pi
+            use mathtools, only: Pi, twoPi
             type(amrex_mfiter) :: mfi
             type(amrex_box) :: bx
             type(amrex_multifab) :: A  ! Cell-centered vector potential (3 components)
@@ -240,9 +240,9 @@ contains
                   x = amr%xlo + (real(i,WP)+0.5_WP)*dx
                   y = amr%ylo + (real(j,WP)+0.5_WP)*dy
                   z = amr%zlo + (real(k,WP)+0.5_WP)*dz
-                  pA(i,j,k,1) = +tfac * cos(Pi*x)    * sin(Pi*y)**2 * sin(Pi*z)**2
-                  pA(i,j,k,2) = -tfac * sin(Pi*x)**2 * cos(Pi*y)    * sin(Pi*z)**2
-                  pA(i,j,k,3) = +tfac * sin(Pi*x)**2 * sin(Pi*y)**2 * cos(Pi*z)
+                  pA(i,j,k,1) =  0.0_WP
+                  pA(i,j,k,2) = -tfac * sin(Pi*x)**2 * sin(twoPi*y) * sin(Pi*z)**2
+                  pA(i,j,k,3) = +tfac * sin(Pi*x)**2 * sin(Pi*y)**2 * sin(twoPi*z)
                end do; end do; end do
             end do
             call amr%mfiter_destroy(mfi)
@@ -250,26 +250,23 @@ contains
             call amr%mfiter_build(amr%clvl(), mfi)
             do while (mfi%next())
                pU => U%dataptr(mfi); pV => V%dataptr(mfi); pW => W%dataptr(mfi); pA => A%dataptr(mfi)
-               ! U = dAz/dy - dAy/dz at X-faces (i, j+1/2, k+1/2)
-               ! Average in x (i-1, i), difference in y or z
-               bx = mfi%grownnodaltilebox(1, vel_ng)
+               ! U = dAz/dy - dAy/dz at X-faces
+               bx = mfi%grownnodaltilebox(1-1, vel_ng) ! bug amrex's fortran interface!
                do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  pU(i,j,k,1) = ((pA(i,j,k,3)+pA(i-1,j,k,3)) - (pA(i,j-1,k,3)+pA(i-1,j-1,k,3))) * 0.5_WP * dyi &
-                  &           - ((pA(i,j,k-1,2)+pA(i-1,j,k-1,2)) - (pA(i,j,k,2)+pA(i-1,j,k,2))) * 0.5_WP * dzi
+                  pU(i,j,k,1) = 0.25_WP*dyi*(pA(i-1,j+1,k,3)+pA(i,j+1,k,3)-pA(i-1,j-1,k,3)-pA(i,j-1,k,3)) &
+                  &           - 0.25_WP*dzi*(pA(i-1,j,k+1,2)+pA(i,j,k+1,2)-pA(i-1,j,k-1,2)-pA(i,j,k-1,2))
                end do; end do; end do
-               ! V = dAx/dz - dAz/dx at Y-faces (i+1/2, j, k+1/2)
-               ! Average in y (j-1, j), difference in z or x
-               bx = mfi%grownnodaltilebox(2, vel_ng)
+               ! V = dAx/dz - dAz/dx at Y-faces
+               bx = mfi%grownnodaltilebox(2-1, vel_ng) ! bug amrex's fortran interface!
                do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  pV(i,j,k,1) = ((pA(i,j,k,1)+pA(i,j-1,k,1)) - (pA(i,j,k-1,1)+pA(i,j-1,k-1,1))) * 0.5_WP * dzi &
-                  &           - ((pA(i,j,k,3)+pA(i,j-1,k,3)) - (pA(i-1,j,k,3)+pA(i-1,j-1,k,3))) * 0.5_WP * dxi
+                  pV(i,j,k,1) = 0.25_WP*dzi*(pA(i,j-1,k+1,1)+pA(i,j,k+1,1)-pA(i,j-1,k-1,1)-pA(i,j,k-1,1)) &
+                  &           - 0.25_WP*dxi*(pA(i+1,j-1,k,3)+pA(i+1,j,k,3)-pA(i-1,j-1,k,3)-pA(i-1,j,k,3))
                end do; end do; end do
-               ! W = dAy/dx - dAx/dy at Z-faces (i+1/2, j+1/2, k)
-               ! Average in z (k-1, k), difference in x or y
-               bx = mfi%grownnodaltilebox(3, vel_ng)
+               ! W = dAy/dx - dAx/dy at Z-faces
+               bx = mfi%grownnodaltilebox(3-1, vel_ng) ! bug amrex's fortran interface!
                do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  pW(i,j,k,1) = ((pA(i,j,k,2)+pA(i,j,k-1,2)) - (pA(i-1,j,k,2)+pA(i-1,j,k-1,2))) * 0.5_WP * dxi &
-                  &           - ((pA(i,j,k,1)+pA(i,j,k-1,1)) - (pA(i,j-1,k,1)+pA(i,j-1,k-1,1))) * 0.5_WP * dyi
+                  pW(i,j,k,1) = 0.25_WP*dxi*(pA(i+1,j,k-1,2)+pA(i+1,j,k,2)-pA(i-1,j,k-1,2)-pA(i-1,j,k,2)) &
+                  &           - 0.25_WP*dyi*(pA(i,j+1,k-1,1)+pA(i,j+1,k,1)-pA(i,j-1,k-1,1)-pA(i,j-1,k,1))
                end do; end do; end do
             end do
             call amr%mfiter_destroy(mfi)

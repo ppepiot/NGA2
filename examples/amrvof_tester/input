@@ -5,7 +5,7 @@ Test: advect
 Base nx: 32
 Base ny: 32
 Base nz: 32
-Max level: 0
+Max level: 2
 
 # Regridding parameters
 Regrid nsteps: 10
