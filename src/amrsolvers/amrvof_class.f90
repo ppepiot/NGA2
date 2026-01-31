@@ -1715,6 +1715,9 @@ contains
          pVFold => this%VFold%mf(lvl)%dataptr(mfi)
          pCliqold => this%Cliqold%mf(lvl)%dataptr(mfi)
          pCgasold => this%Cgasold%mf(lvl)%dataptr(mfi)
+         pU => U%dataptr(mfi)
+         pV => V%dataptr(mfi)
+         pW => W%dataptr(mfi)
          pFx => Fx_mf%dataptr(mfi)
          pFy => Fy_mf%dataptr(mfi)
          pFz => Fz_mf%dataptr(mfi)
@@ -2092,7 +2095,7 @@ contains
             ipu = floor((pos(1) - this%amr%xlo) * dxi)
             jpv = floor((pos(2) - this%amr%ylo) * dyi)
             kpw = floor((pos(3) - this%amr%zlo) * dzi)
-            ! Clamp to array bounds (each index clamped for its target array)
+            ! Clamp to array bounds
             ipu = max(lbound(pU,1), min(ubound(pU,1)-1, ipu))
             jpc = max(lbound(pU,2), min(ubound(pU,2)-1, jpc))
             kpc = max(lbound(pU,3), min(ubound(pU,3)-1, kpc))
@@ -2129,10 +2132,11 @@ contains
             &        wzw2*(wyc1*(wxc1*pW(ipc+1,jpc+1,kpw  ,1)+wxc2*pW(ipc,jpc+1,kpw  ,1)) + &
             &              wyc2*(wxc1*pW(ipc+1,jpc  ,kpw  ,1)+wxc2*pW(ipc,jpc  ,kpw  ,1)))
          else
-            ! All cell-centered: use U bounds (all arrays have same bounds)
+            ! All cell-centered
             ipc = floor((pos(1) - this%amr%xlo) * dxi - 0.5_WP)
             jpc = floor((pos(2) - this%amr%ylo) * dyi - 0.5_WP)
             kpc = floor((pos(3) - this%amr%zlo) * dzi - 0.5_WP)
+            ! Clamp to array bounds
             ipc = max(lbound(pU,1), min(ubound(pU,1)-1, ipc))
             jpc = max(lbound(pU,2), min(ubound(pU,2)-1, jpc))
             kpc = max(lbound(pU,3), min(ubound(pU,3)-1, kpc))
