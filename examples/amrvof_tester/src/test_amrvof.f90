@@ -212,41 +212,68 @@ contains
 
          ! Build velocity and set LeVeque vortex field
          set_velocity: block
-            use amrex_amr_module, only: amrex_mfiter, amrex_box
+            use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_multifab
             use mathtools, only: Pi
             type(amrex_mfiter) :: mfi
             type(amrex_box) :: bx
-            real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW
-            real(WP) :: x, y, z, T, dx, dy, dz
+            type(amrex_multifab) :: A  ! Cell-centered vector potential (3 components)
+            real(WP), dimension(:,:,:,:), contiguous, pointer :: pU, pV, pW, pA
+            real(WP) :: x, y, z, dx, dy, dz, dxi, dyi, dzi, T, tfac
             integer :: i, j, k
             T = 3.0_WP
-            dx = amr%dx(amr%clvl()); dy = amr%dy(amr%clvl()); dz = amr%dz(amr%clvl())
+            tfac = cos(Pi*time%t/T) / Pi
+            dx = amr%dx(amr%clvl()); dxi=1.0_WP/dx
+            dy = amr%dy(amr%clvl()); dyi=1.0_WP/dy
+            dz = amr%dz(amr%clvl()); dzi=1.0_WP/dz
+            ! Build velocity MultiFabs
             call amr%mfab_build(amr%clvl(), U, ncomp=1, nover=vel_ng, atface=[.true. , .false., .false.])
             call amr%mfab_build(amr%clvl(), V, ncomp=1, nover=vel_ng, atface=[.false., .true. , .false.])
             call amr%mfab_build(amr%clvl(), W, ncomp=1, nover=vel_ng, atface=[.false., .false., .true. ])
+            ! Build cell-centered MultiFab for vector potential (Ax, Ay, Az)
+            call amr%mfab_build(amr%clvl(), A, ncomp=3, nover=vel_ng+1)
+            ! Fill vector potential at cell centers
             call amr%mfiter_build(amr%clvl(), mfi)
             do while (mfi%next())
-               pU => U%dataptr(mfi); pV => V%dataptr(mfi); pW => W%dataptr(mfi)
-               ! U faces
-               bx = mfi%grownnodaltilebox(1, vel_ng)
+               pA => A%dataptr(mfi)
+               bx = mfi%growntilebox(vel_ng+1)
                do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  x = amr%xlo + real(i,WP)*dx; y = amr%ylo + (real(j,WP)+0.5_WP)*dy; z = amr%zlo + (real(k,WP)+0.5_WP)*dz
-                  pU(i,j,k,1) = 2.0_WP*sin(Pi*x)**2*sin(2.0_WP*Pi*y)*sin(2.0_WP*Pi*z)*cos(Pi*time%t/T)
-               end do; end do; end do
-               ! V faces
-               bx = mfi%grownnodaltilebox(2, vel_ng)
-               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx; y = amr%ylo + real(j,WP)*dy; z = amr%zlo + (real(k,WP)+0.5_WP)*dz
-                  pV(i,j,k,1) = -sin(2.0_WP*Pi*x)*sin(Pi*y)**2*sin(2.0_WP*Pi*z)*cos(Pi*time%t/T)
-               end do; end do; end do
-               ! W faces
-               bx = mfi%grownnodaltilebox(3, vel_ng)
-               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
-                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx; y = amr%ylo + (real(j,WP)+0.5_WP)*dy; z = amr%zlo + real(k,WP)*dz
-                  pW(i,j,k,1) = -sin(2.0_WP*Pi*x)*sin(2.0_WP*Pi*y)*sin(Pi*z)**2*cos(Pi*time%t/T)
+                  x = amr%xlo + (real(i,WP)+0.5_WP)*dx
+                  y = amr%ylo + (real(j,WP)+0.5_WP)*dy
+                  z = amr%zlo + (real(k,WP)+0.5_WP)*dz
+                  pA(i,j,k,1) = +tfac * cos(Pi*x)    * sin(Pi*y)**2 * sin(Pi*z)**2
+                  pA(i,j,k,2) = -tfac * sin(Pi*x)**2 * cos(Pi*y)    * sin(Pi*z)**2
+                  pA(i,j,k,3) = +tfac * sin(Pi*x)**2 * sin(Pi*y)**2 * cos(Pi*z)
                end do; end do; end do
             end do
             call amr%mfiter_destroy(mfi)
+            ! Compute velocity from curl of vector potential using 4-point averaging
+            call amr%mfiter_build(amr%clvl(), mfi)
+            do while (mfi%next())
+               pU => U%dataptr(mfi); pV => V%dataptr(mfi); pW => W%dataptr(mfi); pA => A%dataptr(mfi)
+               ! U = dAz/dy - dAy/dz at X-faces (i, j+1/2, k+1/2)
+               ! Average in x (i-1, i), difference in y or z
+               bx = mfi%grownnodaltilebox(1, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  pU(i,j,k,1) = ((pA(i,j,k,3)+pA(i-1,j,k,3)) - (pA(i,j-1,k,3)+pA(i-1,j-1,k,3))) * 0.5_WP * dyi &
+                  &           - ((pA(i,j,k-1,2)+pA(i-1,j,k-1,2)) - (pA(i,j,k,2)+pA(i-1,j,k,2))) * 0.5_WP * dzi
+               end do; end do; end do
+               ! V = dAx/dz - dAz/dx at Y-faces (i+1/2, j, k+1/2)
+               ! Average in y (j-1, j), difference in z or x
+               bx = mfi%grownnodaltilebox(2, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  pV(i,j,k,1) = ((pA(i,j,k,1)+pA(i,j-1,k,1)) - (pA(i,j,k-1,1)+pA(i,j-1,k-1,1))) * 0.5_WP * dzi &
+                  &           - ((pA(i,j,k,3)+pA(i,j-1,k,3)) - (pA(i-1,j,k,3)+pA(i-1,j-1,k,3))) * 0.5_WP * dxi
+               end do; end do; end do
+               ! W = dAy/dx - dAx/dy at Z-faces (i+1/2, j+1/2, k)
+               ! Average in z (k-1, k), difference in x or y
+               bx = mfi%grownnodaltilebox(3, vel_ng)
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  pW(i,j,k,1) = ((pA(i,j,k,2)+pA(i,j,k-1,2)) - (pA(i-1,j,k,2)+pA(i-1,j,k-1,2))) * 0.5_WP * dxi &
+                  &           - ((pA(i,j,k,1)+pA(i,j,k-1,1)) - (pA(i,j-1,k,1)+pA(i,j-1,k-1,1))) * 0.5_WP * dyi
+               end do; end do; end do
+            end do
+            call amr%mfiter_destroy(mfi)
+            call amrex_multifab_destroy(A)
          end block set_velocity
 
          ! Compute CFL and update dt based on CFL constraint

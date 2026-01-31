@@ -1786,8 +1786,7 @@ contains
       
       !> Compute flux through a face using full semi-Lagrangian RK2 with recursive tet cutting
       subroutine compute_flux(fi, fj, fk, dir, fv, flux)
-         use amrvof_geometry, only: tet_map, cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert, &
-         &                          tet_sign, volume_correct_x, volume_correct_y, volume_correct_z 
+         use amrvof_geometry, only: tet_map, cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert, tet_sign, volume_correct
          integer, intent(in) :: fi, fj, fk, dir
          real(WP), intent(in) :: fv
          real(WP), dimension(8), intent(out) :: flux
@@ -1844,16 +1843,13 @@ contains
          face(:,7) = project(face(:,3), -dt)
          face(:,8) = project(face(:,4), -dt)
          
-         ! Center point (will be adjusted by volume_correct)
-         face(:,9) = 0.25_WP * (face(:,5) + face(:,6) + face(:,7) + face(:,8))
-         
-         ! Apply volume correction for exact flux
+         ! Adjust center point to match expected volume
          if (dir .eq. 1) then
-            call volume_correct_x(face, vol_expected)
+            call volume_correct(face=face, target_volume=vol_expected, winding=+1.0_WP)
          else if (dir .eq. 2) then
-            call volume_correct_y(face, vol_expected)
+            call volume_correct(face=face, target_volume=vol_expected, winding=-1.0_WP)
          else
-            call volume_correct_z(face, vol_expected)
+            call volume_correct(face=face, target_volume=vol_expected, winding=+1.0_WP)
          end if
          
          ! Process each of the 8 tets with recursive cutting and increment flux
