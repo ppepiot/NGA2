@@ -12,7 +12,7 @@ module amrvof_geometry
    public :: get_plane_dist
    public :: tet_vol, tet_sign, cut_tet_vol
    public :: flux_polyhedron_vol, cut_hex_vol
-   public :: volume_correct
+   public :: correct_flux_poly
    public :: cut_hex_polygon, hex_poly_nvert, get_hex_poly_nvert
 
    ! Default parameters for volume fraction
@@ -351,12 +351,24 @@ contains
       implicit none
       real(WP), dimension(3,4), intent(in) :: v
       real(WP) :: vol
-      real(WP), dimension(3) :: a, b, c
-      a = v(:,1) - v(:,4)
-      b = v(:,2) - v(:,4)
-      c = v(:,3) - v(:,4)
-      vol = abs(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
+      real(WP), dimension(3) :: a,b,c
+      a=v(:,1)-v(:,4)
+      b=v(:,2)-v(:,4)
+      c=v(:,3)-v(:,4)
+      vol=(-a(1)*(b(2)*c(3)-c(2)*b(3))&
+      &    +a(2)*(b(1)*c(3)-c(1)*b(3))&
+      &    -a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
    end function tet_vol
+
+   !> Function that calculates the sign of a tet
+   function tet_sign(vert) result(s)
+      implicit none
+      real(WP) :: s
+      real(WP), dimension(3,4), intent(in) :: vert
+      real(WP), dimension(3) :: a,b,c
+      a=vert(:,1)-vert(:,4); b=vert(:,2)-vert(:,4); c=vert(:,3)-vert(:,4)
+      s=sign(1.0_WP,-(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2))))
+   end function tet_sign
    
    !> Cut a tetrahedron by a plane and return liquid/gas volumes and barycenters
    !> Input:  v(:,1:4) = 4 tet vertices, plane(1:4) = [nx,ny,nz,d] where n.x=d defines plane
@@ -433,16 +445,6 @@ contains
       
    end subroutine cut_tet_vol
    
-   !> Function that calculates the sign of a tet
-   function tet_sign(vert) result(s)
-      implicit none
-      real(WP) :: s
-      real(WP), dimension(3,4), intent(in) :: vert
-      real(WP), dimension(3) :: a,b,c
-      a=vert(:,1)-vert(:,4); b=vert(:,2)-vert(:,4); c=vert(:,3)-vert(:,4)
-      s=sign(1.0_WP,-(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP)
-   end function tet_sign
-   
    !> Compute signed volume of flux polyhedron
    !> face(:,1:8) = 8 vertices (4 at time t, 4 back-projected)
    !> Decomposes into 6 tets using tet_map and sums signed volumes
@@ -460,61 +462,53 @@ contains
          vol = vol + (a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
       end do
    end function flux_polyhedron_vol
-   
-   !> Adjust vertex 9 to match target volume (IRL's adjustCapToMatchVolume algorithm)
-   !> face(:,1:4) = base face at time t
-   !> face(:,5:8) = back-projected face  
-   !> face(:,9) = center point (will be adjusted)
-   !> target_volume = expected signed volume of flux polyhedron
-   !> winding = +1 for X/Z flux (CCW winding), -1 for Y flux (CW winding)
-   subroutine volume_correct(face, target_volume, winding)
+
+   !> Adjust flux polyhedron to enforce target volume
+   !> Uses IRL's direction-independent approach: moves vertex 9 along back-face normal
+   subroutine correct_flux_poly(poly,target_volume)
       implicit none
-      real(WP), dimension(3,9), intent(inout) :: face
+      real(WP), dimension(3,9), intent(inout) :: poly
       real(WP), intent(in) :: target_volume
-      real(WP), intent(in) :: winding
-      real(WP) :: current_volume, needed_change, adjustment, mag_sq, mag
-      real(WP), dimension(3) :: sum_cross, dir, v5, v6, v7, v8, a, b, c, cross1, cross2, cross3, cross4
-      integer :: ntet
-      
-      ! Initialize vertex 9 to centroid of back face
-      face(:,9) = 0.25_WP * (face(:,5) + face(:,6) + face(:,7) + face(:,8))
-      
-      ! Compute current volume of the polyhedron (8 tets using tet_map)
-      ! winding affects the sign of the volume computation
-      current_volume = 0.0_WP
-      do ntet = 1, 8
-         a = face(:,tet_map(1,ntet)) - face(:,tet_map(4,ntet))
-         b = face(:,tet_map(2,ntet)) - face(:,tet_map(4,ntet))
-         c = face(:,tet_map(3,ntet)) - face(:,tet_map(4,ntet))
-         current_volume = current_volume + winding * (-a(1)*(b(2)*c(3)-c(2)*b(3)) + a(2)*(b(1)*c(3)-c(1)*b(3)) - a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
-      end do
-      
-      needed_change = target_volume - current_volume
-      
-      ! Make vertices 5-8 relative to vertex 9
-      v5 = face(:,5) - face(:,9)
-      v6 = face(:,6) - face(:,9)
-      v7 = face(:,7) - face(:,9)
-      v8 = face(:,8) - face(:,9)
-      
-      ! Sum cross products around the back-face quad (5-6-7-8)
-      ! Following IRL: edges (6,5), (5,8), (8,7), (7,6)
-      cross1 = [v6(2)*v5(3) - v6(3)*v5(2), v6(3)*v5(1) - v6(1)*v5(3), v6(1)*v5(2) - v6(2)*v5(1)]
-      cross2 = [v5(2)*v8(3) - v5(3)*v8(2), v5(3)*v8(1) - v5(1)*v8(3), v5(1)*v8(2) - v5(2)*v8(1)]
-      cross3 = [v8(2)*v7(3) - v8(3)*v7(2), v8(3)*v7(1) - v8(1)*v7(3), v8(1)*v7(2) - v8(2)*v7(1)]
-      cross4 = [v7(2)*v6(3) - v7(3)*v6(2), v7(3)*v6(1) - v7(1)*v6(3), v7(1)*v6(2) - v7(2)*v6(1)]
-      sum_cross = winding * (cross1 + cross2 + cross3 + cross4)
-      
-      ! Move vertex 9 along average normal direction
-      mag_sq = sum_cross(1)**2 + sum_cross(2)**2 + sum_cross(3)**2
-      mag = sqrt(mag_sq)
-      if (mag .gt. tiny(1.0_WP)) then
-         adjustment = 6.0_WP * needed_change / mag
-         dir = sum_cross / mag
-         face(:,9) = face(:,9) + adjustment * dir
-      end if
-   end subroutine volume_correct
-   
+      real(WP) :: starting_volume,needed_change,mag,adjustment
+      real(WP), dimension(3) :: cross_sum,dir
+      real(WP), dimension(3) :: e1,e2,c1,c2
+      integer :: n
+      ! Compute starting volume
+      starting_volume=0.0_WP
+      do n=1,8; starting_volume=starting_volume+tet_vol([poly(:,tet_map(1,n)),poly(:,tet_map(2,n)),poly(:,tet_map(3,n)),poly(:,tet_map(4,n))]); end do
+      needed_change=target_volume-starting_volume
+      ! Compute volume gradient for tets 7 and 8 (the only tets using vertex 9)
+      ! For tet (A,B,C,D), gradient w.r.t. D is -(1/6)*((B-A)×(C-A))
+      ! Tet 7 = (5,6,8,9): gradient = -((v6-v5)×(v8-v5)). Take edges from vertex 5
+      e1=poly(:,6)-poly(:,5); e2=poly(:,8)-poly(:,5)
+      c1=[e1(2)*e2(3)-e1(3)*e2(2),e1(3)*e2(1)-e1(1)*e2(3),e1(1)*e2(2)-e1(2)*e2(1)]
+      ! Tet 8 = (6,7,8,9): gradient = -((v7-v6)×(v8-v6)). Take edges from vertex 6
+      e1=poly(:,7)-poly(:,6); e2=poly(:,8)-poly(:,6)
+      c2=[e1(2)*e2(3)-e1(3)*e2(2),e1(3)*e2(1)-e1(1)*e2(3),e1(1)*e2(2)-e1(2)*e2(1)]
+      ! Total gradient (negative sign absorbed into adjustment formula)
+      cross_sum=c1+c2
+      ! Compute adjustment along normal direction
+      mag=sqrt(cross_sum(1)**2+cross_sum(2)**2+cross_sum(3)**2)
+      adjustment=6.0_WP*needed_change/max(mag,tiny(1.0_WP))
+      dir=cross_sum/max(mag,tiny(1.0_WP))
+      ! Move vertex 9
+      poly(:,9)=poly(:,9)+adjustment*dir
+      ! DEBUG: Verify corrected volume matches target
+      block
+         real(WP) :: final_vol
+         integer :: ntet
+         final_vol = 0.0_WP
+         do ntet = 1,8
+            final_vol = final_vol + tet_vol([poly(:,tet_map(1,ntet)), poly(:,tet_map(2,ntet)), &
+            &                                poly(:,tet_map(3,ntet)), poly(:,tet_map(4,ntet))])
+         end do
+         if (abs(final_vol - target_volume) > 1.0e-10_WP) then
+            print*, 'correct_flux_poly FAILED: target=', target_volume, 'got=', final_vol, 'diff=', final_vol-target_volume
+         end if
+      end block
+
+   end subroutine correct_flux_poly
+
    !> Cut a hex cell by a plane and compute liquid/gas volumes and barycenters
    !> hex(:,1:8) = 8 vertices of hex cell (standard ordering)
    !> plane(1:3) = normal, plane(4) = distance (n·x = d)

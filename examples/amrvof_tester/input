@@ -16,6 +16,6 @@ Max dt:   2.5e-3
 Max CFL:  0.9
 
 # Output
-Output period: 0.01
+Output period: 0.1
 
 
