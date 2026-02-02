@@ -8,7 +8,6 @@ module amrvof_class
    use amrgrid_class,    only: amrgrid
    use amrdata_class,    only: amrdata
    use amrsolver_class,  only: amrsolver
-   use amrvof_geometry,  only: VFlo, VFhi
    use surfmesh_class,   only: surfmesh
    use amrex_amr_module, only: amrex_multifab, amrex_mfiter, amrex_box, &
    &                           amrex_boxarray, amrex_distromap, amrex_geometry
@@ -16,7 +15,7 @@ module amrvof_class
    private
 
    ! Expose type and dispatchers
-   public :: amrvof, VFlo, VFhi
+   public :: amrvof
    public :: amrvof_on_init, amrvof_on_coarse, amrvof_on_remake
    public :: amrvof_on_clear, amrvof_tagging, amrvof_postregrid
 
@@ -25,6 +24,11 @@ module amrvof_class
    integer, parameter, public :: BC_GAS     = 2  !< All gas in ghost
    integer, parameter, public :: BC_REFLECT = 3  !< Symmetry (mirror across boundary)
    integer, parameter, public :: BC_USER    = 4  !< User-defined callback
+
+   ! Default parameters for volume fraction
+   real(WP), parameter, public :: VFlo = 1.0e-12_WP    !< Minimum VF value considered
+   real(WP), parameter, public :: VFhi = 1.0_WP-VFlo   !< Maximum VF value considered
+   real(WP), parameter, public :: vol_eps = 1.0e-8_WP  !< Volume epsilon for division by zero
 
    !> AMR VOF solver type
    type, extends(amrsolver) :: amrvof
@@ -1413,7 +1417,7 @@ contains
    !> Computes in valid + ghost cells from PLIC (which is already filled)
    !> Then averages down to coarse levels
    subroutine reset_moments(this)
-      use amrvof_geometry, only: cut_hex_vol, VFlo, VFhi
+      use amrvof_geometry, only: cut_hex_vol
       class(amrvof), intent(inout) :: this
       integer :: lvl, i, j, k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
@@ -1769,21 +1773,19 @@ contains
                ! New phasic volumes
                Lvol_new=Lvol_old-Lvol_flux
                Gvol_new=Gvol_old-Gvol_flux
-               ! New volume fraction
+               ! New volume fraction and default barycenters
                pVF(i,j,k,1)=Lvol_new/(Lvol_new+Gvol_new)
+               pCliq(i,j,k,1:3) = [this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+               pCgas(i,j,k,1:3) = [this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                ! Clip and update barycenters
                if (pVF(i,j,k,1).lt.VFlo) then
                   pVF(i,j,k,1)=0.0_WP
-                  pCliq(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
-                  pCgas(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                else if (pVF(i,j,k,1).gt.VFhi) then
                   pVF(i,j,k,1)=1.0_WP
-                  pCliq(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
-                  pCgas(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                else
                   ! Update barycenters from moment conservation and project forward
-                  Lbar_new=(Lbar_old*Lvol_old-Lbar_flux)/Lvol_new; pCliq(i,j,k,1:3)=project(Lbar_new,dt)
-                  Gbar_new=(Gbar_old*Gvol_old-Gbar_flux)/Gvol_new; pCgas(i,j,k,1:3)=project(Gbar_new,dt)
+                  if (Lvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Lbar_new=(Lbar_old*Lvol_old-Lbar_flux)/Lvol_new; pCliq(i,j,k,1:3)=project(Lbar_new,dt); end if
+                  if (Gvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Gbar_new=(Gbar_old*Gvol_old-Gbar_flux)/Gvol_new; pCgas(i,j,k,1:3)=project(Gbar_new,dt); end if
                end if
             end do; end do; end do
          end do

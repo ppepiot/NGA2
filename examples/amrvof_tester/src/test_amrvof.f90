@@ -3,7 +3,7 @@ module mod_test_amrvof
    use precision,         only: WP
    use amrviz_class,      only: amrviz
    use amrgrid_class,     only: amrgrid
-   use amrvof_class,      only: amrvof
+   use amrvof_class,      only: amrvof, VFlo
    use amrdata_class,     only: amrdata
    use timetracker_class, only: timetracker
    use event_class,       only: event
@@ -46,7 +46,6 @@ contains
       use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_boxarray, amrex_distromap, &
       &                           amrex_mfiter_build, amrex_mfiter_destroy
       use mms_geom,         only: initialize_volume_moments
-      use amrvof_geometry,  only: VFlo
       class(amrvof), intent(inout) :: solver
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time

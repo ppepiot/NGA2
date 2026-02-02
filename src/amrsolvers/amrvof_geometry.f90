@@ -8,16 +8,11 @@ module amrvof_geometry
    ! Expose tables and routines
    public :: tet_map, cut_side, cut_v1, cut_v2, cut_vtet
    public :: cut_ntets, cut_nvert, cut_nntet
-   public :: VFlo, VFhi
    public :: get_plane_dist
    public :: tet_vol, tet_sign, cut_tet_vol
    public :: flux_polyhedron_vol, cut_hex_vol
    public :: correct_flux_poly
    public :: cut_hex_polygon, hex_poly_nvert, get_hex_poly_nvert
-
-   ! Default parameters for volume fraction
-   real(WP), parameter :: VFlo = 1.0e-12_WP    !< Minimum VF value considered
-   real(WP), parameter :: VFhi = 1.0_WP - VFlo !< Maximum VF value considered
 
    ! Cutting tables from mpcomp_class_noirl
    ! tet_map: maps a hex cell (8 vertices + center) to 8 tetrahedra
