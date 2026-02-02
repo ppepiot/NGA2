@@ -9,7 +9,7 @@ Regrid nsteps: 50
 Tagging threshold: 1.0
 
 # Flow parameter
-Reynolds number: 1000
+Reynolds number: 3000
 
 # Time integration
 Max time: 100

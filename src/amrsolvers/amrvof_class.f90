@@ -121,16 +121,16 @@ module amrvof_class
 
    !> Abstract interface for user-defined VOF boundary condition
    !> User must set VF, Cliq, Cgas, and PLIC consistently in ghost cells
+   !> what=1 -> fill PLIC, what=2 -> fill moments
    abstract interface
-      subroutine vof_bc_iface(solver, lvl, time, dir, side, pVF, pCliq, pCgas, pPLIC, ilo, ihi, jlo, jhi, klo, khi)
-         import :: amrvof, WP
+      subroutine vof_bc_iface(solver, bx, pVF, pCliq, pCgas, pPLIC, face, time, what)
+         import :: amrvof, amrex_box, WP
          class(amrvof), intent(inout) :: solver
-         integer, intent(in) :: lvl       !< Level
-         real(WP), intent(in) :: time     !< Current simulation time
-         integer, intent(in) :: dir       !< Direction (1=x, 2=y, 3=z)
-         integer, intent(in) :: side      !< Side (-1=lo, +1=hi)
+         type(amrex_box), intent(in) :: bx           !< Ghost region to fill
          real(WP), dimension(:,:,:,:), contiguous, intent(inout) :: pVF, pCliq, pCgas, pPLIC
-         integer, intent(in) :: ilo, ihi, jlo, jhi, klo, khi  !< Ghost region bounds
+         integer, intent(in) :: face                 !< 1=xlo,2=xhi,3=ylo,4=yhi,5=zlo,6=zhi
+         real(WP), intent(in) :: time
+         integer, intent(in) :: what                 !< 1=PLIC, 2=moments
       end subroutine vof_bc_iface
    end interface
 
@@ -734,17 +734,17 @@ contains
    !> Handles BC_LIQ (trivial d=+∞), BC_GAS (trivial d=-∞), 
    !> BC_REFLECT (mirror + flip normal), BC_USER (user callback)
    subroutine fill_plic_lvl(this, lvl, time)
-      use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, amrex_geometry
+      use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, amrex_geometry, amrex_box
       implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
       type(amrex_mfiter) :: mfi
       type(amrex_geometry) :: geom
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pP
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       integer :: ig, jg, kg, ilo, ihi, jlo, jhi, klo, khi
       integer :: dlo(3), dhi(3)
-      real(WP) :: xL, yL, zL
+      real(WP) :: xL, yL, zL, dx, dy, dz
       
       ! Sync ghosts (periodic + MPI exchange + C/F)
       call this%PLIC%fill_lvl(lvl, time)
@@ -753,129 +753,89 @@ contains
       geom = this%amr%geom(lvl)
       dlo = geom%domain%lo
       dhi = geom%domain%hi
-      
       xL = this%amr%xhi - this%amr%xlo
       yL = this%amr%yhi - this%amr%ylo
       zL = this%amr%zhi - this%amr%zlo
+      dx = this%amr%dx(lvl)
+      dy = this%amr%dy(lvl)
+      dz = this%amr%dz(lvl)
       
-      ! Fix periodic plane distance
+      ! Fix periodic plane distance + apply physical BC
       call amrex_mfiter_build(mfi, this%PLIC%mf(lvl), tiling=.false.)
       do while (mfi%next())
-         pP => this%PLIC%mf(lvl)%dataptr(mfi)
-         ilo = lbound(pP,1); ihi = ubound(pP,1)
-         jlo = lbound(pP,2); jhi = ubound(pP,2)
-         klo = lbound(pP,3); khi = ubound(pP,3)
+         pVF   => this%VF%mf(lvl)%dataptr(mfi)
+         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         ilo = lbound(pPLIC,1); ihi = ubound(pPLIC,1)
+         jlo = lbound(pPLIC,2); jhi = ubound(pPLIC,2)
+         klo = lbound(pPLIC,3); khi = ubound(pPLIC,3)
          
-         ! X-periodic
+         ! X-periodic: fix plane distance
          if (this%amr%xper) then
             if (ilo .lt. dlo(1)) then
                do kg = klo, khi; do jg = jlo, jhi; do ig = ilo, dlo(1)-1
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) - pP(ig,jg,kg,1)*xL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) - pPLIC(ig,jg,kg,1)*xL
                end do; end do; end do
             end if
             if (ihi .gt. dhi(1)) then
                do kg = klo, khi; do jg = jlo, jhi; do ig = dhi(1)+1, ihi
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) + pP(ig,jg,kg,1)*xL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) + pPLIC(ig,jg,kg,1)*xL
                end do; end do; end do
             end if
          end if
-         
-         ! Y-periodic
+         ! Y-periodic: fix plane distance
          if (this%amr%yper) then
             if (jlo .lt. dlo(2)) then
                do kg = klo, khi; do jg = jlo, dlo(2)-1; do ig = ilo, ihi
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) - pP(ig,jg,kg,2)*yL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) - pPLIC(ig,jg,kg,2)*yL
                end do; end do; end do
             end if
             if (jhi .gt. dhi(2)) then
                do kg = klo, khi; do jg = dhi(2)+1, jhi; do ig = ilo, ihi
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) + pP(ig,jg,kg,2)*yL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) + pPLIC(ig,jg,kg,2)*yL
                end do; end do; end do
             end if
          end if
-         
-         ! Z-periodic
+         ! Z-periodic: fix plane distance
          if (this%amr%zper) then
             if (klo .lt. dlo(3)) then
                do kg = klo, dlo(3)-1; do jg = jlo, jhi; do ig = ilo, ihi
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) - pP(ig,jg,kg,3)*zL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) - pPLIC(ig,jg,kg,3)*zL
                end do; end do; end do
             end if
             if (khi .gt. dhi(3)) then
                do kg = dhi(3)+1, khi; do jg = jlo, jhi; do ig = ilo, ihi
-                  pP(ig,jg,kg,4) = pP(ig,jg,kg,4) + pP(ig,jg,kg,3)*zL
+                  pPLIC(ig,jg,kg,4) = pPLIC(ig,jg,kg,4) + pPLIC(ig,jg,kg,3)*zL
                end do; end do; end do
             end if
+         end if
+         
+         ! Apply physical BC for PLIC
+         if (.not.this%amr%xper) then
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+         end if
+         if (.not.this%amr%yper) then
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+         end if
+         if (.not.this%amr%zper) then
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
       
-      ! Apply physical BC for PLIC
-      call apply_plic_bc()
-      
    contains
       
-      !> Apply physical BC to PLIC at domain boundaries
-      subroutine apply_plic_bc()
-         type(amrex_mfiter) :: mfi
-         type(amrex_geometry) :: geom
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
-         integer :: ilo, ihi, jlo, jhi, klo, khi
-         integer :: dlo(3), dhi(3)
-         real(WP) :: dx, dy, dz
-         
-         geom = this%amr%geom(lvl)
-         dlo = geom%domain%lo
-         dhi = geom%domain%hi
-         dx = this%amr%dx(lvl)
-         dy = this%amr%dy(lvl)
-         dz = this%amr%dz(lvl)
-         
-         call amrex_mfiter_build(mfi, this%PLIC%mf(lvl), tiling=.false.)
-         do while (mfi%next())
-            pVF => this%VF%mf(lvl)%dataptr(mfi)
-            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
-            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
-            ilo = lbound(pPLIC,1); ihi = ubound(pPLIC,1)
-            jlo = lbound(pPLIC,2); jhi = ubound(pPLIC,2)
-            klo = lbound(pPLIC,3); khi = ubound(pPLIC,3)
-            
-            ! X-boundaries
-            if (.not.this%amr%xper) then
-               if (ilo.lt.dlo(1)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 1, -1, this%bc_xlo, &
-               &   ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo, dx, dy, dz)
-               if (ihi.gt.dhi(1)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 1, +1, this%bc_xhi, &
-               &   dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi, dx, dy, dz)
-            end if
-            
-            ! Y-boundaries
-            if (.not.this%amr%yper) then
-               if (jlo.lt.dlo(2)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 2, -1, this%bc_ylo, &
-               &   ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo, dx, dy, dz)
-               if (jhi.gt.dhi(2)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 2, +1, this%bc_yhi, &
-               &   ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi, dx, dy, dz)
-            end if
-            
-            ! Z-boundaries
-            if (.not.this%amr%zper) then
-               if (klo.lt.dlo(3)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 3, -1, this%bc_zlo, &
-               &   ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo, dx, dy, dz)
-               if (khi.gt.dhi(3)) call apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, 3, +1, this%bc_zhi, &
-               &   ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi, dx, dy, dz)
-            end if
-            
-         end do
-         call amrex_mfiter_destroy(mfi)
-      end subroutine apply_plic_bc
-      
       !> Apply BC to PLIC on a single face
-      subroutine apply_plic_bc_face(pVF, pCliq, pCgas, pPLIC, dir, side, bc_type, &
-      &   i1, i2, j1, j2, k1, k2, bnd, x_bnd, dx, dy, dz)
-         real(WP), dimension(:,:,:,:), contiguous, intent(inout) :: pVF, pCliq, pCgas, pPLIC
+      !> Uses host association for pVF, pCliq, pCgas, pPLIC
+      subroutine apply_bc_face(dir, side, bc_type, i1, i2, j1, j2, k1, k2, bnd, x_bnd)
          integer, intent(in) :: dir, side, bc_type, i1, i2, j1, j2, k1, k2, bnd
-         real(WP), intent(in) :: x_bnd, dx, dy, dz
-         integer :: ig, jg, kg, isrc, jsrc, ksrc
+         real(WP), intent(in) :: x_bnd
+         integer :: ig, jg, kg, isrc, jsrc, ksrc, face
+         type(amrex_box) :: bc_bx
          
          select case (bc_type)
          
@@ -909,9 +869,11 @@ contains
             end do; end do; end do
             
           case (BC_USER)
-            ! User callback sets PLIC (user_vof_bc receives all arrays)
+            ! User callback sets PLIC
             if (associated(this%user_vof_bc)) then
-               call this%user_vof_bc(this, lvl, time, dir, side, pVF, pCliq, pCgas, pPLIC, i1, i2, j1, j2, k1, k2)
+               bc_bx = amrex_box([i1, j1, k1], [i2, j2, k2])
+               face = 2*dir - 1 + (1+side)/2  ! dir=1,side=-1 -> 1; dir=1,side=+1 -> 2; etc.
+               call this%user_vof_bc(this, bc_bx, pVF, pCliq, pCgas, pPLIC, face, time, 1)
             end if
             
           case default
@@ -919,7 +881,7 @@ contains
             
          end select
          
-      end subroutine apply_plic_bc_face
+      end subroutine apply_bc_face
       
    end subroutine fill_plic_lvl
 
@@ -932,32 +894,39 @@ contains
       real(WP), intent(in) :: time
       type(amrex_mfiter) :: mfi
       type(amrex_geometry) :: geom
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pCliq, pCgas
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
       integer :: ig, jg, kg, ilo, ihi, jlo, jhi, klo, khi
       integer :: dlo(3), dhi(3)
-      real(WP) :: xL, yL, zL
+      real(WP) :: xL, yL, zL, dx, dy, dz
       
       ! Sync ghosts (periodic + MPI exchange + C/F)
       call this%VF%fill_lvl(lvl, time)
       call this%Cliq%fill_lvl(lvl, time)
       call this%Cgas%fill_lvl(lvl, time)
       
-      ! Fix barycenter positions in periodic ghost cells
+      ! Get geometry info
       geom = this%amr%geom(lvl)
       dlo = geom%domain%lo
       dhi = geom%domain%hi
       xL = this%amr%xhi - this%amr%xlo
       yL = this%amr%yhi - this%amr%ylo
       zL = this%amr%zhi - this%amr%zlo
+      dx = this%amr%dx(lvl)
+      dy = this%amr%dy(lvl)
+      dz = this%amr%dz(lvl)
       
-      call amrex_mfiter_build(mfi, this%Cliq%mf(lvl), tiling=.false.)
+      ! Fix barycenter positions in periodic ghost cells + apply physical BC
+      call amrex_mfiter_build(mfi, this%VF%mf(lvl), tiling=.false.)
       do while (mfi%next())
+         pVF   => this%VF%mf(lvl)%dataptr(mfi)
          pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
          pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-         ilo = lbound(pCliq,1); ihi = ubound(pCliq,1)
-         jlo = lbound(pCliq,2); jhi = ubound(pCliq,2)
-         klo = lbound(pCliq,3); khi = ubound(pCliq,3)
-         ! X-periodic
+         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
+         ilo = lbound(pVF,1); ihi = ubound(pVF,1)
+         jlo = lbound(pVF,2); jhi = ubound(pVF,2)
+         klo = lbound(pVF,3); khi = ubound(pVF,3)
+         
+         ! X-periodic: shift barycenters
          if (this%amr%xper) then
             if (ilo .lt. dlo(1)) then
                do kg = klo, khi; do jg = jlo, jhi; do ig = ilo, dlo(1)-1
@@ -972,7 +941,7 @@ contains
                end do; end do; end do
             end if
          end if
-         ! Y-periodic
+         ! Y-periodic: shift barycenters
          if (this%amr%yper) then
             if (jlo .lt. dlo(2)) then
                do kg = klo, khi; do jg = jlo, dlo(2)-1; do ig = ilo, ihi
@@ -987,7 +956,7 @@ contains
                end do; end do; end do
             end if
          end if
-         ! Z-periodic
+         ! Z-periodic: shift barycenters
          if (this%amr%zper) then
             if (klo .lt. dlo(3)) then
                do kg = klo, dlo(3)-1; do jg = jlo, jhi; do ig = ilo, ihi
@@ -1002,77 +971,33 @@ contains
                end do; end do; end do
             end if
          end if
+         
+         ! Apply physical BC for moments
+         if (.not.this%amr%xper) then
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+         end if
+         if (.not.this%amr%yper) then
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+         end if
+         if (.not.this%amr%zper) then
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
+         end if
       end do
       call amrex_mfiter_destroy(mfi)
       
-      ! Apply physical BC for moments
-      call apply_moments_bc()
-      
    contains
       
-      !> Apply physical BC to VF/Cliq/Cgas at domain boundaries
-      subroutine apply_moments_bc()
-         type(amrex_mfiter) :: mfi
-         type(amrex_geometry) :: geom
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
-         integer :: ilo, ihi, jlo, jhi, klo, khi
-         integer :: dlo(3), dhi(3)
-         real(WP) :: dx, dy, dz
-         
-         geom = this%amr%geom(lvl)
-         dlo = geom%domain%lo
-         dhi = geom%domain%hi
-         dx = this%amr%dx(lvl)
-         dy = this%amr%dy(lvl)
-         dz = this%amr%dz(lvl)
-         
-         call amrex_mfiter_build(mfi, this%VF%mf(lvl), tiling=.false.)
-         do while (mfi%next())
-            pVF => this%VF%mf(lvl)%dataptr(mfi)
-            pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
-            pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-            pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
-            ilo = lbound(pVF,1); ihi = ubound(pVF,1)
-            jlo = lbound(pVF,2); jhi = ubound(pVF,2)
-            klo = lbound(pVF,3); khi = ubound(pVF,3)
-            
-            ! X-boundaries
-            if (.not.this%amr%xper) then
-               if (ilo.lt.dlo(1)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 1, -1, this%bc_xlo, &
-               &   ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), dx, dy, dz)
-               if (ihi.gt.dhi(1)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 1, +1, this%bc_xhi, &
-               &   dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), dx, dy, dz)
-            end if
-            
-            ! Y-boundaries
-            if (.not.this%amr%yper) then
-               if (jlo.lt.dlo(2)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 2, -1, this%bc_ylo, &
-               &   ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), dx, dy, dz)
-               if (jhi.gt.dhi(2)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 2, +1, this%bc_yhi, &
-               &   ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), dx, dy, dz)
-            end if
-            
-            ! Z-boundaries
-            if (.not.this%amr%zper) then
-               if (klo.lt.dlo(3)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 3, -1, this%bc_zlo, &
-               &   ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), dx, dy, dz)
-               if (khi.gt.dhi(3)) call apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, 3, +1, this%bc_zhi, &
-               &   ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), dx, dy, dz)
-            end if
-            
-         end do
-         call amrex_mfiter_destroy(mfi)
-      end subroutine apply_moments_bc
-      
-      !> Apply BC to VF/Cliq/Cgas on a single face (moments only)
-      !> For BC_USER, user callback receives all arrays including PLIC for convenience
-      subroutine apply_moments_bc_face(pVF, pCliq, pCgas, pPLIC, dir, side, bc_type, &
-      &   i1, i2, j1, j2, k1, k2, bnd, dx, dy, dz)
-         real(WP), dimension(:,:,:,:), contiguous, intent(inout) :: pVF, pCliq, pCgas, pPLIC
+      !> Apply BC to VF/Cliq/Cgas on a single face
+      !> Uses host association for pVF, pCliq, pCgas, pPLIC, dx, dy, dz
+      subroutine apply_bc_face(dir, side, bc_type, i1, i2, j1, j2, k1, k2, bnd, x_bnd)
          integer, intent(in) :: dir, side, bc_type, i1, i2, j1, j2, k1, k2, bnd
-         real(WP), intent(in) :: dx, dy, dz
-         integer :: ig, jg, kg, isrc, jsrc, ksrc
+         real(WP), intent(in) :: x_bnd
+         integer :: ig, jg, kg, isrc, jsrc, ksrc, face
          real(WP), dimension(3) :: center
+         type(amrex_box) :: bc_bx
          
          select case (bc_type)
          
@@ -1099,21 +1024,27 @@ contains
             end do; end do; end do
             
           case (BC_REFLECT)
-            ! Mirror VF/Cliq/Cgas from interior
+            ! Mirror VF/Cliq/Cgas from interior + reflect barycenters
             do kg = k1, k2; do jg = j1, j2; do ig = i1, i2
                isrc = ig; jsrc = jg; ksrc = kg
                if (dir.eq.1) isrc = 2*bnd - ig - side
                if (dir.eq.2) jsrc = 2*bnd - jg - side
                if (dir.eq.3) ksrc = 2*bnd - kg - side
+               ! Copy VF
                pVF(ig,jg,kg,1) = pVF(isrc,jsrc,ksrc,1)
+               ! Copy and reflect barycenters
                pCliq(ig,jg,kg,1:3) = pCliq(isrc,jsrc,ksrc,1:3)
                pCgas(ig,jg,kg,1:3) = pCgas(isrc,jsrc,ksrc,1:3)
+               pCliq(ig,jg,kg,dir) = 2.0_WP*x_bnd - pCliq(isrc,jsrc,ksrc,dir)
+               pCgas(ig,jg,kg,dir) = 2.0_WP*x_bnd - pCgas(isrc,jsrc,ksrc,dir)
             end do; end do; end do
             
           case (BC_USER)
-            ! User callback sets moments (and optionally PLIC)
+            ! User callback sets moments
             if (associated(this%user_vof_bc)) then
-               call this%user_vof_bc(this, lvl, time, dir, side, pVF, pCliq, pCgas, pPLIC, i1, i2, j1, j2, k1, k2)
+               bc_bx = amrex_box([i1, j1, k1], [i2, j2, k2])
+               face = 2*dir - 1 + (1+side)/2  ! dir=1,side=-1 -> 1; dir=1,side=+1 -> 2; etc.
+               call this%user_vof_bc(this, bc_bx, pVF, pCliq, pCgas, pPLIC, face, time, 2)
             end if
             
           case default
@@ -1121,7 +1052,7 @@ contains
             
          end select
          
-      end subroutine apply_moments_bc_face
+      end subroutine apply_bc_face
       
    end subroutine fill_moments_lvl
 
