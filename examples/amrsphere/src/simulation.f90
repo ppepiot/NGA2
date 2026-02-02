@@ -190,7 +190,7 @@ contains
          fs%visc=1.0_WP/fs%visc
          ! Set pressure convergence
          fs%psolver%max_iter=20
-         fs%psolver%tol_rel=1.0e-6_WP
+         fs%psolver%tol_rel=1.0e-5_WP
          ! Set boundary conditions
          fs%U%lo_bc(1,1)=amrex_bc_ext_dir
          fs%V%lo_bc(1,1)=amrex_bc_foextrap
