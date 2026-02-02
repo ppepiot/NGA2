@@ -84,6 +84,7 @@ module amrincomp_class
       ! Physics procedures
       procedure :: get_dmomdt                 !< Compute momentum advection RHS
       procedure :: get_cfl                    !< Compute CFL numbers
+      procedure :: correct_outflow            !< Correct outflow for global mass conservation
       procedure :: print => amrincomp_print   !< Print solver info
    end type amrincomp
 
@@ -117,7 +118,7 @@ module amrincomp_class
          import :: amrincomp, amrex_box, amrex_geometry, WP
          class(amrincomp), intent(in) :: solver
          type(amrex_box), intent(in) :: bx          !< Boundary region to fill
-         real(WP), dimension(:,:,:,:), intent(inout) :: p
+         real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
          character(len=1), intent(in) :: comp       !< 'U', 'V', or 'W'
          integer, intent(in) :: face                !< 1=xlo,2=xhi,3=ylo,4=yhi,5=zlo,6=zhi
          real(WP), intent(in) :: time
@@ -1030,6 +1031,7 @@ contains
    subroutine velocity_fillbc(this, mf, scomp, ncomp, time, geom)
       use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, &
       &   amrex_bc_ext_dir, amrex_bc_foextrap, amrex_bc_hoextrap, amrex_bc_reflect_even, amrex_bc_reflect_odd
+      implicit none
       class(amrdata), intent(inout) :: this
       type(amrex_multifab), intent(inout) :: mf
       integer, intent(in) :: scomp, ncomp
@@ -1037,15 +1039,17 @@ contains
       type(amrex_geometry), intent(in) :: geom
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
+      class(amrincomp), pointer :: solver
       real(WP), dimension(:,:,:,:), contiguous, pointer :: p
-      integer :: i, j, k, dlo(3), dhi(3), flo(3), fhi(3), bnd
+      integer :: i, j, k, dlo(3), dhi(3), flo(3), fhi(3)
       integer :: ilo, ihi, jlo, jhi, klo, khi
       character(len=1) :: comp
       logical :: xper, yper, zper
 
       ! Access solver for periodicity and user callback
-      select type (solver => this%parent)
+      select type (s => this%parent)
        class is (amrincomp)
+         solver => s
          xper = solver%amr%xper; yper = solver%amr%yper; zper = solver%amr%zper
          if (xper .and. yper .and. zper) return
       end select
@@ -1079,49 +1083,18 @@ contains
 
          select type (solver => this%parent)
           class is (amrincomp)
-
             ! X-LOW BOUNDARY
-            if (.not.xper .and. ilo .lt. flo(1)) then
-               bnd = flo(1)
-               call apply_vel_bc_lo(p, 1, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%lo_bc(1,1), solver, comp, 1, time, geom)
-            end if
-
+            if (.not.xper .and. ilo .lt. flo(1)) call apply_vel_bc_lo(dir=1, bnd=flo(1), bctype=this%lo_bc(1,1), face=1)
             ! X-HIGH BOUNDARY
-            if (.not.xper .and. ihi .gt. fhi(1)) then
-               bnd = fhi(1)
-               call apply_vel_bc_hi(p, 1, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%hi_bc(1,1), solver, comp, 2, time, geom)
-            end if
-
+            if (.not.xper .and. ihi .gt. fhi(1)) call apply_vel_bc_hi(dir=1, bnd=fhi(1), bctype=this%hi_bc(1,1), face=2)
             ! Y-LOW BOUNDARY
-            if (.not.yper .and. jlo .lt. flo(2)) then
-               bnd = flo(2)
-               call apply_vel_bc_lo(p, 2, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%lo_bc(2,1), solver, comp, 3, time, geom)
-            end if
-
+            if (.not.yper .and. jlo .lt. flo(2)) call apply_vel_bc_lo(dir=2, bnd=flo(2), bctype=this%lo_bc(2,1), face=3)
             ! Y-HIGH BOUNDARY
-            if (.not.yper .and. jhi .gt. fhi(2)) then
-               bnd = fhi(2)
-               call apply_vel_bc_hi(p, 2, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%hi_bc(2,1), solver, comp, 4, time, geom)
-            end if
-
+            if (.not.yper .and. jhi .gt. fhi(2)) call apply_vel_bc_hi(dir=2, bnd=fhi(2), bctype=this%hi_bc(2,1), face=4)
             ! Z-LOW BOUNDARY
-            if (.not.zper .and. klo .lt. flo(3)) then
-               bnd = flo(3)
-               call apply_vel_bc_lo(p, 3, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%lo_bc(3,1), solver, comp, 5, time, geom)
-            end if
-
+            if (.not.zper .and. klo .lt. flo(3)) call apply_vel_bc_lo(dir=3, bnd=flo(3), bctype=this%lo_bc(3,1), face=5)
             ! Z-HIGH BOUNDARY
-            if (.not.zper .and. khi .gt. fhi(3)) then
-               bnd = fhi(3)
-               call apply_vel_bc_hi(p, 3, bnd, ilo, ihi, jlo, jhi, klo, khi, &
-               &   this%hi_bc(3,1), solver, comp, 6, time, geom)
-            end if
-
+            if (.not.zper .and. khi .gt. fhi(3)) call apply_vel_bc_hi(dir=3, bnd=fhi(3), bctype=this%hi_bc(3,1), face=6)
          end select
       end do
       call amrex_mfiter_destroy(mfi)
@@ -1131,13 +1104,8 @@ contains
       !> Apply BC at low boundary in direction dir
       !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
       !> For TANGENT component (e.g., V in x): fills ghosts only
-      subroutine apply_vel_bc_lo(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
-         real(WP), dimension(:,:,:,:), intent(inout) :: p
-         integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
-         class(amrincomp), intent(in) :: solver
-         character(len=1), intent(in) :: comp
-         real(WP), intent(in) :: time
-         type(amrex_geometry), intent(in) :: geom
+      subroutine apply_vel_bc_lo(dir, bnd, bctype, face)
+         integer, intent(in) :: dir, bnd, bctype, face
          type(amrex_box) :: bc_bx
          integer :: ii, jj, kk, fill_to, src_from
          logical :: is_normal
@@ -1220,13 +1188,8 @@ contains
       !> Apply BC at high boundary in direction dir
       !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
       !> For TANGENT component (e.g., V in x): fills ghosts only
-      subroutine apply_vel_bc_hi(p, dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, solver, comp, face, time, geom)
-         real(WP), dimension(:,:,:,:), intent(inout) :: p
-         integer, intent(in) :: dir, bnd, ilo, ihi, jlo, jhi, klo, khi, bctype, face
-         class(amrincomp), intent(in) :: solver
-         character(len=1), intent(in) :: comp
-         real(WP), intent(in) :: time
-         type(amrex_geometry), intent(in) :: geom
+      subroutine apply_vel_bc_hi(dir, bnd, bctype, face)
+         integer, intent(in) :: dir, bnd, bctype, face
          type(amrex_box) :: bc_bx
          integer :: ii, jj, kk, fill_from, src_from
          logical :: is_normal
@@ -1306,5 +1269,86 @@ contains
       end subroutine apply_vel_bc_hi
 
    end subroutine velocity_fillbc
+
+   !> Correct outflow velocity to ensure global mass conservation
+   subroutine correct_outflow(this)
+      use mpi_f08,  only: MPI_ALLREDUCE, MPI_SUM, MPI_IN_PLACE
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(amrincomp), intent(inout) :: this
+      real(WP) :: Qin, Qout, Ucorr, Aout
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU
+      integer :: i, j, k, ilo, ihi, jlo, jhi, klo, khi
+      integer :: dlo(3), dhi(3), ilo_bnd, ihi_bnd, ierr
+      real(WP) :: dy, dz, dA
+      type(amrex_mfiter) :: mfi
+
+      if (this%amr%xper) return
+
+      ! Level 0 only
+      dlo = this%amr%geom(0)%domain%lo
+      dhi = this%amr%geom(0)%domain%hi
+      ilo_bnd = dlo(1)
+      ihi_bnd = dhi(1) + 1
+      dy = this%amr%dy(0)
+      dz = this%amr%dz(0)
+      dA = dy * dz
+
+      Qin = 0.0_WP; Qout = 0.0_WP; Aout = 0.0_WP
+
+      call this%amr%mfiter_build(0, mfi, tiling=.false.)
+      do while (mfi%next())
+         pU => this%U%mf(0)%dataptr(mfi)
+         ilo = lbound(pU,1); ihi = ubound(pU,1)
+         jlo = lbound(pU,2); jhi = ubound(pU,2)
+         klo = lbound(pU,3); khi = ubound(pU,3)
+
+         if (ilo .le. ilo_bnd .and. ilo_bnd .le. ihi) then
+            do k = max(klo,dlo(3)), min(khi,dhi(3))
+               do j = max(jlo,dlo(2)), min(jhi,dhi(2))
+                  Qin = Qin + pU(ilo_bnd,j,k,1) * dA
+               end do
+            end do
+         end if
+
+         if (ilo .le. ihi_bnd .and. ihi_bnd .le. ihi) then
+            do k = max(klo,dlo(3)), min(khi,dhi(3))
+               do j = max(jlo,dlo(2)), min(jhi,dhi(2))
+                  Qout = Qout + pU(ihi_bnd,j,k,1) * dA
+                  Aout = Aout + dA
+               end do
+            end do
+         end if
+      end do
+      call this%amr%mfiter_destroy(mfi)
+
+      call MPI_ALLREDUCE(MPI_IN_PLACE, Qin,  1, MPI_REAL_WP, MPI_SUM, this%amr%comm, ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE, Qout, 1, MPI_REAL_WP, MPI_SUM, this%amr%comm, ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE, Aout, 1, MPI_REAL_WP, MPI_SUM, this%amr%comm, ierr)
+
+      if (Aout .gt. 0.0_WP) then
+         Ucorr = (Qin - Qout) / Aout
+      else
+         return
+      end if
+
+      call this%amr%mfiter_build(0, mfi, tiling=.false.)
+      do while (mfi%next())
+         pU => this%U%mf(0)%dataptr(mfi)
+         ilo = lbound(pU,1); ihi = ubound(pU,1)
+         jlo = lbound(pU,2); jhi = ubound(pU,2)
+         klo = lbound(pU,3); khi = ubound(pU,3)
+
+         if (ilo .le. ihi_bnd .and. ihi_bnd .le. ihi) then
+            do k = max(klo,dlo(3)), min(khi,dhi(3))
+               do j = max(jlo,dlo(2)), min(jhi,dhi(2))
+                  pU(ihi_bnd,j,k,1) = pU(ihi_bnd,j,k,1) + Ucorr
+               end do
+            end do
+         end if
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      
+   end subroutine correct_outflow
 
 end module amrincomp_class
