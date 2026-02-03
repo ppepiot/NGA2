@@ -134,6 +134,7 @@ contains
 
    !> Dispatch on_init: calls type-bound method then user callback
    subroutine amrincomp_on_init(ctx, lvl, time, ba, dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -147,6 +148,7 @@ contains
 
    !> Dispatch on_coarse: calls type-bound method
    subroutine amrincomp_on_coarse(ctx, lvl, time, ba, dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -159,6 +161,7 @@ contains
 
    !> Dispatch on_remake: calls type-bound method
    subroutine amrincomp_on_remake(ctx, lvl, time, ba, dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -171,6 +174,7 @@ contains
 
    !> Dispatch on_clear: calls type-bound method
    subroutine amrincomp_on_clear(ctx, lvl)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(amrincomp), pointer :: this
@@ -180,6 +184,7 @@ contains
 
    !> Dispatch tagging: calls user callback if set
    subroutine amrincomp_tagging(ctx, lvl, tags, time)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags
@@ -191,6 +196,7 @@ contains
 
    !> Dispatch post_regrid: calls type-bound method
    subroutine amrincomp_postregrid(ctx, lbase, time)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
@@ -205,6 +211,7 @@ contains
 
    !> Initialize the incompressible solver
    subroutine initialize(this, amr, name)
+      implicit none
       class(amrincomp), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
       character(len=*), intent(in), optional :: name
@@ -263,12 +270,32 @@ contains
 
    end subroutine initialize
 
+   !> Finalize the incompressible solver
+   subroutine finalize(this)
+      implicit none
+      class(amrincomp), intent(inout) :: this
+      call this%U%finalize()
+      call this%V%finalize()
+      call this%W%finalize()
+      call this%Uold%finalize()
+      call this%Vold%finalize()
+      call this%Wold%finalize()
+      call this%P%finalize()
+      call this%div%finalize()
+      call this%psolver%finalize()
+      nullify(this%amr)
+      nullify(this%user_init)
+      nullify(this%user_tagging)
+      nullify(this%user_dirichlet)
+   end subroutine finalize
+
    ! ============================================================================
    ! INTERNAL CALLBACK OVERRIDES
    ! ============================================================================
 
    !> Override on_init: reset levels and set to zero
    subroutine on_init(this, lvl, time, ba, dm)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -296,6 +323,7 @@ contains
 
    !> Override on_coarse: create new fine level from coarse using divergence-free interpolation
    subroutine on_coarse(this, lvl, time, ba, dm)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -319,6 +347,7 @@ contains
    !> Override on_remake: migrate data on regrid using divergence-free interpolation
    subroutine on_remake(this, lvl, time, ba, dm)
       use amrex_amr_module, only: amrex_multifab_build, amrex_multifab_destroy
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -354,6 +383,7 @@ contains
 
    !> Override on_clear: delete level
    subroutine on_clear(this, lvl)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       call this%U%clear_level(lvl)
@@ -368,6 +398,7 @@ contains
 
    !> Override post_regrid: average down for C/F consistency
    subroutine post_regrid(this, lbase, time)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
@@ -380,6 +411,7 @@ contains
    !> Average down MAC velocity for a single level (lvl+1 -> lvl)
    !> Uses amrdata infrastructure which handles face-centered averaging correctly
    subroutine average_down_velocity_to(this, lvl)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       call this%U%average_downto(lvl)
@@ -391,6 +423,7 @@ contains
    !> Simply calls average_down_velocity_to in a loop
    !> @param lbase Optional: lowest level to average down to (default 0)
    subroutine average_down_velocity(this, lbase)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in), optional :: lbase
       integer :: lvl, lb
@@ -405,6 +438,7 @@ contains
       use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
       use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two_faces
       use amrdata_class, only: amrdata_fillbc
+      implicit none
       class(amrincomp), target, intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -456,6 +490,7 @@ contains
 
    !> Fill velocity ghost cells on all levels
    subroutine fill_velocity(this, time)
+      implicit none
       class(amrincomp), intent(inout) :: this
       real(WP), intent(in) :: time
       integer :: lvl
@@ -470,6 +505,7 @@ contains
       use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
       use amrex_interface, only: amrmfab_fillcoarsepatch_faces
       use amrdata_class, only: amrdata_fillbc
+      implicit none
       class(amrincomp), target, intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -502,6 +538,7 @@ contains
 
    !> Sync velocity ghost cells at a single level (lightweight, no C/F interpolation)
    subroutine sync_velocity_lvl(this, lvl)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       call this%U%sync_lvl(lvl)
@@ -511,6 +548,7 @@ contains
 
    !> Sync velocity ghost cells on all levels
    subroutine sync_velocity(this)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer :: lvl
       do lvl = 0, this%amr%clvl()
@@ -524,6 +562,7 @@ contains
       use iso_c_binding, only: c_loc, c_funloc, c_funptr, c_ptr
       use amrex_interface, only: amrmfab_fillpatch_single, amrmfab_fillpatch_two_faces
       use amrdata_class, only: amrdata_fillbc
+      implicit none
       class(amrincomp), target, intent(inout) :: this
       type(amrex_multifab), intent(inout) :: Udest, Vdest, Wdest
       integer, intent(in) :: lvl
@@ -577,6 +616,7 @@ contains
    !> Average down pressure for a single level (lvl+1 -> lvl)
    !> Uses amrdata infrastructure which handles cell-centered averaging correctly
    subroutine average_down_pressure_to(this, lvl)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lvl
       call this%P%average_downto(lvl)
@@ -586,6 +626,7 @@ contains
    !> Simply calls average_down_pressure_to in a loop
    !> @param lbase Optional: lowest level to average down to (default 0)
    subroutine average_down_pressure(this, lbase)
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer, intent(in), optional :: lbase
       integer :: lvl, lb
@@ -595,23 +636,6 @@ contains
       end do
    end subroutine average_down_pressure
 
-   !> Finalize the incompressible solver
-   subroutine finalize(this)
-      class(amrincomp), intent(inout) :: this
-      call this%U%finalize()
-      call this%V%finalize()
-      call this%W%finalize()
-      call this%Uold%finalize()
-      call this%Vold%finalize()
-      call this%Wold%finalize()
-      call this%P%finalize()
-      call this%div%finalize()
-      call this%psolver%finalize()
-      nullify(this%amr)
-      nullify(this%user_init)
-      nullify(this%user_tagging)
-   end subroutine finalize
-
    ! ============================================================================
    ! PHYSICS METHODS
    ! ============================================================================
@@ -619,6 +643,7 @@ contains
    !> Compute divergence of velocity into internal div field, update divmax
    subroutine get_div(this)
       use amrex_interface, only: amrmfab_compute_divergence
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer :: lvl
       ! Use our wrapper to amrex's 2nd order staggered divergence
@@ -636,6 +661,7 @@ contains
 
    !> Compute pressure gradient into user-provided face amrdata
    subroutine get_pgrad(this, dPdx, dPdy, dPdz)
+      implicit none
       class(amrincomp), intent(inout) :: this
       type(amrdata), intent(inout) :: dPdx, dPdy, dPdz
       integer :: lvl, i, j, k
@@ -677,6 +703,7 @@ contains
       use amrex_interface, only: amrmask_make_fine
       use parallel, only: MPI_REAL_WP
       use mpi_f08
+      implicit none
       class(amrincomp), intent(inout) :: this
       integer :: lvl, i, j, k, ierr
       real(WP) :: dV, Uc, Vc, Wc
@@ -756,6 +783,7 @@ contains
 
    !> Compute CFL numbers (convective and viscous)
    subroutine get_cfl(this, dt, cfl, cflc)
+      implicit none
       class(amrincomp), intent(inout) :: this
       real(WP), intent(in)  :: dt
       real(WP), intent(out) :: cfl
@@ -793,6 +821,7 @@ contains
    subroutine amrincomp_print(this)
       use messager, only: log
       use string, only: str_long
+      implicit none
       class(amrincomp), intent(in) :: this
       character(len=str_long) :: message
       call log("Incompressible solver: "//trim(this%name))
@@ -804,6 +833,7 @@ contains
    !> Register solver data for checkpoint
    subroutine register_checkpoint(this, io)
       use amrio_class, only: amrio
+      implicit none
       class(amrincomp), intent(inout) :: this
       class(amrio), intent(inout) :: io
       call io%add_data(this%U, 'U')
@@ -815,6 +845,7 @@ contains
    !> Restore solver data from checkpoint
    subroutine restore_checkpoint(this, io, dirname)
       use amrio_class, only: amrio
+      implicit none
       class(amrincomp), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
@@ -830,6 +861,7 @@ contains
    subroutine get_dmomdt(this, U, V, W, drhoUdt, drhoVdt, drhoWdt, time)
       use amrex_amr_module, only: amrex_multifab, amrex_multifab_destroy, amrex_mfiter, amrex_box
       use amrex_interface,  only: amrmfab_average_down_cell, amrmfab_average_down_edge
+      implicit none
       class(amrincomp), intent(inout) :: this
       class(amrdata), intent(inout) :: U, V, W                          !< Velocity state (face-centered)
       class(amrdata), intent(inout) :: drhoUdt, drhoVdt, drhoWdt        !< Output: momentum RHS (face-centered)
@@ -1105,6 +1137,7 @@ contains
       !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
       !> For TANGENT component (e.g., V in x): fills ghosts only
       subroutine apply_vel_bc_lo(dir, bnd, bctype, face)
+         implicit none
          integer, intent(in) :: dir, bnd, bctype, face
          type(amrex_box) :: bc_bx
          integer :: ii, jj, kk, fill_to, src_from
@@ -1189,6 +1222,7 @@ contains
       !> For NORMAL component (e.g., U in x): fills boundary face + ghosts
       !> For TANGENT component (e.g., V in x): fills ghosts only
       subroutine apply_vel_bc_hi(dir, bnd, bctype, face)
+         implicit none
          integer, intent(in) :: dir, bnd, bctype, face
          type(amrex_box) :: bc_bx
          integer :: ii, jj, kk, fill_from, src_from

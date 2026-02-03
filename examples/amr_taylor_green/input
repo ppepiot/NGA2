@@ -1,0 +1,26 @@
+# AMR grid
+Base nx:    256
+Base ny:    256
+Base nz:    256
+Max levels: 1
+
+# Regridding parameters
+Regrid nsteps:     0
+Tagging threshold: 1.0
+
+# EoS parameters
+Gamma: 1.4
+Pinf:  0.0
+
+# Flow definition
+Mach:     1.25
+Reynolds: 1600
+Prandtl:  0.71
+
+# Time integration
+Max dt:   5e-3
+Max CFL:  0.5
+Max time: 10
+
+# Output
+Output period: 0.1
