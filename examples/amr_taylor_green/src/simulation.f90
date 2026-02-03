@@ -259,6 +259,7 @@ contains
          call consfile%add_column(fs%Qint(3),'V Momentum')
          call consfile%add_column(fs%Qint(4),'W Momentum')
          call consfile%add_column(fs%Qint(5),'Internal energy')
+         call consfile%add_column(fs%rhoKint,'Kinetic energy')
          call consfile%write()
          ! Create CFL monitor
          cflfile=monitor(amRoot=amr%amRoot,name='cfl')
