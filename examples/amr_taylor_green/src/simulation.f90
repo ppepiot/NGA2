@@ -213,6 +213,9 @@ contains
          call amr%init_from_scratch(time=time%t)
          ! Compute viscosities
          call get_viscosities()
+         ! Add artificial bulk viscosity
+         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
+         call fs%beta%multiply(src=fs%Q,srccomp=1)
       end block init_regridding
       
       ! Initialize visualization
@@ -343,6 +346,10 @@ contains
          
          ! Compute viscosities
          call get_viscosities()
+
+         ! Add artificial bulk viscosity
+         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
+         call fs%beta%multiply(src=fs%Q,srccomp=1)
          
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)

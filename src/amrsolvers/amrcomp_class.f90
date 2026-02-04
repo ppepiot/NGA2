@@ -900,7 +900,7 @@ contains
 
          ! Destroy temp divergence multifab
          call amrex_multifab_destroy(div)
-         
+
          ! Fill beta's ghosts at this level
          call beta%mf(lvl)%fill_boundary(this%amr%geom(lvl))
          call this%amr%mfab_foextrap(lvl=lvl,mfab=beta%mf(lvl))
@@ -929,9 +929,33 @@ contains
          ! Max speed of sound
          Cmax=this%C%norm0(lvl=lvl)
          ! Max viscosities
-         viscmax=max(this%visc%norm0(lvl=lvl)/max(this%Qmin(1),this%rho_floor),&
-         &           this%beta%norm0(lvl=lvl)/max(this%Qmin(1),this%rho_floor),&
-         &           this%diff%norm0(lvl=lvl)/max(this%Qmin(1),this%rho_floor))
+         get_viscmax: block
+            use amrex_amr_module, only: amrex_mfiter,amrex_box
+            use parallel, only: MPI_REAL_WP
+            use mpi_f08, only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX
+            type(amrex_mfiter) :: mfi
+            type(amrex_box) :: bx
+            real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVisc,pBeta,pDiff
+            integer :: i,j,k,ierr
+            real(WP) :: rho
+            viscmax=0.0_WP
+            call this%amr%mfiter_build(lvl,mfi)
+            do while(mfi%next())
+               ! Get data pointers
+               pQ=>this%Q%mf(lvl)%dataptr(mfi)
+               pVisc=>this%visc%mf(lvl)%dataptr(mfi)
+               pBeta=>this%beta%mf(lvl)%dataptr(mfi)
+               pDiff=>this%diff%mf(lvl)%dataptr(mfi)
+               ! Loop over interior tiles
+               bx=mfi%tilebox()
+               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                  rho=max(pQ(i,j,k,1),this%rho_floor)
+                  viscmax=max(viscmax,pVisc(i,j,k,1)/rho,pBeta(i,j,k,1)/rho,pDiff(i,j,k,1)/rho)
+               end do; end do; end do
+            end do
+            call this%amr%mfiter_destroy(mfi)
+            call MPI_ALLREDUCE(MPI_IN_PLACE,viscmax,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+         end block get_viscmax
          ! Convective+acoustic
          this%CFLc_x=max(this%CFLc_x,(Umax+Cmax)*dt/this%amr%dx(lvl))
          this%CFLc_y=max(this%CFLc_y,(Vmax+Cmax)*dt/this%amr%dy(lvl))
