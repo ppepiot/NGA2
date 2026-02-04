@@ -156,7 +156,7 @@ contains
       character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVisc
       real(WP) :: dx,dy,dz,dxi,dyi,dzi,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
-      real(WP) :: gradU_mag,div_neg,rho,mu,Rec,Res
+      real(WP) :: vort_mag,div_neg,rho,mu,Rec,Res
       integer :: i,j,k
       dx=solver%amr%dx(lvl); dxi=1.0_WP/dx
       dy=solver%amr%dy(lvl); dyi=1.0_WP/dy
@@ -183,12 +183,12 @@ contains
             dwdx=0.5_WP*dxi*(pQ(i+1,j,k,4)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,4)/max(pQ(i-1,j,k,1),solver%rho_floor))
             dwdy=0.5_WP*dyi*(pQ(i,j+1,k,4)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,4)/max(pQ(i,j-1,k,1),solver%rho_floor))
             dwdz=0.5_WP*dzi*(pQ(i,j,k+1,4)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,4)/max(pQ(i,j,k-1,1),solver%rho_floor))
-            ! |∇u| = sqrt(sum of all gradients squared)
-            gradU_mag=sqrt(dudx**2+dudy**2+dudz**2+dvdx**2+dvdy**2+dvdz**2+dwdx**2+dwdy**2+dwdz**2)
+            ! Vorticity magnitude
+            vort_mag=sqrt((dwdy-dvdz)**2+(dudz-dwdx)**2+(dvdx-dudy)**2)
             ! Divergence (only compression, i.e., negative divergence)
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
             ! Local cell Reynolds for turbulence
-            Rec=rho*gradU_mag*min(dx,dy,dz)**2/mu
+            Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
             ! Local cell Reynolds for shocks
             Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
             ! Tag based on either criterion
