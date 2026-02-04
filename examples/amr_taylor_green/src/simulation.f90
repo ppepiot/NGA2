@@ -63,32 +63,35 @@ contains
       get_C=sqrt(Gamma*(P+Pinf)/RHO)
    end function get_C
 
-   !> Compute viscosity using Sutherland's law and set diffusivity based on Prandtl number
-   subroutine get_visc_diff()
+   !> Compute viscosity using Sutherland's law, zero bulk viscosity, and set diffusivity based on Prandtl number
+   subroutine get_viscosities()
       use amrex_amr_module, only: amrex_mfiter,amrex_box
       integer :: lvl,i,j,k
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pI,pVisc,pDiff
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pI,pVisc,pBeta,pDiff
       do lvl=0,amr%clvl()
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
             ! Get pointers to data
             pI=>fs%I%mf(lvl)%dataptr(mfi)
             pVisc=>fs%visc%mf(lvl)%dataptr(mfi)
+            pBeta=>fs%beta%mf(lvl)%dataptr(mfi)
             pDiff=>fs%diff%mf(lvl)%dataptr(mfi)
             ! Get tilebox with overlap
             bx=mfi%growntilebox(fs%nover)
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                ! Sutherland's law: T = I/Cv
                pVisc(i,j,k,1)=Reynolds**(-1.0_WP)*(1.4042_WP*(pI(i,j,k,1)/Cv)**1.5_WP)/(pI(i,j,k,1)/Cv+0.4042_WP)
+               ! Zero bulk viscosity
+               pBeta(i,j,k,1)=0.0_WP
                ! Heat diffusivity: k = Cp*mu/Pr = Cv*Gamma*mu/Pr
                pDiff(i,j,k,1)=Cv*Gamma*pVisc(i,j,k,1)/Prandtl
             end do; end do; end do
          end do
          call amr%mfiter_destroy(mfi)
       end do
-   end subroutine get_visc_diff
+   end subroutine get_viscosities
    
    !> User init callback - set initial conditions for Q
    subroutine user_init(solver,lvl,time,ba,dm)
@@ -208,8 +211,8 @@ contains
          !call param_read('Tagging threshold',tagging_threshold)
          ! Create initial grid
          call amr%init_from_scratch(time=time%t)
-         ! Compute viscosity and diffusivity
-         call get_visc_diff()
+         ! Compute viscosities
+         call get_viscosities()
       end block init_regridding
       
       ! Initialize visualization
@@ -338,8 +341,8 @@ contains
          ! Recompute primitive variables
          call fs%get_primitive(fs%Q)
          
-         ! Compute viscosity and diffusivity
-         call get_visc_diff()
+         ! Compute viscosities
+         call get_viscosities()
          
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)

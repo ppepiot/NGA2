@@ -73,9 +73,10 @@ module amrcomp_class
       procedure :: on_clear
       procedure :: post_regrid
       ! Physics
-      procedure :: get_dQdt
       procedure :: get_primitive
       procedure :: get_conserved
+      procedure :: get_dQdt
+      procedure :: get_viscartif
       procedure :: get_cfl
       ! Print
       procedure :: get_info
@@ -227,6 +228,7 @@ contains
    !> Initialize the compressible solver
    subroutine initialize(this,amr,name)
       use iso_c_binding, only: c_loc
+      use amrex_amr_module, only: amrex_bc_foextrap
       implicit none
       class(amrcomp), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
@@ -253,10 +255,25 @@ contains
       call this%T%initialize(amr,name='T',ncomp=1,ng=this%nover); this%T%parent=>this
       call this%C%initialize(amr,name='C',ncomp=1,ng=this%nover); this%C%parent=>this
 
-      ! Initialize physical properties
+      ! Initialize physical properties (Neumann BCs on those)
       call this%visc%initialize(amr,name='visc',ncomp=1,ng=this%nover); this%visc%parent=>this
       call this%beta%initialize(amr,name='beta',ncomp=1,ng=this%nover); this%beta%parent=>this
       call this%diff%initialize(amr,name='diff',ncomp=1,ng=this%nover); this%diff%parent=>this
+      if (.not.amr%xper) then
+         this%visc%lo_bc(1,1)=amrex_bc_foextrap; this%visc%hi_bc(1,1)=amrex_bc_foextrap
+         this%beta%lo_bc(1,1)=amrex_bc_foextrap; this%beta%hi_bc(1,1)=amrex_bc_foextrap
+         this%diff%lo_bc(1,1)=amrex_bc_foextrap; this%diff%hi_bc(1,1)=amrex_bc_foextrap
+      end if
+      if (.not.amr%yper) then
+         this%visc%lo_bc(2,1)=amrex_bc_foextrap; this%visc%hi_bc(2,1)=amrex_bc_foextrap
+         this%beta%lo_bc(2,1)=amrex_bc_foextrap; this%beta%hi_bc(2,1)=amrex_bc_foextrap
+         this%diff%lo_bc(2,1)=amrex_bc_foextrap; this%diff%hi_bc(2,1)=amrex_bc_foextrap
+      end if
+      if (.not.amr%zper) then
+         this%visc%lo_bc(3,1)=amrex_bc_foextrap; this%visc%hi_bc(3,1)=amrex_bc_foextrap
+         this%beta%lo_bc(3,1)=amrex_bc_foextrap; this%beta%hi_bc(3,1)=amrex_bc_foextrap
+         this%diff%lo_bc(3,1)=amrex_bc_foextrap; this%diff%hi_bc(3,1)=amrex_bc_foextrap
+      end if
 
       ! Set fillbc callbacks to shared handler
       !this%Q%fillbc=>comp_fillbc
@@ -722,24 +739,24 @@ contains
                ! Pressure dilatation
                rhs(i,j,k,5)=rhs(i,j,k,5)-pP(i,j,k,1)*(0.5_WP*dxi*(pU(i+1,j,k,1)-pU(i-1,j,k,1))+0.5_WP*dyi*(pV(i,j+1,k,1)-pV(i,j-1,k,1))+0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1)))
                ! Viscous heating: compute cell-centered gradU and stress tensor
-               !gradU(1,1)=0.5_WP*dxi*(pU(i+1,j,k,1)-pU(i-1,j,k,1))
-               !gradU(2,1)=0.5_WP*dyi*(pU(i,j+1,k,1)-pU(i,j-1,k,1))
-               !gradU(3,1)=0.5_WP*dzi*(pU(i,j,k+1,1)-pU(i,j,k-1,1))
-               !gradU(1,2)=0.5_WP*dxi*(pV(i+1,j,k,1)-pV(i-1,j,k,1))
-               !gradU(2,2)=0.5_WP*dyi*(pV(i,j+1,k,1)-pV(i,j-1,k,1))
-               !gradU(3,2)=0.5_WP*dzi*(pV(i,j,k+1,1)-pV(i,j,k-1,1))
-               !gradU(1,3)=0.5_WP*dxi*(pW(i+1,j,k,1)-pW(i-1,j,k,1))
-               !gradU(2,3)=0.5_WP*dyi*(pW(i,j+1,k,1)-pW(i,j-1,k,1))
-               !gradU(3,3)=0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1))
-               !div=gradU(1,1)+gradU(2,2)+gradU(3,3)
+               gradU(1,1)=0.5_WP*dxi*(pU(i+1,j,k,1)-pU(i-1,j,k,1))
+               gradU(2,1)=0.5_WP*dyi*(pU(i,j+1,k,1)-pU(i,j-1,k,1))
+               gradU(3,1)=0.5_WP*dzi*(pU(i,j,k+1,1)-pU(i,j,k-1,1))
+               gradU(1,2)=0.5_WP*dxi*(pV(i+1,j,k,1)-pV(i-1,j,k,1))
+               gradU(2,2)=0.5_WP*dyi*(pV(i,j+1,k,1)-pV(i,j-1,k,1))
+               gradU(3,2)=0.5_WP*dzi*(pV(i,j,k+1,1)-pV(i,j,k-1,1))
+               gradU(1,3)=0.5_WP*dxi*(pW(i+1,j,k,1)-pW(i-1,j,k,1))
+               gradU(2,3)=0.5_WP*dyi*(pW(i,j+1,k,1)-pW(i,j-1,k,1))
+               gradU(3,3)=0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1))
+               div=gradU(1,1)+gradU(2,2)+gradU(3,3)
                ! τ:∇U = τ_ij * gradU(i,j)
-               !rhs(i,j,k,5)=rhs(i,j,k,5) &
-               !& +(2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
-               !& +(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
-               !& +(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
-               !& +pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
-               !& +pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
-               !& +pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3))
+               rhs(i,j,k,5)=rhs(i,j,k,5) &
+               & +(2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
+               & +(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
+               & +(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
+               & +pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
+               & +pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
+               & +pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3))
             end do; end do; end do
 
          end do
@@ -763,6 +780,134 @@ contains
          weno_weight=(1.0_WP-tanh((ratio-lambda)/delta))/3.0_WP+(1.0_WP-tanh((ratio-1.0_WP/lambda)/delta))/6.0_WP
       end function weno_weight
    end subroutine get_dQdt
+
+   !> Compute artificial bulk viscosity
+   subroutine get_viscartif(this,dt,beta)
+      use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_multifab,amrex_multifab_destroy
+      implicit none
+      class(amrcomp), intent(inout) :: this
+      real(WP), intent(in) :: dt
+      class(amrdata), intent(inout) :: beta
+      ! Local variables
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      type(amrex_multifab) :: div
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pBeta,pDiv,pU,pV,pW,pC
+      real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_beta
+      real(WP) :: dudy,dudz,dvdx,dvdz,dwdx,dwdy,vort,grad_div
+      integer :: lvl,i,j,k,si,sj,sk,n
+      ! Parameters
+      real(WP), parameter :: Cartif=2.0_WP
+      real(WP), parameter :: max_cfl=0.5_WP
+      integer, parameter :: nfilter=2
+      real(WP), dimension(-1:+1), parameter :: filter=[1.0_WP/6.0_WP,2.0_WP/3.0_WP,1.0_WP/6.0_WP]
+      
+      ! Zero out beta
+      call beta%setval(val=0.0_WP)
+      
+      ! Loop over levels
+      do lvl=0,this%amr%clvl()
+         
+         ! Grid spacings
+         dx=this%amr%dx(lvl); dxi=1.0_WP/dx
+         dy=this%amr%dy(lvl); dyi=1.0_WP/dy
+         dz=this%amr%dz(lvl); dzi=1.0_WP/dz
+         
+         ! Max beta from CFL
+         max_beta=max_cfl*min(dx**2,dy**2,dz**2)/(4.0_WP*dt)
+         
+         ! Build temp multifab for divergence at this level (1 ghost cell)
+         call this%amr%mfab_build(lvl=lvl,mfab=div,ncomp=1,nover=1); call div%setval(0.0_WP)
+         
+         ! Phase 1: Compute divergence
+         call this%amr%mfiter_build(lvl,mfi)
+         do while(mfi%next())
+            ! Get data pointers
+            pU=>this%U%mf(lvl)%dataptr(mfi)
+            pV=>this%V%mf(lvl)%dataptr(mfi)
+            pW=>this%W%mf(lvl)%dataptr(mfi)
+            pDiv=>div%dataptr(mfi)
+            ! Loop over tiles grown by 1 (safe as velocity has 2 ghost cells)
+            bx=mfi%growntilebox(1)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pDiv(i,j,k,1)=0.5_WP*(dxi*(pU(i+1,j,k,1)-pU(i-1,j,k,1))+dyi*(pV(i,j+1,k,1)-pV(i,j-1,k,1))+dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1)))
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         
+         ! Phase 2: Compute beta
+         call this%amr%mfiter_build(lvl,mfi)
+         do while(mfi%next())
+            ! Get data pointers
+            pU=>this%U%mf(lvl)%dataptr(mfi)
+            pV=>this%V%mf(lvl)%dataptr(mfi)
+            pW=>this%W%mf(lvl)%dataptr(mfi)
+            pC=>this%C%mf(lvl)%dataptr(mfi)
+            pDiv=>div%dataptr(mfi)
+            pBeta=>beta%mf(lvl)%dataptr(mfi)
+            ! Loop over interior tiles
+            bx=mfi%tilebox()
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               ! Only work in compression regions
+               if (pDiv(i,j,k,1).ge.0.0_WP) cycle
+               ! Compute local vorticity
+               dudy=0.5_WP*dyi*(pU(i,j+1,k,1)-pU(i,j-1,k,1))
+               dudz=0.5_WP*dzi*(pU(i,j,k+1,1)-pU(i,j,k-1,1))
+               dvdx=0.5_WP*dxi*(pV(i+1,j,k,1)-pV(i-1,j,k,1))
+               dvdz=0.5_WP*dzi*(pV(i,j,k+1,1)-pV(i,j,k-1,1))
+               dwdx=0.5_WP*dxi*(pW(i+1,j,k,1)-pW(i-1,j,k,1))
+               dwdy=0.5_WP*dyi*(pW(i,j+1,k,1)-pW(i,j-1,k,1))
+               vort=(dwdy-dvdz)**2+(dudz-dwdx)**2+(dvdx-dudy)**2
+               ! Compute |grad(div)|
+               grad_div=max(abs(pDiv(i+1,j,k,1)-pDiv(i,j,k,1)),abs(pDiv(i,j,k,1)-pDiv(i-1,j,k,1)))*dx**2 &
+               &       +max(abs(pDiv(i,j+1,k,1)-pDiv(i,j,k,1)),abs(pDiv(i,j,k,1)-pDiv(i,j-1,k,1)))*dy**2 &
+               &       +max(abs(pDiv(i,j,k+1,1)-pDiv(i,j,k,1)),abs(pDiv(i,j,k,1)-pDiv(i,j,k-1,1)))*dz**2
+               ! Floor vorticity with sound speed
+               vort=max(vort,(0.05_WP*pC(i,j,k,1)/min(dx,dy,dz))**2)
+               ! Compute beta
+               pBeta(i,j,k,1)=Cartif*grad_div*min(4.0_WP/3.0_WP*pDiv(i,j,k,1)**2/(pDiv(i,j,k,1)**2+vort+1.0e-15_WP),1.0_WP)
+               ! Clip to max
+               pBeta(i,j,k,1)=min(pBeta(i,j,k,1),max_beta)
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         
+         ! Phase 3: Filter beta using div as scratch
+         do n=1,nfilter
+            ! Copy beta to div
+            call div%copy(srcmf=beta%mf(lvl),srccomp=1,dstcomp=1,nc=1,ng=0)
+            ! Fill internal/periodic ghosts
+            call div%fill_boundary(this%amr%geom(lvl))
+            ! Apply Neumann BCs
+            call this%amr%mfab_foextrap(lvl=lvl,mfab=div)
+            ! Apply filter
+            call this%amr%mfiter_build(lvl,mfi)
+            do while(mfi%next())
+               ! Get data pointers
+               pDiv=>div%dataptr(mfi)
+               pBeta=>beta%mf(lvl)%dataptr(mfi)
+               ! Loop over interior tiles
+               bx=mfi%tilebox()
+               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                  pBeta(i,j,k,1)=0.0_WP
+                  do sk=-1,+1; do sj=-1,+1; do si=-1,+1
+                     pBeta(i,j,k,1)=pBeta(i,j,k,1)+filter(si)*filter(sj)*filter(sk)*pDiv(i+si,j+sj,k+sk,1)
+                  end do; end do; end do
+               end do; end do; end do
+            end do
+            call this%amr%mfiter_destroy(mfi)
+         end do
+
+         ! Destroy temp divergence multifab
+         call amrex_multifab_destroy(div)
+         
+         ! Fill beta's ghosts at this level
+         call beta%mf(lvl)%fill_boundary(this%amr%geom(lvl))
+         call this%amr%mfab_foextrap(lvl=lvl,mfab=beta%mf(lvl))
+         
+      end do
+      
+   end subroutine get_viscartif
 
    !> Calculate CFL numbers
    subroutine get_cfl(this,dt,cfl)
