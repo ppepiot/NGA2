@@ -1,4 +1,4 @@
-!> AMR Taylor-Green Vortex test case for compressible solver
+!> AMR compressible sphere test case with shock initialization
 module simulation
    use precision,         only: WP
    use amrgrid_class,     only: amrgrid
@@ -34,13 +34,24 @@ module simulation
    !> Simulation monitoring
    type(monitor) :: mfile,consfile,cflfile,gridfile
    
-   !> Flow parameters
-   real(WP) :: Mach,Reynolds,Prandtl
-
    !> Stiffened gas EOS parameters
    real(WP) :: Gamma,Pinf,Cv
+
+   !> Flow parameters
+   real(WP) :: M2,Xs                  !< Post-shock Mach and shock location
+   real(WP) :: Ms                     !< Shock Mach number
+   real(WP) :: rho1,p1,u1             !< Pre-shock state
+   real(WP) :: rho2,p2,u2             !< Post-shock state
+   real(WP) :: Reynolds,Prandtl       !< Viscous parameters
    
 contains
+
+
+   !> Smooth Heaviside function
+   real(WP) function Hshock(x,delta)
+      real(WP), intent(in) :: x,delta
+      Hshock=1.0_WP/(1.0_WP+exp(-x/delta))
+   end function Hshock
 
 
    !> P=EOS(RHO,I) - Stiffened gas
@@ -63,6 +74,13 @@ contains
       real(WP), intent(in) :: RHO,P
       get_C=sqrt(Gamma*(P+Pinf)/RHO)
    end function get_C
+
+   !> I=EOS(RHO,P)
+   pure real(WP) function get_I(RHO,P)
+      implicit none
+      real(WP), intent(in) :: RHO,P
+      get_I=(P+Gamma*Pinf)/(RHO*(Gamma-1.0_WP))
+   end function get_I
 
    !> Compute viscosity using Sutherland's law, zero bulk viscosity, and set diffusivity based on Prandtl number
    subroutine get_viscosities()
@@ -87,15 +105,15 @@ contains
                ! Zero bulk viscosity
                pBeta(i,j,k,1)=0.0_WP
                ! Heat diffusivity: k = Cp*mu/Pr = Cv*Gamma*mu/Pr
-               pDiff(i,j,k,1)=Cv*Gamma*pVisc(i,j,k,1)/Prandtl
+               pDiff(i,j,k,1)=Gamma*Cv*pVisc(i,j,k,1)/Prandtl
             end do; end do; end do
          end do
          call amr%mfiter_destroy(mfi)
       end do
    end subroutine get_viscosities
    
-   !> User init callback - set initial conditions for Q
-   subroutine user_init(solver,lvl,time,ba,dm)
+   !> User init callback - set normal shock profile
+   subroutine shock_init(solver,lvl,time,ba,dm)
       use amrex_amr_module, only: amrex_boxarray,amrex_distromap,amrex_mfiter,amrex_box
       use amrex_amr_module, only: amrex_mfiter_build,amrex_mfiter_destroy
       class(amrcomp), intent(inout) :: solver
@@ -106,42 +124,55 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
-      real(WP) :: dx,dy,dz,x,y,z,rho,P,U,V,W,IE
-      integer :: i,j,k   
-      dx=solver%amr%dx(lvl); dy=solver%amr%dy(lvl); dz=solver%amr%dz(lvl)
+      real(WP) :: rho,P,U,IE,H
+      integer :: i
       call amrex_mfiter_build(mfi,ba,dm,tiling=.true.)
       do while (mfi%next())
-         ! Get pointer to Q
+         ! Get pointer to data
          pQ=>solver%Q%mf(lvl)%dataptr(mfi)
          ! Get tilebox with overlap
          bx=mfi%growntilebox(solver%nover)
-         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Get physical coordinates
-            x=(real(i,WP)+0.5_WP)*dx
-            y=(real(j,WP)+0.5_WP)*dy
-            z=(real(k,WP)+0.5_WP)*dz
-            ! TGV velocity
-            U=+sin(x)*cos(y)*cos(z)
-            V=-cos(x)*sin(y)*cos(z)
-            W=0.0_WP
-            ! TGV pressure
-            P=1.0_WP/(Gamma*Mach**2)+(cos(2.0_WP*x)+cos(2.0_WP*y))*(cos(2.0_WP*z)+2.0_WP)/16.0_WP
-            ! Internal energy with T=1 normalization
-            IE=Cv
-            ! Density from EOS inversion
-            rho=(P+Gamma*Pinf)/(IE*(Gamma-1.0_WP))
-            ! Set conserved variable Q
-            pQ(i,j,k,1)=rho
-            pQ(i,j,k,2)=rho*U
-            pQ(i,j,k,3)=rho*V
-            pQ(i,j,k,4)=rho*W
-            pQ(i,j,k,5)=rho*IE
-         end do; end do; end do
+         do i=bx%lo(1),bx%hi(1)
+            ! Evaluate Heaviside function
+            H=Hshock(x=Xs-(solver%amr%xlo+(real(i,WP)+0.5_WP)*solver%amr%dx(lvl)),delta=0.5_WP*solver%amr%dx(lvl))
+            ! Interpolate between post-shock (H=1, right of shock) and pre-shock (H=0, left of shock)
+            rho=rho1+(rho2-rho1)*H
+            U=u1+(u2-u1)*H
+            P=p1+(p2-p1)*H
+            IE=get_I(rho,P)
+            ! Set conserved variables
+            pQ(i,:,:,1)=rho
+            pQ(i,:,:,2)=rho*U
+            pQ(i,:,:,3)=0.0_WP
+            pQ(i,:,:,4)=0.0_WP
+            pQ(i,:,:,5)=rho*IE
+         end do
       end do
       call amrex_mfiter_destroy(mfi)
-   end subroutine user_init
+   end subroutine shock_init
 
-   !> Tagger for this case based on velocity gradient (turbulence) and divergence (shocks)
+   !> Apply inflow BC at low-x (face=1)
+   subroutine shock_dirichlet(solver,pQ,bc_bx,face,time)
+      use amrex_amr_module, only: amrex_box
+      class(amrcomp), intent(inout) :: solver
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
+      type(amrex_box), intent(in) :: bc_bx
+      integer, intent(in) :: face
+      real(WP), intent(in) :: time
+      integer :: i,j,k
+      select case (face)
+       case (1)  ! X-LOW: Dirichlet inflow with pre-shock (stationary) values
+         do k=bc_bx%lo(3),bc_bx%hi(3); do j=bc_bx%lo(2),bc_bx%hi(2); do i=bc_bx%lo(1),bc_bx%hi(1)
+            pQ(i,j,k,1)=rho2
+            pQ(i,j,k,2)=rho2*u2
+            pQ(i,j,k,3)=0.0_WP
+            pQ(i,j,k,4)=0.0_WP
+            pQ(i,j,k,5)=rho2*get_I(rho2,p2)
+         end do; end do; end do
+      end select
+   end subroutine shock_dirichlet
+
+   !> Tagger based on vorticity and divergence
    subroutine my_tagger(solver,lvl,tags_ptr,time)
       use iso_c_binding,    only: c_ptr,c_char
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_tagboxarray
@@ -169,11 +200,9 @@ contains
          pQ=>solver%Q%mf(lvl)%dataptr(mfi)
          pVisc=>solver%visc%mf(lvl)%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Local density and viscosity
             rho=pQ(i,j,k,1)
             mu=pVisc(i,j,k,1)
-            if (mu.le.0.0_WP) mu=1.0_WP/Reynolds ! visc may not have been set yet
-            ! Centered velocity gradients
+            if (mu.le.0.0_WP) mu=1.0_WP/Reynolds
             dudx=0.5_WP*dxi*(pQ(i+1,j,k,2)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,2)/max(pQ(i-1,j,k,1),solver%rho_floor))
             dudy=0.5_WP*dyi*(pQ(i,j+1,k,2)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,2)/max(pQ(i,j-1,k,1),solver%rho_floor))
             dudz=0.5_WP*dzi*(pQ(i,j,k+1,2)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,2)/max(pQ(i,j,k-1,1),solver%rho_floor))
@@ -183,15 +212,10 @@ contains
             dwdx=0.5_WP*dxi*(pQ(i+1,j,k,4)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,4)/max(pQ(i-1,j,k,1),solver%rho_floor))
             dwdy=0.5_WP*dyi*(pQ(i,j+1,k,4)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,4)/max(pQ(i,j-1,k,1),solver%rho_floor))
             dwdz=0.5_WP*dzi*(pQ(i,j,k+1,4)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,4)/max(pQ(i,j,k-1,1),solver%rho_floor))
-            ! Vorticity magnitude
             vort_mag=sqrt((dwdy-dvdz)**2+(dudz-dwdx)**2+(dvdx-dudy)**2)
-            ! Divergence (only compression, i.e., negative divergence)
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
-            ! Local cell Reynolds for turbulence
             Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
-            ! Local cell Reynolds for shocks
             Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
-            ! Tag based on either criterion
             if (Rec.gt.Rec_tag.or.Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
          end do; end do; end do
       end do
@@ -205,25 +229,59 @@ contains
       
       ! Read EoS and flow parameters
       init_eos_and_flow: block
+         use messager, only: log,die
+         use string,   only: str_long
+         character(len=str_long) :: message
+         real(WP) :: A,B,C
+         ! EoS parameters
          call param_read('Gamma',Gamma)
-         call param_read('Pinf',Pinf)
-         call param_read('Mach',Mach)
-         call param_read('Reynolds',Reynolds)
-         call param_read('Prandtl',Prandtl)
-         Cv=1.0_WP/(Gamma*(Gamma-1.0_WP)*Mach**2)
+         Pinf=0.0_WP
+         ! Shock parameters (input is M2, post-shock lab Mach)
+         call param_read('Mach number',M2)
+         call param_read('Shock location',Xs)
+         ! Post-shock normalization: rho2=1, u2=1, u1=0, T2=1
+         rho2=1.0_WP
+         p2=1.0_WP/(Gamma*M2**2)
+         ! Quadratic for rho1: A*rho1^2 - B*rho1 + C = 0
+         A=2.0_WP*Gamma*p2+(Gamma-1.0_WP)
+         B=4.0_WP*Gamma*p2+(Gamma+1.0_WP)
+         C=2.0_WP*Gamma*p2
+         rho1=(B-sqrt(B**2-4.0_WP*A*C))/(2.0_WP*A)  ! smaller root for compression
+         ! Shock-fixed frame velocities and pressure
+         u1=1.0_WP/(1.0_WP-rho1)
+         u2=u1-1.0_WP
+         p1=p2-rho1/(1.0_WP-rho1)
+         if (p1.le.0.0_WP) call die('[simulation_init] Cannot achieve requested Mach number - negative pre-shock pressure')
+         ! Shock Mach number
+         Ms=u1/sqrt(Gamma*p1/rho1)
+         ! Shift to lab frame: pre-shock stationary
+         u2=1.0_WP
+         u1=0.0_WP
+         ! Cv from T2=1
+         Cv=p2/(rho2*(Gamma-1.0_WP))
+         ! Viscous parameters
+         call param_read('Reynolds number',Reynolds)
+         call param_read('Prandtl number',Prandtl)
+         ! Log shock conditions
+         if (amr%amRoot) then
+            write(message,'("[Post-shock Mach] M2=",es12.5)') M2; call log(message)
+            write(message,'("[Shock Mach]      Ms=",es12.5)') Ms; call log(message)
+            write(message,'("[Pre-shock]  rho1=",es12.5," p1=",es12.5)') rho1,p1; call log(message)
+            write(message,'("[Post-shock] rho2=",es12.5," p2=",es12.5)') rho2,p2; call log(message)
+            write(message,'("[Cv=",es12.5,"]")') Cv; call log(message)
+         end if
       end block init_eos_and_flow
       
       ! Initialize AMR grid
       create_amrgrid: block
-         use mathtools, only: twoPi
-         amr%name='amrtgv'
+         amr%name='amrcomp_sphere'
          call param_read('Base nx',amr%nx)
          call param_read('Base ny',amr%ny)
          call param_read('Base nz',amr%nz)
-         amr%xlo=0.0_WP; amr%xhi=twoPi
-         amr%ylo=0.0_WP; amr%yhi=twoPi
-         amr%zlo=0.0_WP; amr%zhi=twoPi
-         amr%xper=.true.; amr%yper=.true.; amr%zper=.true.
+         amr%xlo=-5.0_WP;  amr%xhi=+15.0_WP
+         amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
+         amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
+         amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max levels',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
@@ -239,6 +297,7 @@ contains
 
       ! Initialize compressible solver
       create_solver: block
+         use amrex_amr_module, only: amrex_bc_ext_dir,amrex_bc_foextrap
          ! Create flow solver
          call fs%initialize(amr=amr)
          ! Provide thermodynamic model
@@ -246,7 +305,11 @@ contains
          fs%getC=>get_C
          fs%getT=>get_T
          ! Set initial conditions
-         fs%user_init=>user_init
+         fs%Q%lo_bc(1,:)=amrex_bc_ext_dir
+         fs%Q%hi_bc(1,:)=amrex_bc_foextrap
+         fs%user_init=>shock_init
+         ! Set boundary conditions
+         fs%user_bc=>shock_dirichlet
       end block create_solver
       
       ! Initialize workspaces
@@ -280,9 +343,8 @@ contains
       ! Initialize visualization
       create_viz: block
          ! Create visualization object
-         call viz%initialize(amr,'TGV')
+         call viz%initialize(amr,'sphere')
          call viz%add_scalar(fs%Q,1,'RHO')
-         call viz%add_scalar(fs%I,1,'I')
          call viz%add_scalar(fs%P,1,'P')
          call viz%add_scalar(fs%U,1,'U')
          call viz%add_scalar(fs%V,1,'V')
@@ -307,26 +369,11 @@ contains
          call mfile%add_column(time%dt,'Timestep size')
          call mfile%add_column(time%cfl,'Maximum CFL')
          call mfile%add_column(fs%Umax,'Umax')
-         call mfile%add_column(fs%Vmax,'Vmax')
-         call mfile%add_column(fs%Wmax,'Wmax')
          call mfile%add_column(fs%Pmin,'Pmin')
          call mfile%add_column(fs%Pmax,'Pmax')
          call mfile%add_column(fs%Qmin(1),'RHOmin')
          call mfile%add_column(fs%Qmax(1),'RHOmax')
-         call mfile%add_column(fs%Imin,'Imin')
-         call mfile%add_column(fs%Imax,'Imax')
          call mfile%write()
-         ! Create conservation monitor
-         consfile=monitor(amRoot=amr%amRoot,name='conservation')
-         call consfile%add_column(time%n,'Timestep number')
-         call consfile%add_column(time%t,'Time')
-         call consfile%add_column(fs%Qint(1),'Mass')
-         call consfile%add_column(fs%Qint(2),'U Momentum')
-         call consfile%add_column(fs%Qint(3),'V Momentum')
-         call consfile%add_column(fs%Qint(4),'W Momentum')
-         call consfile%add_column(fs%Qint(5),'Internal energy')
-         call consfile%add_column(fs%rhoKint,'Kinetic energy')
-         call consfile%write()
          ! Create CFL monitor
          cflfile=monitor(amRoot=amr%amRoot,name='cfl')
          call cflfile%add_column(time%n,'Timestep')
@@ -342,6 +389,17 @@ contains
          call cflfile%add_column(fs%CFLv_y,'CFLv_y')
          call cflfile%add_column(fs%CFLv_z,'CFLv_z')
          call cflfile%write()
+         ! Create conservation monitor
+         consfile=monitor(amRoot=amr%amRoot,name='conservation')
+         call consfile%add_column(time%n,'Timestep number')
+         call consfile%add_column(time%t,'Time')
+         call consfile%add_column(fs%Qint(1),'Mass')
+         call consfile%add_column(fs%Qint(2),'U Momentum')
+         call consfile%add_column(fs%Qint(3),'V Momentum')
+         call consfile%add_column(fs%Qint(4),'W Momentum')
+         call consfile%add_column(fs%Qint(5),'Internal energy')
+         call consfile%add_column(fs%rhoKint,'Kinetic energy')
+         call consfile%write()
          ! Create grid monitor
          gridfile=monitor(amRoot=amr%amRoot,name='grid')
          call gridfile%add_column(time%n,'Timestep')

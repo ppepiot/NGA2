@@ -20,6 +20,7 @@ module amrcomp_class
       ! User-configurable callbacks
       procedure(comp_init_iface), pointer, nopass :: user_init=>null()
       procedure(comp_tagging_iface), pointer, nopass :: user_tagging=>null()
+      procedure(comp_bc_iface), pointer, nopass :: user_bc=>null()
 
       ! Equation of state function pointers: P=P(rho,I), C=C(rho,P), T=T(rho,P)
       procedure(eos_P_iface), pointer, nopass :: getP=>null()
@@ -134,6 +135,19 @@ module amrcomp_class
          real(WP), intent(in) :: rho
          real(WP), intent(in) :: P
       end function eos_T_iface
+   end interface
+
+   !> Abstract interface for user BC callback
+   abstract interface
+      subroutine comp_bc_iface(solver,pQ,bc_bx,face,time)
+         use amrex_amr_module, only: amrex_box
+         import :: amrcomp,WP
+         class(amrcomp), intent(inout) :: solver
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
+         type(amrex_box), intent(in) :: bc_bx
+         integer, intent(in) :: face
+         real(WP), intent(in) :: time
+      end subroutine comp_bc_iface
    end interface
 
 contains
@@ -275,14 +289,8 @@ contains
          this%diff%lo_bc(3,1)=amrex_bc_foextrap; this%diff%hi_bc(3,1)=amrex_bc_foextrap
       end if
 
-      ! Set fillbc callbacks to shared handler
-      !this%Q%fillbc=>comp_fillbc
-      !this%U%fillbc=>comp_fillbc
-      !this%V%fillbc=>comp_fillbc
-      !this%W%fillbc=>comp_fillbc
-      !this%I%fillbc=>comp_fillbc
-      !this%P%fillbc=>comp_fillbc
-      !this%T%fillbc=>comp_fillbc
+      ! Set Q fillbc callback to internal handler
+      this%Q%fillbc=>Q_fillbc
 
       ! Register callbacks with amrgrid
       select type (this)
@@ -433,6 +441,89 @@ contains
       ! Rebuild primitive variables
       call this%get_primitive(this%Q)
    end subroutine post_regrid
+
+   !> Internal fillbc for Q - calls default_fillbc first, then user_bc for ext_dir faces
+   subroutine Q_fillbc(this,mf,scomp,ncomp,time,geom)
+      use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy,&
+      &                           amrex_box,amrex_geometry,amrex_multifab,amrex_bc_ext_dir
+      use amrdata_class, only: default_fillbc
+      implicit none
+      class(amrdata), intent(inout) :: this
+      type(amrex_multifab), intent(inout) :: mf
+      integer, intent(in) :: scomp, ncomp
+      real(WP), intent(in) :: time
+      type(amrex_geometry), intent(in) :: geom
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bc_bx
+      class(amrcomp), pointer :: solver
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
+      integer :: ilo,ihi,jlo,jhi,klo,khi
+      integer :: dlo(3),dhi(3)
+      
+      ! First apply default BC handling (foextrap,hoextrap,reflect,etc.)
+      call default_fillbc(this,mf,scomp,ncomp,time,geom)
+      
+      ! Access parent solver
+      select type (s=>this%parent)
+       class is (amrcomp)
+         solver=>s
+      end select
+      
+      ! Check if user callback exists
+      if (.not.associated(solver%user_bc)) return
+
+      ! Get domain bounds
+      dlo=geom%domain%lo
+      dhi=geom%domain%hi
+
+      ! Loop over FABs and apply user_bc for ext_dir faces
+      call amrex_mfiter_build(mfi,mf,tiling=.false.)
+      do while (mfi%next())
+         p=>mf%dataptr(mfi)
+         ilo=lbound(p,1); ihi=ubound(p,1)
+         jlo=lbound(p,2); jhi=ubound(p,2)
+         klo=lbound(p,3); khi=ubound(p,3)
+
+         ! X-LOW (face=1)
+         if (this%lo_bc(1,1).eq.amrex_bc_ext_dir .and. ilo.lt.dlo(1)) then
+            bc_bx=amrex_box([ilo,jlo,klo],[dlo(1)-1,jhi,khi])
+            call solver%user_bc(solver,p,bc_bx,1,time)
+         end if
+
+         ! X-HIGH (face=2)
+         if (this%hi_bc(1,1).eq.amrex_bc_ext_dir .and. ihi.gt.dhi(1)) then
+            bc_bx=amrex_box([dhi(1)+1,jlo,klo],[ihi,jhi,khi])
+            call solver%user_bc(solver,p,bc_bx,2,time)
+         end if
+
+         ! Y-LOW (face=3)
+         if (this%lo_bc(2,1).eq.amrex_bc_ext_dir .and. jlo.lt.dlo(2)) then
+            bc_bx=amrex_box([ilo,jlo,klo],[ihi,dlo(2)-1,khi])
+            call solver%user_bc(solver,p,bc_bx,3,time)
+         end if
+
+         ! Y-HIGH (face=4)
+         if (this%hi_bc(2,1).eq.amrex_bc_ext_dir .and. jhi.gt.dhi(2)) then
+            bc_bx=amrex_box([ilo,dhi(2)+1,klo],[ihi,jhi,khi])
+            call solver%user_bc(solver,p,bc_bx,4,time)
+         end if
+
+         ! Z-LOW (face=5)
+         if (this%lo_bc(3,1).eq.amrex_bc_ext_dir .and. klo.lt.dlo(3)) then
+            bc_bx=amrex_box([ilo,jlo,klo],[ihi,jhi,dlo(3)-1])
+            call solver%user_bc(solver,p,bc_bx,5,time)
+         end if
+
+         ! Z-HIGH (face=6)
+         if (this%hi_bc(3,1).eq.amrex_bc_ext_dir .and. khi.gt.dhi(3)) then
+            bc_bx=amrex_box([ilo,jlo,dhi(3)+1],[ihi,jhi,khi])
+            call solver%user_bc(solver,p,bc_bx,6,time)
+         end if
+
+      end do
+      call amrex_mfiter_destroy(mfi)
+
+   end subroutine Q_fillbc
 
    ! ============================================================================
    ! PHYSICS METHODS
@@ -1094,5 +1185,4 @@ contains
       character(len=*), intent(in) :: dirname
       call io%read_data(dirname,this%Q,'Q')
    end subroutine restore_checkpoint
-
 end module amrcomp_class

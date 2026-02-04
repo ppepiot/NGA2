@@ -12,6 +12,7 @@ module amrdata_class
 
    public :: amrdata
    public :: amrdata_on_init,amrdata_on_coarse,amrdata_on_remake,amrdata_on_clear,amrdata_fillbc
+   public :: default_fillbc
 
    ! Special interpolation modes for amrdata
    integer, parameter, public :: amrex_interp_none   = -1  !< Workspace: allocate but don't fill
