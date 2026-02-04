@@ -933,27 +933,27 @@ contains
 
             ! Diagonal fluxes
             do k = bx%lo(3)-1, bx%hi(3)+1; do j = bx%lo(2)-1, bx%hi(2)+1; do i = bx%lo(1)-1, bx%hi(1)+1
-               pFUx(i,j,k,1) = - 0.25_WP * (pU(i,j,k,1) + pU(i+1,j,k,1))**2 + 2.0_WP * this%visc * (pU(i+1,j,k,1) - pU(i,j,k,1)) * dxi
-               pFVy(i,j,k,1) = - 0.25_WP * (pV(i,j,k,1) + pV(i,j+1,k,1))**2 + 2.0_WP * this%visc * (pV(i,j+1,k,1) - pV(i,j,k,1)) * dyi
-               pFWz(i,j,k,1) = - 0.25_WP * (pW(i,j,k,1) + pW(i,j,k+1,1))**2 + 2.0_WP * this%visc * (pW(i,j,k+1,1) - pW(i,j,k,1)) * dzi
+               pFUx(i,j,k,1) = - 0.25_WP * this%rho * sum(pU(i:i+1,j,k,1))**2 + 2.0_WP * this%visc * (pU(i+1,j,k,1) - pU(i,j,k,1)) * dxi
+               pFVy(i,j,k,1) = - 0.25_WP * this%rho * sum(pV(i,j:j+1,k,1))**2 + 2.0_WP * this%visc * (pV(i,j+1,k,1) - pV(i,j,k,1)) * dyi
+               pFWz(i,j,k,1) = - 0.25_WP * this%rho * sum(pW(i,j,k:k+1,1))**2 + 2.0_WP * this%visc * (pW(i,j,k+1,1) - pW(i,j,k,1)) * dzi
             end do; end do; end do
 
             ! Edge cross-fluxes with proper bounds for each type
             ! xy-edge (FUy, FVx): nodal in x,y; cell in z -> [lo,hi] in z; [lo,hi+1] in x,y
             do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)+1
-               pFUy(i,j,k,1) = - 0.25_WP * (pV(i-1,j,k,1) + pV(i,j,k,1)) * (pU(i,j-1,k,1) + pU(i,j,k,1)) &
+               pFUy(i,j,k,1) = - 0.25_WP * this%rho * sum(pV(i-1:i,j,k,1)) * sum(pU(i,j-1:j,k,1)) &
                &              + this%visc * ((pU(i,j,k,1) - pU(i,j-1,k,1)) * dyi + (pV(i,j,k,1) - pV(i-1,j,k,1)) * dxi)
                pFVx(i,j,k,1) = pFUy(i,j,k,1)
             end do; end do; end do
             ! yz-edge (FVz, FWy): nodal in y,z; cell in x -> [lo,hi] in x; [lo,hi+1] in y,z
             do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2)+1; do i = bx%lo(1), bx%hi(1)
-               pFVz(i,j,k,1) = - 0.25_WP * (pW(i,j-1,k,1) + pW(i,j,k,1)) * (pV(i,j,k-1,1) + pV(i,j,k,1)) &
+               pFVz(i,j,k,1) = - 0.25_WP * this%rho * sum(pW(i,j-1:j,k,1)) * sum(pV(i,j,k-1:k,1)) &
                &              + this%visc * ((pV(i,j,k,1) - pV(i,j,k-1,1)) * dzi + (pW(i,j,k,1) - pW(i,j-1,k,1)) * dyi)
                pFWy(i,j,k,1) = pFVz(i,j,k,1)
             end do; end do; end do
             ! zx-edge (FWx, FUz): nodal in z,x; cell in y -> [lo,hi] in y; [lo,hi+1] in z,x
             do k = bx%lo(3), bx%hi(3)+1; do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)+1
-               pFWx(i,j,k,1) = - 0.25_WP * (pU(i,j,k-1,1) + pU(i,j,k,1)) * (pW(i-1,j,k,1) + pW(i,j,k,1)) &
+               pFWx(i,j,k,1) = - 0.25_WP * this%rho * sum(pU(i,j,k-1:k,1)) * sum(pW(i-1:i,j,k,1)) &
                &              + this%visc * ((pW(i,j,k,1) - pW(i-1,j,k,1)) * dxi + (pU(i,j,k,1) - pU(i,j,k-1,1)) * dzi)
                pFUz(i,j,k,1) = pFWx(i,j,k,1)
             end do; end do; end do

@@ -32,7 +32,7 @@ module simulation
 
    ! Regrid parameters
    type(event) :: regrid_evt
-   real(WP) :: tagging_threshold=huge(1.0_WP)
+   real(WP) :: Re_tag=huge(1.0_WP)
 
    ! Monitoring
    type(monitor) :: mfile,cflfile,gridfile
@@ -61,7 +61,7 @@ contains
       type(amrex_box) :: bx
       character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW
-      real(WP) :: dx,dy,dz,dist,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,gradU_mag
+      real(WP) :: dx,dy,dz,dist,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,gradU_mag,Re_cell
       integer :: i,j,k
       dx=solver%amr%dx(lvl); dy=solver%amr%dy(lvl); dz=solver%amr%dz(lvl)
       tags=tags_ptr
@@ -73,8 +73,8 @@ contains
          pV=>solver%V%mf(lvl)%dataptr(mfi)
          pW=>solver%W%mf(lvl)%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Skip if close to outflow (within 2 units)
-            if (solver%amr%xlo+(real(i,WP)+0.5_WP)*dx.gt.solver%amr%xhi-2.0_WP) cycle
+            ! Skip if close to outflow (within 5 units)
+            if (solver%amr%xlo+(real(i,WP)+0.5_WP)*dx.gt.solver%amr%xhi-5.0_WP) cycle
             ! Diagonal gradients
             dudx=(pU(i+1,j,k,1)-pU(i,j,k,1))/dx
             dvdy=(pV(i,j+1,k,1)-pV(i,j,k,1))/dy
@@ -88,7 +88,10 @@ contains
             dwdy=0.25_WP*(pW(i,j+1,k,1)+pW(i,j+1,k+1,1)-pW(i,j-1,k,1)-pW(i,j-1,k+1,1))/(2.0_WP*dy)
             ! |∇u| = sqrt(sum of all gradients squared)
             gradU_mag=sqrt(dudx**2+dudy**2+dudz**2+dvdx**2+dvdy**2+dvdz**2+dwdx**2+dwdy**2+dwdz**2)
-            if (gradU_mag.gt.tagging_threshold) tagarr(i,j,k,1)=SETtag
+            ! Normalize into a local Reynolds number
+            Re_cell=solver%rho*gradU_mag*min(dx,dy,dz)**2/solver%visc
+            ! Tagged based on cell Re value
+            if (Re_cell.gt.Re_tag) tagarr(i,j,k,1)=SETtag
             ! Also tag based on closeness to sphere surface
             dist=sphere_levelset([solver%amr%xlo+(real(i,WP)+0.5_WP)*dx,solver%amr%ylo+(real(j,WP)+0.5_WP)*dy,solver%amr%zlo+(real(k,WP)+0.5_WP)*dz],time)
             if (dist.lt.5.0_WP*dx.and.dist.gt.-dx) tagarr(i,j,k,1)=SETtag
@@ -224,7 +227,7 @@ contains
          call param_read('Regrid nsteps',regrid_evt%nper)
          ! Set case-specific tagging
          fs%user_tagging=>my_tagger
-         call param_read('Tagging threshold',tagging_threshold)
+         call param_read('Tagging Reynolds',Re_tag)
          ! Create initial grid
          call amr%init_from_scratch(time=time%t)
       end block init_regridding

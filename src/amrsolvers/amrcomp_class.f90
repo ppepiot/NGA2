@@ -428,6 +428,8 @@ contains
       do lvl=this%amr%clvl()-1,lbase,-1
          call this%Q%average_downto(lvl)
       end do
+      ! Fill ghosts
+      call this%Q%fill(time)
       ! Rebuild primitive variables
       call this%get_primitive(this%Q)
    end subroutine post_regrid
@@ -459,7 +461,7 @@ contains
       do lvl=0,this%amr%clvl()
          call this%amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
-            bx=mfi%growntilebox(this%nover)
+            ! Get pointers to data
             pQ=>Q%mf(lvl)%dataptr(mfi)
             pU=>this%U%mf(lvl)%dataptr(mfi)
             pV=>this%V%mf(lvl)%dataptr(mfi)
@@ -468,6 +470,8 @@ contains
             pP=>this%P%mf(lvl)%dataptr(mfi)
             pT=>this%T%mf(lvl)%dataptr(mfi)
             pC=>this%C%mf(lvl)%dataptr(mfi)
+            ! Loop over grown tiles
+            bx=mfi%growntilebox(this%nover)
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                ! Compute velocity from momentum
                rho_inv=1.0_WP/max(pQ(i,j,k,1),this%rho_floor)
@@ -874,6 +878,8 @@ contains
          
          ! Phase 3: Filter beta using div as scratch
          do n=1,nfilter
+            ! Reset div to zero
+            call div%setval(0.0_WP)
             ! Copy beta to div
             call div%copy(srcmf=beta%mf(lvl),srccomp=1,dstcomp=1,nc=1,ng=0)
             ! Fill internal/periodic ghosts
@@ -904,9 +910,9 @@ contains
          ! Fill beta's ghosts at this level
          call beta%mf(lvl)%fill_boundary(this%amr%geom(lvl))
          call this%amr%mfab_foextrap(lvl=lvl,mfab=beta%mf(lvl))
-         
+
       end do
-      
+
    end subroutine get_viscartif
 
    !> Calculate CFL numbers

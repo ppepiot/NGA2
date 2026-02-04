@@ -28,7 +28,8 @@ module simulation
 
    ! Regrid parameters
    type(event) :: regrid_evt
-   real(WP) :: tagging_threshold=huge(1.0_WP)
+   real(WP) :: Rec_tag=huge(1.0_WP)
+   real(WP) :: Res_tag=huge(1.0_WP)
    
    !> Simulation monitoring
    type(monitor) :: mfile,consfile,cflfile,gridfile
@@ -139,6 +140,63 @@ contains
       end do
       call amrex_mfiter_destroy(mfi)
    end subroutine user_init
+
+   !> Tagger for this case based on velocity gradient (turbulence) and divergence (shocks)
+   subroutine my_tagger(solver,lvl,tags_ptr,time)
+      use iso_c_binding,    only: c_ptr,c_char
+      use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_tagboxarray
+      use amrgrid_class,    only: SETtag
+      class(amrcomp), intent(inout) :: solver
+      integer, intent(in) :: lvl
+      type(c_ptr), intent(in) :: tags_ptr
+      real(WP), intent(in) :: time
+      type(amrex_tagboxarray) :: tags
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVisc
+      real(WP) :: dx,dy,dz,dxi,dyi,dzi,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
+      real(WP) :: gradU_mag,div_neg,rho,mu,Rec,Res
+      integer :: i,j,k
+      dx=solver%amr%dx(lvl); dxi=1.0_WP/dx
+      dy=solver%amr%dy(lvl); dyi=1.0_WP/dy
+      dz=solver%amr%dz(lvl); dzi=1.0_WP/dz
+      tags=tags_ptr
+      call solver%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         bx=mfi%tilebox()
+         tagarr=>tags%dataPtr(mfi)
+         pQ=>solver%Q%mf(lvl)%dataptr(mfi)
+         pVisc=>solver%visc%mf(lvl)%dataptr(mfi)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Local density and viscosity
+            rho=pQ(i,j,k,1)
+            mu=pVisc(i,j,k,1)
+            if (mu.le.0.0_WP) mu=1.0_WP/Reynolds ! visc may not have been set yet
+            ! Centered velocity gradients
+            dudx=0.5_WP*dxi*(pQ(i+1,j,k,2)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,2)/max(pQ(i-1,j,k,1),solver%rho_floor))
+            dudy=0.5_WP*dyi*(pQ(i,j+1,k,2)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,2)/max(pQ(i,j-1,k,1),solver%rho_floor))
+            dudz=0.5_WP*dzi*(pQ(i,j,k+1,2)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,2)/max(pQ(i,j,k-1,1),solver%rho_floor))
+            dvdx=0.5_WP*dxi*(pQ(i+1,j,k,3)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,3)/max(pQ(i-1,j,k,1),solver%rho_floor))
+            dvdy=0.5_WP*dyi*(pQ(i,j+1,k,3)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,3)/max(pQ(i,j-1,k,1),solver%rho_floor))
+            dvdz=0.5_WP*dzi*(pQ(i,j,k+1,3)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,3)/max(pQ(i,j,k-1,1),solver%rho_floor))
+            dwdx=0.5_WP*dxi*(pQ(i+1,j,k,4)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,4)/max(pQ(i-1,j,k,1),solver%rho_floor))
+            dwdy=0.5_WP*dyi*(pQ(i,j+1,k,4)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,4)/max(pQ(i,j-1,k,1),solver%rho_floor))
+            dwdz=0.5_WP*dzi*(pQ(i,j,k+1,4)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,4)/max(pQ(i,j,k-1,1),solver%rho_floor))
+            ! |∇u| = sqrt(sum of all gradients squared)
+            gradU_mag=sqrt(dudx**2+dudy**2+dudz**2+dvdx**2+dvdy**2+dvdz**2+dwdx**2+dwdy**2+dwdz**2)
+            ! Divergence (only compression, i.e., negative divergence)
+            div_neg=min(dudx+dvdy+dwdz,0.0_WP)
+            ! Local cell Reynolds for turbulence
+            Rec=rho*gradU_mag*min(dx,dy,dz)**2/mu
+            ! Local cell Reynolds for shocks
+            Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
+            ! Tag based on either criterion
+            if (Rec.gt.Rec_tag.or.Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
+         end do; end do; end do
+      end do
+      call solver%amr%mfiter_destroy(mfi)
+   end subroutine my_tagger
    
    !> Initialization of problem solver
    subroutine simulation_init
@@ -207,8 +265,9 @@ contains
          regrid_evt=event(time=time,name='Regrid')
          call param_read('Regrid nsteps',regrid_evt%nper)
          ! Set case-specific tagging
-         !fs%user_tagging=>my_tagger
-         !call param_read('Tagging threshold',tagging_threshold)
+         fs%user_tagging=>my_tagger
+         call param_read('Tagging Rec',Rec_tag)
+         call param_read('Tagging Res',Res_tag)
          ! Create initial grid
          call amr%init_from_scratch(time=time%t)
          ! Compute viscosities
@@ -228,6 +287,7 @@ contains
          call viz%add_scalar(fs%U,1,'U')
          call viz%add_scalar(fs%V,1,'V')
          call viz%add_scalar(fs%W,1,'W')
+         call viz%add_scalar(fs%beta,1,'beta')
          ! Create visualization output event
          viz_evt=event(time=time,name='Visualization output')
          call param_read('Output period',viz_evt%tper)
@@ -344,6 +404,12 @@ contains
          ! Recompute primitive variables
          call fs%get_primitive(fs%Q)
          
+         ! Regrid if event triggers
+         if (regrid_evt%occurs()) then
+            call amr%regrid(baselvl=0,time=time%t)
+            call gridfile%write()
+         end if
+
          ! Compute viscosities
          call get_viscosities()
 
@@ -353,19 +419,12 @@ contains
          
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)
-         
-         ! Regrid if event triggers
-         if (regrid_evt%occurs()) then
-            call amr%regrid(baselvl=0,time=time%t)
-            call gridfile%write()
-         end if
 
          ! Perform and output monitoring
          call fs%get_info()
          call mfile%write()
          call consfile%write()
          call cflfile%write()
-         call gridfile%write()
          
       end do
       
