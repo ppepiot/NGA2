@@ -278,7 +278,7 @@ contains
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF
       real(WP) :: sum_VF,sum_VFQ1,sum_VFQ5,myVF
-      integer :: i,j,k,lvl
+      integer :: i,j,k,lvl,ii,jj,kk
       do lvl=0,amr%clvl()
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
@@ -295,15 +295,13 @@ contains
                pQ(i,j,k,3)=pVF(i,j,k,1)*pQ(i,j,k,3)
                pQ(i,j,k,4)=pVF(i,j,k,1)*pQ(i,j,k,4)
                ! VF-weighted neighbor average for Q(1) and Q(5)
-               sum_VF  =pVF(i-1,j,k,1)+pVF(i+1,j,k,1) &
-               &       +pVF(i,j-1,k,1)+pVF(i,j+1,k,1) &
-               &       +pVF(i,j,k-1,1)+pVF(i,j,k+1,1)
-               sum_VFQ1=pVF(i-1,j,k,1)*pQ(i-1,j,k,1)+pVF(i+1,j,k,1)*pQ(i+1,j,k,1) &
-               &       +pVF(i,j-1,k,1)*pQ(i,j-1,k,1)+pVF(i,j+1,k,1)*pQ(i,j+1,k,1) &
-               &       +pVF(i,j,k-1,1)*pQ(i,j,k-1,1)+pVF(i,j,k+1,1)*pQ(i,j,k+1,1)
-               sum_VFQ5=pVF(i-1,j,k,1)*pQ(i-1,j,k,5)+pVF(i+1,j,k,1)*pQ(i+1,j,k,5) &
-               &       +pVF(i,j-1,k,1)*pQ(i,j-1,k,5)+pVF(i,j+1,k,1)*pQ(i,j+1,k,5) &
-               &       +pVF(i,j,k-1,1)*pQ(i,j,k-1,5)+pVF(i,j,k+1,1)*pQ(i,j,k+1,5)
+               sum_VF=0.0_WP; sum_VFQ1=0.0_WP; sum_VFQ5=0.0_WP
+               do kk=-1,1; do jj=-1,1; do ii=-1,1
+                  if (ii.eq.0.and.jj.eq.0.and.kk.eq.0) cycle
+                  sum_VF  =sum_VF  +pVF(i+ii,j+jj,k+kk,1)
+                  sum_VFQ1=sum_VFQ1+pVF(i+ii,j+jj,k+kk,1)*pQ(i+ii,j+jj,k+kk,1)
+                  sum_VFQ5=sum_VFQ5+pVF(i+ii,j+jj,k+kk,1)*pQ(i+ii,j+jj,k+kk,5)
+               end do; end do; end do
                if (sum_VF.gt.0.0_WP) then
                   pQ(i,j,k,1)=pVF(i,j,k,1)*pQ(i,j,k,1)+(1.0_WP-pVF(i,j,k,1))*sum_VFQ1/sum_VF
                   pQ(i,j,k,5)=pVF(i,j,k,1)*pQ(i,j,k,5)+(1.0_WP-pVF(i,j,k,1))*sum_VFQ5/sum_VF
