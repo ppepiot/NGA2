@@ -78,6 +78,8 @@ module amrdata_class
       procedure :: norm0            !< L-infinity norm at level
       procedure :: norm1            !< L1 norm at level
       procedure :: norm2            !< L2 norm at level
+      ! Vector operations
+      procedure :: get_magnitude    !< C = sqrt(A²+B²+C²) from 3 sources
       ! Iteration helper
       procedure :: mfiter_build     !< Build MFIter from this data's MultiFab
    end type amrdata
@@ -886,6 +888,37 @@ contains
       ic = 1; if (present(comp)) ic = comp
       val = this%mf(lvl)%norm2(ic)
    end function norm2
+
+   !> Compute magnitude: this = sqrt(srcX² + srcY² + srcZ²)
+   subroutine get_magnitude(this,srcX,srcY,srcZ,nghost)
+      use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy,amrex_box
+      class(amrdata), intent(inout) :: this
+      class(amrdata), intent(in) :: srcX,srcY,srcZ
+      integer, intent(in), optional :: nghost
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pM,pX,pY,pZ
+      integer :: i,j,k,n,lvl,ng
+      ng=min(this%ng,srcX%ng,srcY%ng,srcZ%ng); if (present(nghost)) ng=nghost
+      do lvl=0,this%amr%clvl()
+         call amrex_mfiter_build(mfi,this%mf(lvl),tiling=.true.)
+         do while (mfi%next())
+            ! Get pointers to the data
+            pM=>this%mf(lvl)%dataptr(mfi)
+            pX=>srcX%mf(lvl)%dataptr(mfi)
+            pY=>srcY%mf(lvl)%dataptr(mfi)
+            pZ=>srcZ%mf(lvl)%dataptr(mfi)
+            ! Loop over grown tile
+            bx=mfi%growntilebox(ng)
+            do n=1,this%ncomp
+               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                  pM(i,j,k,n)=sqrt(pX(i,j,k,n)**2+pY(i,j,k,n)**2+pZ(i,j,k,n)**2)
+               end do; end do; end do
+            end do
+         end do
+         call amrex_mfiter_destroy(mfi)
+      end do
+   end subroutine get_magnitude
 
    ! ============================================================================
    ! HELPER ROUTINES

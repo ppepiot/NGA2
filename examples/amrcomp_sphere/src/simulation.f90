@@ -21,6 +21,7 @@ module simulation
    type(timetracker) :: time
    type(amrcomp), target :: fs
    type(amrdata) :: dQdt,k1,k2,k3,k4
+   type(amrdata) :: Umag,Mach
 
    !> IBs
    type(amrdata) :: VF
@@ -206,7 +207,6 @@ contains
             call initialize_volume_moments(lo=[data%amr%xlo+real(i  ,WP)*dx,data%amr%ylo+real(j  ,WP)*dy,data%amr%zlo+real(k  ,WP)*dz], &
             &                              hi=[data%amr%xlo+real(i+1,WP)*dx,data%amr%ylo+real(j+1,WP)*dy,data%amr%zlo+real(k+1,WP)*dz], &
             &                              levelset=sphere_levelset,time=time,level=3,VFlo=VFlo,VF=pVF(i,j,k,1),BL=BL,BG=BG)
-            pVF(i,j,k,1)=max(pVF(i,j,k,1),VFlo)
          end do; end do; end do
       end do
       call amrex_mfiter_destroy(mfi)
@@ -260,8 +260,10 @@ contains
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
             ! Tag based on cell Reynolds numbers
             Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
+            if (Rec.gt.Rec_tag) tagarr(i,j,k,1)=SETtag
+            ! Also tag based on cell shock Reynolds number
             Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
-            if (Rec.gt.Rec_tag.or.Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
+            if (Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
             ! Tag near sphere surface
             dist=sphere_levelset([solver%amr%xlo+(real(i,WP)+0.5_WP)*dx,solver%amr%ylo+(real(j,WP)+0.5_WP)*dy,solver%amr%zlo+(real(k,WP)+0.5_WP)*dz],time)
             if (dist.lt.5.0_WP*dx.and.dist.gt.-dx) tagarr(i,j,k,1)=SETtag
@@ -276,6 +278,7 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF
+      real(WP) :: sum_VF,sum_VFQ1,sum_VFQ5,myVF
       integer :: i,j,k,lvl
       do lvl=0,amr%clvl()
          call amr%mfiter_build(lvl,mfi)
@@ -283,12 +286,29 @@ contains
             ! Get pointers to data
             pQ=>fs%Q%mf(lvl)%dataptr(mfi)
             pVF=>VF%mf(lvl)%dataptr(mfi)
-            ! Get grown tilebox
-            bx=mfi%growntilebox(fs%nover)
+            ! Get interior tilebox
+            bx=mfi%tilebox()
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               ! Skip pure fluid cells
+               if (pVF(i,j,k,1).eq.1.0_WP) cycle
+               ! Scale Q(2-4) by VF
                pQ(i,j,k,2)=pVF(i,j,k,1)*pQ(i,j,k,2)
                pQ(i,j,k,3)=pVF(i,j,k,1)*pQ(i,j,k,3)
                pQ(i,j,k,4)=pVF(i,j,k,1)*pQ(i,j,k,4)
+               ! VF-weighted neighbor average for Q(1) and Q(5)
+               sum_VF  =pVF(i-1,j,k,1)+pVF(i+1,j,k,1) &
+               &       +pVF(i,j-1,k,1)+pVF(i,j+1,k,1) &
+               &       +pVF(i,j,k-1,1)+pVF(i,j,k+1,1)
+               sum_VFQ1=pVF(i-1,j,k,1)*pQ(i-1,j,k,1)+pVF(i+1,j,k,1)*pQ(i+1,j,k,1) &
+               &       +pVF(i,j-1,k,1)*pQ(i,j-1,k,1)+pVF(i,j+1,k,1)*pQ(i,j+1,k,1) &
+               &       +pVF(i,j,k-1,1)*pQ(i,j,k-1,1)+pVF(i,j,k+1,1)*pQ(i,j,k+1,1)
+               sum_VFQ5=pVF(i-1,j,k,1)*pQ(i-1,j,k,5)+pVF(i+1,j,k,1)*pQ(i+1,j,k,5) &
+               &       +pVF(i,j-1,k,1)*pQ(i,j-1,k,5)+pVF(i,j+1,k,1)*pQ(i,j+1,k,5) &
+               &       +pVF(i,j,k-1,1)*pQ(i,j,k-1,5)+pVF(i,j,k+1,1)*pQ(i,j,k+1,5)
+               if (sum_VF.gt.0.0_WP) then
+                  pQ(i,j,k,1)=pVF(i,j,k,1)*pQ(i,j,k,1)+(1.0_WP-pVF(i,j,k,1))*sum_VFQ1/sum_VF
+                  pQ(i,j,k,5)=pVF(i,j,k,1)*pQ(i,j,k,5)+(1.0_WP-pVF(i,j,k,1))*sum_VFQ5/sum_VF
+               end if
             end do; end do; end do
          end do
          call amr%mfiter_destroy(mfi)
@@ -351,9 +371,9 @@ contains
          call param_read('Base nx',amr%nx)
          call param_read('Base ny',amr%ny)
          call param_read('Base nz',amr%nz)
-         amr%xlo=-5.0_WP;  amr%xhi=+15.0_WP
-         amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
-         amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
+         amr%xlo=-5.0_WP; amr%xhi=+15.0_WP
+         amr%ylo=-5.0_WP; amr%yhi=+5.0_WP
+         amr%zlo=-5.0_WP; amr%zhi=+5.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max levels',amr%maxlvl)
          call amr%initialize()
@@ -401,6 +421,8 @@ contains
          call k2%initialize(amr,name='k2',ncomp=5,ng=0,interp=amrex_interp_none); call k2%register()
          call k3%initialize(amr,name='k3',ncomp=5,ng=0,interp=amrex_interp_none); call k3%register()
          call k4%initialize(amr,name='k4',ncomp=5,ng=0,interp=amrex_interp_none); call k4%register()
+         call Umag%initialize(amr,name='Umag',ncomp=1,ng=0,interp=amrex_interp_none); call Umag%register()
+         call Mach%initialize(amr,name='Mach',ncomp=1,ng=0,interp=amrex_interp_none); call Mach%register()
       end block create_workspace
       
       ! Initialize regridding
@@ -419,6 +441,9 @@ contains
          ! Add artificial bulk viscosity
          call fs%get_viscartif(dt=time%dt,beta=fs%beta)
          call fs%beta%multiply(src=fs%Q,srccomp=1)
+         ! Compute Umag and Mach number
+         call Umag%get_magnitude(fs%U,fs%V,fs%W)
+         call Mach%copy(src=Umag); call Mach%divide(src=fs%C)
       end block init_regridding
       
       ! Initialize visualization
@@ -433,6 +458,8 @@ contains
          call viz%add_scalar(fs%I,1,'I')
          call viz%add_scalar(fs%beta,1,'beta')
          call viz%add_scalar(VF,1,'VF')
+         call viz%add_scalar(Umag,1,'Umag')
+         call viz%add_scalar(Mach,1,'Mach')
          ! Create visualization output event
          viz_evt=event(time=time,name='Visualization output')
          call param_read('Output period',viz_evt%tper)
@@ -519,20 +546,20 @@ contains
          
          ! ===== RK4 Stage 2: k2 = f(t+dt/2, Q+k1/2) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k1)  ! Q=Qold+dt/2*k1
-         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
+         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt) ! IB forcing
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k2%copy(src=dQdt)
          
          ! ===== RK4 Stage 3: k3 = f(t+dt/2, Q+k2/2) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k2)  ! Q=Qold+dt/2*k2
-         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
+         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt) ! IB forcing
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k3%copy(src=dQdt)
          
          ! ===== RK4 Stage 4: k4 = f(t+dt, Q+k3) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=k3)  ! Q=Qold+dt*k3
-         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt)
+         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt) ! IB forcing
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+time%dt); call k4%copy(src=dQdt)
          
          ! ===== RK4 Combination: Q = Qold + (k1 + 2*k2 + 2*k3 + k4)/6 =====
@@ -541,10 +568,8 @@ contains
          call fs%Q%saxpy(a=time%dt/3.0_WP,src=k2)
          call fs%Q%saxpy(a=time%dt/3.0_WP,src=k3)
          call fs%Q%saxpy(a=time%dt/6.0_WP,src=k4)
-         call apply_ibm()
-
-         ! Average down and fill ghosts
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
+         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t) ! IB forcing
          
          ! Recompute primitive variables
          call fs%get_primitive(fs%Q)
@@ -561,7 +586,11 @@ contains
          ! Add artificial bulk viscosity
          call fs%get_viscartif(dt=time%dt,beta=fs%beta)
          call fs%beta%multiply(src=fs%Q,srccomp=1)
-         
+
+         ! Compute Umag and Mach number
+         call Umag%get_magnitude(fs%U,fs%V,fs%W)
+         call Mach%copy(src=Umag); call Mach%divide(src=fs%C)
+
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)
 
@@ -591,6 +620,8 @@ contains
       call k3%finalize()
       call k4%finalize()
       call VF%finalize()
+      call Umag%finalize()
+      call Mach%finalize()
       ! Finalize visualization
       call viz%finalize()
       call viz_evt%finalize()
