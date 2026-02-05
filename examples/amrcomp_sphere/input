@@ -2,12 +2,12 @@
 Base nx:    32
 Base ny:    32
 Base nz:    32
-Max levels: 3
+Max levels: 5
 
 # Regridding parameters
 Regrid nsteps:     10
 Tagging Rec:       50
-Tagging Res:       100
+Tagging Res:       10
 
 # EoS parameters
 Gamma: 1.4
@@ -17,11 +17,11 @@ Mach number:     1.2
 Shock location: -2.0
 
 # Viscous parameters
-Reynolds number:   5000
+Reynolds number:   3000
 Prandtl number:    0.71
 
 # Time integration
-Max dt:   2e-2
+Max dt:   1e-2
 Max CFL:  0.8
 Max time: 20
 

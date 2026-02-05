@@ -21,6 +21,9 @@ module simulation
    type(timetracker) :: time
    type(amrcomp), target :: fs
    type(amrdata) :: dQdt,k1,k2,k3,k4
+
+   !> IBs
+   type(amrdata) :: VF
    
    !> Visualization
    type(event) :: viz_evt
@@ -46,13 +49,19 @@ module simulation
    
 contains
 
-
    !> Smooth Heaviside function
    real(WP) function Hshock(x,delta)
       real(WP), intent(in) :: x,delta
       Hshock=1.0_WP/(1.0_WP+exp(-x/delta))
    end function Hshock
 
+   !> Levelset function for sphere
+   function sphere_levelset(xyz,t) result(G)
+      real(WP), dimension(3), intent(in) :: xyz
+      real(WP), intent(in) :: t
+      real(WP) :: G
+      G=sqrt(xyz(1)**2+xyz(2)**2+xyz(3)**2)-0.5_WP
+   end function sphere_levelset
 
    !> P=EOS(RHO,I) - Stiffened gas
    pure real(WP) function get_P(RHO,I)
@@ -172,6 +181,37 @@ contains
       end select
    end subroutine shock_dirichlet
 
+   !> Initialize fluid volume fraction
+   subroutine init_VF(data,lvl,time,ba,dm)
+      use mms_geom, only: initialize_volume_moments
+      use amrex_amr_module, only: amrex_boxarray,amrex_distromap,amrex_mfiter,amrex_box,amrex_mfiter_build,amrex_mfiter_destroy
+      class(amrdata), intent(inout) :: data
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
+      real(WP), dimension(3) :: BL,BG
+      real(WP) :: dx,dy,dz
+      integer :: i,j,k
+      real(WP), parameter :: VFlo=1.0e-12_WP
+      dx=data%amr%dx(lvl); dy=data%amr%dy(lvl); dz=data%amr%dz(lvl)
+      call amrex_mfiter_build(mfi,ba,dm,tiling=.false.)
+      do while (mfi%next())
+         bx=mfi%growntilebox(data%ng)
+         pVF=>data%mf(lvl)%dataptr(mfi)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            call initialize_volume_moments(lo=[data%amr%xlo+real(i  ,WP)*dx,data%amr%ylo+real(j  ,WP)*dy,data%amr%zlo+real(k  ,WP)*dz], &
+            &                              hi=[data%amr%xlo+real(i+1,WP)*dx,data%amr%ylo+real(j+1,WP)*dy,data%amr%zlo+real(k+1,WP)*dz], &
+            &                              levelset=sphere_levelset,time=time,level=3,VFlo=VFlo,VF=pVF(i,j,k,1),BL=BL,BG=BG)
+            pVF(i,j,k,1)=max(pVF(i,j,k,1),VFlo)
+         end do; end do; end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+   end subroutine init_VF
+
    !> Tagger based on vorticity and divergence
    subroutine my_tagger(solver,lvl,tags_ptr,time)
       use iso_c_binding,    only: c_ptr,c_char
@@ -187,7 +227,7 @@ contains
       character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVisc
       real(WP) :: dx,dy,dz,dxi,dyi,dzi,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz
-      real(WP) :: vort_mag,div_neg,rho,mu,Rec,Res
+      real(WP) :: vort_mag,div_neg,rho,mu,Rec,Res,dist
       integer :: i,j,k
       dx=solver%amr%dx(lvl); dxi=1.0_WP/dx
       dy=solver%amr%dy(lvl); dyi=1.0_WP/dy
@@ -200,9 +240,11 @@ contains
          pQ=>solver%Q%mf(lvl)%dataptr(mfi)
          pVisc=>solver%visc%mf(lvl)%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Get rho and mu
             rho=pQ(i,j,k,1)
             mu=pVisc(i,j,k,1)
             if (mu.le.0.0_WP) mu=1.0_WP/Reynolds
+            ! Get velocity gradient
             dudx=0.5_WP*dxi*(pQ(i+1,j,k,2)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,2)/max(pQ(i-1,j,k,1),solver%rho_floor))
             dudy=0.5_WP*dyi*(pQ(i,j+1,k,2)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,2)/max(pQ(i,j-1,k,1),solver%rho_floor))
             dudz=0.5_WP*dzi*(pQ(i,j,k+1,2)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,2)/max(pQ(i,j,k-1,1),solver%rho_floor))
@@ -212,15 +254,46 @@ contains
             dwdx=0.5_WP*dxi*(pQ(i+1,j,k,4)/max(pQ(i+1,j,k,1),solver%rho_floor)-pQ(i-1,j,k,4)/max(pQ(i-1,j,k,1),solver%rho_floor))
             dwdy=0.5_WP*dyi*(pQ(i,j+1,k,4)/max(pQ(i,j+1,k,1),solver%rho_floor)-pQ(i,j-1,k,4)/max(pQ(i,j-1,k,1),solver%rho_floor))
             dwdz=0.5_WP*dzi*(pQ(i,j,k+1,4)/max(pQ(i,j,k+1,1),solver%rho_floor)-pQ(i,j,k-1,4)/max(pQ(i,j,k-1,1),solver%rho_floor))
+            ! Get vorticity magnitude
             vort_mag=sqrt((dwdy-dvdz)**2+(dudz-dwdx)**2+(dvdx-dudy)**2)
+            ! Get dilatation
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
+            ! Tag based on cell Reynolds numbers
             Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
             Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
             if (Rec.gt.Rec_tag.or.Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
+            ! Tag near sphere surface
+            dist=sphere_levelset([solver%amr%xlo+(real(i,WP)+0.5_WP)*dx,solver%amr%ylo+(real(j,WP)+0.5_WP)*dy,solver%amr%zlo+(real(k,WP)+0.5_WP)*dz],time)
+            if (dist.lt.5.0_WP*dx.and.dist.gt.-dx) tagarr(i,j,k,1)=SETtag
          end do; end do; end do
       end do
       call solver%amr%mfiter_destroy(mfi)
    end subroutine my_tagger
+
+   !> Apply IB forcing - zero Q inside solid
+   subroutine apply_ibm()
+      use amrex_amr_module, only: amrex_mfiter,amrex_box
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF
+      integer :: i,j,k,lvl
+      do lvl=0,amr%clvl()
+         call amr%mfiter_build(lvl,mfi)
+         do while (mfi%next())
+            ! Get pointers to data
+            pQ=>fs%Q%mf(lvl)%dataptr(mfi)
+            pVF=>VF%mf(lvl)%dataptr(mfi)
+            ! Get grown tilebox
+            bx=mfi%growntilebox(fs%nover)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pQ(i,j,k,2)=pVF(i,j,k,1)*pQ(i,j,k,2)
+               pQ(i,j,k,3)=pVF(i,j,k,1)*pQ(i,j,k,3)
+               pQ(i,j,k,4)=pVF(i,j,k,1)*pQ(i,j,k,4)
+            end do; end do; end do
+         end do
+         call amr%mfiter_destroy(mfi)
+      end do
+   end subroutine apply_ibm
    
    !> Initialization of problem solver
    subroutine simulation_init
@@ -311,6 +384,14 @@ contains
          ! Set boundary conditions
          fs%user_bc=>shock_dirichlet
       end block create_solver
+
+      ! Create VF for IB
+      create_VF: block
+         use amrdata_class, only: amrex_interp_reinit
+         call VF%initialize(amr,name='VF',ncomp=1,ng=fs%nover,interp=amrex_interp_reinit)
+         VF%user_init=>init_VF
+         call VF%register()
+      end block create_VF
       
       ! Initialize workspaces
       create_workspace: block
@@ -349,7 +430,9 @@ contains
          call viz%add_scalar(fs%U,1,'U')
          call viz%add_scalar(fs%V,1,'V')
          call viz%add_scalar(fs%W,1,'W')
+         call viz%add_scalar(fs%I,1,'I')
          call viz%add_scalar(fs%beta,1,'beta')
+         call viz%add_scalar(VF,1,'VF')
          ! Create visualization output event
          viz_evt=event(time=time,name='Visualization output')
          call param_read('Output period',viz_evt%tper)
@@ -436,16 +519,19 @@ contains
          
          ! ===== RK4 Stage 2: k2 = f(t+dt/2, Q+k1/2) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k1)  ! Q=Qold+dt/2*k1
+         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k2%copy(src=dQdt)
          
          ! ===== RK4 Stage 3: k3 = f(t+dt/2, Q+k2/2) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k2)  ! Q=Qold+dt/2*k2
+         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k3%copy(src=dQdt)
          
          ! ===== RK4 Stage 4: k4 = f(t+dt, Q+k3) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=k3)  ! Q=Qold+dt*k3
+         call apply_ibm()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt)
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+time%dt); call k4%copy(src=dQdt)
          
@@ -455,6 +541,7 @@ contains
          call fs%Q%saxpy(a=time%dt/3.0_WP,src=k2)
          call fs%Q%saxpy(a=time%dt/3.0_WP,src=k3)
          call fs%Q%saxpy(a=time%dt/6.0_WP,src=k4)
+         call apply_ibm()
 
          ! Average down and fill ghosts
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
@@ -503,6 +590,7 @@ contains
       call k2%finalize()
       call k3%finalize()
       call k4%finalize()
+      call VF%finalize()
       ! Finalize visualization
       call viz%finalize()
       call viz_evt%finalize()
