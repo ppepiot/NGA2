@@ -46,6 +46,11 @@ module simulation
    real(WP) :: rho1,p1,u1             !< Pre-shock state
    real(WP) :: rho2,p2,u2             !< Post-shock state
    real(WP) :: Reynolds,Prandtl       !< Viscous parameters
+
+   !> Sponge parameters
+   real(WP) :: R_spg=3.0_WP
+   real(WP) :: L_spg=1.0_WP
+   real(WP) :: nu_spg=0.01_WP
    
 contains
 
@@ -97,12 +102,14 @@ contains
       integer :: lvl,i,j,k
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pT,pVisc,pBeta,pDiff
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pT,pQ,pVisc,pBeta,pDiff
+      real(WP) :: r_cyl,blend
       do lvl=0,amr%clvl()
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
             ! Get pointers to data
             pT=>fs%T%mf(lvl)%dataptr(mfi)
+            pQ=>fs%Q%mf(lvl)%dataptr(mfi)
             pVisc=>fs%visc%mf(lvl)%dataptr(mfi)
             pBeta=>fs%beta%mf(lvl)%dataptr(mfi)
             pDiff=>fs%diff%mf(lvl)%dataptr(mfi)
@@ -115,6 +122,13 @@ contains
                pBeta(i,j,k,1)=0.0_WP
                ! Heat diffusivity: k = Cp*mu/Pr = Cv*Gamma*mu/Pr
                pDiff(i,j,k,1)=Gamma*Cv*pVisc(i,j,k,1)/Prandtl
+               ! Apply sponge layer viscosity
+               r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2+(amr%zlo+(real(k,WP)+0.5_WP)*amr%dz(lvl))**2)
+               if (r_cyl.gt.R_spg) then
+                  blend=min((r_cyl-R_spg)/L_spg,1.0_WP)**2
+                  pVisc(i,j,k,1)=max(pVisc(i,j,k,1),blend*nu_spg*pQ(i,j,k,1))
+                  pDiff(i,j,k,1)=max(pDiff(i,j,k,1),blend*nu_spg*pQ(i,j,k,1))
+               end if
             end do; end do; end do
          end do
          call amr%mfiter_destroy(mfi)
