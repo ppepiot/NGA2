@@ -2,7 +2,7 @@
 Base nx:    32
 Base ny:    32
 Base nz:    32
-Max levels: 3
+Max levels: 5
 
 # Regridding parameters
 Regrid nsteps:     10
