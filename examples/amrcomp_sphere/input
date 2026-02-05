@@ -2,7 +2,7 @@
 Base nx:    32
 Base ny:    16
 Base nz:    16
-Max levels: 4
+Max levels: 5
 
 # Regridding parameters
 Regrid nsteps:     10
@@ -17,11 +17,11 @@ Mach number:     1.2
 Shock location: -0.6
 
 # Viscous parameters
-Reynolds number:   3000
+Reynolds number:   5000
 Prandtl number:    0.71
 
 # Time integration
-Max dt:   1e-2
+Max dt:   5e-3
 Max CFL:  0.8
 Max time: 50
 

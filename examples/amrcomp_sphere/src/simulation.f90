@@ -8,7 +8,6 @@ module simulation
    use timetracker_class, only: timetracker
    use event_class,       only: event
    use monitor_class,     only: monitor
-   use messager,          only: log
    implicit none
    private
    
@@ -356,13 +355,11 @@ contains
          call param_read('Reynolds number',Reynolds)
          call param_read('Prandtl number',Prandtl)
          ! Log shock conditions
-         if (amr%amRoot) then
-            write(message,'("[Post-shock Mach] M2=",es12.5)') M2; call log(message)
-            write(message,'("[Shock Mach]      Ms=",es12.5)') Ms; call log(message)
-            write(message,'("[Pre-shock]  rho1=",es12.5," p1=",es12.5)') rho1,p1; call log(message)
-            write(message,'("[Post-shock] rho2=",es12.5," p2=",es12.5)') rho2,p2; call log(message)
-            write(message,'("[Cv=",es12.5,"]")') Cv; call log(message)
-         end if
+         write(message,'("[Post-shock Mach] M2=",es12.5)') M2; call log(message)
+         write(message,'("[Shock Mach]      Ms=",es12.5)') Ms; call log(message)
+         write(message,'("[Pre-shock]  rho1=",es12.5," p1=",es12.5)') rho1,p1; call log(message)
+         write(message,'("[Post-shock] rho2=",es12.5," p2=",es12.5)') rho2,p2; call log(message)
+         write(message,'("[Cv=",es12.5,"]")') Cv; call log(message)
       end block init_eos_and_flow
       
       ! Initialize AMR grid
@@ -371,9 +368,9 @@ contains
          call param_read('Base nx',amr%nx)
          call param_read('Base ny',amr%ny)
          call param_read('Base nz',amr%nz)
-         amr%xlo=-5.0_WP; amr%xhi=+15.0_WP
-         amr%ylo=-5.0_WP; amr%yhi=+5.0_WP
-         amr%zlo=-5.0_WP; amr%zhi=+5.0_WP
+         amr%xlo=-05.0_WP; amr%xhi=+15.0_WP
+         amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
+         amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max levels',amr%maxlvl)
          call amr%initialize()
