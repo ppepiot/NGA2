@@ -1,8 +1,8 @@
 # AMR grid
 Base nx:    32
-Base ny:    16
-Base nz:    16
-Max levels: 5
+Base ny:    32
+Base nz:    32
+Max levels: 3
 
 # Regridding parameters
 Regrid nsteps:     10
@@ -21,8 +21,8 @@ Reynolds number:   5000
 Prandtl number:    0.71
 
 # Time integration
-Max dt:   5e-3
-Max CFL:  0.8
+Max dt:   2.5e-3
+Max CFL:  1.0
 Max time: 50
 
 # Output
