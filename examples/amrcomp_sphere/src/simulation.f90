@@ -550,36 +550,43 @@ contains
          ! Remember old conserved variables
          call fs%Qold%copy(src=fs%Q)
          
-         ! ===== RK4 Stage 1: k1 = f(t, Q) =====
+         ! ===== RK2/RK4 Stage 1: k1 = f(t, Q) =====
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t); call k1%copy(src=dQdt)
          
-         ! ===== RK4 Stage 2: k2 = f(t+dt/2, Q+k1/2) =====
+         ! ===== RK2/RK4 Stage 2: k2 = f(t+dt/2, Q+k1/2) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k1)  ! Q=Qold+dt/2*k1
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt) ! IB forcing
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k2%copy(src=dQdt)
-         
-         ! ===== RK4 Stage 3: k3 = f(t+dt/2, Q+k2/2) =====
-         call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k2)  ! Q=Qold+dt/2*k2
-         call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
-         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt) ! IB forcing
-         call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k3%copy(src=dQdt)
-         
-         ! ===== RK4 Stage 4: k4 = f(t+dt, Q+k3) =====
-         call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=k3)  ! Q=Qold+dt*k3
-         call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt)
-         call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt) ! IB forcing
-         call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+time%dt); call k4%copy(src=dQdt)
-         
-         ! ===== RK4 Combination: Q = Qold + (k1 + 2*k2 + 2*k3 + k4)/6 =====
+
+         ! ===== FOR RK2, RUN THIS =====
          call fs%Q%copy(src=fs%Qold)
-         call fs%Q%saxpy(a=time%dt/6.0_WP,src=k1)
-         call fs%Q%saxpy(a=time%dt/3.0_WP,src=k2)
-         call fs%Q%saxpy(a=time%dt/3.0_WP,src=k3)
-         call fs%Q%saxpy(a=time%dt/6.0_WP,src=k4)
+         call fs%Q%saxpy(a=time%dt,src=k2)
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
          call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t) ! IB forcing
+         ! =============================
          
+         ! ===== RK4 Stage 3: k3 = f(t+dt/2, Q+k2/2) =====
+         !call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=k2)  ! Q=Qold+dt/2*k2
+         !call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
+         !call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt) ! IB forcing
+         !call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+0.5_WP*time%dt); call k3%copy(src=dQdt)
+         
+         ! ===== RK4 Stage 4: k4 = f(t+dt, Q+k3) =====
+         !call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=k3)  ! Q=Qold+dt*k3
+         !call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt)
+         !call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t+time%dt) ! IB forcing
+         !call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,time=time%t+time%dt); call k4%copy(src=dQdt)
+         
+         ! ===== RK4 Combination: Q = Qold + (k1 + 2*k2 + 2*k3 + k4)/6 =====
+         !call fs%Q%copy(src=fs%Qold)
+         !call fs%Q%saxpy(a=time%dt/6.0_WP,src=k1)
+         !call fs%Q%saxpy(a=time%dt/3.0_WP,src=k2)
+         !call fs%Q%saxpy(a=time%dt/3.0_WP,src=k3)
+         !call fs%Q%saxpy(a=time%dt/6.0_WP,src=k4)
+         !call fs%Q%average_down(); call fs%Q%fill(time=time%t)
+         !call apply_ibm(); call fs%Q%average_down(); call fs%Q%fill(time=time%t) ! IB forcing
+
          ! Recompute primitive variables
          call fs%get_primitive(fs%Q)
          
