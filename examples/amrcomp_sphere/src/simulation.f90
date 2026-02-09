@@ -488,6 +488,8 @@ contains
          call mfile%add_column(time%dt,'Timestep size')
          call mfile%add_column(time%cfl,'Maximum CFL')
          call mfile%add_column(fs%Umax,'Umax')
+         call mfile%add_column(fs%Vmax,'Vmax')
+         call mfile%add_column(fs%Wmax,'Wmax')
          call mfile%add_column(fs%Pmin,'Pmin')
          call mfile%add_column(fs%Pmax,'Pmax')
          call mfile%add_column(fs%Qmin(1),'RHOmin')

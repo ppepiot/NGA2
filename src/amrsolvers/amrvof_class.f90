@@ -38,12 +38,8 @@ module amrvof_class
       procedure(vof_bc_iface), pointer, nopass :: user_vof_bc => null()
 
       ! PLIC boundary conditions (per face, only used if direction is non-periodic)
-      integer :: bc_xlo = BC_REFLECT
-      integer :: bc_xhi = BC_REFLECT
-      integer :: bc_ylo = BC_REFLECT
-      integer :: bc_yhi = BC_REFLECT
-      integer :: bc_zlo = BC_REFLECT
-      integer :: bc_zhi = BC_REFLECT
+      integer :: vof_lo_bc(3) = BC_REFLECT
+      integer :: vof_hi_bc(3) = BC_REFLECT
 
       ! VOF data (solver owns these - 4 MultiFabs as per plan)
       type(amrdata) :: VF           !< Volume fraction (cell-centered)
@@ -811,16 +807,16 @@ contains
          
          ! Apply physical BC for PLIC
          if (.not.this%amr%xper) then
-            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
-            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%vof_lo_bc(1), ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%vof_hi_bc(1), dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
          end if
          if (.not.this%amr%yper) then
-            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
-            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%vof_lo_bc(2), ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%vof_hi_bc(2), ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
          end if
          if (.not.this%amr%zper) then
-            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
-            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%vof_lo_bc(3), ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%vof_hi_bc(3), ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
@@ -972,16 +968,16 @@ contains
          
          ! Apply physical BC for moments
          if (.not.this%amr%xper) then
-            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
-            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%vof_lo_bc(1), ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%vof_hi_bc(1), dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
          end if
          if (.not.this%amr%yper) then
-            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
-            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%vof_lo_bc(2), ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%vof_hi_bc(2), ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
          end if
          if (.not.this%amr%zper) then
-            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
-            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%vof_lo_bc(3), ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%vof_hi_bc(3), ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
