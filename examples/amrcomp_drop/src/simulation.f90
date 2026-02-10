@@ -19,7 +19,7 @@ module simulation
    !> Timetracker and compressible multiphase solver
    type(timetracker) :: time
    type(amrmpcomp), target :: fs
-   type(amrdata) :: dQdt,rho_mix,Umag,Mach
+   type(amrdata) :: dQdt,Umag,Mach
    
    !> Visualization
    type(event) :: viz_evt
@@ -253,7 +253,7 @@ contains
             H=Hshock(x=Xs-x_cc,delta=0.5_WP*dx)
             rhoG=rhoG1+(rhoG2-rhoG1)*H
             pG  =pG1  +(pG2  -pG1  )*H
-            uG  =1.0_WP!u1   +(u2   -u1   )*H
+            uG  =u1   +(u2   -u1   )*H
             ! Set conserved variables: Q=(VF*rhoL, (1-VF)*rhoG, VF*rhoL*IL, (1-VF)*rhoG*IG, rho_mix*U, 0, 0)
             pQ(i,j,k,1)=(       myVF)*rhoL1
             pQ(i,j,k,2)=(1.0_WP-myVF)*rhoG
@@ -422,7 +422,7 @@ contains
          amr%xlo=-05.0_WP; amr%xhi=+15.0_WP
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
-         amr%xper=.true.; amr%yper=.true.; amr%zper=.true.
+         amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max levels',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
@@ -462,7 +462,6 @@ contains
       create_workspace: block
          use amrdata_class, only: amrex_interp_none
          call dQdt%initialize(amr,name='dQdt',ncomp=7,ng=0,interp=amrex_interp_none); call dQdt%register()
-         call rho_mix%initialize(amr,name='rho_mix',ncomp=1,ng=fs%nover,interp=amrex_interp_none); call rho_mix%register()
          call Umag%initialize(amr,name='Umag',ncomp=1,ng=0,interp=amrex_interp_none); call Umag%register()
          call Mach%initialize(amr,name='Mach',ncomp=1,ng=0,interp=amrex_interp_none); call Mach%register()
       end block create_workspace
@@ -485,7 +484,7 @@ contains
          call get_viscosities()
          ! Add artificial bulk viscosity
          call fs%get_viscartif(dt=time%dt,beta=fs%beta)
-         call rho_mix%copy(src=fs%Q,srccomp=1,ncomp=1); call rho_mix%add(src=fs%Q,srccomp=2,ncomp=1); call fs%beta%multiply(src=rho_mix,srccomp=1)
+         call fs%beta%multiply(src=fs%RHOG)
          ! Compute Umag and Mach number
          call Umag%get_magnitude(fs%U,fs%V,fs%W)
          call Mach%copy(src=Umag); call Mach%divide(src=fs%C)
@@ -634,7 +633,7 @@ contains
 
          ! Add artificial bulk viscosity
          call fs%get_viscartif(dt=time%dt,beta=fs%beta)
-         call rho_mix%copy(src=fs%Q,srccomp=1,ncomp=1); call rho_mix%add(src=fs%Q,srccomp=2,ncomp=1); call fs%beta%multiply(src=rho_mix,srccomp=1)
+         call fs%beta%multiply(src=fs%RHOG)
 
          ! Compute Umag and Mach number
          call Umag%get_magnitude(fs%U,fs%V,fs%W)
@@ -664,7 +663,6 @@ contains
       ! Finalize solver
       call fs%finalize()
       call dQdt%finalize()
-      call rho_mix%finalize()
       call Umag%finalize()
       call Mach%finalize()
       ! Finalize visualization

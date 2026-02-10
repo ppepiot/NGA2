@@ -15,7 +15,7 @@ GammaL: 6.12
 
 # Shock parameters
 Mach number:     1.2
-Shock location: -100!-0.6
+Shock location: -0.6
 
 # Liquid state
 Density ratio:     816.0
@@ -35,4 +35,4 @@ Max CFL:  1.0
 Max time: 50
 
 # Output
-Output period: 1e-3
+Output period: 1e-1
