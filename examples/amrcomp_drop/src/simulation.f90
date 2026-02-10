@@ -253,7 +253,7 @@ contains
             H=Hshock(x=Xs-x_cc,delta=0.5_WP*dx)
             rhoG=rhoG1+(rhoG2-rhoG1)*H
             pG  =pG1  +(pG2  -pG1  )*H
-            uG  =u1   +(u2   -u1   )*H
+            uG  =1.0_WP!u1   +(u2   -u1   )*H
             ! Set conserved variables: Q=(VF*rhoL, (1-VF)*rhoG, VF*rhoL*IL, (1-VF)*rhoG*IG, rho_mix*U, 0, 0)
             pQ(i,j,k,1)=(       myVF)*rhoL1
             pQ(i,j,k,2)=(1.0_WP-myVF)*rhoG
@@ -422,7 +422,7 @@ contains
          amr%xlo=-05.0_WP; amr%xhi=+15.0_WP
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
-         amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
+         amr%xper=.true.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max levels',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
@@ -447,12 +447,15 @@ contains
          fs%getPG=>get_PG; fs%getCG=>get_CG; fs%getTG=>get_TG
          ! Provide pressure relaxation model
          fs%relax=>P_relax_implicit
-         ! Set initial conditions and BCs
-         fs%vof_lo_bc(1)=BC_GAS
-         fs%Q%lo_bc(1,:)=amrex_bc_ext_dir
-         fs%Q%hi_bc(1,:)=amrex_bc_foextrap
+         ! Set initial conditions
          fs%user_init=>shockdrop_init
-         fs%user_bc=>shock_dirichlet
+         ! Set BCs
+         if (.not.amr%xper) then
+            fs%vof_lo_bc(1)=BC_GAS
+            fs%Q%lo_bc(1,:)=amrex_bc_ext_dir
+            fs%Q%hi_bc(1,:)=amrex_bc_foextrap
+            fs%user_bc=>shock_dirichlet
+         end if
       end block create_solver
       
       ! Initialize workspaces
@@ -524,16 +527,17 @@ contains
          call mfile%add_column(fs%Umax,'Umax')
          call mfile%add_column(fs%Vmax,'Vmax')
          call mfile%add_column(fs%Wmax,'Wmax')
-         call mfile%add_column(fs%Qmin(1),'rhoLmin')
-         call mfile%add_column(fs%Qmax(1),'rhoLmax')
+         call mfile%add_column(fs%RHOLmin,'rhoLmin')
+         call mfile%add_column(fs%RHOLmax,'rhoLmax')
          call mfile%add_column(fs%PLmin,'PLmin')
          call mfile%add_column(fs%PLmax,'PLmax')
-         call mfile%add_column(fs%Qmin(2),'rhoGmin')
-         call mfile%add_column(fs%Qmax(2),'rhoGmax')
+         call mfile%add_column(fs%RHOGmin,'rhoGmin')
+         call mfile%add_column(fs%RHOGmax,'rhoGmax')
          call mfile%add_column(fs%PGmin,'PGmin')
          call mfile%add_column(fs%PGmax,'PGmax')
          call mfile%add_column(fs%VFmin,'VFmin')
          call mfile%add_column(fs%VFmax,'VFmax')
+         call mfile%add_column(fs%VFint,'VFint')
          call mfile%write()
          ! Create CFL monitor
          cflfile=monitor(amRoot=amr%amRoot,name='cfl')
@@ -588,7 +592,7 @@ contains
          
          ! Increment time
          call fs%get_cfl(dt=time%dt,cfl=time%cfl)
-         call time%adjust_dt()
+         !call time%adjust_dt()
          call time%increment()
          
          ! Remember old state
