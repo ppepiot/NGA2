@@ -187,8 +187,8 @@ contains
                ! Liquid viscosity from ratio
                mu_l=visc_ratio*Reynolds**(-1.0_WP)
                ! Mixture viscosity
-               !pVisc(i,j,k,1)=pVF(i,j,k,1)*mu_l+(1.0_WP-pVF(i,j,k,1))*mu_g
-               pVisc(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/mu_l+(1.0_WP-pVF(i,j,k,1))/mu_g)
+               pVisc(i,j,k,1)=pVF(i,j,k,1)*mu_l+(1.0_WP-pVF(i,j,k,1))*mu_g
+               !pVisc(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/mu_l+(1.0_WP-pVF(i,j,k,1))/mu_g) ! Needs guard
                ! Zero bulk viscosity
                pBeta(i,j,k,1)=0.0_WP
                ! Gas heat diffusivity: k=Cv*Gamma*mu/Pr
@@ -196,8 +196,8 @@ contains
                ! Liquid heat diffusivity from ratio
                k_l=diff_ratio*GammaG*CvG/(Reynolds*Prandtl)
                ! Mixture diffusivity
-               !pDiff(i,j,k,1)=pVF(i,j,k,1)*k_l+(1.0_WP-pVF(i,j,k,1))*k_g
-               pDiff(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/k_l+(1.0_WP-pVF(i,j,k,1))/k_g)
+               pDiff(i,j,k,1)=pVF(i,j,k,1)*k_l+(1.0_WP-pVF(i,j,k,1))*k_g
+               !pDiff(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/k_l+(1.0_WP-pVF(i,j,k,1))/k_g) ! Needs guard
                ! Apply sponge layer viscosity
                r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2+(amr%zlo+(real(k,WP)+0.5_WP)*amr%dz(lvl))**2)
                if (r_cyl.gt.R_spg) then
@@ -592,7 +592,7 @@ contains
          
          ! Increment time
          call fs%get_cfl(dt=time%dt,cfl=time%cfl)
-         !call time%adjust_dt()
+         call time%adjust_dt()
          call time%increment()
          
          ! Remember old state

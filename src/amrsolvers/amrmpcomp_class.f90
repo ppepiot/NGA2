@@ -1240,9 +1240,9 @@ contains
                   gradU(3,3)=0.25_WP*dzi*(pW(i-1,j,k+1,1)-pW(i-1,j,k-1,1)+pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
                   ! Viscous stress at x-face
-                  !pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(1,1)+gradU(1,1))+0.5_WP*(sum(pBeta(i-1:i,j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i-1:i,j,k,1)))*div
-                  !pFx(i,j,k,6)=pFx(i,j,k,6)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(2,1)+gradU(1,2))
-                  !pFx(i,j,k,7)=pFx(i,j,k,7)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
+                  pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(1,1)+gradU(1,1))+0.5_WP*(sum(pBeta(i-1:i,j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i-1:i,j,k,1)))*div
+                  pFx(i,j,k,6)=pFx(i,j,k,6)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(2,1)+gradU(1,2))
+                  pFx(i,j,k,7)=pFx(i,j,k,7)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
                   ! VF-weighted heat diffusion flux
                   !pFx(i,j,k,3)=pFx(i,j,k,3)+0.5_WP*sum(       pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
                   !pFx(i,j,k,4)=pFx(i,j,k,4)+0.5_WP*sum(1.0_WP-pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
@@ -1293,9 +1293,9 @@ contains
                   gradU(3,3)=0.25_WP*dzi*(pW(i,j-1,k+1,1)-pW(i,j-1,k-1,1)+pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
                   ! Viscous stress at y-face
-                  !pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(1,2)+gradU(2,1))
-                  !pFy(i,j,k,6)=pFy(i,j,k,6)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(2,2)+gradU(2,2))+0.5_WP*(sum(pBeta(i,j-1:j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j-1:j,k,1)))*div
-                  !pFy(i,j,k,7)=pFy(i,j,k,7)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
+                  pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(1,2)+gradU(2,1))
+                  pFy(i,j,k,6)=pFy(i,j,k,6)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(2,2)+gradU(2,2))+0.5_WP*(sum(pBeta(i,j-1:j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j-1:j,k,1)))*div
+                  pFy(i,j,k,7)=pFy(i,j,k,7)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
                   ! VF-weighted heat diffusion flux
                   !pFy(i,j,k,3)=pFy(i,j,k,3)+0.5_WP*sum(       pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
                   !pFy(i,j,k,4)=pFy(i,j,k,4)+0.5_WP*sum(1.0_WP-pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
@@ -1346,9 +1346,9 @@ contains
                   gradU(3,3)=dzi*(pW(i,j,k,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
                   ! Viscous stress at z-face
-                  !pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(1,3)+gradU(3,1))
-                  !pFz(i,j,k,6)=pFz(i,j,k,6)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(2,3)+gradU(3,2))
-                  !pFz(i,j,k,7)=pFz(i,j,k,7)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
+                  pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(1,3)+gradU(3,1))
+                  pFz(i,j,k,6)=pFz(i,j,k,6)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(2,3)+gradU(3,2))
+                  pFz(i,j,k,7)=pFz(i,j,k,7)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
                   ! VF-weighted heat diffusion flux
                   !pFz(i,j,k,3)=pFz(i,j,k,3)+0.5_WP*sum(       pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
                   !pFz(i,j,k,4)=pFz(i,j,k,4)+0.5_WP*sum(1.0_WP-pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
@@ -1439,20 +1439,20 @@ contains
                   rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*pPL(i,j,k,1)*div
                   rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)*div
                   ! Viscous heating: τ:∇U, split by VF between phasic energies
-                  !rhs(i,j,k,3)=rhs(i,j,k,3)+(       pVF(i,j,k,1))*( &
-                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
-                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
-                  !rhs(i,j,k,4)=rhs(i,j,k,4)+(1.0_WP-pVF(i,j,k,1))*( &
-                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
-                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
+                  rhs(i,j,k,3)=rhs(i,j,k,3)+(       pVF(i,j,k,1))*( &
+                  & (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
+                  &+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
+                  &+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
+                  &+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
+                  &+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
+                  &+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
+                  rhs(i,j,k,4)=rhs(i,j,k,4)+(1.0_WP-pVF(i,j,k,1))*( &
+                  & (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
+                  &+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
+                  &+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
+                  &+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
+                  &+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
+                  &+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
                   ! VF/barycenter update at band cells (finest level only)
                   if (lvl.eq.this%amr%clvl()) then
                      ! Skip if cell not in band
@@ -2710,33 +2710,33 @@ contains
             if (pVF(i,j,k,1).lt.VFlo.or.pVF(i,j,k,1).gt.VFhi) cycle
             ! Apply user-provided relaxation model (modifies VF and Q)
             call this%relax(pVF(i,j,k,1),pQ(i,j,k,:))
-            ! Adjust PLIC plane to match new VF
-            lo=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
-            hi=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
-            cell_center=0.5_WP*(lo+hi)
-            ! Reposition plane: keep normal, adjust distance for new VF
-            pPLIC(i,j,k,4)=get_plane_dist(pPLIC(i,j,k,1:3),lo,hi,pVF(i,j,k,1))
-            ! Recompute barycenters from adjusted PLIC
-            hex(:,1)=[lo(1),lo(2),lo(3)]; hex(:,2)=[hi(1),lo(2),lo(3)]
-            hex(:,3)=[hi(1),hi(2),lo(3)]; hex(:,4)=[lo(1),hi(2),lo(3)]
-            hex(:,5)=[lo(1),lo(2),hi(3)]; hex(:,6)=[hi(1),lo(2),hi(3)]
-            hex(:,7)=[hi(1),hi(2),hi(3)]; hex(:,8)=[lo(1),hi(2),hi(3)]
-            plane=pPLIC(i,j,k,1:4)
-            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas)
-            pVF(i,j,k,1)=vol_liq/(dx*dy*dz)
-            pCliq(i,j,k,1:3)=bary_liq
-            pCgas(i,j,k,1:3)=bary_gas
-            ! Handle newly-pure cells from relaxation
-            if (pVF(i,j,k,1).lt.VFlo) then
-               pVF(i,j,k,1)=0.0_WP
-               pCliq(i,j,k,1:3)=cell_center
-               pCgas(i,j,k,1:3)=cell_center
-            end if
-            if (pVF(i,j,k,1).gt.VFhi) then
-               pVF(i,j,k,1)=1.0_WP
-               pCliq(i,j,k,1:3)=cell_center
-               pCgas(i,j,k,1:3)=cell_center
-            end if
+            ! ! Adjust PLIC plane to match new VF
+            ! lo=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
+            ! hi=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
+            ! cell_center=0.5_WP*(lo+hi)
+            ! ! Reposition plane: keep normal, adjust distance for new VF
+            ! pPLIC(i,j,k,4)=get_plane_dist(pPLIC(i,j,k,1:3),lo,hi,pVF(i,j,k,1))
+            ! ! Recompute barycenters from adjusted PLIC
+            ! hex(:,1)=[lo(1),lo(2),lo(3)]; hex(:,2)=[hi(1),lo(2),lo(3)]
+            ! hex(:,3)=[hi(1),hi(2),lo(3)]; hex(:,4)=[lo(1),hi(2),lo(3)]
+            ! hex(:,5)=[lo(1),lo(2),hi(3)]; hex(:,6)=[hi(1),lo(2),hi(3)]
+            ! hex(:,7)=[hi(1),hi(2),hi(3)]; hex(:,8)=[lo(1),hi(2),hi(3)]
+            ! plane=pPLIC(i,j,k,1:4)
+            ! call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas)
+            ! pVF(i,j,k,1)=vol_liq/(dx*dy*dz)
+            ! pCliq(i,j,k,1:3)=bary_liq
+            ! pCgas(i,j,k,1:3)=bary_gas
+            ! ! Handle newly-pure cells from relaxation
+            ! if (pVF(i,j,k,1).lt.VFlo) then
+            !    pVF(i,j,k,1)=0.0_WP
+            !    pCliq(i,j,k,1:3)=cell_center
+            !    pCgas(i,j,k,1:3)=cell_center
+            ! end if
+            ! if (pVF(i,j,k,1).gt.VFhi) then
+            !    pVF(i,j,k,1)=1.0_WP
+            !    pCliq(i,j,k,1:3)=cell_center
+            !    pCgas(i,j,k,1:3)=cell_center
+            ! end if
          end do; end do; end do
       end do
       call this%amr%mfiter_destroy(mfi)
