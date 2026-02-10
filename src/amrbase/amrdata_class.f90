@@ -62,6 +62,7 @@ module amrdata_class
       procedure :: setval           !< Y = val
       procedure :: plus             !< Y = Y + val
       procedure :: mult             !< Y = Y * val
+      procedure :: clip             !< Y = clip(Y, minval, maxval)
       ! Binary operations (Y = op(Y, X))
       procedure :: add              !< Y = Y + X
       procedure :: subtract         !< Y = Y - X
@@ -763,6 +764,40 @@ contains
          call this%mf(l)%copy(src%mf(l), sc, dc, nc, ng)
       end do
    end subroutine copy
+
+   !> Clip values: Y = max(cliplo, min(cliphi, Y))
+   subroutine clip(this, cliplo, cliphi, lvl, lbase, comp, ncomp, nghost)
+      use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, amrex_box
+      implicit none
+      class(amrdata), intent(inout) :: this
+      real(WP), intent(in), optional :: cliplo, cliphi
+      integer, intent(in), optional :: lvl, lbase, comp, ncomp, nghost
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
+      real(WP) :: lo, hi
+      integer :: i, j, k, n, l, l0, l1, ic, nc, ng
+      if (.not.associated(this%amr)) return
+      lo = -huge(1.0_WP); if (present(cliplo)) lo = cliplo
+      hi = +huge(1.0_WP); if (present(cliphi)) hi = cliphi
+      call get_level_range(this, lvl, lbase, l0, l1)
+      ic = 1; if (present(comp)) ic = comp
+      nc = this%ncomp; if (present(ncomp)) nc = ncomp
+      ng = this%ng; if (present(nghost)) ng = nghost
+      do l = l0, l1
+         call amrex_mfiter_build(mfi, this%mf(l), tiling=.true.)
+         do while (mfi%next())
+            p => this%mf(l)%dataptr(mfi)
+            bx = mfi%growntilebox(ng)
+            do n = ic, ic+nc-1
+               do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+                  p(i,j,k,n) = max(lo, min(hi, p(i,j,k,n)))
+               end do; end do; end do
+            end do
+         end do
+         call amrex_mfiter_destroy(mfi)
+      end do
+   end subroutine clip
 
    ! ============================================================================
    ! BLAS-LIKE OPERATIONS

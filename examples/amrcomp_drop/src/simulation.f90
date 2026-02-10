@@ -423,7 +423,7 @@ contains
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
-         call param_read('Max levels',amr%maxlvl)
+         call param_read('Max level',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
       
@@ -606,13 +606,14 @@ contains
          
          ! ===== RK2 Stage 2: Q* = Qold + dt/2*dQdt, dQdt* = f(t+dt/2, Q*) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=dQdt)
+         call fs%Q%clip(cliplo=1.0e-10_WP,comp=4,ncomp=1)
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call fs%apply_relax()
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,dt=time%dt,time=time%t+0.5_WP*time%dt)
 
          ! ===== RK2 Final: Q = Qold + dt*dQdt* =====
-         call fs%Q%copy(src=fs%Qold)
-         call fs%Q%saxpy(a=time%dt,src=dQdt)
+         call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=dQdt)
+         call fs%Q%clip(cliplo=1.0e-10_WP,comp=4,ncomp=1)
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
          call fs%apply_relax()
 

@@ -384,7 +384,7 @@ contains
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
-         call param_read('Max levels',amr%maxlvl)
+         call param_read('Max level',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
       
