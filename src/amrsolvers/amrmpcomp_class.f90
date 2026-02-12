@@ -126,6 +126,7 @@ module amrmpcomp_class
       procedure :: build_plic
       procedure :: reset_moments
       procedure :: apply_relax
+      procedure :: cleanup_Q
       ! VOF sync/fill/average utilities
       procedure :: fill_moments_lvl
       procedure :: sync_moments_lvl
@@ -501,6 +502,7 @@ contains
       call this%IL%finalize(); call this%IG%finalize()
       call this%PL%finalize(); call this%PG%finalize()
       call this%TL%finalize(); call this%TG%finalize()
+      ! Mixture properties
       call this%C%finalize()
       ! Physical properties
       call this%visc%finalize(); call this%beta%finalize(); call this%diff%finalize()
@@ -876,7 +878,7 @@ contains
                pV(i,j,k,1)=pQ(i,j,k,6)*rho_inv
                pW(i,j,k,1)=pQ(i,j,k,7)*rho_inv
                ! Get liquid primitive variables
-               if (pVF(i,j,k,1).ge.VFlo) then
+               if (pVF(i,j,k,1).ge.VFlo.and.pQ(i,j,k,1).gt.0.0_WP.and.pQ(i,j,k,3).gt.0.0_WP) then
                   pRHOL(i,j,k,1)=pQ(i,j,k,1)/pVF(i,j,k,1)
                   pIL  (i,j,k,1)=pQ(i,j,k,3)/pQ(i,j,k,1)
                   pPL  (i,j,k,1)=this%getPL(pRHOL(i,j,k,1),pIL(i,j,k,1))
@@ -890,7 +892,7 @@ contains
                   CL            =0.0_WP
                end if
                ! Get gas primitive variables
-               if (pVF(i,j,k,1).le.VFhi) then
+               if (pVF(i,j,k,1).le.VFhi.and.pQ(i,j,k,2).gt.0.0_WP.and.pQ(i,j,k,4).gt.0.0_WP) then
                   pRHOG(i,j,k,1)=pQ(i,j,k,2)/(1.0_WP-pVF(i,j,k,1))
                   pIG  (i,j,k,1)=pQ(i,j,k,4)/pQ(i,j,k,2)
                   pPG  (i,j,k,1)=this%getPG(pRHOG(i,j,k,1),pIG(i,j,k,1))
@@ -1203,24 +1205,28 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pU(i-1:i,j,k,1))
-                     ! WENO phasic mass fluxes: Q(1)=rhoL*VF, Q(2)=rhoG*(1-VF)
-                     w=weno_weight((abs(pQ(i-1,j,k,1)-pQ(i-2,j,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i+1,j,k,1)-pQ(i  ,j,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFx(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i-2:i  ,j,k,1)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i-1:i+1,j,k,1))
-                     w=weno_weight((abs(pQ(i-1,j,k,2)-pQ(i-2,j,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i-1,j,k,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i+1,j,k,2)-pQ(i  ,j,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i-1,j,k,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFx(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i-2:i  ,j,k,2)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i-1:i+1,j,k,2))
-                     ! WENO phasic energy fluxes: F(3)=F(1)*WENO(IL), F(4)=F(2)*WENO(IG)
-                     w=weno_weight((abs(pIL(i-1,j,k,1)-pIL(i-2,j,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIL(i+1,j,k,1)-pIL(i  ,j,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFx(i,j,k,3)=0.5_WP*(pFx(i,j,k,1)-abs(pFx(i,j,k,1)))*sum(wenop*pIL(i-2:i  ,j,k,1)) &
-                     &           +0.5_WP*(pFx(i,j,k,1)+abs(pFx(i,j,k,1)))*sum(wenom*pIL(i-1:i+1,j,k,1))
-                     w=weno_weight((abs(pIG(i-1,j,k,1)-pIG(i-2,j,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIG(i+1,j,k,1)-pIG(i  ,j,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFx(i,j,k,4)=0.5_WP*(pFx(i,j,k,2)-abs(pFx(i,j,k,2)))*sum(wenop*pIG(i-2:i  ,j,k,1)) &
-                     &           +0.5_WP*(pFx(i,j,k,2)+abs(pFx(i,j,k,2)))*sum(wenom*pIG(i-1:i+1,j,k,1))
+                     ! WENO liquid mass and energy fluxes
+                     if (any(pVF(i-1:i,j,k,1).ge.VFlo)) then
+                        w=weno_weight((abs(pQ(i-1,j,k,1)-pQ(i-2,j,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i+1,j,k,1)-pQ(i  ,j,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFx(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i-2:i  ,j,k,1)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i-1:i+1,j,k,1))
+                        w=weno_weight((abs(pIL(i-1,j,k,1)-pIL(i-2,j,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIL(i+1,j,k,1)-pIL(i  ,j,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFx(i,j,k,3)=0.5_WP*(pFx(i,j,k,1)-abs(pFx(i,j,k,1)))*sum(wenop*pIL(i-2:i  ,j,k,1)) &
+                        &           +0.5_WP*(pFx(i,j,k,1)+abs(pFx(i,j,k,1)))*sum(wenom*pIL(i-1:i+1,j,k,1))
+                     end if
+                     ! WENO gas mass and energy fluxes
+                     if (any(pVF(i-1:i,j,k,1).le.VFhi)) then
+                        w=weno_weight((abs(pQ(i-1,j,k,2)-pQ(i-2,j,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i-1,j,k,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i+1,j,k,2)-pQ(i  ,j,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i-1,j,k,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFx(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i-2:i  ,j,k,2)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i-1:i+1,j,k,2))
+                        w=weno_weight((abs(pIG(i-1,j,k,1)-pIG(i-2,j,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIG(i+1,j,k,1)-pIG(i  ,j,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i-1,j,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFx(i,j,k,4)=0.5_WP*(pFx(i,j,k,2)-abs(pFx(i,j,k,2)))*sum(wenop*pIG(i-2:i  ,j,k,1)) &
+                        &           +0.5_WP*(pFx(i,j,k,2)+abs(pFx(i,j,k,2)))*sum(wenom*pIG(i-1:i+1,j,k,1))
+                     end if
                      ! Momentum fluxes
                      pFx(i,j,k,5)=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1))
                      pFx(i,j,k,6)=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1))
@@ -1256,24 +1262,28 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pV(i,j-1:j,k,1))
-                     ! WENO phasic mass fluxes: Q(1)=rhoL*VF, Q(2)=rhoG*(1-VF)
-                     w=weno_weight((abs(pQ(i,j-1,k,1)-pQ(i,j-2,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i,j+1,k,1)-pQ(i,j  ,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFy(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j-2:j  ,k,1)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j-1:j+1,k,1))
-                     w=weno_weight((abs(pQ(i,j-1,k,2)-pQ(i,j-2,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j-1,k,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i,j+1,k,2)-pQ(i,j  ,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j-1,k,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFy(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j-2:j  ,k,2)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j-1:j+1,k,2))
-                     ! WENO phasic energy fluxes: F(3)=F(1)*WENO(IL), F(4)=F(2)*WENO(IG)
-                     w=weno_weight((abs(pIL(i,j-1,k,1)-pIL(i,j-2,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIL(i,j+1,k,1)-pIL(i,j  ,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFy(i,j,k,3)=0.5_WP*(pFy(i,j,k,1)-abs(pFy(i,j,k,1)))*sum(wenop*pIL(i,j-2:j  ,k,1)) &
-                     &           +0.5_WP*(pFy(i,j,k,1)+abs(pFy(i,j,k,1)))*sum(wenom*pIL(i,j-1:j+1,k,1))
-                     w=weno_weight((abs(pIG(i,j-1,k,1)-pIG(i,j-2,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIG(i,j+1,k,1)-pIG(i,j  ,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFy(i,j,k,4)=0.5_WP*(pFy(i,j,k,2)-abs(pFy(i,j,k,2)))*sum(wenop*pIG(i,j-2:j  ,k,1)) &
-                     &           +0.5_WP*(pFy(i,j,k,2)+abs(pFy(i,j,k,2)))*sum(wenom*pIG(i,j-1:j+1,k,1))
+                     ! WENO liquid mass and energy fluxes
+                     if (any(pVF(i,j-1:j,k,1).ge.VFlo)) then
+                        w=weno_weight((abs(pQ(i,j-1,k,1)-pQ(i,j-2,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i,j+1,k,1)-pQ(i,j  ,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFy(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j-2:j  ,k,1)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j-1:j+1,k,1))
+                        w=weno_weight((abs(pIL(i,j-1,k,1)-pIL(i,j-2,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIL(i,j+1,k,1)-pIL(i,j  ,k,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFy(i,j,k,3)=0.5_WP*(pFy(i,j,k,1)-abs(pFy(i,j,k,1)))*sum(wenop*pIL(i,j-2:j  ,k,1)) &
+                        &           +0.5_WP*(pFy(i,j,k,1)+abs(pFy(i,j,k,1)))*sum(wenom*pIL(i,j-1:j+1,k,1))
+                     end if
+                     ! WENO gas mass and energy fluxes
+                     if (any(pVF(i,j-1:j,k,1).le.VFhi)) then
+                        w=weno_weight((abs(pQ(i,j-1,k,2)-pQ(i,j-2,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j-1,k,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i,j+1,k,2)-pQ(i,j  ,k,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j-1,k,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFy(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j-2:j  ,k,2)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j-1:j+1,k,2))
+                        w=weno_weight((abs(pIG(i,j-1,k,1)-pIG(i,j-2,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIG(i,j+1,k,1)-pIG(i,j  ,k,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j-1,k,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFy(i,j,k,4)=0.5_WP*(pFy(i,j,k,2)-abs(pFy(i,j,k,2)))*sum(wenop*pIG(i,j-2:j  ,k,1)) &
+                        &           +0.5_WP*(pFy(i,j,k,2)+abs(pFy(i,j,k,2)))*sum(wenom*pIG(i,j-1:j+1,k,1))
+                     end if
                      ! Momentum fluxes
                      pFy(i,j,k,5)=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1))
                      pFy(i,j,k,6)=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1))
@@ -1309,24 +1319,28 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pW(i,j,k-1:k,1))
-                     ! WENO phasic mass fluxes: Q(1)=rhoL*VF, Q(2)=rhoG*(1-VF)
-                     w=weno_weight((abs(pQ(i,j,k-1,1)-pQ(i,j,k-2,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i,j,k+1,1)-pQ(i,j,k  ,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFz(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j,k-2:k  ,1)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j,k-1:k+1,1))
-                     w=weno_weight((abs(pQ(i,j,k-1,2)-pQ(i,j,k-2,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j,k-1,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pQ(i,j,k+1,2)-pQ(i,j,k  ,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j,k-1,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFz(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j,k-2:k  ,2)) &
-                     &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j,k-1:k+1,2))
-                     ! WENO phasic energy fluxes: F(3)=F(1)*WENO(IL), F(4)=F(2)*WENO(IG)
-                     w=weno_weight((abs(pIL(i,j,k-1,1)-pIL(i,j,k-2,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIL(i,j,k+1,1)-pIL(i,j,k  ,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFz(i,j,k,3)=0.5_WP*(pFz(i,j,k,1)-abs(pFz(i,j,k,1)))*sum(wenop*pIL(i,j,k-2:k  ,1)) &
-                     &           +0.5_WP*(pFz(i,j,k,1)+abs(pFz(i,j,k,1)))*sum(wenom*pIL(i,j,k-1:k+1,1))
-                     w=weno_weight((abs(pIG(i,j,k-1,1)-pIG(i,j,k-2,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
-                     w=weno_weight((abs(pIG(i,j,k+1,1)-pIG(i,j,k  ,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
-                     pFz(i,j,k,4)=0.5_WP*(pFz(i,j,k,2)-abs(pFz(i,j,k,2)))*sum(wenop*pIG(i,j,k-2:k  ,1)) &
-                     &           +0.5_WP*(pFz(i,j,k,2)+abs(pFz(i,j,k,2)))*sum(wenom*pIG(i,j,k-1:k+1,1))
+                     ! WENO liquid mass and energy fluxes
+                     if (any(pVF(i,j,k-1:k,1).ge.VFlo)) then
+                        w=weno_weight((abs(pQ(i,j,k-1,1)-pQ(i,j,k-2,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i,j,k+1,1)-pQ(i,j,k  ,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFz(i,j,k,1)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j,k-2:k  ,1)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j,k-1:k+1,1))
+                        w=weno_weight((abs(pIL(i,j,k-1,1)-pIL(i,j,k-2,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIL(i,j,k+1,1)-pIL(i,j,k  ,1))+eps)/(abs(pIL(i,j,k,1)-pIL(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFz(i,j,k,3)=0.5_WP*(pFz(i,j,k,1)-abs(pFz(i,j,k,1)))*sum(wenop*pIL(i,j,k-2:k  ,1)) &
+                        &           +0.5_WP*(pFz(i,j,k,1)+abs(pFz(i,j,k,1)))*sum(wenom*pIL(i,j,k-1:k+1,1))
+                     end if
+                     ! WENO gas mass and energy fluxes
+                     if (any(pVF(i,j,k-1:k,1).le.VFhi)) then
+                        w=weno_weight((abs(pQ(i,j,k-1,2)-pQ(i,j,k-2,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j,k-1,2))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pQ(i,j,k+1,2)-pQ(i,j,k  ,2))+eps)/(abs(pQ(i,j,k,2)-pQ(i,j,k-1,2))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFz(i,j,k,2)=-0.5_WP*(vel+abs(vel))*sum(wenop*pQ(i,j,k-2:k  ,2)) &
+                        &            -0.5_WP*(vel-abs(vel))*sum(wenom*pQ(i,j,k-1:k+1,2))
+                        w=weno_weight((abs(pIG(i,j,k-1,1)-pIG(i,j,k-2,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
+                        w=weno_weight((abs(pIG(i,j,k+1,1)-pIG(i,j,k  ,1))+eps)/(abs(pIG(i,j,k,1)-pIG(i,j,k-1,1))+eps)); wenom=0.5_WP*[1.0_WP-w,1.0_WP+2.0_WP*w,-w]
+                        pFz(i,j,k,4)=0.5_WP*(pFz(i,j,k,2)-abs(pFz(i,j,k,2)))*sum(wenop*pIG(i,j,k-2:k  ,1)) &
+                        &           +0.5_WP*(pFz(i,j,k,2)+abs(pFz(i,j,k,2)))*sum(wenom*pIG(i,j,k-1:k+1,1))
+                     end if
                      ! Momentum fluxes
                      pFz(i,j,k,5)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1))
                      pFz(i,j,k,6)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1))
@@ -1376,11 +1390,11 @@ contains
          integer :: lvl,i,j,k
          real(WP), dimension(:,:,:,:), contiguous, pointer :: rhs,pFx,pFy,pFz,pBand
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold  ! Intentional masking
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pPL,pPG,pVisc,pBeta
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pPL,pPG,pQ,pVisc,pBeta
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVx,pVy,pVz
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pCliq,pCgas,pCliqold,pCgasold
          real(WP), dimension(1:3,1:3) :: gradU
-         real(WP) :: div,vol
+         real(WP) :: div,vol,Pmix,YL,YG
          real(WP) :: Lvol_old,Lvol_new,Lvol_flux
          real(WP) :: Gvol_old,Gvol_new,Gvol_flux
          real(WP), dimension(3) :: Lbar_old,Lbar_new,Lbar_flux
@@ -1405,6 +1419,7 @@ contains
                pVF  =>this%VF%mf(lvl)%dataptr(mfi)
                pPL  =>this%PL%mf(lvl)%dataptr(mfi)
                pPG  =>this%PG%mf(lvl)%dataptr(mfi)
+               pQ   =>this%Q%mf(lvl)%dataptr(mfi)
                pVisc=>this%visc%mf(lvl)%dataptr(mfi)
                pBeta=>this%beta%mf(lvl)%dataptr(mfi)
                ! Extra pointers at finest level
@@ -1435,9 +1450,13 @@ contains
                   gradU(2,3)=0.5_WP*dyi*(pW(i,j+1,k,1)-pW(i,j-1,k,1))
                   gradU(3,3)=0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
-                  ! Pressure dilatation: split by VF between phasic energies
-                  rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*pPL(i,j,k,1)*div
-                  rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)*div
+                  ! Pressure dilatation: split by VF between phasic energies - discontinuous
+                  !rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*pPL(i,j,k,1)*div
+                  !rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)*div
+                  ! Pressure dilatation: split by VF between phasic energies - continuous
+                  Pmix=pVF(i,j,k,1)*pPL(i,j,k,1)+(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)
+                  rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*Pmix*div
+                  rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*Pmix*div
                   ! Viscous heating: τ:∇U, split by VF between phasic energies
                   rhs(i,j,k,3)=rhs(i,j,k,3)+(       pVF(i,j,k,1))*( &
                   & (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
@@ -1453,6 +1472,22 @@ contains
                   &+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
                   &+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
                   &+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
+                  ! Viscous heating: τ:∇U, split by mass fractions between phasic energies
+                  !YL=pQ(i,j,k,1)/max(sum(pQ(i,j,k,1:2)),this%rho_floor); YG=1.0_WP-YL
+                  !rhs(i,j,k,3)=rhs(i,j,k,3)+YL*( &
+                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
+                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
+                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
+                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
+                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
+                  !+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
+                  !rhs(i,j,k,4)=rhs(i,j,k,4)+YG*( &
+                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
+                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
+                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
+                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
+                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
+                  !&+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
                   ! VF/barycenter update at band cells (finest level only)
                   if (lvl.eq.this%amr%clvl()) then
                      ! Skip if cell not in band
@@ -1766,6 +1801,48 @@ contains
       end function interp_velocity
 
    end subroutine get_dQdt
+
+   !> Clean up passed Q based on VF to account for round-off
+   subroutine cleanup_Q(this,Q)
+      use amrex_amr_module, only: amrex_mfiter,amrex_box
+      implicit none
+      class(amrmpcomp), intent(inout) :: this
+      type(amrdata),    intent(inout) :: Q
+      integer :: lvl,i,j,k
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF,pCliq,pCgas
+      lvl=this%amr%clvl()
+      call this%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         pQ =>Q%mf(lvl)%dataptr(mfi)
+         pVF=>this%VF%mf(lvl)%dataptr(mfi)
+         pCliq=>this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas=>this%Cgas%mf(lvl)%dataptr(mfi)
+         bx=mfi%tilebox()
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Clean up Q based on VF to account for round-off
+            if (pVF(i,j,k,1).lt.VFlo) then; pQ(i,j,k,1)=0.0_WP; pQ(i,j,k,3)=0.0_WP; end if
+            if (pVF(i,j,k,1).gt.VFhi) then; pQ(i,j,k,2)=0.0_WP; pQ(i,j,k,4)=0.0_WP; end if
+            ! Clean up VF based on Q to account for round-off
+            if (pQ(i,j,k,1).le.0.0_WP.or.pQ(i,j,k,3).le.0.0_WP) then
+               pVF(i,j,k,1)=0.0_WP
+               pCliq(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
+               pCgas(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
+               pQ(i,j,k,1)=0.0_WP
+               pQ(i,j,k,3)=0.0_WP
+            end if
+            if (pQ(i,j,k,2).le.0.0_WP.or.pQ(i,j,k,4).le.0.0_WP) then
+               pVF(i,j,k,1)=1.0_WP
+               pCliq(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
+               pCgas(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
+               pQ(i,j,k,2)=0.0_WP
+               pQ(i,j,k,4)=0.0_WP
+            end if
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+   end subroutine cleanup_Q
 
    !> Build PLIC reconstruction from VF and barycenters using PLICnet
    subroutine build_plic(this,time)
@@ -2631,46 +2708,41 @@ contains
 
    !> Average down VF/Cliq/Cgas from finest to lbase, then sync ghost cells
    !> Clean up PLIC at coarse levels and sync ghost cells
-   subroutine vof_average_down(this, lbase)
+   subroutine vof_average_down(this,lbase)
       use amrex_interface, only: amrmfab_average_down_cell
       class(amrmpcomp), intent(inout) :: this
       integer, intent(in), optional :: lbase
       integer :: lvl, lb
-      lb = 0; if (present(lbase)) lb = lbase
+      lb=0; if (present(lbase)) lb=lbase
       ! Average valid cells from fine to coarse
-      do lvl = this%amr%clvl()-1, lb, -1
-         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1)  , cmf=this%VF%mf(lvl)  , rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
-         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1), cmf=this%Cliq%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
-         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1), cmf=this%Cgas%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+      do lvl=this%amr%clvl()-1,lb,-1
+         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1)  ,cmf=this%VF%mf(lvl)  ,rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1),cmf=this%Cliq%mf(lvl),rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1),cmf=this%Cgas%mf(lvl),rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
       end do
       ! Sync ghost cells on all levels + fix periodic barycenters
       call this%sync_moments()
       ! Clean up PLIC at coarse levels
-      do lvl = this%amr%clvl()-1, lb, -1
+      do lvl=this%amr%clvl()-1,lb,-1
          call set_trivial_plic()
          call this%sync_plic_lvl(lvl)
       end do
    contains
       !> Set PLIC to trivial planes based on VF
       subroutine set_trivial_plic()
-         use amrex_amr_module, only: amrex_mfiter, amrex_mfiter_build, amrex_mfiter_destroy, amrex_box
+         use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy,amrex_box
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: bx
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF2, pPLIC2
-         integer :: i, j, k
-         call amrex_mfiter_build(mfi, this%PLIC%mf(lvl), tiling=.false.)
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pPLIC
+         integer :: i,j,k
+         call amrex_mfiter_build(mfi,this%PLIC%mf(lvl),tiling=.false.)
          do while (mfi%next())
-            bx = mfi%tilebox()
-            pVF2 => this%VF%mf(lvl)%dataptr(mfi)
-            pPLIC2 => this%PLIC%mf(lvl)%dataptr(mfi)
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
-                     pPLIC2(i,j,k,1:3) = 0.0_WP
-                     pPLIC2(i,j,k,4) = sign(1.0e10_WP, pVF2(i,j,k,1) - 0.5_WP)
-                  end do
-               end do
-            end do
+            pVF  =>this%VF%mf(lvl)%dataptr(mfi)
+            pPLIC=>this%PLIC%mf(lvl)%dataptr(mfi)
+            bx=mfi%tilebox()
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pPLIC(i,j,k,:)=[0.0_WP,0.0_WP,0.0_WP,sign(1.0e10_WP,pVF(i,j,k,1)-0.5_WP)]
+            end do; end do; end do
          end do
          call amrex_mfiter_destroy(mfi)
       end subroutine set_trivial_plic
@@ -2753,12 +2825,12 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       type(amrex_multifab) :: div
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pBeta,pDiv,pU,pV,pW,pC
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pBeta,pDiv,pU,pV,pW,pC,pVF,pRHOL,pRHOG
       real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_beta
       real(WP) :: dudy,dudz,dvdx,dvdz,dwdx,dwdy,vort,grad_div
       integer :: lvl,i,j,k,si,sj,sk,n
       ! Parameters
-      real(WP), parameter :: Cartif=2.0_WP
+      real(WP), parameter :: Cartif=5.0_WP
       real(WP), parameter :: max_cfl=0.5_WP
       integer, parameter :: nfilter=2
       real(WP), dimension(-1:+1), parameter :: filter=[1.0_WP/6.0_WP,2.0_WP/3.0_WP,1.0_WP/6.0_WP]
@@ -2863,6 +2935,22 @@ contains
 
          ! Destroy temp divergence multifab
          call amrex_multifab_destroy(div)
+
+         ! Phase 4: Make it a dynamic quantity
+         call this%amr%mfiter_build(lvl,mfi)
+         do while(mfi%next())
+            ! Get data pointers
+            pRHOL=>this%RHOL%mf(lvl)%dataptr(mfi)
+            pRHOG=>this%RHOG%mf(lvl)%dataptr(mfi)
+            pVF  =>this%VF%mf(lvl)%dataptr(mfi)
+            pBeta=>beta%mf(lvl)%dataptr(mfi)
+            ! Loop over interior tiles
+            bx=mfi%tilebox()
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pBeta(i,j,k,1)=pBeta(i,j,k,1)/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),this%rho_floor)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),this%rho_floor))
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
 
          ! Fill beta's ghosts at this level
          call beta%mf(lvl)%fill_boundary(this%amr%geom(lvl))
