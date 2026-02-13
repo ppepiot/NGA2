@@ -1254,9 +1254,9 @@ contains
                   pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(1,1)+gradU(1,1))+0.5_WP*(sum(pBeta(i-1:i,j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i-1:i,j,k,1)))*div
                   pFx(i,j,k,6)=pFx(i,j,k,6)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(2,1)+gradU(1,2))
                   pFx(i,j,k,7)=pFx(i,j,k,7)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
-                  ! Phasic heat diffusion flux
-                  if (all(pVF(i-1:i,j,k,1).ge.0.5_WP)) pFx(i,j,k,3)=pFx(i,j,k,3)+minval(       pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
-                  if (all(pVF(i-1:i,j,k,1).le.0.5_WP)) pFx(i,j,k,4)=pFx(i,j,k,4)+minval(1.0_WP-pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
+                  ! Phasic heat diffusion flux (pure cells only)
+                  if (all(pVF(i-1:i,j,k,1).gt.VFhi)) pFx(i,j,k,3)=pFx(i,j,k,3)+0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
+                  if (all(pVF(i-1:i,j,k,1).lt.VFlo)) pFx(i,j,k,4)=pFx(i,j,k,4)+0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
                end do; end do; end do
                ! Y-fluxes
                fbx=mfi%nodaltilebox(2)
@@ -1311,9 +1311,9 @@ contains
                   pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(1,2)+gradU(2,1))
                   pFy(i,j,k,6)=pFy(i,j,k,6)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(2,2)+gradU(2,2))+0.5_WP*(sum(pBeta(i,j-1:j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j-1:j,k,1)))*div
                   pFy(i,j,k,7)=pFy(i,j,k,7)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
-                  ! Phasic heat diffusion flux
-                  if (all(pVF(i,j-1:j,k,1).ge.0.5_WP)) pFy(i,j,k,3)=pFy(i,j,k,3)+minval(       pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
-                  if (all(pVF(i,j-1:j,k,1).le.0.5_WP)) pFy(i,j,k,4)=pFy(i,j,k,4)+minval(1.0_WP-pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
+                  ! Phasic heat diffusion flux (pure cells only)
+                  if (all(pVF(i,j-1:j,k,1).gt.VFhi)) pFy(i,j,k,3)=pFy(i,j,k,3)+0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
+                  if (all(pVF(i,j-1:j,k,1).lt.VFlo)) pFy(i,j,k,4)=pFy(i,j,k,4)+0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
                end do; end do; end do
                ! Z-fluxes
                fbx=mfi%nodaltilebox(3)
@@ -1368,9 +1368,9 @@ contains
                   pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(1,3)+gradU(3,1))
                   pFz(i,j,k,6)=pFz(i,j,k,6)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(2,3)+gradU(3,2))
                   pFz(i,j,k,7)=pFz(i,j,k,7)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
-                  ! Phasic heat diffusion flux
-                  if (all(pVF(i,j,k-1:k,1).ge.0.5_WP)) pFz(i,j,k,3)=pFz(i,j,k,3)+minval(       pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
-                  if (all(pVF(i,j,k-1:k,1).le.0.5_WP)) pFz(i,j,k,4)=pFz(i,j,k,4)+minval(1.0_WP-pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
+                  ! Phasic heat diffusion flux (pure cells only)
+                  if (all(pVF(i,j,k-1:k,1).gt.VFhi)) pFz(i,j,k,3)=pFz(i,j,k,3)+0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
+                  if (all(pVF(i,j,k-1:k,1).lt.VFlo)) pFz(i,j,k,4)=pFz(i,j,k,4)+0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
                end do; end do; end do
             end do
             call this%amr%mfiter_destroy(mfi)
