@@ -174,6 +174,7 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pTG,pVF,pQ,pVisc,pBeta,pDiff
       real(WP) :: r_cyl,blend,mu_g,mu_l,k_g,k_l
       real(WP), parameter :: Tmax_visc=10.0_WP
+      real(WP), parameter :: myeps=1.0e-15_WP
       do lvl=0,amr%clvl()
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
@@ -192,8 +193,8 @@ contains
                ! Liquid viscosity from ratio
                mu_l=visc_ratio*Reynolds**(-1.0_WP)
                ! Mixture viscosity
-               pVisc(i,j,k,1)=pVF(i,j,k,1)*mu_l+(1.0_WP-pVF(i,j,k,1))*mu_g
-               !pVisc(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/mu_l+(1.0_WP-pVF(i,j,k,1))/mu_g) ! Needs guard
+               !pVisc(i,j,k,1)=pVF(i,j,k,1)*mu_l+(1.0_WP-pVF(i,j,k,1))*mu_g ! Arithmetic averaging
+               pVisc(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/max(mu_l,myeps)+(1.0_WP-pVF(i,j,k,1))/max(mu_g,myeps)) ! Harmonic averaging
                ! Zero bulk viscosity
                pBeta(i,j,k,1)=0.0_WP
                ! Gas heat diffusivity: k=Cv*Gamma*mu/Pr
@@ -201,8 +202,8 @@ contains
                ! Liquid heat diffusivity from ratio
                k_l=diff_ratio*GammaG*CvG/(Reynolds*Prandtl)
                ! Mixture diffusivity
-               pDiff(i,j,k,1)=pVF(i,j,k,1)*k_l+(1.0_WP-pVF(i,j,k,1))*k_g
-               !pDiff(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/k_l+(1.0_WP-pVF(i,j,k,1))/k_g) ! Needs guard
+               !pDiff(i,j,k,1)=pVF(i,j,k,1)*k_l+(1.0_WP-pVF(i,j,k,1))*k_g ! Arithmetic averaging
+               pDiff(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/max(k_l,myeps)+(1.0_WP-pVF(i,j,k,1))/max(k_g,myeps)) ! Harmonic averaging
                ! Apply sponge layer viscosity
                r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2+(amr%zlo+(real(k,WP)+0.5_WP)*amr%dz(lvl))**2)
                if (r_cyl.gt.R_spg) then
@@ -399,7 +400,7 @@ contains
          rhoL1=density_ratio*rhoG1
          PinfL=pG1*(density_ratio*GammaG/GammaL*sound_ratio**2-1.0_WP)
          pL1=pG1                                                        ! Force pressure equilibrium
-         CvL=(pL1+PinfL)/(rhoL1*(GammaL-1.0_WP))
+         CvL=(pL1+PinfL)/(rhoL1*(GammaL-1.0_WP)*get_TG(rhoG1,pG1))      ! Force thermal equilibrium
          ! Viscous parameters
          call param_read('Reynolds number',Reynolds)
          call param_read('Prandtl number',Prandtl)

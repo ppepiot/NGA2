@@ -72,8 +72,8 @@ module amrmpcomp_class
       type(amrdata) :: PL,PG               !< Phasic pressures
       type(amrdata) :: TL,TG               !< Phasic temperatures
 
-      ! Mixture speed of sound
-      type(amrdata) :: C
+      ! Mixture properties
+      type(amrdata) :: C                   !< Speed of sound
 
       ! Physical properties
       type(amrdata) :: visc              !< Dynamic viscosity
@@ -442,7 +442,9 @@ contains
       call this%PG%initialize  (amr,name='PG'  ,ncomp=1,ng=this%nover); this%PG%parent  =>this
       call this%TL%initialize  (amr,name='TL'  ,ncomp=1,ng=this%nover); this%TL%parent  =>this
       call this%TG%initialize  (amr,name='TG'  ,ncomp=1,ng=this%nover); this%TG%parent  =>this
-      call this%C%initialize   (amr,name='C'   ,ncomp=1,ng=this%nover); this%C%parent   =>this
+
+      ! Initialize mixture properties
+      call this%C%initialize(amr,name='C',ncomp=1,ng=this%nover); this%C%parent=>this
 
       ! Initialize physical properties (Neumann BCs on those)
       call this%visc%initialize(amr,name='visc',ncomp=1,ng=this%nover); this%visc%parent=>this
@@ -542,6 +544,7 @@ contains
       call this%IL%reset_level(lvl,ba,dm); call this%IG%reset_level(lvl,ba,dm)
       call this%PL%reset_level(lvl,ba,dm); call this%PG%reset_level(lvl,ba,dm)
       call this%TL%reset_level(lvl,ba,dm); call this%TG%reset_level(lvl,ba,dm)
+      ! Reset mixture properties
       call this%C%reset_level(lvl,ba,dm)
       ! Reset physical properties
       call this%visc%reset_level(lvl,ba,dm)
@@ -560,7 +563,9 @@ contains
       call this%IL%setval(val=0.0_WP,lvl=lvl); call this%IG%setval(val=0.0_WP,lvl=lvl)
       call this%PL%setval(val=0.0_WP,lvl=lvl); call this%PG%setval(val=0.0_WP,lvl=lvl)
       call this%TL%setval(val=0.0_WP,lvl=lvl); call this%TG%setval(val=0.0_WP,lvl=lvl)
+      ! Reset mixture properties
       call this%C%setval(val=0.0_WP,lvl=lvl)
+      ! Reset physical properties
       call this%visc%setval(val=0.0_WP,lvl=lvl)
       call this%beta%setval(val=0.0_WP,lvl=lvl)
       call this%diff%setval(val=0.0_WP,lvl=lvl)
@@ -1249,9 +1254,9 @@ contains
                   pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(1,1)+gradU(1,1))+0.5_WP*(sum(pBeta(i-1:i,j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i-1:i,j,k,1)))*div
                   pFx(i,j,k,6)=pFx(i,j,k,6)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(2,1)+gradU(1,2))
                   pFx(i,j,k,7)=pFx(i,j,k,7)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
-                  ! Heat diffusion flux
-                  !pFx(i,j,k,3)=pFx(i,j,k,3)+minval(       pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
-                  !pFx(i,j,k,4)=pFx(i,j,k,4)+minval(1.0_WP-pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
+                  ! Phasic heat diffusion flux
+                  if (all(pVF(i-1:i,j,k,1).ge.0.5_WP)) pFx(i,j,k,3)=pFx(i,j,k,3)+minval(       pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
+                  if (all(pVF(i-1:i,j,k,1).le.0.5_WP)) pFx(i,j,k,4)=pFx(i,j,k,4)+minval(1.0_WP-pVF(i-1:i,j,k,1))*0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
                end do; end do; end do
                ! Y-fluxes
                fbx=mfi%nodaltilebox(2)
@@ -1306,9 +1311,9 @@ contains
                   pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(1,2)+gradU(2,1))
                   pFy(i,j,k,6)=pFy(i,j,k,6)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(2,2)+gradU(2,2))+0.5_WP*(sum(pBeta(i,j-1:j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j-1:j,k,1)))*div
                   pFy(i,j,k,7)=pFy(i,j,k,7)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
-                  ! Heat diffusion flux
-                  !pFy(i,j,k,3)=pFy(i,j,k,3)+minval(       pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
-                  !pFy(i,j,k,4)=pFy(i,j,k,4)+minval(1.0_WP-pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
+                  ! Phasic heat diffusion flux
+                  if (all(pVF(i,j-1:j,k,1).ge.0.5_WP)) pFy(i,j,k,3)=pFy(i,j,k,3)+minval(       pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
+                  if (all(pVF(i,j-1:j,k,1).le.0.5_WP)) pFy(i,j,k,4)=pFy(i,j,k,4)+minval(1.0_WP-pVF(i,j-1:j,k,1))*0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
                end do; end do; end do
                ! Z-fluxes
                fbx=mfi%nodaltilebox(3)
@@ -1363,9 +1368,9 @@ contains
                   pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(1,3)+gradU(3,1))
                   pFz(i,j,k,6)=pFz(i,j,k,6)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(2,3)+gradU(3,2))
                   pFz(i,j,k,7)=pFz(i,j,k,7)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
-                  ! Heat diffusion flux
-                  !pFz(i,j,k,3)=pFz(i,j,k,3)+minval(       pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
-                  !pFz(i,j,k,4)=pFz(i,j,k,4)+minval(1.0_WP-pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
+                  ! Phasic heat diffusion flux
+                  if (all(pVF(i,j,k-1:k,1).ge.0.5_WP)) pFz(i,j,k,3)=pFz(i,j,k,3)+minval(       pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
+                  if (all(pVF(i,j,k-1:k,1).le.0.5_WP)) pFz(i,j,k,4)=pFz(i,j,k,4)+minval(1.0_WP-pVF(i,j,k-1:k,1))*0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
                end do; end do; end do
             end do
             call this%amr%mfiter_destroy(mfi)
@@ -1394,7 +1399,7 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVx,pVy,pVz
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pCliq,pCgas,pCliqold,pCgasold
          real(WP), dimension(1:3,1:3) :: gradU
-         real(WP) :: div,vol,Pmix,YL,YG
+         real(WP) :: div,vol
          real(WP) :: Lvol_old,Lvol_new,Lvol_flux
          real(WP) :: Gvol_old,Gvol_new,Gvol_flux
          real(WP), dimension(3) :: Lbar_old,Lbar_new,Lbar_flux
@@ -1437,6 +1442,39 @@ contains
                ! Loop over interior
                bx=mfi%tilebox()
                do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                  ! VF/barycenter update at band cells (finest level only)
+                  if (lvl.eq.this%amr%clvl()) then
+                     ! Work on band cells only
+                     if (pBand(i,j,k,1).gt.0.0_WP) then
+                        ! Old phasic moments
+                        Lvol_old=(       pVFold(i,j,k,1))*vol
+                        Gvol_old=(1.0_WP-pVFold(i,j,k,1))*vol
+                        Lbar_old=pCliqold(i,j,k,1:3)
+                        Gbar_old=pCgasold(i,j,k,1:3)
+                        ! Net volume flux (outflow positive) from SL volume moments
+                        Lvol_flux=pVx(i+1,j,k, 1 )-pVx(i,j,k, 1 )+pVy(i,j+1,k, 1 )-pVy(i,j,k, 1 )+pVz(i,j,k+1, 1 )-pVz(i,j,k, 1 )
+                        Gvol_flux=pVx(i+1,j,k, 2 )-pVx(i,j,k, 2 )+pVy(i,j+1,k, 2 )-pVy(i,j,k, 2 )+pVz(i,j,k+1, 2 )-pVz(i,j,k, 2 )
+                        Lbar_flux=pVx(i+1,j,k,3:5)-pVx(i,j,k,3:5)+pVy(i,j+1,k,3:5)-pVy(i,j,k,3:5)+pVz(i,j,k+1,3:5)-pVz(i,j,k,3:5)
+                        Gbar_flux=pVx(i+1,j,k,6:8)-pVx(i,j,k,6:8)+pVy(i,j+1,k,6:8)-pVy(i,j,k,6:8)+pVz(i,j,k+1,6:8)-pVz(i,j,k,6:8)
+                        ! New phasic volumes
+                        Lvol_new=Lvol_old-Lvol_flux
+                        Gvol_new=Gvol_old-Gvol_flux
+                        ! New VF and default barycenters
+                        pVF(i,j,k,1)=Lvol_new/(Lvol_new+Gvol_new)
+                        pCliq(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+                        pCgas(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+                        ! Clip and update barycenters
+                        if (pVF(i,j,k,1).lt.VFlo) then
+                           pVF(i,j,k,1)=0.0_WP
+                        else if (pVF(i,j,k,1).gt.VFhi) then
+                           pVF(i,j,k,1)=1.0_WP
+                        else
+                           ! Update barycenters from moment conservation and project forward
+                           if (Lvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Lbar_new=(Lbar_old*Lvol_old-Lbar_flux)/Lvol_new; pCliq(i,j,k,1:3)=project(Lbar_new,dt); end if
+                           if (Gvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Gbar_new=(Gbar_old*Gvol_old-Gbar_flux)/Gvol_new; pCgas(i,j,k,1:3)=project(Gbar_new,dt); end if
+                        end if
+                     end if
+                  end if
                   ! Divergence of conserved variable fluxes (7 components)
                   rhs(i,j,k,:)=dxi*(pFx(i+1,j,k,:)-pFx(i,j,k,:))+dyi*(pFy(i,j+1,k,:)-pFy(i,j,k,:))+dzi*(pFz(i,j,k+1,:)-pFz(i,j,k,:))
                   ! Velocity gradients at cell center
@@ -1451,12 +1489,8 @@ contains
                   gradU(3,3)=0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
                   ! Pressure dilatation: split by VF between phasic energies - discontinuous
-                  !rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*pPL(i,j,k,1)*div
-                  !rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)*div
-                  ! Pressure dilatation: split by VF between phasic energies - continuous
-                  Pmix=pVF(i,j,k,1)*pPL(i,j,k,1)+(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)
-                  rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*Pmix*div
-                  rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*Pmix*div
+                  rhs(i,j,k,3)=rhs(i,j,k,3)-(       pVF(i,j,k,1))*pPL(i,j,k,1)*div
+                  rhs(i,j,k,4)=rhs(i,j,k,4)-(1.0_WP-pVF(i,j,k,1))*pPG(i,j,k,1)*div
                   ! Viscous heating: τ:∇U, split by VF between phasic energies
                   rhs(i,j,k,3)=rhs(i,j,k,3)+(       pVF(i,j,k,1))*( &
                   & (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
@@ -1472,54 +1506,6 @@ contains
                   &+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
                   &+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
                   &+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
-                  ! Viscous heating: τ:∇U, split by mass fractions between phasic energies
-                  !YL=pQ(i,j,k,1)/max(sum(pQ(i,j,k,1:2)),this%rho_floor); YG=1.0_WP-YL
-                  !rhs(i,j,k,3)=rhs(i,j,k,3)+YL*( &
-                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
-                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
-                  !+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
-                  !rhs(i,j,k,4)=rhs(i,j,k,4)+YG*( &
-                  !& (2.0_WP*pVisc(i,j,k,1)*gradU(1,1)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(1,1) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(2,2)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(2,2) &
-                  !&+(2.0_WP*pVisc(i,j,k,1)*gradU(3,3)+(pBeta(i,j,k,1)-2.0_WP/3.0_WP*pVisc(i,j,k,1))*div)*gradU(3,3) &
-                  !&+pVisc(i,j,k,1)*(gradU(2,1)+gradU(1,2))*(gradU(2,1)+gradU(1,2)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,1)+gradU(1,3))*(gradU(3,1)+gradU(1,3)) &
-                  !&+pVisc(i,j,k,1)*(gradU(3,2)+gradU(2,3))*(gradU(3,2)+gradU(2,3)))
-                  ! VF/barycenter update at band cells (finest level only)
-                  if (lvl.eq.this%amr%clvl()) then
-                     ! Skip if cell not in band
-                     if (pBand(i,j,k,1).eq.0.0_WP) cycle
-                     ! Old phasic moments
-                     Lvol_old=(       pVFold(i,j,k,1))*vol
-                     Gvol_old=(1.0_WP-pVFold(i,j,k,1))*vol
-                     Lbar_old=pCliqold(i,j,k,1:3)
-                     Gbar_old=pCgasold(i,j,k,1:3)
-                     ! Net volume flux (outflow positive) from SL volume moments
-                     Lvol_flux=pVx(i+1,j,k, 1 )-pVx(i,j,k, 1 )+pVy(i,j+1,k, 1 )-pVy(i,j,k, 1 )+pVz(i,j,k+1, 1 )-pVz(i,j,k, 1 )
-                     Gvol_flux=pVx(i+1,j,k, 2 )-pVx(i,j,k, 2 )+pVy(i,j+1,k, 2 )-pVy(i,j,k, 2 )+pVz(i,j,k+1, 2 )-pVz(i,j,k, 2 )
-                     Lbar_flux=pVx(i+1,j,k,3:5)-pVx(i,j,k,3:5)+pVy(i,j+1,k,3:5)-pVy(i,j,k,3:5)+pVz(i,j,k+1,3:5)-pVz(i,j,k,3:5)
-                     Gbar_flux=pVx(i+1,j,k,6:8)-pVx(i,j,k,6:8)+pVy(i,j+1,k,6:8)-pVy(i,j,k,6:8)+pVz(i,j,k+1,6:8)-pVz(i,j,k,6:8)
-                     ! New phasic volumes
-                     Lvol_new=Lvol_old-Lvol_flux
-                     Gvol_new=Gvol_old-Gvol_flux
-                     ! New VF and default barycenters
-                     pVF(i,j,k,1)=Lvol_new/(Lvol_new+Gvol_new)
-                     pCliq(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
-                     pCgas(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
-                     ! Clip and update barycenters
-                     if (pVF(i,j,k,1).lt.VFlo) then
-                        pVF(i,j,k,1)=0.0_WP
-                     else if (pVF(i,j,k,1).gt.VFhi) then
-                        pVF(i,j,k,1)=1.0_WP
-                     else
-                        ! Update barycenters from moment conservation and project forward
-                        if (Lvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Lbar_new=(Lbar_old*Lvol_old-Lbar_flux)/Lvol_new; pCliq(i,j,k,1:3)=project(Lbar_new,dt); end if
-                        if (Gvol_new/(Lvol_new+Gvol_new).gt.vol_eps) then; Gbar_new=(Gbar_old*Gvol_old-Gbar_flux)/Gvol_new; pCgas(i,j,k,1:3)=project(Gbar_new,dt); end if
-                     end if
-                  end if
                end do; end do; end do
             end do
             call this%amr%mfiter_destroy(mfi)
@@ -3001,7 +2987,7 @@ contains
                bx=mfi%tilebox()
                do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   rho=max(pQ(i,j,k,1)+pQ(i,j,k,2),this%rho_floor)
-                  viscmax=max(viscmax,pVisc(i,j,k,1)/rho,pBeta(i,j,k,1)/rho,pDiff(i,j,k,1)/rho)
+                  viscmax=max(viscmax,pVisc(i,j,k,1)/rho,pBeta(i,j,k,1)/rho,pDiff(i,j,k,1)/rho)   ! This is incorrect for heat diffusion!
                end do; end do; end do
             end do
             call this%amr%mfiter_destroy(mfi)

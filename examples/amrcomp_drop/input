@@ -22,7 +22,7 @@ Density ratio:     816.0
 Sound speed ratio: 4.3
 
 # Viscous parameters
-Reynolds number:        5000.0
+Reynolds number:        5e3
 Prandtl number:         0.71
 Viscosity ratio:        58.3
 Diffusivity ratio:      20
