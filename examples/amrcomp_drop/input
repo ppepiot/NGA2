@@ -30,7 +30,7 @@ Sutherland exponent:    1.5
 Sutherland temperature: 0.4042
 
 # Time integration
-Max dt:   5e-3
+Max dt:   2.5e-3
 Max CFL:  1.0
 Max time: 50
 
