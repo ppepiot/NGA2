@@ -43,7 +43,9 @@ using TagDispatcher = void (*)(void *owner, int lev, amrex::TagBoxArray *,
 using PostRegridDispatcher = void (*)(void *owner, int lbase, double time);
 // Cost callback: owner fills per-box cost array for load balancing
 // costs array is pre-filled with 1.0 (uniform); callback overwrites with actual costs
-using CostDispatcher = void (*)(void *owner, int lev, int nboxes, double *costs);
+// ba_ptr points to the new BoxArray being distributed
+using CostDispatcher = void (*)(void *owner, int lev, int nboxes, double *costs,
+                                const void *ba_ptr);
 }
 
 //=============================================================================
@@ -82,7 +84,7 @@ public:
     if (on_cost_dispatch && owner) {
       int nboxes = static_cast<int>(ba.size());
       amrex::Vector<amrex::Real> costs(nboxes, 1.0);
-      on_cost_dispatch(owner, lev, nboxes, costs.data());
+      on_cost_dispatch(owner, lev, nboxes, costs.data(), &ba);
       switch (cost_strategy) {
       case 0:
         return amrex::DistributionMapping::makeSFC(costs, ba);

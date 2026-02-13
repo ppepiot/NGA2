@@ -99,6 +99,9 @@ module amrmpcomp_class
       ! Minimum density for stability
       real(WP) :: rho_floor=1.0e-10_WP
 
+      ! Cost for mixed cells in load balancing (1.0 = same as pure, higher = more expensive)
+      real(WP) :: SLcost=10.0_WP
+
       ! Number of overlap cells (2 for WENO3 stencil)
       integer :: nover=2
 
@@ -391,6 +394,63 @@ contains
       call this%post_regrid(lbase,time)
    end subroutine amrmpcomp_postregrid
 
+   !> Dispatch cost: fills per-box costs for load balancing
+   !> Estimates cost based on number of mixed cells (VFlo < VF < VFhi)
+   !> per new box, sampled from old VF data via box intersection.
+   !> ba is the new BoxArray being distributed.
+   subroutine amrmpcomp_get_cost(ctx,lvl,nboxes,costs,ba)
+      use iso_c_binding, only: c_f_pointer,c_associated
+      use amrex_amr_module, only: amrex_boxarray,amrex_box,amrex_mfiter,&
+      &                           amrex_mfiter_build,amrex_mfiter_destroy,amrex_intersection
+      use parallel, only: MPI_REAL_WP
+      use mpi_f08, only: MPI_ALLREDUCE,MPI_SUM,MPI_IN_PLACE
+      implicit none
+      type(c_ptr), intent(in) :: ctx
+      integer, intent(in) :: lvl,nboxes
+      real(WP), intent(inout) :: costs(nboxes)
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrmpcomp), pointer :: this
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: old_bx,new_bx,isect
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
+      integer :: n,i,j,k,ierr
+      ! Recover solver object
+      call c_f_pointer(ctx,this)
+      ! Guard: if VF data doesn't exist yet, return uniform costs
+      if (.not.allocated(this%VF%mf)) then; costs=1.0_WP; return; end if
+      if (.not.c_associated(this%VF%mf(lvl)%p)) then; costs=1.0_WP; return; end if
+      ! Coarser levels are never mixed
+      if (lvl.lt.this%amr%clvl()) then
+         do n=1,nboxes
+            new_bx=ba%get_box(n-1)
+            costs(n)=real(new_bx%numpts(),WP)
+         end do
+         return
+      end if
+      ! At finest level, count mixed cells per new box from local old data
+      costs=0.0_WP
+      call amrex_mfiter_build(mfi,this%VF%mf(lvl),tiling=.false.)
+      do while (mfi%next())
+         old_bx=mfi%tilebox()
+         pVF=>this%VF%mf(lvl)%dataptr(mfi)
+         do n=1,nboxes
+            new_bx=ba%get_box(n-1)  ! 0-indexed
+            if (.not.old_bx%intersects(new_bx)) cycle
+            isect=amrex_intersection(old_bx,new_bx)
+            do k=isect%lo(3),isect%hi(3); do j=isect%lo(2),isect%hi(2); do i=isect%lo(1),isect%hi(1)
+               if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
+                  costs(n)=costs(n)+this%SLcost
+               else
+                  costs(n)=costs(n)+1.0_WP
+               end if
+            end do; end do; end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+      ! Allreduce: sum partial mixed-cell counts across ranks
+      call MPI_ALLREDUCE(MPI_IN_PLACE,costs,nboxes,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
+   end subroutine amrmpcomp_get_cost
+
    ! ============================================================================
    ! INITIALIZATION / FINALIZATION
    ! ============================================================================
@@ -478,6 +538,7 @@ contains
          call this%amr%add_on_clear  (amrmpcomp_on_clear,  c_loc(this))
          call this%amr%add_tagging   (amrmpcomp_tagging,   c_loc(this))
          call this%amr%add_postregrid(amrmpcomp_postregrid,c_loc(this))
+         call this%amr%set_get_cost  (amrmpcomp_get_cost,  c_loc(this))
       end select
 
       ! Print solver info
