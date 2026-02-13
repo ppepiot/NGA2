@@ -41,6 +41,9 @@ using TagDispatcher = void (*)(void *owner, int lev, amrex::TagBoxArray *,
 // Post-regrid callback: owner, lbase, time
 // Called after regrid completes; lbase is the base level for regridding
 using PostRegridDispatcher = void (*)(void *owner, int lbase, double time);
+// Cost callback: owner fills per-box cost array for load balancing
+// costs array is pre-filled with 1.0 (uniform); callback overwrites with actual costs
+using CostDispatcher = void (*)(void *owner, int lev, int nboxes, double *costs);
 }
 
 //=============================================================================
@@ -57,6 +60,8 @@ public:
   ClearDispatcher on_clear_dispatch = nullptr;
   TagDispatcher on_tag_dispatch = nullptr;
   PostRegridDispatcher on_postregrid_dispatch = nullptr;
+  CostDispatcher on_cost_dispatch = nullptr;
+  int cost_strategy = 0;  // 0=SFC (AMReX default), 1=KnapSack
 
   // Public override of regrid to call post-regrid dispatch after base class
   // Note: 'initial' parameter from AMReX is unused, we drop it
@@ -65,6 +70,31 @@ public:
     if (on_postregrid_dispatch && owner) {
       on_postregrid_dispatch(owner, lbase, time);
     }
+  }
+
+  // Override MakeDistributionMap for cost-aware load balancing
+  // If a cost callback is registered, calls it to get per-box costs,
+  // then distributes using the selected strategy.
+  // If no callback, falls back to default (SFC by cell count).
+  //   cost_strategy: 0 = SFC (default), 1 = KnapSack
+  amrex::DistributionMapping
+  MakeDistributionMap(int lev, amrex::BoxArray const &ba) override {
+    if (on_cost_dispatch && owner) {
+      int nboxes = static_cast<int>(ba.size());
+      amrex::Vector<amrex::Real> costs(nboxes, 1.0);
+      on_cost_dispatch(owner, lev, nboxes, costs.data());
+      switch (cost_strategy) {
+      case 0:
+        return amrex::DistributionMapping::makeSFC(costs, ba);
+      case 1:
+        return amrex::DistributionMapping::makeKnapSack(costs);
+      default:
+        amrex::Abort("NGA2AmrCore::MakeDistributionMap: unknown cost_strategy="
+                     + std::to_string(cost_strategy)
+                     + " (valid: 0=SFC, 1=KnapSack)");
+      }
+    }
+    return amrex::FAmrCore::MakeDistributionMap(lev, ba);
   }
 
 protected:
@@ -187,6 +217,14 @@ void amrcore_set_on_tag_dispatch(void *core, nga2::TagDispatcher f) {
 void amrcore_set_on_postregrid_dispatch(void *core,
                                         nga2::PostRegridDispatcher f) {
   static_cast<nga2::NGA2AmrCore *>(core)->on_postregrid_dispatch = f;
+}
+
+void amrcore_set_on_cost_dispatch(void *core, nga2::CostDispatcher f) {
+  static_cast<nga2::NGA2AmrCore *>(core)->on_cost_dispatch = f;
+}
+
+void amrcore_set_cost_strategy(void *core, int strategy) {
+  static_cast<nga2::NGA2AmrCore *>(core)->cost_strategy = strategy;
 }
 
 //-----------------------------------------------------------------------------

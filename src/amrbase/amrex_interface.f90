@@ -23,6 +23,8 @@ module amrex_interface
    public :: amrcore_set_on_clear_dispatch
    public :: amrcore_set_on_tag_dispatch
    public :: amrcore_set_on_postregrid_dispatch
+   public :: amrcore_set_on_cost_dispatch
+   public :: amrcore_set_cost_strategy
 
    !=====================================================================
    ! AmrCore Grid Operations
@@ -150,6 +152,20 @@ module amrex_interface
          type(c_ptr), value :: core
          type(c_funptr), value :: f
       end subroutine amrcore_set_on_postregrid_dispatch
+
+      !> Set cost callback dispatcher for load balancing
+      subroutine amrcore_set_on_cost_dispatch(core,f) bind(c)
+         import :: c_ptr,c_funptr
+         type(c_ptr), value :: core
+         type(c_funptr), value :: f
+      end subroutine amrcore_set_on_cost_dispatch
+
+      !> Set load balancing strategy (0=SFC, 1=KnapSack)
+      subroutine amrcore_set_cost_strategy(core,strat) bind(c)
+         import :: c_ptr,c_int
+         type(c_ptr), value :: core
+         integer(c_int), value :: strat
+      end subroutine amrcore_set_cost_strategy
 
       !------------------------------------------------------------------
       ! AmrCore Grid Operations

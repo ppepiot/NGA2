@@ -68,6 +68,19 @@ module amrgrid_class
       end subroutine clear_callback
    end interface
 
+   !> Abstract interface for cost callback (load balancing)
+   !> Called during MakeDistributionMap; fills per-box costs
+   abstract interface
+      subroutine cost_callback(ctx,lvl,nboxes,costs)
+         use iso_c_binding, only: c_ptr
+         use precision, only: WP
+         implicit none
+         type(c_ptr), intent(in) :: ctx
+         integer, intent(in) :: lvl,nboxes
+         real(WP), intent(inout) :: costs(nboxes)
+      end subroutine cost_callback
+   end interface
+
    ! Wrappers for callback lists
    type :: tagger_wrapper
       procedure(tagging_callback), pointer, nopass :: f=>null()
@@ -85,6 +98,10 @@ module amrgrid_class
       procedure(clear_callback), pointer, nopass :: f=>null()
       type(c_ptr) :: ctx=c_null_ptr
    end type clear_cb_wrapper
+   type :: cost_cb_wrapper
+      procedure(cost_callback), pointer, nopass :: f=>null()
+      type(c_ptr) :: ctx=c_null_ptr
+   end type cost_cb_wrapper
 
    !> Amrgrid object definition based on AMReX's amrcore
    type :: amrgrid
@@ -139,6 +156,9 @@ module amrgrid_class
       type(postregrid_wrapper), dimension(:), allocatable :: postregrid_funcs
       ! Default tiling for mfiter_build
       logical :: default_tiling = .true.
+      ! Cost callback (single, not list) and load balancing strategy
+      type(cost_cb_wrapper) :: cost_func
+      integer :: lb_strat = 0           ! 0=SFC (default), 1=KnapSack
    contains
       procedure :: initialize                !< Initialization of amrgrid object
       procedure :: finalize                  !< Finalization of amrgrid object
@@ -157,6 +177,7 @@ module amrgrid_class
       procedure :: add_postregrid            !< Add a post-regrid callback
       procedure :: clear_tagging             !< Clear all tagging callbacks
       procedure :: clear_postregrid          !< Clear all post-regrid callbacks
+      procedure :: set_cost_callback         !< Set cost callback for load balancing
       ! Various tools and accessors
       procedure :: get_boxarray              !< Obtain box array at a given level
       procedure :: get_distromap             !< Obtain distromap at a given level
@@ -229,7 +250,8 @@ contains
          use amrex_interface, only: amrcore_create,amrcore_set_owner, &
          &   amrcore_set_on_init_dispatch,amrcore_set_on_coarse_dispatch, &
          &   amrcore_set_on_remake_dispatch,amrcore_set_on_clear_dispatch, &
-         &   amrcore_set_on_tag_dispatch,amrcore_set_on_postregrid_dispatch
+         &   amrcore_set_on_tag_dispatch,amrcore_set_on_postregrid_dispatch, &
+         &   amrcore_set_on_cost_dispatch,amrcore_set_cost_strategy
          this%amrcore=amrcore_create()
          ! Set owner pointer - use select type to get c_loc of concrete type
          select type (this)
@@ -242,6 +264,8 @@ contains
          call amrcore_set_on_clear_dispatch(this%amrcore,c_funloc(dispatch_clr_lvl))
          call amrcore_set_on_tag_dispatch(this%amrcore,c_funloc(dispatch_err_est))
          call amrcore_set_on_postregrid_dispatch(this%amrcore,c_funloc(dispatch_postregrid))
+         call amrcore_set_on_cost_dispatch(this%amrcore,c_funloc(dispatch_cost))
+         call amrcore_set_cost_strategy(this%amrcore,this%lb_strat)
          if (present(name)) this%name=trim(adjustl(name))
       end block create_amrcore_obj
       ! Get back geometry objects
@@ -314,6 +338,7 @@ contains
       if (allocated(this%on_clear))  deallocate(this%on_clear)
       if (allocated(this%taggers)) deallocate(this%taggers)
       if (allocated(this%postregrid_funcs)) deallocate(this%postregrid_funcs)
+      this%cost_func%f=>null(); this%cost_func%ctx=c_null_ptr
       ! Do not free comm as it was passed to us
       this%comm=MPI_COMM_NULL
       ! Handle automated AMReX finalization
@@ -354,11 +379,13 @@ contains
 
    !> Perform regriding operation on baselvl
    subroutine regrid(this,baselvl,time)
-      use amrex_interface, only: amrcore_regrid
+      use amrex_interface, only: amrcore_regrid,amrcore_set_cost_strategy
       implicit none
       class(amrgrid), target, intent(inout) :: this
       integer,  intent(in) :: baselvl
       real(WP), intent(in) :: time
+      ! Sync load balancing strategy to C++ before regrid
+      call amrcore_set_cost_strategy(this%amrcore,this%lb_strat)
       ! Regenerate grid and resize/transfer data
       call amrcore_regrid(this%amrcore,baselvl,time)
       ! Generate info about grid
@@ -558,6 +585,22 @@ contains
       end if
    end subroutine dispatch_postregrid
 
+   subroutine dispatch_cost(owner,lvl,nboxes,costs) bind(c)
+      use iso_c_binding, only: c_ptr,c_int,c_double,c_f_pointer
+      implicit none
+      type(c_ptr), value, intent(in) :: owner
+      integer(c_int), value, intent(in) :: lvl
+      integer(c_int), value, intent(in) :: nboxes
+      real(c_double), intent(inout) :: costs(nboxes)
+      type(amrgrid), pointer :: this_grid
+      call c_f_pointer(owner,this_grid)
+      ! Call registered cost callback if present
+      if (associated(this_grid%cost_func%f)) then
+         call this_grid%cost_func%f(this_grid%cost_func%ctx,int(lvl),int(nboxes),costs)
+      end if
+      ! If no callback, costs remain at 1.0 (uniform) from C++ side
+   end subroutine dispatch_cost
+
    !> Add a level init callback (called for MakeNewLevelFromScratch)
    subroutine add_on_init(this,callback,ctx)
       use iso_c_binding, only: c_ptr
@@ -719,6 +762,18 @@ contains
       class(amrgrid), intent(inout) :: this
       if (allocated(this%postregrid_funcs)) deallocate(this%postregrid_funcs)
    end subroutine clear_postregrid
+
+
+   !> Set cost callback for load balancing (single, not list)
+   subroutine set_cost_callback(this,callback,ctx)
+      use iso_c_binding, only: c_ptr
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      procedure(cost_callback) :: callback
+      type(c_ptr), intent(in) :: ctx
+      this%cost_func%f=>callback
+      this%cost_func%ctx=ctx
+   end subroutine set_cost_callback
 
 
    !> Obtain box array at a level
