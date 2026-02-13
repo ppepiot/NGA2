@@ -653,11 +653,6 @@ contains
          call this%amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
 
-            ! Grid spacings
-            dxi=1.0_WP/this%amr%dx(lvl)
-            dyi=1.0_WP/this%amr%dy(lvl)
-            dzi=1.0_WP/this%amr%dz(lvl)
-
             ! Get data pointers
             pQ=>Q%mf(lvl)%dataptr(mfi)
             pU=>this%U%mf(lvl)%dataptr(mfi)
@@ -826,11 +821,7 @@ contains
             bx=mfi%tilebox()
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                ! Advection
-               rhs(i,j,k,1)=dxi*(pFx(i+1,j,k,1)-pFx(i,j,k,1))+dyi*(pFy(i,j+1,k,1)-pFy(i,j,k,1))+dzi*(pFz(i,j,k+1,1)-pFz(i,j,k,1))
-               rhs(i,j,k,2)=dxi*(pFx(i+1,j,k,2)-pFx(i,j,k,2))+dyi*(pFy(i,j+1,k,2)-pFy(i,j,k,2))+dzi*(pFz(i,j,k+1,2)-pFz(i,j,k,2))
-               rhs(i,j,k,3)=dxi*(pFx(i+1,j,k,3)-pFx(i,j,k,3))+dyi*(pFy(i,j+1,k,3)-pFy(i,j,k,3))+dzi*(pFz(i,j,k+1,3)-pFz(i,j,k,3))
-               rhs(i,j,k,4)=dxi*(pFx(i+1,j,k,4)-pFx(i,j,k,4))+dyi*(pFy(i,j+1,k,4)-pFy(i,j,k,4))+dzi*(pFz(i,j,k+1,4)-pFz(i,j,k,4))
-               rhs(i,j,k,5)=dxi*(pFx(i+1,j,k,5)-pFx(i,j,k,5))+dyi*(pFy(i,j+1,k,5)-pFy(i,j,k,5))+dzi*(pFz(i,j,k+1,5)-pFz(i,j,k,5))
+               rhs(i,j,k,:)=dxi*(pFx(i+1,j,k,:)-pFx(i,j,k,:))+dyi*(pFy(i,j+1,k,:)-pFy(i,j,k,:))+dzi*(pFz(i,j,k+1,:)-pFz(i,j,k,:))
                ! Pressure dilatation
                rhs(i,j,k,5)=rhs(i,j,k,5)-pP(i,j,k,1)*(0.5_WP*dxi*(pU(i+1,j,k,1)-pU(i-1,j,k,1))+0.5_WP*dyi*(pV(i,j+1,k,1)-pV(i,j-1,k,1))+0.5_WP*dzi*(pW(i,j,k+1,1)-pW(i,j,k-1,1)))
                ! Viscous heating: compute cell-centered gradU and stress tensor

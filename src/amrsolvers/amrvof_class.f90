@@ -38,12 +38,8 @@ module amrvof_class
       procedure(vof_bc_iface), pointer, nopass :: user_vof_bc => null()
 
       ! PLIC boundary conditions (per face, only used if direction is non-periodic)
-      integer :: bc_xlo = BC_REFLECT
-      integer :: bc_xhi = BC_REFLECT
-      integer :: bc_ylo = BC_REFLECT
-      integer :: bc_yhi = BC_REFLECT
-      integer :: bc_zlo = BC_REFLECT
-      integer :: bc_zhi = BC_REFLECT
+      integer :: vof_lo_bc(3) = BC_REFLECT
+      integer :: vof_hi_bc(3) = BC_REFLECT
 
       ! VOF data (solver owns these - 4 MultiFabs as per plan)
       type(amrdata) :: VF           !< Volume fraction (cell-centered)
@@ -378,8 +374,6 @@ contains
       call this%Cliqold%setval(val=0.0_WP, lvl=lvl)
       call this%Cgasold%setval(val=0.0_WP, lvl=lvl)
       call this%PLICold%setval(val=0.0_WP, lvl=lvl)
-      ! Call user init to set VF
-      if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -813,16 +807,16 @@ contains
          
          ! Apply physical BC for PLIC
          if (.not.this%amr%xper) then
-            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
-            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%vof_lo_bc(1), ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%vof_hi_bc(1), dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
          end if
          if (.not.this%amr%yper) then
-            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
-            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%vof_lo_bc(2), ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%vof_hi_bc(2), ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
          end if
          if (.not.this%amr%zper) then
-            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
-            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%vof_lo_bc(3), ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%vof_hi_bc(3), ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
@@ -974,16 +968,16 @@ contains
          
          ! Apply physical BC for moments
          if (.not.this%amr%xper) then
-            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%bc_xlo, ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
-            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%bc_xhi, dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
+            if (ilo.lt.dlo(1)) call apply_bc_face(1, -1, this%vof_lo_bc(1), ilo, dlo(1)-1, jlo, jhi, klo, khi, dlo(1), this%amr%xlo)
+            if (ihi.gt.dhi(1)) call apply_bc_face(1, +1, this%vof_hi_bc(1), dhi(1)+1, ihi, jlo, jhi, klo, khi, dhi(1), this%amr%xhi)
          end if
          if (.not.this%amr%yper) then
-            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%bc_ylo, ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
-            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%bc_yhi, ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
+            if (jlo.lt.dlo(2)) call apply_bc_face(2, -1, this%vof_lo_bc(2), ilo, ihi, jlo, dlo(2)-1, klo, khi, dlo(2), this%amr%ylo)
+            if (jhi.gt.dhi(2)) call apply_bc_face(2, +1, this%vof_hi_bc(2), ilo, ihi, dhi(2)+1, jhi, klo, khi, dhi(2), this%amr%yhi)
          end if
          if (.not.this%amr%zper) then
-            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%bc_zlo, ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
-            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%bc_zhi, ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
+            if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%vof_lo_bc(3), ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
+            if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%vof_hi_bc(3), ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
@@ -1350,100 +1344,75 @@ contains
    subroutine reset_moments(this)
       use amrvof_geometry, only: cut_hex_vol
       class(amrvof), intent(inout) :: this
-      integer :: lvl, i, j, k
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF, pCliq, pCgas, pPLIC
+      integer :: lvl,i,j,k
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCliq,pCgas,pPLIC
       real(WP), dimension(3,8) :: hex
       real(WP), dimension(4) :: plane
-      real(WP) :: vol_liq, vol_gas, cell_vol, dx, dy, dz
-      real(WP), dimension(3) :: bary_liq, bary_gas, cell_center
+      real(WP) :: vol_liq,vol_gas,cell_vol,dx,dy,dz
+      real(WP), dimension(3) :: bary_liq,bary_gas,cell_center
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      integer :: ilo, ihi, jlo, jhi, klo, khi
       
       ! Only work at finest level
-      lvl = this%amr%clvl()
+      lvl=this%amr%clvl()
+      dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
+      cell_vol=dx*dy*dz
       
-      dx = this%amr%dx(lvl)
-      dy = this%amr%dy(lvl)
-      dz = this%amr%dz(lvl)
-      cell_vol = dx * dy * dz
-      
-      ! Use tiling=.false. to iterate over full FABs including ghosts
-      call this%amr%mfiter_build(lvl, mfi, tiling=.false.)
+      call this%amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
-         bx = mfi%fabbox()  ! Full box including ghosts
-         
-         pVF   => this%VF%mf(lvl)%dataptr(mfi)
-         pCliq => this%Cliq%mf(lvl)%dataptr(mfi)
-         pCgas => this%Cgas%mf(lvl)%dataptr(mfi)
-         pPLIC => this%PLIC%mf(lvl)%dataptr(mfi)
-         
-         ! Get array bounds (same as bx but from array)
-         ilo = lbound(pVF,1); ihi = ubound(pVF,1)
-         jlo = lbound(pVF,2); jhi = ubound(pVF,2)
-         klo = lbound(pVF,3); khi = ubound(pVF,3)
-         
-         do k = klo, khi
-            do j = jlo, jhi
-               do i = ilo, ihi
-                  
-                  ! Cell center
-                  cell_center = [this%amr%xlo + (real(i,WP)+0.5_WP)*dx, &
-                  &              this%amr%ylo + (real(j,WP)+0.5_WP)*dy, &
-                  &              this%amr%zlo + (real(k,WP)+0.5_WP)*dz]
-                  
-                  ! Build hex cell (8 vertices, standard ordering)
-                  hex(:,1) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-                  hex(:,2) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-                  hex(:,3) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-                  hex(:,4) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k  ,WP)*dz]
-                  hex(:,5) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-                  hex(:,6) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j  ,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-                  hex(:,7) = [this%amr%xlo + real(i+1,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-                  hex(:,8) = [this%amr%xlo + real(i  ,WP)*dx, this%amr%ylo + real(j+1,WP)*dy, this%amr%zlo + real(k+1,WP)*dz]
-                  
-                  ! Get plane from PLIC (already filled including ghosts)
-                  plane(1:3) = pPLIC(i,j,k,1:3)
-                  plane(4)   = pPLIC(i,j,k,4)
-                  
-                  ! Skip cutting for full cells (trivial PLIC with large distance)
-                  if (abs(plane(4)) .ge. 1.0e9_WP) then
-                     if (plane(4) .gt. 0.0_WP) then
-                        pVF(i,j,k,1) = 1.0_WP  ! All liquid
-                     else
-                        pVF(i,j,k,1) = 0.0_WP  ! All gas
-                     end if
-                     pCliq(i,j,k,1:3) = cell_center
-                     pCgas(i,j,k,1:3) = cell_center
-                     cycle
-                  end if
-                  
-                  ! Cut hex by plane
-                  call cut_hex_vol(hex, plane, vol_liq, vol_gas, bary_liq, bary_gas)
-                  
-                  ! Update VF
-                  pVF(i,j,k,1) = vol_liq / cell_vol
-                  
-                  ! Update barycenters
-                  pCliq(i,j,k,1:3) = bary_liq
-                  pCgas(i,j,k,1:3) = bary_gas
-                  
-                  ! Clean up edge cases
-                  if (pVF(i,j,k,1).lt.VFlo) then
-                     pVF(i,j,k,1) = 0.0_WP
-                     pCliq(i,j,k,1:3) = cell_center
-                     pCgas(i,j,k,1:3) = cell_center
-                  end if
-                  if (pVF(i,j,k,1).gt.VFhi) then
-                     pVF(i,j,k,1) = 1.0_WP
-                     pCliq(i,j,k,1:3) = cell_center
-                     pCgas(i,j,k,1:3) = cell_center
-                  end if
-                  
-               end do
-            end do
-         end do
-         
+         ! Get pointers to data
+         pVF  =>this%VF%mf(lvl)%dataptr(mfi)
+         pCliq=>this%Cliq%mf(lvl)%dataptr(mfi)
+         pCgas=>this%Cgas%mf(lvl)%dataptr(mfi)
+         pPLIC=>this%PLIC%mf(lvl)%dataptr(mfi)
+         ! Loop over tiles grown by 1 (matching VF and Cliq/Cgas)
+         bx=mfi%growntilebox(1)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Cell center
+            cell_center=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx, &
+            &            this%amr%ylo+(real(j,WP)+0.5_WP)*dy, &
+            &            this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+            ! Build hex cell (8 vertices)
+            hex(:,1)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
+            hex(:,2)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
+            hex(:,3)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
+            hex(:,4)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
+            hex(:,5)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
+            hex(:,6)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
+            hex(:,7)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
+            hex(:,8)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
+            ! Get plane from PLIC
+            plane(1:3)=pPLIC(i,j,k,1:3)
+            plane(4)  =pPLIC(i,j,k,4)
+            ! Skip cutting for full cells (trivial PLIC with large distance)
+            if (abs(plane(4)).ge.1.0e9_WP) then
+               if (plane(4).gt.0.0_WP) then
+                  pVF(i,j,k,1)=1.0_WP
+               else
+                  pVF(i,j,k,1)=0.0_WP
+               end if
+               pCliq(i,j,k,1:3)=cell_center
+               pCgas(i,j,k,1:3)=cell_center
+               cycle
+            end if
+            ! Cut hex by plane
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas)
+            ! Update VF and barycenters
+            pVF(i,j,k,1)=vol_liq/cell_vol
+            pCliq(i,j,k,1:3)=bary_liq
+            pCgas(i,j,k,1:3)=bary_gas
+            ! Clean up edge cases
+            if (pVF(i,j,k,1).lt.VFlo) then
+               pVF(i,j,k,1)=0.0_WP
+               pCliq(i,j,k,1:3)=cell_center
+               pCgas(i,j,k,1:3)=cell_center
+            end if
+            if (pVF(i,j,k,1).gt.VFhi) then
+               pVF(i,j,k,1)=1.0_WP
+               pCliq(i,j,k,1:3)=cell_center
+               pCgas(i,j,k,1:3)=cell_center
+            end if
+         end do; end do; end do
       end do
       call this%amr%mfiter_destroy(mfi)
       
