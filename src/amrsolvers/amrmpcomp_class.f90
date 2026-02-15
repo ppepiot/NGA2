@@ -105,6 +105,9 @@ module amrmpcomp_class
       ! Number of overlap cells (2 for WENO3 stencil)
       integer :: nover=2
 
+      ! SL momentum blending (0=centered, 1=pure SL)
+      real(WP) :: SLblend=1.0_WP
+
       ! Tagging parameter for VOF
       integer :: regrid_buffer=10  !< Number of cells to buffer around interface for tagging
 
@@ -1168,6 +1171,10 @@ contains
                end do
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
+               ! Blend momentum fluxes with centered fluxes
+               pFx(i,j,k,5)=this%SLblend*pFx(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1))
+               pFx(i,j,k,6)=this%SLblend*pFx(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1))
+               pFx(i,j,k,7)=this%SLblend*pFx(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1))
             end do; end do; end do
             ! Y-fluxes
             fbx=mfi%nodaltilebox(2)
@@ -1190,7 +1197,12 @@ contains
                   pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFy(i,j,k,1:7)=pFy(i,j,k,1:7)+tet_sign(tet)*Qflux
                end do
+               ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
+               ! Blend momentum fluxes with centered fluxes
+               pFy(i,j,k,5)=this%SLblend*pFy(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1))
+               pFy(i,j,k,6)=this%SLblend*pFy(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1))
+               pFy(i,j,k,7)=this%SLblend*pFy(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1))
             end do; end do; end do
             ! Z-fluxes
             fbx=mfi%nodaltilebox(3)
@@ -1213,7 +1225,12 @@ contains
                   pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFz(i,j,k,1:7)=pFz(i,j,k,1:7)+tet_sign(tet)*Qflux
                end do
+               ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
+               ! Blend momentum fluxes with centered fluxes
+               pFz(i,j,k,5)=this%SLblend*pFz(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1))
+               pFz(i,j,k,6)=this%SLblend*pFz(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1))
+               pFz(i,j,k,7)=this%SLblend*pFz(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1))
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
