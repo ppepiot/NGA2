@@ -851,9 +851,9 @@ contains
             ! Mirror PLIC from interior + flip normal component
             do kg = k1, k2; do jg = j1, j2; do ig = i1, i2
                isrc = ig; jsrc = jg; ksrc = kg
-               if (dir.eq.1) isrc = 2*bnd - ig - side
-               if (dir.eq.2) jsrc = 2*bnd - jg - side
-               if (dir.eq.3) ksrc = 2*bnd - kg - side
+               if (dir.eq.1) isrc = 2*bnd - ig + side
+               if (dir.eq.2) jsrc = 2*bnd - jg + side
+               if (dir.eq.3) ksrc = 2*bnd - kg + side
                ! Copy plane
                pPLIC(ig,jg,kg,1:4) = pPLIC(isrc,jsrc,ksrc,1:4)
                ! Flip normal component
@@ -1021,9 +1021,9 @@ contains
             ! Mirror VF/Cliq/Cgas from interior + reflect barycenters
             do kg = k1, k2; do jg = j1, j2; do ig = i1, i2
                isrc = ig; jsrc = jg; ksrc = kg
-               if (dir.eq.1) isrc = 2*bnd - ig - side
-               if (dir.eq.2) jsrc = 2*bnd - jg - side
-               if (dir.eq.3) ksrc = 2*bnd - kg - side
+               if (dir.eq.1) isrc = 2*bnd - ig + side
+               if (dir.eq.2) jsrc = 2*bnd - jg + side
+               if (dir.eq.3) ksrc = 2*bnd - kg + side
                ! Copy VF
                pVF(ig,jg,kg,1) = pVF(isrc,jsrc,ksrc,1)
                ! Copy and reflect barycenters
