@@ -521,8 +521,9 @@ contains
          end if
          ! Compute viscosities
          call get_viscosities()
-         ! Add artificial bulk viscosity
-         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
+         ! Add SGS models
+         call fs%add_viscartif(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
          ! Compute Umag and Mach number
          call Umag%get_magnitude(fs%U,fs%V,fs%W)
          call Mach%copy(src=Umag); call Mach%divide(src=fs%C)
@@ -553,6 +554,7 @@ contains
          call viz%add_scalar(fs%W,1,'W')
          call viz%add_scalar(Umag,1,'Umag')
          call viz%add_scalar(Mach,1,'Mach')
+         call viz%add_scalar(fs%visc,1,'visc')
          call viz%add_scalar(fs%beta,1,'beta')
          call viz%add_surfmesh(fs%smesh,'plic')
          ! Create visualization output event
@@ -688,8 +690,9 @@ contains
          ! Compute viscosities
          call get_viscosities()
 
-         ! Add artificial bulk viscosity
-         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
+         ! Add SGS models
+         call fs%add_viscartif(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
 
          ! Compute Umag and Mach number
          call Umag%get_magnitude(fs%U,fs%V,fs%W)
