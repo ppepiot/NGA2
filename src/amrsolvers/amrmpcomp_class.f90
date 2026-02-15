@@ -3238,18 +3238,30 @@ contains
       call io%add_data(this%VF,'VF')
       call io%add_data(this%Cliq,'Cliq')
       call io%add_data(this%Cgas,'Cgas')
+      call io%add_data(this%PLIC,'PLIC')
    end subroutine register_checkpoint
 
    !> Restore solver data from checkpoint
-   subroutine restore_checkpoint(this,io,dirname)
+   subroutine restore_checkpoint(this,io,dirname,time)
       use amrio_class, only: amrio
       implicit none
       class(amrmpcomp), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
+      real(WP), intent(in) :: time
+      integer :: lvl
       call io%read_data(dirname,this%Q,'Q')
       call io%read_data(dirname,this%VF,'VF')
       call io%read_data(dirname,this%Cliq,'Cliq')
       call io%read_data(dirname,this%Cgas,'Cgas')
+      call io%read_data(dirname,this%PLIC,'PLIC')
+      ! Fill ghost cells (VisMF reads valid data only)
+      call this%Q%fill(time=time)
+      do lvl=0,this%amr%clvl()
+         call this%fill_moments_lvl(lvl,time)
+         call this%fill_plic_lvl(lvl,time)
+      end do
+      ! Rebuild primitive variables
+      call this%get_primitive(this%Q)
    end subroutine restore_checkpoint
 end module amrmpcomp_class

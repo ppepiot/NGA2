@@ -54,11 +54,12 @@ module amrsolver_class
 
    !> Interface for restore_checkpoint
    abstract interface
-      subroutine restore_iface(this, io, dirname)
-         import :: amrsolver, amrio
+      subroutine restore_iface(this, io, dirname, time)
+         import :: amrsolver, amrio, WP
          class(amrsolver), intent(inout) :: this
          class(amrio), intent(inout) :: io
          character(len=*), intent(in) :: dirname
+         real(WP), intent(in) :: time
       end subroutine restore_iface
    end interface
 

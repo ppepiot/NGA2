@@ -66,6 +66,8 @@ module amrex_interface
    public :: amrcheckpoint_mfab_prefix
    public :: amrvismf_set_noutfiles
    public :: amrvismf_get_noutfiles
+   public :: amrcore_build_level
+   public :: amrcore_set_finest_level
 
    !=====================================================================
    ! MLMG Utilities
@@ -389,6 +391,23 @@ module amrex_interface
       integer(c_int) function amrvismf_get_noutfiles() bind(c)
          import :: c_int
       end function amrvismf_get_noutfiles
+
+      !> Build a single level from pre-built BoxArray and DistributionMapping
+      subroutine amrcore_build_level(core, lev, time, ba_ptr, dm_ptr) bind(c)
+         import :: c_ptr, c_int, c_double
+         type(c_ptr), value :: core
+         integer(c_int), value :: lev
+         real(c_double), value :: time
+         type(c_ptr), value :: ba_ptr
+         type(c_ptr), value :: dm_ptr
+      end subroutine amrcore_build_level
+
+      !> Set finest_level on AmrCore
+      subroutine amrcore_set_finest_level(core, finest_level) bind(c)
+         import :: c_ptr, c_int
+         type(c_ptr), value :: core
+         integer(c_int), value :: finest_level
+      end subroutine amrcore_set_finest_level
 
       !====================================================================
       ! MLMG Utilities (not available in AMReX Fortran interface)

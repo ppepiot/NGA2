@@ -166,6 +166,7 @@ module amrgrid_class
       procedure :: initialize                !< Initialization of amrgrid object
       procedure :: finalize                  !< Finalization of amrgrid object
       procedure :: init_from_scratch         !< Initialize data on armgrid according to registered function
+      procedure :: init_from_checkpoint      !< Initialize grid from checkpoint
       procedure :: regrid                    !< Perform regriding operation on level baselvl
       procedure :: get_info                  !< Calculate various information on our amrgrid object
       procedure :: print                     !< Print out grid info
@@ -378,6 +379,67 @@ contains
       ! Generate info about grid
       call this%get_info()
    end subroutine init_from_scratch
+
+
+   !> Initialize grid from checkpoint by reading stored BoxArrays from Header
+   !> All ranks read boxes, build BA/DM, then call MakeNewLevelFromScratch
+   subroutine init_from_checkpoint(this, dirname, time)
+      use string, only: str_long
+      use amrex_interface, only: amrcore_build_level, amrcore_set_finest_level
+      use amrex_amr_module, only: amrex_boxarray, amrex_boxarray_build, &
+      &                           amrex_distromap, amrex_distromap_build
+      use mpi_f08, only: MPI_BCAST, MPI_INTEGER
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      character(len=*), intent(in) :: dirname   !< Checkpoint directory
+      real(WP), intent(in) :: time
+      integer :: finest_level, levels_to_build
+      integer :: lev, nb, m, ierr, iunit
+      integer, dimension(:,:,:), allocatable :: bxs
+      type(amrex_boxarray) :: ba
+      type(amrex_distromap) :: dm
+      character(len=str_long) :: line
+      ! Root reads Header: grab finest_level from line 2, then skip to BOXARRAYS
+      if (this%amRoot) then
+         open(newunit=iunit, file=trim(dirname)//'/Header', status='old', action='read')
+         read(iunit,'(A)') line  ! Version string
+         read(iunit,*) finest_level
+         ! Skip remaining header lines until BOXARRAYS marker
+         do
+            read(iunit,'(A)') line
+            if (trim(line).eq.'BOXARRAYS') exit
+         end do
+      end if
+      call MPI_BCAST(finest_level, 1, MPI_INTEGER, 0, this%comm, ierr)
+      ! Cap at current maxlvl (allows restarting with fewer levels)
+      levels_to_build = min(finest_level, this%maxlvl)
+      ! Build each level from box data
+      do lev = 0, finest_level
+         ! Root reads nboxes
+         if (this%amRoot) read(iunit,*) nb
+         call MPI_BCAST(nb, 1, MPI_INTEGER, 0, this%comm, ierr)
+         ! Read box coordinates: bxs(lo:hi, dim, nboxes)
+         allocate(bxs(2, 3, nb))
+         if (this%amRoot) then
+            do m = 1, nb
+               read(iunit,*) bxs(1,1,m),bxs(1,2,m),bxs(1,3,m),bxs(2,1,m),bxs(2,2,m),bxs(2,3,m)
+            end do
+         end if
+         ! Only build levels up to maxlvl (skip finer levels from checkpoint)
+         if (lev .le. levels_to_build) then
+            call MPI_BCAST(bxs, 6*nb, MPI_INTEGER, 0, this%comm, ierr)
+            call amrex_boxarray_build(ba, bxs)
+            call amrex_distromap_build(dm, ba)
+            call amrcore_build_level(this%amrcore, lev, time, ba%p, dm%p)
+         end if
+         deallocate(bxs)
+      end do
+      if (this%amRoot) close(iunit)
+      ! Set finest level on AmrCore
+      call amrcore_set_finest_level(this%amrcore, levels_to_build)
+      ! Generate info about grid
+      call this%get_info()
+   end subroutine init_from_checkpoint
 
 
    !> Perform regriding operation on baselvl

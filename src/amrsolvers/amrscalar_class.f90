@@ -522,11 +522,13 @@ contains
 
 
    !> Restore solver data from checkpoint
-   subroutine restore_checkpoint(this, io, dirname)
+   subroutine restore_checkpoint(this, io, dirname, time)
       class(amrscalar), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
+      real(WP), intent(in) :: time
       call io%read_data(dirname, this%SC, 'SC')
+      call this%SC%fill(time=time)
    end subroutine restore_checkpoint
 
 end module amrscalar_class

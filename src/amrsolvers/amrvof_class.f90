@@ -2036,15 +2036,22 @@ contains
    end subroutine register_checkpoint
 
    !> Restore checkpoint
-   subroutine restore_checkpoint(this, io, dirname)
+   subroutine restore_checkpoint(this, io, dirname, time)
       use amrio_class, only: amrio
       class(amrvof), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
+      real(WP), intent(in) :: time
+      integer :: lvl
       call io%read_data(dirname, this%VF, 'VF')
       call io%read_data(dirname, this%Cliq, 'Cliq')
       call io%read_data(dirname, this%Cgas, 'Cgas')
       call io%read_data(dirname, this%PLIC, 'PLIC')
+      ! Fill ghost cells with dedicated VOF fills
+      do lvl=0,this%amr%clvl()
+         call this%fill_moments_lvl(lvl,time)
+         call this%fill_plic_lvl(lvl,time)
+      end do
    end subroutine restore_checkpoint
 
    !> Compute advective CFL at finest level

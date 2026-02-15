@@ -1168,12 +1168,15 @@ contains
    end subroutine register_checkpoint
 
    !> Restore solver data from checkpoint
-   subroutine restore_checkpoint(this,io,dirname)
+   subroutine restore_checkpoint(this,io,dirname,time)
       use amrio_class, only: amrio
       implicit none
       class(amrcomp), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
+      real(WP), intent(in) :: time
       call io%read_data(dirname,this%Q,'Q')
+      ! Fill ghost cells (VisMF reads valid data only)
+      call this%Q%fill(time=time)
    end subroutine restore_checkpoint
 end module amrcomp_class

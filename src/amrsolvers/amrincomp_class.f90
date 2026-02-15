@@ -843,16 +843,20 @@ contains
    end subroutine register_checkpoint
 
    !> Restore solver data from checkpoint
-   subroutine restore_checkpoint(this, io, dirname)
+   subroutine restore_checkpoint(this, io, dirname, time)
       use amrio_class, only: amrio
       implicit none
       class(amrincomp), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
+      real(WP), intent(in) :: time
       call io%read_data(dirname, this%U, 'U')
       call io%read_data(dirname, this%V, 'V')
       call io%read_data(dirname, this%W, 'W')
       call io%read_data(dirname, this%P, 'P')
+      ! Fill ghost cells (VisMF reads valid data only)
+      call this%fill_velocity(time=time)
+      call this%P%fill(time=time)
    end subroutine restore_checkpoint
 
    !> Compute momentum advection RHS for all levels

@@ -99,6 +99,15 @@ public:
     return amrex::FAmrCore::MakeDistributionMap(lev, ba);
   }
 
+  // Public wrapper for MakeNewLevelFromScratch (protected in AmrCore)
+  // Needed by amrcore_read_grids to build levels from checkpoint
+  void BuildLevelFromScratch(int lev, amrex::Real time,
+                             const amrex::BoxArray &ba,
+                             const amrex::DistributionMapping &dm) {
+    SetBoxArray(lev, ba);
+    SetDistributionMap(lev, dm);
+    MakeNewLevelFromScratch(lev, time, ba, dm);
+  }
 protected:
   void MakeNewLevelFromScratch(int lev, amrex::Real time,
                                const amrex::BoxArray &ba,
@@ -634,6 +643,16 @@ void amrvismf_set_noutfiles(int nfiles) { amrex::VisMF::SetNOutFiles(nfiles); }
 // Get current number of output files setting
 int amrvismf_get_noutfiles() { return amrex::VisMF::GetNOutFiles(); }
 
+// Build a single level from pre-built BoxArray and DistributionMapping
+// Called from Fortran after reading box data and constructing BA/DM
+// Fires on_init callbacks (MakeNewLevelFromScratch)
+void amrcore_build_level(void *core, int lev, double time,
+                         void *ba_ptr, void *dm_ptr) {
+  auto *amrcore = static_cast<nga2::NGA2AmrCore *>(core);
+  auto &ba = *static_cast<amrex::BoxArray *>(ba_ptr);
+  auto &dm = *static_cast<amrex::DistributionMapping *>(dm_ptr);
+  amrcore->BuildLevelFromScratch(lev, time, ba, dm);
+}
 //=============================================================================
 // HDF5 Plotfile Utilities
 //=============================================================================

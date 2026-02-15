@@ -1,6 +1,7 @@
 !> AMR compressible drop test case
 module simulation
    use precision,         only: WP
+   use string,            only: str_medium
    use amrgrid_class,     only: amrgrid
    use amrmpcomp_class,   only: amrmpcomp
    use amrviz_class,      only: amrviz
@@ -8,6 +9,7 @@ module simulation
    use timetracker_class, only: timetracker
    use event_class,       only: event
    use monitor_class,     only: monitor
+   use amrio_class,       only: amrio
    implicit none
    private
    
@@ -27,6 +29,13 @@ module simulation
 
    ! Regrid parameters
    type(event) :: regrid_evt
+
+   ! Restart parameters
+   type(amrio) :: io
+   type(event) :: save_evt
+   character(len=str_medium) :: restart_dir
+   logical :: restarted
+   real(WP) :: restart_time
    
    !> Simulation monitoring
    type(monitor) :: mfile,consfile,cflfile,gridfile
@@ -432,7 +441,19 @@ contains
          call param_read('Max level',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
-      
+
+      ! Handle restart/saves here
+      handle_restart: block
+         integer :: restart_step
+         ! Initialize IO object
+         call io%initialize(amr=amr,nfiles=1)
+         ! Check if restarting
+         call param_read('Restart from',restart_dir,default='')
+         restarted=(len_trim(restart_dir).gt.0)
+         ! If restarting, read header
+         if (restarted) call io%read_header(dirname=trim(restart_dir),time=restart_time,step=restart_step)
+      end block handle_restart
+
       ! Initialize time tracker
       initialize_timetracker: block
          time=timetracker(amRoot=amr%amRoot)
@@ -440,6 +461,10 @@ contains
          call param_read('Max dt',time%dtmax)
          call param_read('Max CFL',time%cflmax)
          time%dt=time%dtmax
+         if (restarted) then
+            call io%get_scalar('dt',time%dt)
+            time%t=restart_time
+         end if
       end block initialize_timetracker
 
       ! Initialize compressible multiphase solver
@@ -471,7 +496,7 @@ contains
          call Umag%initialize(amr,name='Umag',ncomp=1,ng=0,interp=amrex_interp_none); call Umag%register()
          call Mach%initialize(amr,name='Mach',ncomp=1,ng=0,interp=amrex_interp_none); call Mach%register()
       end block create_workspace
-      
+
       ! Initialize regridding
       init_regridding: block
          ! Create regridding event
@@ -481,11 +506,19 @@ contains
          fs%user_tagging=>my_tagger
          call param_read('Tagging Rec',Rec_tag)
          call param_read('Tagging Res',Res_tag)
-         ! Create initial grid
-         call amr%init_from_scratch(time=time%t)
-         ! Build PLIC and reset moments
-         call fs%build_plic(time%t)
-         call fs%reset_moments()
+         ! Build the grid
+         if (restarted) then
+            ! Restore grid hierarchy from checkpoint
+            call amr%init_from_checkpoint(dirname=trim(restart_dir),time=time%t)
+            ! Restore solver state
+            call fs%restore_checkpoint(io=io,dirname=trim(restart_dir),time=time%t)
+         else
+            ! Fresh start
+            call amr%init_from_scratch(time=time%t)
+            ! Build PLIC and reset moments
+            call fs%build_plic(time%t)
+            call fs%reset_moments()
+         end if
          ! Compute viscosities
          call get_viscosities()
          ! Add artificial bulk viscosity
@@ -494,6 +527,17 @@ contains
          call Umag%get_magnitude(fs%U,fs%V,fs%W)
          call Mach%copy(src=Umag); call Mach%divide(src=fs%C)
       end block init_regridding
+
+      ! Initialize checkpoint save event
+      init_checkpoint: block
+         ! Create checkpoint save event
+         save_evt=event(time=time,name='Checkpoint')
+         call param_read('Checkpoint period',save_evt%tper,default=-1.0_WP)
+         ! Let solver self-register for checkpointing
+         call fs%register_checkpoint(io)
+         ! Add dt to checkpoint save
+         call io%add_scalar(name='dt',value=time%dt)
+      end block init_checkpoint
       
       ! Initialize visualization
       create_viz: block
@@ -654,6 +698,14 @@ contains
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)
 
+         ! Checkpoint save
+         if (save_evt%occurs()) then
+            save_checkpoint: block
+               use string, only: rtoa
+               call io%write(dirname='restart/drop_'//trim(adjustl(rtoa(time%t))),time=time%t,step=time%n)
+            end block save_checkpoint
+         end if
+
          ! Perform and output monitoring
          call fs%get_info()
          call mfile%write()
@@ -680,6 +732,9 @@ contains
       ! Finalize visualization
       call viz%finalize()
       call viz_evt%finalize()
+      ! Finalize checkpoint
+      call save_evt%finalize()
+      call io%finalize()
       ! Finalize monitoring
       call mfile%finalize()
       call cflfile%finalize()
