@@ -38,7 +38,7 @@ module simulation
    real(WP) :: restart_time
    
    !> Simulation monitoring
-   type(monitor) :: mfile,consfile,cflfile,gridfile
+   type(monitor) :: mfile,consfile,cflfile,gridfile,tfile
    
    !> Stiffened gas EOS parameters (liquid and gas)
    real(WP) :: GammaL,PinfL,CvL
@@ -499,6 +499,8 @@ contains
 
       ! Initialize regridding
       init_regridding: block
+         ! KnapSack load balancing
+         amr%lb_strat=1
          ! Create regridding event
          regrid_evt=event(time=time,name='Regrid')
          call param_read('Regrid nsteps',regrid_evt%nper)
@@ -630,6 +632,33 @@ contains
          call gridfile%add_column(amr%minRSS,'Minimum RSS')
          call gridfile%add_column(amr%avgRSS,'Average RSS')
          call gridfile%write()
+         ! Create timing monitor
+         tfile=monitor(amRoot=amr%amRoot,name='timing')
+         call tfile%add_column(time%n,'Timestep')
+         call tfile%add_column(time%t,'Time')
+         ! Full routine times (max across ranks = wall-clock cost)
+         call tfile%add_column(fs%wtmax_dQdt,'dQdt_max')
+         call tfile%add_column(fs%wtmax_plic,'plic_max')
+         call tfile%add_column(fs%wtmax_relax,'relax_max')
+         call tfile%add_column(fs%wtmax_visc,'visc_max')
+         ! Compute loop times (max = slowest rank, min = fastest rank)
+         call tfile%add_column(fs%wtmax_prim,'prim_max')
+         call tfile%add_column(fs%wtmin_prim,'prim_min')
+         call tfile%add_column(fs%wtmax_sl,'sl_max')
+         call tfile%add_column(fs%wtmin_sl,'sl_min')
+         call tfile%add_column(fs%wtmax_fv,'fv_max')
+         call tfile%add_column(fs%wtmin_fv,'fv_min')
+         call tfile%add_column(fs%wtmax_div,'div_max')
+         call tfile%add_column(fs%wtmin_div,'div_min')
+         call tfile%add_column(fs%wtmax_plicnet,'plicnet_max')
+         call tfile%add_column(fs%wtmin_plicnet,'plicnet_min')
+         call tfile%add_column(fs%wtmax_polygon,'polygon_max')
+         call tfile%add_column(fs%wtmin_polygon,'polygon_min')
+         call tfile%add_column(fs%ncells_max,'cells_max')
+         call tfile%add_column(fs%ncells_min,'cells_min')
+         call tfile%add_column(fs%nmixed_max,'mixed_max')
+         call tfile%add_column(fs%nmixed_min,'mixed_min')
+         call tfile%write()
       end block create_monitors
 
    end subroutine simulation_init
@@ -714,6 +743,7 @@ contains
          call mfile%write()
          call consfile%write()
          call cflfile%write()
+         call tfile%write()
          
       end do
       
@@ -743,6 +773,7 @@ contains
       call cflfile%finalize()
       call consfile%finalize()
       call gridfile%finalize()
+      call tfile%finalize()
    end subroutine simulation_final
    
    !> Diagnostic: scan Q/primitives for extreme values

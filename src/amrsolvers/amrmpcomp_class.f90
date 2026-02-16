@@ -100,7 +100,7 @@ module amrmpcomp_class
       real(WP) :: rho_floor=1.0e-10_WP
 
       ! Cost for mixed cells in load balancing (1.0 = same as pure, higher = more expensive)
-      real(WP) :: SLcost=10.0_WP
+      real(WP) :: SLcost=100.0_WP
 
       ! Number of overlap cells (2 for WENO3 stencil)
       integer :: nover=2
@@ -114,6 +114,9 @@ module amrmpcomp_class
       ! Surface mesh for visualization
       type(surfmesh) :: smesh
 
+      ! Load distribution diagnostics
+      real(WP) :: ncells_max=0.0_WP, ncells_min=0.0_WP  !< Finest-level cells per rank (max/min)
+      real(WP) :: nmixed_max=0.0_WP, nmixed_min=0.0_WP  !< Mixed cells per rank (max/min)
       ! Per-rank timing
       real(WP) :: wt_prim=0.0_WP       !< Get_primitive loops
       real(WP) :: wt_dQdt=0.0_WP       !< Full get_dQdt
@@ -3429,6 +3432,34 @@ contains
          ! Reduce across MPI ranks
          call MPI_ALLREDUCE(MPI_IN_PLACE,this%rhoKint,1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
       end block get_rhoKint
+
+      ! Load distribution diagnostics at finest level
+      load_distribution: block
+         use amrex_amr_module, only: amrex_mfiter,amrex_box
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: bx
+         real(WP) :: ncells_local,nmixed_local
+         integer :: i,j,k
+         ncells_local=0.0_WP;nmixed_local=0.0_WP
+         lvl=this%amr%clvl()
+         call this%amr%mfiter_build(lvl,mfi)
+         do while (mfi%next())
+            bx=mfi%tilebox()
+            pVF=>this%VF%mf(lvl)%dataptr(mfi)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               ncells_local=ncells_local+1.0_WP
+               if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) nmixed_local=nmixed_local+1.0_WP
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         this%ncells_max=ncells_local; this%ncells_min=ncells_local
+         this%nmixed_max=nmixed_local; this%nmixed_min=nmixed_local
+         call MPI_ALLREDUCE(MPI_IN_PLACE,this%ncells_max,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,this%ncells_min,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,this%nmixed_max,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,this%nmixed_min,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      end block load_distribution
 
       ! Reduce per-rank timing to min/max across ranks
       call MPI_ALLREDUCE(this%wt_prim,      this%wtmax_prim,      1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
