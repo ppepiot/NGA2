@@ -1162,11 +1162,19 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
+         ! Instrumentation for tet span distribution
+         integer :: nleaf,spmax,sx,sy,sz,total_span
+         integer :: n_tets_total,n_leaves_total,spmax_total
+         integer :: span_hist(0:8)  ! histogram of total span (sx+sy+sz)
+         integer :: span_hist_g(0:8) ! MPI-reduced version
+         integer :: stats_l(3),stats_g(3) ! local/global [n_tets, n_leaves, spmax]
          ! Get finest level info
          lvl=this%amr%clvl()
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
          dy=this%amr%dy(lvl); dyi=1.0_WP/this%amr%dy(lvl)
          dz=this%amr%dz(lvl); dzi=1.0_WP/this%amr%dz(lvl)
+         ! Initialize instrumentation
+         n_tets_total=0; n_leaves_total=0; spmax_total=0; span_hist=0
          ! Loop over finest level tiles
          call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
          do while (mfi%next())
@@ -1203,9 +1211,18 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux)
+                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
                   pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFx(i,j,k,1:7)=pFx(i,j,k,1:7)+tet_sign(tet)*Qflux
+                  ! Instrumentation
+                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
+                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
+                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
+                  total_span=sx+sy+sz
+                  n_tets_total=n_tets_total+1
+                  n_leaves_total=n_leaves_total+nleaf
+                  spmax_total=max(spmax_total,spmax)
+                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
@@ -1231,9 +1248,18 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux)
+                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
                   pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFy(i,j,k,1:7)=pFy(i,j,k,1:7)+tet_sign(tet)*Qflux
+                  ! Instrumentation
+                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
+                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
+                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
+                  total_span=sx+sy+sz
+                  n_tets_total=n_tets_total+1
+                  n_leaves_total=n_leaves_total+nleaf
+                  spmax_total=max(spmax_total,spmax)
+                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
@@ -1259,9 +1285,18 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux)
+                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
                   pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFz(i,j,k,1:7)=pFz(i,j,k,1:7)+tet_sign(tet)*Qflux
+                  ! Instrumentation
+                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
+                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
+                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
+                  total_span=sx+sy+sz
+                  n_tets_total=n_tets_total+1
+                  n_leaves_total=n_leaves_total+nleaf
+                  spmax_total=max(spmax_total,spmax)
+                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
@@ -1274,6 +1309,29 @@ contains
          call this%amr%mfiter_destroy(mfi)
          ! Nullify pointers
          nullify(pU,pV,pW,pPLICold,pQold,pVFold)
+         ! Print tet span instrumentation
+         block
+            use mpi_f08
+            integer :: ierr
+            stats_l=[n_tets_total,n_leaves_total,spmax_total]
+            call MPI_Allreduce(stats_l,stats_g,3,MPI_INTEGER,MPI_SUM,this%amr%comm,ierr)
+            stats_g(3)=0
+            call MPI_Allreduce(spmax_total,stats_g(3),1,MPI_INTEGER,MPI_MAX,this%amr%comm,ierr)
+            call MPI_Allreduce(span_hist,span_hist_g,9,MPI_INTEGER,MPI_SUM,this%amr%comm,ierr)
+            if (this%amr%amRoot) then
+               print '(A)',       '  [tet2flux stats]'
+               print '(A,I10)',   '    Total initial tets : ',stats_g(1)
+               print '(A,I10)',   '    Total leaf tets    : ',stats_g(2)
+               print '(A,F10.2)', '    Avg leaves/init tet: ',real(stats_g(2),WP)/max(real(stats_g(1),WP),1.0_WP)
+               print '(A,I10)',   '    Max stack depth    : ',stats_g(3)
+               print '(A)',       '    Span histogram (sx+sy+sz):'
+               do n=0,8
+                  if (span_hist_g(n).gt.0) &
+                     print '(A,I1,A,I10,A,F6.2,A)', '      span=',n,': ',span_hist_g(n), &
+                        ' (',100.0_WP*real(span_hist_g(n),WP)/max(real(stats_g(1),WP),1.0_WP),'%)'
+               end do
+            end if
+         end block
       end block semilagrangian_fluxes
       this%wt_sl=this%wt_sl+(MPI_Wtime()-t1)
       
@@ -1665,91 +1723,128 @@ contains
          weno_weight=(1.0_WP-tanh((ratio-lambda)/delta))/3.0_WP+(1.0_WP-tanh((ratio-1.0_WP/lambda)/delta))/6.0_WP
       end function weno_weight
 
-      !> Recursive subroutine that cuts a tet by grid planes to compute volume and Q fluxes
-      recursive subroutine tet2flux(mytet,myind,myVflux,myQflux)
+      !> Iterative subroutine that cuts a tet by grid planes to compute volume and Q fluxes
+      !> Uses explicit stack instead of recursion for performance and GPU readiness
+      subroutine tet2flux(mytet,myind,myVflux,myQflux,nleaf,spmax)
          use amrvof_geometry, only: cut_side,cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert
+         use messager, only: die
          real(WP), dimension(3,4), intent(in) :: mytet
          integer,  dimension(3,4), intent(in) :: myind
          real(WP), dimension(8),  intent(out) :: myVflux
          real(WP), dimension(7),  intent(out) :: myQflux
+         integer,                 intent(out) :: nleaf  ! number of leaf tets
+         integer,                 intent(out) :: spmax  ! max stack depth reached
+         ! Stack size: 32 is safe for CFL<1 (max depth=5, branching<=6)
+         ! REVISIT HERE for CFL>1: use 5*(3*ceiling(maxCFL)+2)+1
+         integer, parameter :: STACK_MAX=32
+         real(WP), dimension(3,4,STACK_MAX) :: stet   ! stack of tet vertices
+         integer,  dimension(3,4,STACK_MAX) :: sind   ! stack of cell indices
+         integer :: sp                                ! stack pointer
          integer :: dir,cut_ind,icase,n1,n2,v1,v2
          real(WP), dimension(4) :: dd
          real(WP), dimension(3,8) :: vert
          integer,  dimension(3,8,2) :: vert_ind
          real(WP) :: mu,my_vol
-         real(WP), dimension(3,4) :: newtet
-         integer,  dimension(3,4) :: newind
          real(WP), dimension(3) :: a,b,c
          real(WP), dimension(8) :: subVflux
          real(WP), dimension(7) :: subQflux
-         real(WP) :: xcut,ycut,zcut
+         real(WP) :: cut_pos
+         real(WP), dimension(3,4) :: cur_tet
+         integer,  dimension(3,4) :: cur_ind
          
          myVflux=0.0_WP
          myQflux=0.0_WP
+         nleaf=0
+         spmax=0
          
-         ! Determine if tet spans multiple cells and needs cutting
-         if (maxval(myind(1,:))-minval(myind(1,:)).gt.0) then
-            dir=1; cut_ind=maxval(myind(1,:))
-            xcut=this%amr%xlo+real(cut_ind,WP)*dx
-            dd(:)=mytet(1,:)-xcut
-         else if (maxval(myind(2,:))-minval(myind(2,:)).gt.0) then
-            dir=2; cut_ind=maxval(myind(2,:))
-            ycut=this%amr%ylo+real(cut_ind,WP)*dy
-            dd(:)=mytet(2,:)-ycut
-         else if (maxval(myind(3,:))-minval(myind(3,:)).gt.0) then
-            dir=3; cut_ind=maxval(myind(3,:))
-            zcut=this%amr%zlo+real(cut_ind,WP)*dz
-            dd(:)=mytet(3,:)-zcut
-         else
-            ! All vertices in same cell - cut by PLIC and return
-            call tet2flux_plic(mytet,myind(1,1),myind(2,1),myind(3,1),myVflux,myQflux)
-            return
-         end if
+         ! Push initial tet onto stack
+         sp=1
+         stet(:,:,1)=mytet
+         sind(:,:,1)=myind
          
-         ! Find cut case (1-indexed: 1-16)
-         icase=1+int(0.5_WP+sign(0.5_WP,dd(1))) &
-              +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
-              +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
-              +8*int(0.5_WP+sign(0.5_WP,dd(4)))
-         
-         ! Copy vertices and indices
-         do n1=1,4
-            vert(:,n1)=mytet(:,n1)
-            vert_ind(:,n1,1)=myind(:,n1)
-            vert_ind(:,n1,2)=myind(:,n1)
-            vert_ind(dir,n1,1)=min(vert_ind(dir,n1,1),cut_ind-1)
-            vert_ind(dir,n1,2)=max(vert_ind(dir,n1,1),cut_ind)
-         end do
-         
-         ! Create interpolated vertices on cut plane
-         do n1=1,cut_nvert(icase)
-            v1=cut_v1(n1,icase); v2=cut_v2(n1,icase)
-            mu=min(1.0_WP,max(0.0_WP,-dd(v1)/(sign(abs(dd(v2)-dd(v1))+epsilon(1.0_WP),dd(v2)-dd(v1)))))
-            vert(:,4+n1)=(1.0_WP-mu)*vert(:,v1)+mu*vert(:,v2)
-            vert_ind(1,4+n1,1)=floor((vert(1,4+n1)-this%amr%xlo)*dxi)
-            vert_ind(2,4+n1,1)=floor((vert(2,4+n1)-this%amr%ylo)*dyi)
-            vert_ind(3,4+n1,1)=floor((vert(3,4+n1)-this%amr%zlo)*dzi)
-            vert_ind(:,4+n1,1)=max(vert_ind(:,4+n1,1),min(vert_ind(:,v1,1),vert_ind(:,v2,1)))
-            vert_ind(:,4+n1,1)=min(vert_ind(:,4+n1,1),max(vert_ind(:,v1,1),vert_ind(:,v2,1)))
-            vert_ind(:,4+n1,2)=vert_ind(:,4+n1,1)
-            vert_ind(dir,4+n1,1)=cut_ind-1
-            vert_ind(dir,4+n1,2)=cut_ind
-         end do
-         
-         ! Create and process sub-tets
-         do n1=1,cut_ntets(icase)
-            do n2=1,4
-               newtet(:,n2)=vert(:,cut_vtet(n2,n1,icase))
-               newind(:,n2)=vert_ind(:,cut_vtet(n2,n1,icase),cut_side(n1,icase))
+         ! Process stack
+         do while (sp.gt.0)
+            spmax=max(spmax,sp)
+            
+            ! Pop current tet
+            cur_tet=stet(:,:,sp)
+            cur_ind=sind(:,:,sp)
+            sp=sp-1
+            
+            ! Determine if tet spans multiple cells and needs cutting
+            if (maxval(cur_ind(1,:))-minval(cur_ind(1,:)).gt.0) then
+               dir=1; cut_ind=maxval(cur_ind(1,:))
+               cut_pos=this%amr%xlo+real(cut_ind,WP)*dx
+               dd(:)=cur_tet(1,:)-cut_pos
+            else if (maxval(cur_ind(2,:))-minval(cur_ind(2,:)).gt.0) then
+               dir=2; cut_ind=maxval(cur_ind(2,:))
+               cut_pos=this%amr%ylo+real(cut_ind,WP)*dy
+               dd(:)=cur_tet(2,:)-cut_pos
+            else if (maxval(cur_ind(3,:))-minval(cur_ind(3,:)).gt.0) then
+               dir=3; cut_ind=maxval(cur_ind(3,:))
+               cut_pos=this%amr%zlo+real(cut_ind,WP)*dz
+               dd(:)=cur_tet(3,:)-cut_pos
+            else
+               ! All vertices in same cell - cut by PLIC and accumulate
+               call tet2flux_plic(cur_tet,cur_ind(1,1),cur_ind(2,1),cur_ind(3,1),subVflux,subQflux)
+               nleaf=nleaf+1
+               myVflux=myVflux+subVflux
+               myQflux=myQflux+subQflux
+               cycle
+            end if
+            
+            ! Find cut case (1-indexed: 1-16)
+            icase=1+int(0.5_WP+sign(0.5_WP,dd(1))) &
+                 +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
+                 +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
+                 +8*int(0.5_WP+sign(0.5_WP,dd(4)))
+            
+            ! Copy vertices and indices
+            do n1=1,4
+               vert(:,n1)=cur_tet(:,n1)
+               vert_ind(:,n1,1)=cur_ind(:,n1)
+               vert_ind(:,n1,2)=cur_ind(:,n1)
+               vert_ind(dir,n1,1)=min(vert_ind(dir,n1,1),cut_ind-1)
+               vert_ind(dir,n1,2)=max(vert_ind(dir,n1,1),cut_ind)
             end do
-            a=newtet(:,1)-newtet(:,4)
-            b=newtet(:,2)-newtet(:,4)
-            c=newtet(:,3)-newtet(:,4)
-            my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
-            if (my_vol.lt.1.0e-15_WP*dx*dy*dz) cycle
-            call tet2flux(newtet,newind,subVflux,subQflux)
-            myVflux=myVflux+subVflux
-            myQflux=myQflux+subQflux
+            
+            ! Create interpolated vertices on cut plane
+            do n1=1,cut_nvert(icase)
+               v1=cut_v1(n1,icase); v2=cut_v2(n1,icase)
+               mu=min(1.0_WP,max(0.0_WP,-dd(v1)/(sign(abs(dd(v2)-dd(v1))+epsilon(1.0_WP),dd(v2)-dd(v1)))))
+               vert(:,4+n1)=(1.0_WP-mu)*vert(:,v1)+mu*vert(:,v2)
+               vert_ind(1,4+n1,1)=floor((vert(1,4+n1)-this%amr%xlo)*dxi)
+               vert_ind(2,4+n1,1)=floor((vert(2,4+n1)-this%amr%ylo)*dyi)
+               vert_ind(3,4+n1,1)=floor((vert(3,4+n1)-this%amr%zlo)*dzi)
+               vert_ind(:,4+n1,1)=max(vert_ind(:,4+n1,1),min(vert_ind(:,v1,1),vert_ind(:,v2,1)))
+               vert_ind(:,4+n1,1)=min(vert_ind(:,4+n1,1),max(vert_ind(:,v1,1),vert_ind(:,v2,1)))
+               vert_ind(:,4+n1,2)=vert_ind(:,4+n1,1)
+               vert_ind(dir,4+n1,1)=cut_ind-1
+               vert_ind(dir,4+n1,2)=cut_ind
+            end do
+            
+            ! Create sub-tets and push onto stack
+            do n1=1,cut_ntets(icase)
+               a(1)=vert(1,cut_vtet(1,n1,icase))-vert(1,cut_vtet(4,n1,icase))
+               a(2)=vert(2,cut_vtet(1,n1,icase))-vert(2,cut_vtet(4,n1,icase))
+               a(3)=vert(3,cut_vtet(1,n1,icase))-vert(3,cut_vtet(4,n1,icase))
+               b(1)=vert(1,cut_vtet(2,n1,icase))-vert(1,cut_vtet(4,n1,icase))
+               b(2)=vert(2,cut_vtet(2,n1,icase))-vert(2,cut_vtet(4,n1,icase))
+               b(3)=vert(3,cut_vtet(2,n1,icase))-vert(3,cut_vtet(4,n1,icase))
+               c(1)=vert(1,cut_vtet(3,n1,icase))-vert(1,cut_vtet(4,n1,icase))
+               c(2)=vert(2,cut_vtet(3,n1,icase))-vert(2,cut_vtet(4,n1,icase))
+               c(3)=vert(3,cut_vtet(3,n1,icase))-vert(3,cut_vtet(4,n1,icase))
+               my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
+               if (my_vol.lt.1.0e-15_WP*dx*dy*dz) cycle
+               ! Push sub-tet onto stack
+               sp=sp+1
+               if (sp.gt.STACK_MAX) call die('[tet2flux] Stack overflow - increase STACK_MAX')
+               do n2=1,4
+                  stet(:,n2,sp)=vert(:,cut_vtet(n2,n1,icase))
+                  sind(:,n2,sp)=vert_ind(:,cut_vtet(n2,n1,icase),cut_side(n1,icase))
+               end do
+            end do
+            
          end do
          
       end subroutine tet2flux
