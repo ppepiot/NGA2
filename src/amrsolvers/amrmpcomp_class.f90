@@ -111,8 +111,31 @@ module amrmpcomp_class
       ! Tagging parameter for VOF
       integer :: regrid_buffer=10  !< Number of cells to buffer around interface for tagging
 
-      ! Surface mesh for visualization (finest level polygons)
+      ! Surface mesh for visualization
       type(surfmesh) :: smesh
+
+      ! Per-rank timing
+      real(WP) :: wt_prim=0.0_WP       !< Get_primitive loops
+      real(WP) :: wt_dQdt=0.0_WP       !< Full get_dQdt
+      real(WP) :: wt_sl=0.0_WP         !< Band construction + SL flux loops
+      real(WP) :: wt_fv=0.0_WP         !< FV flux loops
+      real(WP) :: wt_div=0.0_WP        !< Divergence + source loops
+      real(WP) :: wt_plic=0.0_WP       !< Full build_plic
+      real(WP) :: wt_plicnet=0.0_WP    !< PLICnet reconstruction loop
+      real(WP) :: wt_polygon=0.0_WP    !< Polygon extraction loop
+      real(WP) :: wt_relax=0.0_WP      !< Apply_relax
+      real(WP) :: wt_visc=0.0_WP       !< Viscosity models
+      ! Reduced timing
+      real(WP) :: wtmax_prim   =0.0_WP, wtmin_prim   =0.0_WP
+      real(WP) :: wtmax_dQdt   =0.0_WP, wtmin_dQdt   =0.0_WP
+      real(WP) :: wtmax_sl     =0.0_WP, wtmin_sl     =0.0_WP
+      real(WP) :: wtmax_fv     =0.0_WP, wtmin_fv     =0.0_WP
+      real(WP) :: wtmax_div    =0.0_WP, wtmin_div    =0.0_WP
+      real(WP) :: wtmax_plic   =0.0_WP, wtmin_plic   =0.0_WP
+      real(WP) :: wtmax_plicnet=0.0_WP, wtmin_plicnet=0.0_WP
+      real(WP) :: wtmax_polygon=0.0_WP, wtmin_polygon=0.0_WP
+      real(WP) :: wtmax_relax  =0.0_WP, wtmin_relax  =0.0_WP
+      real(WP) :: wtmax_visc   =0.0_WP, wtmin_visc   =0.0_WP
 
    contains
       procedure :: initialize
@@ -900,16 +923,20 @@ contains
    !> Q layout: (1) VF*rhoL, (2) (1-VF)*rhoG, (3) VF*rhoL*IL, (4) (1-VF)*rhoG*IG, (5) rhoU, (6) rhoV, (7) rhoW
    subroutine get_primitive(this,Q)
       use amrex_amr_module, only: amrex_mfiter,amrex_box
+      use mpi_f08, only: MPI_Wtime
       use messager, only: die
       implicit none
       class(amrmpcomp), intent(inout) :: this
       type(amrdata), intent(in) :: Q
       integer :: lvl,i,j,k
+      real(WP) :: t0
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF,pU,pV,pW
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pRHOL,pRHOG,pIL,pIG,pPL,pPG,pTL,pTG,pC
       real(WP) :: rho_inv,CL,CG
+      ! Start timer
+      t0=MPI_Wtime()
       ! Check passed Q is as expected
       if (Q%ncomp.ne.7) call die('[amrmpcomp get_primitive] Q must have 7 components')
       if (Q%ng.lt.this%nover) call die('[amrmpcomp get_primitive] Q must have at least nover ghost cells')
@@ -981,6 +1008,8 @@ contains
          end do
          call this%amr%mfiter_destroy(mfi)
       end do
+      ! End timer
+      this%wt_prim=this%wt_prim+(MPI_Wtime()-t0)
    end subroutine get_primitive
 
    !> Calculate conserved variables from primitive variables
@@ -1025,11 +1054,13 @@ contains
    !> Calculate dQdt from passed Q
    subroutine get_dQdt(this,Q,dQdt,dt,time)
       use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
       type(amrdata), intent(inout) :: Q
       type(amrdata), intent(inout) :: dQdt
       real(WP), intent(in) :: dt,time
+      real(WP) :: t0,t1
       type(amrex_multifab), dimension(0:this%amr%maxlvl) :: Fx,Fy,Fz
       type(amrex_multifab) :: Vx,Vy,Vz
       type(amrex_multifab) :: band
@@ -1041,10 +1072,14 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQold    ! Qold used in tet2flux_plic
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold   ! VFold used in tet2flux_plic
 
+      ! Start full routine timer
+      t0=MPI_Wtime()
+
       ! First build primitive variables from Q
       call this%get_primitive(Q)
       
       ! Build transport band at finest level to localize SL computation
+      t1=MPI_Wtime()
       build_band: block
          integer :: dir,n,i,j,k,lvl
          integer, dimension(3) :: ind
@@ -1237,8 +1272,10 @@ contains
          ! Nullify pointers
          nullify(pU,pV,pW,pPLICold,pQold,pVFold)
       end block semilagrangian_fluxes
+      this%wt_sl=this%wt_sl+(MPI_Wtime()-t1)
       
       ! Phase 1b: Finite volume fluxes for all levels (Euler fluxes skip band cells at finest level)
+      t1=MPI_Wtime()
       finitevolume_fluxes: block
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pFx,pFy,pFz,pBand
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pPL,pPG,pTL,pTG,pIL,pIG,pVF
@@ -1455,6 +1492,7 @@ contains
             call this%amr%mfiter_destroy(mfi)
          end do
       end block finitevolume_fluxes
+      this%wt_fv=this%wt_fv+(MPI_Wtime()-t1)
 
       ! Phase 2: Average down all fluxes for C/F conservation
       c_f_consistency: block
@@ -1468,6 +1506,7 @@ contains
       end block c_f_consistency
       
       ! Phase 3: Compute divergence and source terms for all levels, update VF/bary at band
+      t1=MPI_Wtime()
       divergence_and_sources: block
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: bx
@@ -1590,6 +1629,7 @@ contains
             call this%amr%mfiter_destroy(mfi)
          end do
       end block divergence_and_sources
+      this%wt_div=this%wt_div+(MPI_Wtime()-t1)
 
       ! Cleanup temporary mfabs
       cleanup: block
@@ -1607,6 +1647,9 @@ contains
 
       ! Sync and apply BC
       call this%fill_moments_lvl(this%amr%clvl(),time)
+
+      ! Stop full routine timer
+      this%wt_dQdt=this%wt_dQdt+(MPI_Wtime()-t0)
       
    contains
 
@@ -1915,10 +1958,15 @@ contains
       use mathtools, only: normalize
       use amrvof_geometry, only: get_plane_dist, cut_hex_polygon
       use amrex_amr_module, only: amrex_mfiter,amrex_box
+      use mpi_f08, only: MPI_Wtime
       class(amrmpcomp), intent(inout) :: this
       real(WP), intent(in) :: time
       integer :: lvl
       real(WP) :: dx, dy, dz, dxi, dyi, dzi
+      real(WP) :: t0,t1
+
+      ! Start full routine timer
+      t0=MPI_Wtime()
 
       ! Only build at finest level
       lvl = this%amr%clvl()
@@ -1929,6 +1977,7 @@ contains
       dz = this%amr%dz(lvl); dzi = 1.0_WP / dz
 
       ! Compute PLIC planes
+      t1=MPI_Wtime()
       plic_reconstruction: block
          integer :: i, j, k, ii, jj, kk, direction, direction2
          real(WP), dimension(0:188) :: moments
@@ -2080,6 +2129,7 @@ contains
          end do
          call this%amr%mfiter_destroy(mfi)
       end block plic_reconstruction
+      this%wt_plicnet=this%wt_plicnet+(MPI_Wtime()-t1)
       
       ! Fill PLIC ghosts (sync + periodic correction + physical BC)
       call this%fill_plic_lvl(lvl, time)
@@ -2087,6 +2137,7 @@ contains
       ! ========== Pass 2: Per-FAB polygon extraction ==========
       call this%smesh%reset()
       
+      t1=MPI_Wtime()
       polygon_extraction: block
          integer :: i, j, k, ii, jj, kk
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC2
@@ -2173,7 +2224,11 @@ contains
          end do
          call this%amr%mfiter_destroy(mfi2)
       end block polygon_extraction
-      
+      this%wt_polygon=this%wt_polygon+(MPI_Wtime()-t1)
+
+      ! Stop full routine timer
+      this%wt_plic=this%wt_plic+(MPI_Wtime()-t0)
+
    end subroutine build_plic
 
    !> Reset VF and barycenters from PLIC plane to ensure consistency
@@ -2817,9 +2872,11 @@ contains
    subroutine apply_relax(this)
       use amrex_amr_module, only: amrex_mfiter,amrex_box
       use amrvof_geometry,  only: get_plane_dist,cut_hex_vol
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
       integer :: lvl,i,j,k
+      real(WP) :: t0
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pQ,pPLIC,pCliq,pCgas
@@ -2829,6 +2886,10 @@ contains
       real(WP) :: dx,dy,dz,vol_liq,vol_gas
       ! If no relaxation model was provided, return
       if (.not.associated(this%relax)) return
+
+      ! Start timer
+      t0=MPI_Wtime()
+
       ! Apply relaxation on finest level only (mixture cells are always at finest)
       lvl=this%amr%clvl()
       dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
@@ -2877,11 +2938,16 @@ contains
          end do; end do; end do
       end do
       call this%amr%mfiter_destroy(mfi)
+
+      ! End timer
+      this%wt_relax=this%wt_relax+(MPI_Wtime()-t0)
+
    end subroutine apply_relax
    
    !> Add artificial bulk viscosity to this%beta
    subroutine add_viscartif(this,dt,Cartif)
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_multifab,amrex_multifab_destroy
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -2891,7 +2957,7 @@ contains
       type(amrex_box) :: bx
       type(amrex_multifab) :: beta_t,scratch
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pBeta_t,pScratch,pU,pV,pW,pC,pBeta,pVF,pRHOL,pRHOG
-      real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_beta,myCartif
+      real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_beta,myCartif,t0
       real(WP) :: dudy,dudz,dvdx,dvdz,dwdx,dwdy,vort,grad_div
       integer :: lvl,i,j,k,si,sj,sk,n
       ! Parameters
@@ -2899,6 +2965,9 @@ contains
       integer, parameter :: nfilter=2
       real(WP), dimension(-1:+1), parameter :: filter=[1.0_WP/6.0_WP,2.0_WP/3.0_WP,1.0_WP/6.0_WP]
       
+      ! Start timer
+      t0=MPI_Wtime()
+
       ! Set model constant
       if (present(Cartif)) then; myCartif=Cartif; else; myCartif=5.0_WP; end if
       
@@ -3014,11 +3083,15 @@ contains
          
       end do
 
+      ! End timer
+      this%wt_visc=this%wt_visc+(MPI_Wtime()-t0)
+
    end subroutine add_viscartif
 
    !> Add Vreman SGS eddy viscosity to this%visc
    subroutine add_vreman(this,dt,Cs)
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_multifab,amrex_multifab_destroy
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -3028,7 +3101,7 @@ contains
       type(amrex_box) :: bx
       type(amrex_multifab) :: visc_t,scratch
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVisc_t,pScratch,pU,pV,pW,pVisc,pVF,pRHOL,pRHOG
-      real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_visc,Cmodel,Aij,Bij
+      real(WP) :: dxi,dyi,dzi,dx,dy,dz,max_visc,Cmodel,Aij,Bij,t0
       real(WP), dimension(1:3,1:3) :: gradU,betaij
       integer :: lvl,i,j,k,si,sj,sk,n
       ! Parameters
@@ -3036,6 +3109,9 @@ contains
       integer, parameter :: nfilter=2
       real(WP), dimension(-1:+1), parameter :: filter=[1.0_WP/6.0_WP,2.0_WP/3.0_WP,1.0_WP/6.0_WP]
       
+      ! Start timer
+      t0=MPI_Wtime()
+
       ! Model constant: c=2.5*Cs**2 (Vreman uses c=0.07 which corresponds to Cs=0.17)
       if (present(Cs)) then; Cmodel=2.5_WP*Cs**2; else; Cmodel=2.5_WP*0.17_WP**2; end if
       
@@ -3139,6 +3215,9 @@ contains
          
       end do
       
+      ! End timer
+      this%wt_visc=this%wt_visc+(MPI_Wtime()-t0)
+
    end subroutine add_vreman
 
    !> Calculate CFL numbers
@@ -3350,7 +3429,33 @@ contains
          ! Reduce across MPI ranks
          call MPI_ALLREDUCE(MPI_IN_PLACE,this%rhoKint,1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
       end block get_rhoKint
-      
+
+      ! Reduce per-rank timing to min/max across ranks
+      call MPI_ALLREDUCE(this%wt_prim,      this%wtmax_prim,      1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_prim,      this%wtmin_prim,      1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_dQdt,      this%wtmax_dQdt,      1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_dQdt,      this%wtmin_dQdt,      1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_sl,        this%wtmax_sl,        1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_sl,        this%wtmin_sl,        1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_fv,        this%wtmax_fv,        1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_fv,        this%wtmin_fv,        1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_div,       this%wtmax_div,       1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_div,       this%wtmin_div,       1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plic,      this%wtmax_plic,      1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plic,      this%wtmin_plic,      1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plicnet, this%wtmax_plicnet, 1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plicnet, this%wtmin_plicnet, 1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_polygon, this%wtmax_polygon, 1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_polygon, this%wtmin_polygon, 1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_relax,     this%wtmax_relax,     1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_relax,     this%wtmin_relax,     1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_visc,      this%wtmax_visc,      1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_visc,      this%wtmin_visc,      1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      ! Reset per-rank timing accumulators for next interval
+      this%wt_prim=0.0_WP; this%wt_dQdt=0.0_WP; this%wt_sl=0.0_WP; this%wt_fv=0.0_WP; this%wt_div=0.0_WP
+      this%wt_plic=0.0_WP; this%wt_plicnet=0.0_WP; this%wt_polygon=0.0_WP
+      this%wt_relax=0.0_WP; this%wt_visc=0.0_WP
+
    end subroutine get_info
 
    !> Print solver info to screen
