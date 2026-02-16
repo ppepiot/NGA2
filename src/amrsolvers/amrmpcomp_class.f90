@@ -1162,19 +1162,11 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
-         ! Instrumentation for tet span distribution
-         integer :: nleaf,spmax,sx,sy,sz,total_span
-         integer :: n_tets_total,n_leaves_total,spmax_total
-         integer :: span_hist(0:8)  ! histogram of total span (sx+sy+sz)
-         integer :: span_hist_g(0:8) ! MPI-reduced version
-         integer :: stats_l(3),stats_g(3) ! local/global [n_tets, n_leaves, spmax]
          ! Get finest level info
          lvl=this%amr%clvl()
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
          dy=this%amr%dy(lvl); dyi=1.0_WP/this%amr%dy(lvl)
          dz=this%amr%dz(lvl); dzi=1.0_WP/this%amr%dz(lvl)
-         ! Initialize instrumentation
-         n_tets_total=0; n_leaves_total=0; spmax_total=0; span_hist=0
          ! Loop over finest level tiles
          call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
          do while (mfi%next())
@@ -1211,18 +1203,9 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
+                  call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFx(i,j,k,1:7)=pFx(i,j,k,1:7)+tet_sign(tet)*Qflux
-                  ! Instrumentation
-                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
-                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
-                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
-                  total_span=sx+sy+sz
-                  n_tets_total=n_tets_total+1
-                  n_leaves_total=n_leaves_total+nleaf
-                  spmax_total=max(spmax_total,spmax)
-                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
@@ -1248,18 +1231,9 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
+                  call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFy(i,j,k,1:7)=pFy(i,j,k,1:7)+tet_sign(tet)*Qflux
-                  ! Instrumentation
-                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
-                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
-                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
-                  total_span=sx+sy+sz
-                  n_tets_total=n_tets_total+1
-                  n_leaves_total=n_leaves_total+nleaf
-                  spmax_total=max(spmax_total,spmax)
-                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
@@ -1285,18 +1259,9 @@ contains
                      tet(:,nn)=face(:,tet_map(nn,n))
                      ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
                   end do
-                  call tet2flux(tet,ijk,Vflux,Qflux,nleaf,spmax)
+                  call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFz(i,j,k,1:7)=pFz(i,j,k,1:7)+tet_sign(tet)*Qflux
-                  ! Instrumentation
-                  sx=maxval(ijk(1,:))-minval(ijk(1,:))
-                  sy=maxval(ijk(2,:))-minval(ijk(2,:))
-                  sz=maxval(ijk(3,:))-minval(ijk(3,:))
-                  total_span=sx+sy+sz
-                  n_tets_total=n_tets_total+1
-                  n_leaves_total=n_leaves_total+nleaf
-                  spmax_total=max(spmax_total,spmax)
-                  span_hist(min(total_span,8))=span_hist(min(total_span,8))+1
                end do
                ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
@@ -1309,29 +1274,6 @@ contains
          call this%amr%mfiter_destroy(mfi)
          ! Nullify pointers
          nullify(pU,pV,pW,pPLICold,pQold,pVFold)
-         ! Print tet span instrumentation
-         block
-            use mpi_f08
-            integer :: ierr
-            stats_l=[n_tets_total,n_leaves_total,spmax_total]
-            call MPI_Allreduce(stats_l,stats_g,3,MPI_INTEGER,MPI_SUM,this%amr%comm,ierr)
-            stats_g(3)=0
-            call MPI_Allreduce(spmax_total,stats_g(3),1,MPI_INTEGER,MPI_MAX,this%amr%comm,ierr)
-            call MPI_Allreduce(span_hist,span_hist_g,9,MPI_INTEGER,MPI_SUM,this%amr%comm,ierr)
-            if (this%amr%amRoot) then
-               print '(A)',       '  [tet2flux stats]'
-               print '(A,I10)',   '    Total initial tets : ',stats_g(1)
-               print '(A,I10)',   '    Total leaf tets    : ',stats_g(2)
-               print '(A,F10.2)', '    Avg leaves/init tet: ',real(stats_g(2),WP)/max(real(stats_g(1),WP),1.0_WP)
-               print '(A,I10)',   '    Max stack depth    : ',stats_g(3)
-               print '(A)',       '    Span histogram (sx+sy+sz):'
-               do n=0,8
-                  if (span_hist_g(n).gt.0) &
-                     print '(A,I1,A,I10,A,F6.2,A)', '      span=',n,': ',span_hist_g(n), &
-                        ' (',100.0_WP*real(span_hist_g(n),WP)/max(real(stats_g(1),WP),1.0_WP),'%)'
-               end do
-            end if
-         end block
       end block semilagrangian_fluxes
       this%wt_sl=this%wt_sl+(MPI_Wtime()-t1)
       
@@ -1959,6 +1901,183 @@ contains
          myQflux(5:7)=sum(myQflux(1:2))*pQold(i0,j0,k0,5:7)/max(sum(pQold(i0,j0,k0,1:2)),this%rho_floor)
          
       end subroutine tet2flux_plic
+
+      !> Polyhedron-clipping version: tet→poly, clip by grid planes, clip by PLIC
+      !> Replaces tet2flux+tet2flux_plic with sequential planar clips (no recursion)
+      subroutine tet2flux_poly(mytet,myind,myVflux,myQflux)
+         use amrvof_geometry, only: convex_poly,tet_to_poly,clip_poly_by_plane,poly_vol,poly_vol_centroid
+         use messager, only: die
+         real(WP), dimension(3,4), intent(in)  :: mytet
+         integer,  dimension(3,4), intent(in)  :: myind
+         real(WP), dimension(8),   intent(out) :: myVflux
+         real(WP), dimension(7),   intent(out) :: myQflux
+         integer, parameter :: MAX_PIECES=32
+         type(convex_poly) :: pieces(MAX_PIECES),clone,liq_poly
+         integer :: pcell(3,MAX_PIECES)
+         integer :: np,p,np_before
+         integer :: ilo,ihi,jlo,jhi,klo,khi,ix,iy,iz
+         integer :: icontp,icontn,icontp_lo,icontn_lo,ierr
+         integer :: i0,j0,k0
+         real(WP) :: cut_pos,vol_tot,vol_liq,VF0
+         real(WP), dimension(3) :: normal,bary,centroid
+         real(WP), dimension(8) :: subVflux
+         real(WP), dimension(7) :: subQflux
+         
+         myVflux=0.0_WP
+         myQflux=0.0_WP
+         
+         ! Step 1: Convert tet to polyhedron
+         call tet_to_poly(mytet,pieces(1))
+         
+         ! Step 2: Determine cell span
+         ilo=minval(myind(1,:)); ihi=maxval(myind(1,:))
+         jlo=minval(myind(2,:)); jhi=maxval(myind(2,:))
+         klo=minval(myind(3,:)); khi=maxval(myind(3,:))
+         
+         ! Initialize piece tracking
+         np=1
+         pcell(:,1)=[ilo,jlo,klo]
+         ! Step 3: Sequential grid-plane clipping
+         ! X-planes
+            do ix=ilo+1,ihi
+               cut_pos=this%amr%xlo+real(ix,WP)*dx
+               np_before=np
+               do p=1,np_before
+                  if (pcell(1,p).lt.ix) then
+                     clone=pieces(p)
+                     ! Keep x < cut_pos in pieces(p): n=[1,0,0], d=cut_pos
+                     call clip_poly_by_plane(pieces(p),[1.0_WP,0.0_WP,0.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
+                     if (icontp_lo.eq.0) then
+                        ! Entire piece on hi side - just reassign cell
+                        pieces(p)=clone
+                        pcell(1,p)=ix
+                     else if (icontn_lo.gt.0) then
+                        ! Actual split - create hi-side clone: n=[-1,0,0], d=-cut_pos
+                        call clip_poly_by_plane(clone,[-1.0_WP,0.0_WP,0.0_WP],-cut_pos,icontp,icontn,ierr)
+                        if (icontp.gt.0) then
+                           np=np+1
+                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
+                           pieces(np)=clone
+                           pcell(:,np)=pcell(:,p)
+                           pcell(1,np)=ix
+                        end if
+                     end if
+                  end if
+               end do
+            end do
+         ! Y-planes
+            do iy=jlo+1,jhi
+               cut_pos=this%amr%ylo+real(iy,WP)*dy
+               np_before=np
+               do p=1,np_before
+                  if (pcell(2,p).lt.iy) then
+                     clone=pieces(p)
+                     call clip_poly_by_plane(pieces(p),[0.0_WP,1.0_WP,0.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
+                     if (icontp_lo.eq.0) then
+                        pieces(p)=clone
+                        pcell(2,p)=iy
+                     else if (icontn_lo.gt.0) then
+                        call clip_poly_by_plane(clone,[0.0_WP,-1.0_WP,0.0_WP],-cut_pos,icontp,icontn,ierr)
+                        if (icontp.gt.0) then
+                           np=np+1
+                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
+                           pieces(np)=clone
+                           pcell(:,np)=pcell(:,p)
+                           pcell(2,np)=iy
+                        end if
+                     end if
+                  end if
+               end do
+            end do
+         ! Z-planes
+            do iz=klo+1,khi
+               cut_pos=this%amr%zlo+real(iz,WP)*dz
+               np_before=np
+               do p=1,np_before
+                  if (pcell(3,p).lt.iz) then
+                     clone=pieces(p)
+                     call clip_poly_by_plane(pieces(p),[0.0_WP,0.0_WP,1.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
+                     if (icontp_lo.eq.0) then
+                        pieces(p)=clone
+                        pcell(3,p)=iz
+                     else if (icontn_lo.gt.0) then
+                        call clip_poly_by_plane(clone,[0.0_WP,0.0_WP,-1.0_WP],-cut_pos,icontp,icontn,ierr)
+                        if (icontp.gt.0) then
+                           np=np+1
+                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
+                           pieces(np)=clone
+                           pcell(:,np)=pcell(:,p)
+                           pcell(3,np)=iz
+                        end if
+                     end if
+                  end if
+               end do
+            end do
+
+         ! Step 4: For each piece, cut by PLIC and accumulate fluxes
+         do p=1,np
+            i0=pcell(1,p); j0=pcell(2,p); k0=pcell(3,p)
+            subVflux=0.0_WP
+            subQflux=0.0_WP
+            
+            ! Bounds check
+            if (i0.lt.lbound(pPLICold,1).or.i0.gt.ubound(pPLICold,1).or. &
+                j0.lt.lbound(pPLICold,2).or.j0.gt.ubound(pPLICold,2).or. &
+                k0.lt.lbound(pPLICold,3).or.k0.gt.ubound(pPLICold,3)) then
+               call die('[tet2flux_poly] Index out of bounds')
+            end if
+            
+            VF0=pVFold(i0,j0,k0,1)
+            
+            ! Pure cell shortcut
+            if (pPLICold(i0,j0,k0,4).gt.+1.0e9_WP) then
+               ! Pure liquid
+               call poly_vol_centroid(pieces(p),vol_tot,centroid)
+               vol_tot=abs(vol_tot)
+               subVflux( 1 )=vol_tot
+               subVflux(3:5)=vol_tot*centroid
+               subQflux=vol_tot*pQold(i0,j0,k0,:)
+            else if (pPLICold(i0,j0,k0,4).lt.-1.0e9_WP) then
+               ! Pure gas
+               call poly_vol_centroid(pieces(p),vol_tot,centroid)
+               vol_tot=abs(vol_tot)
+               subVflux( 2 )=vol_tot
+               subVflux(6:8)=vol_tot*centroid
+               subQflux=vol_tot*pQold(i0,j0,k0,:)
+            else
+               ! Mixed cell: clip by PLIC to get liquid volume
+               normal=pPLICold(i0,j0,k0,1:3)
+               call poly_vol_centroid(pieces(p),vol_tot,centroid)
+               vol_tot=abs(vol_tot)
+               liq_poly=pieces(p)
+               call clip_poly_by_plane(liq_poly,normal,pPLICold(i0,j0,k0,4),icontp,icontn,ierr)
+               if (icontp.gt.0) then
+                  call poly_vol_centroid(liq_poly,vol_liq,bary)
+                  vol_liq=abs(vol_liq)
+               else
+                  vol_liq=0.0_WP; bary=0.0_WP
+               end if
+               ! Liquid volume moments
+               subVflux( 1 )=vol_liq
+               subVflux(3:5)=vol_liq*bary
+               ! Gas volume moments = total - liquid
+               subVflux( 2 )=vol_tot-vol_liq
+               if (abs(subVflux(2)).gt.tiny(1.0_WP)) then
+                  subVflux(6:8)=(vol_tot*centroid-vol_liq*bary)
+               end if
+               ! Q fluxes (same as tet2flux_plic)
+               subQflux(1)=subVflux(1)*pQold(i0,j0,k0,1)/(       VF0)
+               subQflux(2)=subVflux(2)*pQold(i0,j0,k0,2)/(1.0_WP-VF0)
+               subQflux(3)=subVflux(1)*pQold(i0,j0,k0,3)/(       VF0)
+               subQflux(4)=subVflux(2)*pQold(i0,j0,k0,4)/(1.0_WP-VF0)
+               subQflux(5:7)=sum(subQflux(1:2))*pQold(i0,j0,k0,5:7)/max(sum(pQold(i0,j0,k0,1:2)),this%rho_floor)
+            end if
+            
+            myVflux=myVflux+subVflux
+            myQflux=myQflux+subQflux
+         end do
+         
+      end subroutine tet2flux_poly
 
       !> RK2 vertex projection back in time
       function project(p1,mydt) result(p2)
