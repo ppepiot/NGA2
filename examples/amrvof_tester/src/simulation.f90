@@ -15,7 +15,6 @@ contains
    subroutine simulation_run()
       use mod_test_geometry, only: test_geometry
       use mod_test_amrvof,   only: test_amrvof
-      use mod_test_irlfab,   only: test_irlfab
       character(len=32) :: test_name
 
       call log("Simulation Run: AMRVOF Tester")
@@ -28,14 +27,11 @@ contains
          call test_geometry()
        case ('advect')
          call test_amrvof()
-       case ('irlfab')
-         call test_irlfab()
        case ('all')
          call test_geometry()
          call test_amrvof()
-         call test_irlfab()
        case default
-         call die('Unknown test: '//trim(test_name)//'. Valid: geometry, advect, all, irlfab')
+         call die('Unknown test: '//trim(test_name)//'. Valid: geometry, advect, all')
       end select
    end subroutine simulation_run
 

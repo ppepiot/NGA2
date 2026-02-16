@@ -27,33 +27,7 @@ namespace nga2 {
 // - ngrow in ErrorEst: AMReX always passes 0, not needed
 // - initial in regrid: Unused in AmrCore implementation, dropped
 //=============================================================================
-
 extern "C" {
-
-// Special FabArray that contains encoded IRL objects
-struct AMReX_SeparatorVariant {
-  double a;
-  double b;
-  double c;
-  double d;
-  double e;
-};
-
-static_assert(std::is_trivially_copyable<AMReX_SeparatorVariant>::value,
-              "AMReX_SeparatorVariant must be trivially copyable");
-
-using AMReX_SeparatorVariantFab = amrex::BaseFab<AMReX_SeparatorVariant>;
-using IRLFab = amrex::FabArray<AMReX_SeparatorVariantFab>;
-
-void amrex_new_irlfab(IRLFab *&mf, const amrex::BoxArray *&ba,
-                      const amrex::DistributionMapping *&dm, int nc,
-                      const int *ng, const int *nodal) {
-  mf = new IRLFab(amrex::convert(*ba, amrex::IntVect(nodal)), *dm, nc,
-                  amrex::IntVect(ng));
-  ba = &(mf->boxArray());
-  dm = &(mf->DistributionMap());
-}
-
 // Level callbacks: owner, level, time, boxarray ptr, distromap ptr
 using LevelDispatcher = void (*)(void *owner, int lev, double time,
                                  const amrex::BoxArray *,
@@ -545,8 +519,7 @@ void amrmask_make_fine(void *mask_ptr, void *ba_fine_ptr, int *ref_ratio,
   // Use makeFineMask to fill the mask
   // covered_val = value where fine grids exist
   // notcovered_val = value where no fine grids
-  auto fine_mask =
-      amrex::makeFineMask(*mask, *ba_fine, rr, notcovered_val, covered_val);
+  auto fine_mask = amrex::makeFineMask(*mask, *ba_fine, rr, notcovered_val, covered_val);
   // Copy result into provided mask
   amrex::iMultiFab::Copy(*mask, fine_mask, 0, 0, 1, 0);
 }
@@ -554,6 +527,7 @@ void amrmask_make_fine(void *mask_ptr, void *ba_fine_ptr, int *ref_ratio,
 //-----------------------------------------------------------------------------
 // Plotfile Output (Native and HDF5)
 //-----------------------------------------------------------------------------
+
 
 void amrplotfile_write_native(const char *name, int nlevels, void **mf_ptrs,
                               const char **varnames, int ncomp,

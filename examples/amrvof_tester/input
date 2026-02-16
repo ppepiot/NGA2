@@ -1,5 +1,5 @@
 # Select which test to run: geometry, plic, advect, all
-Test: irlfab
+Test: advect
 
 # Mesh parameters
 Base nx: 32
@@ -12,8 +12,10 @@ Regrid nsteps: 10
 
 # Time integration
 Max time: 3.0
-Max dt: 2.5e-3
-Max CFL: 0.9
+Max dt:   2.5e-3
+Max CFL:  0.9
 
 # Output
 Output period: 0.1
+
+
