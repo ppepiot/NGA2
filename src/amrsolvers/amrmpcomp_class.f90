@@ -159,7 +159,6 @@ module amrmpcomp_class
       procedure :: build_plic
       procedure :: reset_moments
       procedure :: apply_relax
-      procedure :: cleanup_Q
       ! VOF sync/fill/average utilities
       procedure :: fill_moments_lvl
       procedure :: sync_moments_lvl
@@ -2039,48 +2038,6 @@ contains
       end function interp_velocity
 
    end subroutine get_dQdt
-
-   !> Clean up passed Q based on VF to account for round-off
-   subroutine cleanup_Q(this,Q)
-      use amrex_amr_module, only: amrex_mfiter,amrex_box
-      implicit none
-      class(amrmpcomp), intent(inout) :: this
-      type(amrdata),    intent(inout) :: Q
-      integer :: lvl,i,j,k
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF,pCliq,pCgas
-      lvl=this%amr%clvl()
-      call this%amr%mfiter_build(lvl,mfi)
-      do while (mfi%next())
-         pQ =>Q%mf(lvl)%dataptr(mfi)
-         pVF=>this%VF%mf(lvl)%dataptr(mfi)
-         pCliq=>this%Cliq%mf(lvl)%dataptr(mfi)
-         pCgas=>this%Cgas%mf(lvl)%dataptr(mfi)
-         bx=mfi%tilebox()
-         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Clean up Q based on VF to account for round-off
-            if (pVF(i,j,k,1).lt.VFlo) then; pQ(i,j,k,1)=0.0_WP; pQ(i,j,k,3)=0.0_WP; end if
-            if (pVF(i,j,k,1).gt.VFhi) then; pQ(i,j,k,2)=0.0_WP; pQ(i,j,k,4)=0.0_WP; end if
-            ! Clean up VF based on Q to account for round-off
-            if (pQ(i,j,k,1).le.0.0_WP.or.pQ(i,j,k,3).le.0.0_WP) then
-               pVF(i,j,k,1)=0.0_WP
-               pCliq(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
-               pCgas(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
-               pQ(i,j,k,1)=0.0_WP
-               pQ(i,j,k,3)=0.0_WP
-            end if
-            if (pQ(i,j,k,2).le.0.0_WP.or.pQ(i,j,k,4).le.0.0_WP) then
-               pVF(i,j,k,1)=1.0_WP
-               pCliq(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
-               pCgas(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*this%amr%dx(lvl),this%amr%ylo+(real(j,WP)+0.5_WP)*this%amr%dy(lvl),this%amr%zlo+(real(k,WP)+0.5_WP)*this%amr%dz(lvl)]
-               pQ(i,j,k,2)=0.0_WP
-               pQ(i,j,k,4)=0.0_WP
-            end if
-         end do; end do; end do
-      end do
-      call this%amr%mfiter_destroy(mfi)
-   end subroutine cleanup_Q
 
    !> Build PLIC reconstruction from VF and barycenters using PLICnet
    subroutine build_plic(this,time)
