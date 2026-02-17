@@ -1157,6 +1157,7 @@ contains
          real(WP), dimension(3,9) :: face
          real(WP), dimension(3,4) :: tet
          integer , dimension(3,4) :: ijk
+         integer , dimension(3,9) :: fijk
          real(WP), dimension(8) :: Vflux
          real(WP), dimension(7) :: Qflux
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz
@@ -1195,15 +1196,17 @@ contains
                face(:,4)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=project(face(:,4),-dt)
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
                call correct_flux_poly(poly=face,target_volume=dt*dy*dz*0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)))
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(1,nn)=merge(i-1,i,0.5_WP*sum(pU(i-1:i,j,k,1)).gt.0.0_WP); end do
                ! Decompose into tets, cut, and accumulate
                pVx(i,j,k,1:8)=0.0_WP
                pFx(i,j,k,1:7)=0.0_WP
                do n=1,8
                   do nn=1,4
                      tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+                     ijk(:,nn)=fijk(:,tet_map(nn,n))
                   end do
-                  !call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   call tet2flux(tet,ijk,Vflux,Qflux)
                   pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFx(i,j,k,1:7)=pFx(i,j,k,1:7)+tet_sign(tet)*Qflux
@@ -1219,20 +1222,24 @@ contains
             fbx=mfi%nodaltilebox(2)
             do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
                if (maxval(pBand(i,j-1:j,k,1)).eq.0.0_WP) cycle
+               ! Build flux polyhedron
                face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,5)=project(face(:,1),-dt)
                face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,6)=project(face(:,2),-dt)
                face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,7)=project(face(:,3),-dt)
                face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=project(face(:,4),-dt)
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
                call correct_flux_poly(poly=face,target_volume=dt*dz*dx*0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)))
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(2,nn)=merge(j-1,j,0.5_WP*sum(pV(i,j-1:j,k,1)).gt.0.0_WP); end do
+               ! Decompose into tets, cut, and accumulate
                pVy(i,j,k,1:8)=0.0_WP
                pFy(i,j,k,1:7)=0.0_WP
                do n=1,8
                   do nn=1,4
                      tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+                     ijk(:,nn)=fijk(:,tet_map(nn,n))
                   end do
-                  !call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   call tet2flux(tet,ijk,Vflux,Qflux)
                   pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFy(i,j,k,1:7)=pFy(i,j,k,1:7)+tet_sign(tet)*Qflux
@@ -1248,20 +1255,24 @@ contains
             fbx=mfi%nodaltilebox(3)
             do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
                if (maxval(pBand(i,j,k-1:k,1)).eq.0.0_WP) cycle
+               ! Build flux polyhedron
                face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,5)=project(face(:,1),-dt)
                face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,6)=project(face(:,2),-dt)
                face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,7)=project(face(:,3),-dt)
                face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,8)=project(face(:,4),-dt)
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
                call correct_flux_poly(poly=face,target_volume=dt*dx*dy*0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)))
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(3,nn)=merge(k-1,k,0.5_WP*sum(pW(i,j,k-1:k,1)).gt.0.0_WP); end do
+               ! Decompose into tets, cut, and accumulate
                pVz(i,j,k,1:8)=0.0_WP
                pFz(i,j,k,1:7)=0.0_WP
                do n=1,8
                   do nn=1,4
                      tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+                     ijk(:,nn)=fijk(:,tet_map(nn,n))
                   end do
-                  !call tet2flux_poly(tet,ijk,Vflux,Qflux)
                   call tet2flux(tet,ijk,Vflux,Qflux)
                   pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*Vflux
                   pFz(i,j,k,1:7)=pFz(i,j,k,1:7)+tet_sign(tet)*Qflux
@@ -1711,9 +1722,9 @@ contains
          
          ! Find cut case (1-indexed: 1-16)
          icase=1+int(0.5_WP+sign(0.5_WP,dd(1))) &
-              +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
-              +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
-              +8*int(0.5_WP+sign(0.5_WP,dd(4)))
+         &    +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
+         &    +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
+         &    +8*int(0.5_WP+sign(0.5_WP,dd(4)))
          
          ! Copy vertices and indices
          do n1=1,4
@@ -1749,7 +1760,7 @@ contains
             b=newtet(:,2)-newtet(:,4)
             c=newtet(:,3)-newtet(:,4)
             my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
-            if (my_vol.lt.1.0e-15_WP*dx*dy*dz) cycle
+            if (my_vol.lt.VFlo*dx*dy*dz) cycle
             call tet2flux(newtet,newind,subVflux,subQflux)
             myVflux=myVflux+subVflux
             myQflux=myQflux+subQflux
@@ -1760,8 +1771,7 @@ contains
       !> Iterative subroutine that cuts a tet by grid planes to compute volume and Q fluxes
       !> Uses explicit stack instead of recursion for performance and GPU readiness
       subroutine tet2flux_flat(mytet,myind,myVflux,myQflux)
-         use amrvof_geometry, only: cut_side,cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert
-         use messager, only: die
+         use amrvof_geometry, only: cut_side,cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert,tet_vol
          real(WP), dimension(3,4), intent(in) :: mytet
          integer,  dimension(3,4), intent(in) :: myind
          real(WP), dimension(8),   intent(out) :: myVflux
@@ -1777,7 +1787,6 @@ contains
          real(WP), dimension(3,8) :: vert
          integer,  dimension(3,8,2) :: vert_ind
          real(WP) :: mu,my_vol
-         real(WP), dimension(3) :: a,b,c
          real(WP), dimension(8) :: subVflux
          real(WP), dimension(7) :: subQflux
          real(WP) :: cut_pos
@@ -1823,9 +1832,9 @@ contains
             
             ! Find cut case (1-indexed: 1-16)
             icase=1+int(0.5_WP+sign(0.5_WP,dd(1))) &
-                 +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
-                 +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
-                 +8*int(0.5_WP+sign(0.5_WP,dd(4)))
+            &    +2*int(0.5_WP+sign(0.5_WP,dd(2))) &
+            &    +4*int(0.5_WP+sign(0.5_WP,dd(3))) &
+            &    +8*int(0.5_WP+sign(0.5_WP,dd(4)))
             
             ! Copy vertices and indices
             do n1=1,4
@@ -1853,22 +1862,13 @@ contains
             
             ! Create sub-tets and push onto stack
             do n1=1,cut_ntets(icase)
-               a(1)=vert(1,cut_vtet(1,n1,icase))-vert(1,cut_vtet(4,n1,icase))
-               a(2)=vert(2,cut_vtet(1,n1,icase))-vert(2,cut_vtet(4,n1,icase))
-               a(3)=vert(3,cut_vtet(1,n1,icase))-vert(3,cut_vtet(4,n1,icase))
-               b(1)=vert(1,cut_vtet(2,n1,icase))-vert(1,cut_vtet(4,n1,icase))
-               b(2)=vert(2,cut_vtet(2,n1,icase))-vert(2,cut_vtet(4,n1,icase))
-               b(3)=vert(3,cut_vtet(2,n1,icase))-vert(3,cut_vtet(4,n1,icase))
-               c(1)=vert(1,cut_vtet(3,n1,icase))-vert(1,cut_vtet(4,n1,icase))
-               c(2)=vert(2,cut_vtet(3,n1,icase))-vert(2,cut_vtet(4,n1,icase))
-               c(3)=vert(3,cut_vtet(3,n1,icase))-vert(3,cut_vtet(4,n1,icase))
-               my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
-               if (my_vol.lt.1.0e-15_WP*dx*dy*dz) cycle
+               do n2=1,4; cur_tet(:,n2)=vert(:,cut_vtet(n2,n1,icase)); end do
+               my_vol=abs(tet_vol(cur_tet)); if (my_vol.lt.VFlo*dx*dy*dz) cycle
                ! Push sub-tet onto stack
                sp=sp+1
-               if (sp.gt.STACK_MAX) call die('[tet2flux_flat] Stack overflow - increase STACK_MAX')
+               if (sp.gt.STACK_MAX) then; STOP '[tet2flux_flat] Stack overflow'; end if
+               stet(:,:,sp)=cur_tet
                do n2=1,4
-                  stet(:,n2,sp)=vert(:,cut_vtet(n2,n1,icase))
                   sind(:,n2,sp)=vert_ind(:,cut_vtet(n2,n1,icase),cut_side(n1,icase))
                end do
             end do
@@ -1888,40 +1888,39 @@ contains
          integer :: icase,n1,v1,v2
          real(WP), dimension(4) :: dd
          real(WP), dimension(3,8) :: vert
-         real(WP), dimension(3) :: a,b,c,bary,normal
-         real(WP) :: mu,my_vol,dist,VF0
-         
+         real(WP), dimension(3) :: a,b,c,bary,normal,bary_tot
+         real(WP) :: mu,my_vol,dist,VF0,vol_tot
          myVflux=0.0_WP
          myQflux=0.0_WP
 
          ! Check indices are within PLICold bounds
-         if (i0.lt.lbound(pPLICold,1).or.i0.gt.ubound(pPLICold,1).or. &
-             j0.lt.lbound(pPLICold,2).or.j0.gt.ubound(pPLICold,2).or. &
-             k0.lt.lbound(pPLICold,3).or.k0.gt.ubound(pPLICold,3)) then
-            call die('[tet2flux_plic] Index out of bounds - check CFL or ghost cells')
-         end if
+         !if (i0.lt.lbound(pPLICold,1).or.i0.gt.ubound(pPLICold,1).or. &
+         !    j0.lt.lbound(pPLICold,2).or.j0.gt.ubound(pPLICold,2).or. &
+         !    k0.lt.lbound(pPLICold,3).or.k0.gt.ubound(pPLICold,3)) then
+         !   call die('[tet2flux_plic] Index out of bounds - check CFL or ghost cells')
+         !end if
          
          ! Get old VF for this cell
          VF0=pVFold(i0,j0,k0,1)
          
+         ! Tet volume and barycenter
+         vol_tot=abs(tet_vol(mytet))
+         bary_tot=0.25_WP*(mytet(:,1)+mytet(:,2)+mytet(:,3)+mytet(:,4))
+         
          ! Pure cell shortcut
          if (pPLICold(i0,j0,k0,4).gt.+1.0e9_WP) then
             ! Pure liquid
-            my_vol=abs(tet_vol(mytet))
-            bary=0.25_WP*(mytet(:,1)+mytet(:,2)+mytet(:,3)+mytet(:,4))
-            myVflux( 1 )=my_vol
-            myVflux(3:5)=my_vol*bary
+            myVflux( 1 )=vol_tot
+            myVflux(3:5)=vol_tot*bary_tot
             ! Q flux: all mass is liquid
-            myQflux=my_vol*pQold(i0,j0,k0,:)
+            myQflux=vol_tot*pQold(i0,j0,k0,:)
             return
          else if (pPLICold(i0,j0,k0,4).lt.-1.0e9_WP) then
             ! Pure gas
-            my_vol=abs(tet_vol(mytet))
-            bary=0.25_WP*(mytet(:,1)+mytet(:,2)+mytet(:,3)+mytet(:,4))
-            myVflux( 2 )=my_vol
-            myVflux(6:8)=my_vol*bary
+            myVflux( 2 )=vol_tot
+            myVflux(6:8)=vol_tot*bary_tot
             ! Q flux: all mass is gas
-            myQflux=my_vol*pQold(i0,j0,k0,:)
+            myQflux=vol_tot*pQold(i0,j0,k0,:)
             return
          end if
          
@@ -1950,34 +1949,39 @@ contains
             mu=min(1.0_WP,max(0.0_WP,-dd(v1)/(sign(abs(dd(v2)-dd(v1))+epsilon(1.0_WP),dd(v2)-dd(v1)))))
             vert(:,4+n1)=(1.0_WP-mu)*vert(:,v1)+mu*vert(:,v2)
          end do
-         
-         ! Gas tets: from 1 to cut_nntet-1
-         do n1=1,cut_nntet(icase)-1
-            a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            c=vert(:,cut_vtet(3,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
-            bary=0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
-            &            +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
-            myVflux( 2 )=myVflux( 2 )+my_vol
-            myVflux(6:8)=myVflux(6:8)+my_vol*bary
-         end do
-         
-         ! Liquid tets: from cut_ntets down to cut_nntet
-         do n1=cut_ntets(icase),cut_nntet(icase),-1
-            a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            c=vert(:,cut_vtet(3,n1,icase))-vert(:,cut_vtet(4,n1,icase))
-            my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
-            bary=0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
-            &            +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
-            myVflux( 1 )=myVflux( 1 )+my_vol
-            myVflux(3:5)=myVflux(3:5)+my_vol*bary
-         end do
 
-         ! We could enforce exact volume consistency here
-         !myVflux( 2 )=-myVflux( 1 )+abs(tet_vol(mytet))
-         !myVflux(6:8)=-myVflux(3:5)+abs(tet_vol(mytet))*0.25_WP*(mytet(:,1)+mytet(:,2)+mytet(:,3)+mytet(:,4))
+         ! Cut the minority phase
+         if (VF0.gt.0.5_WP) then
+            ! Liquid is dominant → compute gas (micro-phase) directly
+            do n1=1,cut_nntet(icase)-1
+               a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               c=vert(:,cut_vtet(3,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
+               bary=0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
+               &            +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
+               myVflux( 2 )=myVflux( 2 )+my_vol
+               myVflux(6:8)=myVflux(6:8)+my_vol*bary
+            end do
+            ! Liquid = total - gas (safe: subtracting small from large)
+            myVflux( 1 )=vol_tot-myVflux( 2 )
+            myVflux(3:5)=vol_tot*bary_tot-myVflux(6:8)
+         else
+            ! Gas is dominant → compute liquid (micro-phase) directly
+            do n1=cut_ntets(icase),cut_nntet(icase),-1
+               a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               c=vert(:,cut_vtet(3,n1,icase))-vert(:,cut_vtet(4,n1,icase))
+               my_vol=abs(a(1)*(b(2)*c(3)-c(2)*b(3))-a(2)*(b(1)*c(3)-c(1)*b(3))+a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
+               bary=0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
+               &            +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
+               myVflux( 1 )=myVflux( 1 )+my_vol
+               myVflux(3:5)=myVflux(3:5)+my_vol*bary
+            end do
+            ! Gas = total - liquid (safe: subtracting small from large)
+            myVflux( 2 )=vol_tot-myVflux( 1 )
+            myVflux(6:8)=vol_tot*bary_tot-myVflux(3:5)
+         end if
 
          ! Compute Q flux from Qold
          myQflux(1)=myVflux(1)*pQold(i0,j0,k0,1)/(       VF0)
@@ -1987,183 +1991,6 @@ contains
          myQflux(5:7)=sum(myQflux(1:2))*pQold(i0,j0,k0,5:7)/max(sum(pQold(i0,j0,k0,1:2)),this%rho_floor)
          
       end subroutine tet2flux_plic
-
-      !> Polyhedron-clipping version: tet→poly, clip by grid planes, clip by PLIC
-      !> Replaces tet2flux+tet2flux_plic with sequential planar clips (no recursion)
-      subroutine tet2flux_poly(mytet,myind,myVflux,myQflux)
-         use amrvof_geometry, only: convex_poly,tet_to_poly,clip_poly_by_plane,poly_vol,poly_vol_centroid
-         use messager, only: die
-         real(WP), dimension(3,4), intent(in)  :: mytet
-         integer,  dimension(3,4), intent(in)  :: myind
-         real(WP), dimension(8),   intent(out) :: myVflux
-         real(WP), dimension(7),   intent(out) :: myQflux
-         integer, parameter :: MAX_PIECES=32
-         type(convex_poly) :: pieces(MAX_PIECES),clone,liq_poly
-         integer :: pcell(3,MAX_PIECES)
-         integer :: np,p,np_before
-         integer :: ilo,ihi,jlo,jhi,klo,khi,ix,iy,iz
-         integer :: icontp,icontn,icontp_lo,icontn_lo,ierr
-         integer :: i0,j0,k0
-         real(WP) :: cut_pos,vol_tot,vol_liq,VF0
-         real(WP), dimension(3) :: normal,bary,centroid
-         real(WP), dimension(8) :: subVflux
-         real(WP), dimension(7) :: subQflux
-         
-         myVflux=0.0_WP
-         myQflux=0.0_WP
-         
-         ! Step 1: Convert tet to polyhedron
-         call tet_to_poly(mytet,pieces(1))
-         
-         ! Step 2: Determine cell span
-         ilo=minval(myind(1,:)); ihi=maxval(myind(1,:))
-         jlo=minval(myind(2,:)); jhi=maxval(myind(2,:))
-         klo=minval(myind(3,:)); khi=maxval(myind(3,:))
-         
-         ! Initialize piece tracking
-         np=1
-         pcell(:,1)=[ilo,jlo,klo]
-         ! Step 3: Sequential grid-plane clipping
-         ! X-planes
-            do ix=ilo+1,ihi
-               cut_pos=this%amr%xlo+real(ix,WP)*dx
-               np_before=np
-               do p=1,np_before
-                  if (pcell(1,p).lt.ix) then
-                     clone=pieces(p)
-                     ! Keep x < cut_pos in pieces(p): n=[1,0,0], d=cut_pos
-                     call clip_poly_by_plane(pieces(p),[1.0_WP,0.0_WP,0.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
-                     if (icontp_lo.eq.0) then
-                        ! Entire piece on hi side - just reassign cell
-                        pieces(p)=clone
-                        pcell(1,p)=ix
-                     else if (icontn_lo.gt.0) then
-                        ! Actual split - create hi-side clone: n=[-1,0,0], d=-cut_pos
-                        call clip_poly_by_plane(clone,[-1.0_WP,0.0_WP,0.0_WP],-cut_pos,icontp,icontn,ierr)
-                        if (icontp.gt.0) then
-                           np=np+1
-                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
-                           pieces(np)=clone
-                           pcell(:,np)=pcell(:,p)
-                           pcell(1,np)=ix
-                        end if
-                     end if
-                  end if
-               end do
-            end do
-         ! Y-planes
-            do iy=jlo+1,jhi
-               cut_pos=this%amr%ylo+real(iy,WP)*dy
-               np_before=np
-               do p=1,np_before
-                  if (pcell(2,p).lt.iy) then
-                     clone=pieces(p)
-                     call clip_poly_by_plane(pieces(p),[0.0_WP,1.0_WP,0.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
-                     if (icontp_lo.eq.0) then
-                        pieces(p)=clone
-                        pcell(2,p)=iy
-                     else if (icontn_lo.gt.0) then
-                        call clip_poly_by_plane(clone,[0.0_WP,-1.0_WP,0.0_WP],-cut_pos,icontp,icontn,ierr)
-                        if (icontp.gt.0) then
-                           np=np+1
-                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
-                           pieces(np)=clone
-                           pcell(:,np)=pcell(:,p)
-                           pcell(2,np)=iy
-                        end if
-                     end if
-                  end if
-               end do
-            end do
-         ! Z-planes
-            do iz=klo+1,khi
-               cut_pos=this%amr%zlo+real(iz,WP)*dz
-               np_before=np
-               do p=1,np_before
-                  if (pcell(3,p).lt.iz) then
-                     clone=pieces(p)
-                     call clip_poly_by_plane(pieces(p),[0.0_WP,0.0_WP,1.0_WP],cut_pos,icontp_lo,icontn_lo,ierr)
-                     if (icontp_lo.eq.0) then
-                        pieces(p)=clone
-                        pcell(3,p)=iz
-                     else if (icontn_lo.gt.0) then
-                        call clip_poly_by_plane(clone,[0.0_WP,0.0_WP,-1.0_WP],-cut_pos,icontp,icontn,ierr)
-                        if (icontp.gt.0) then
-                           np=np+1
-                           if (np.gt.MAX_PIECES) call die('[tet2flux_poly] Too many pieces')
-                           pieces(np)=clone
-                           pcell(:,np)=pcell(:,p)
-                           pcell(3,np)=iz
-                        end if
-                     end if
-                  end if
-               end do
-            end do
-
-         ! Step 4: For each piece, cut by PLIC and accumulate fluxes
-         do p=1,np
-            i0=pcell(1,p); j0=pcell(2,p); k0=pcell(3,p)
-            subVflux=0.0_WP
-            subQflux=0.0_WP
-            
-            ! Bounds check
-            if (i0.lt.lbound(pPLICold,1).or.i0.gt.ubound(pPLICold,1).or. &
-                j0.lt.lbound(pPLICold,2).or.j0.gt.ubound(pPLICold,2).or. &
-                k0.lt.lbound(pPLICold,3).or.k0.gt.ubound(pPLICold,3)) then
-               call die('[tet2flux_poly] Index out of bounds')
-            end if
-            
-            VF0=pVFold(i0,j0,k0,1)
-            
-            ! Pure cell shortcut
-            if (pPLICold(i0,j0,k0,4).gt.+1.0e9_WP) then
-               ! Pure liquid
-               call poly_vol_centroid(pieces(p),vol_tot,centroid)
-               vol_tot=abs(vol_tot)
-               subVflux( 1 )=vol_tot
-               subVflux(3:5)=vol_tot*centroid
-               subQflux=vol_tot*pQold(i0,j0,k0,:)
-            else if (pPLICold(i0,j0,k0,4).lt.-1.0e9_WP) then
-               ! Pure gas
-               call poly_vol_centroid(pieces(p),vol_tot,centroid)
-               vol_tot=abs(vol_tot)
-               subVflux( 2 )=vol_tot
-               subVflux(6:8)=vol_tot*centroid
-               subQflux=vol_tot*pQold(i0,j0,k0,:)
-            else
-               ! Mixed cell: clip by PLIC to get liquid volume
-               normal=pPLICold(i0,j0,k0,1:3)
-               call poly_vol_centroid(pieces(p),vol_tot,centroid)
-               vol_tot=abs(vol_tot)
-               liq_poly=pieces(p)
-               call clip_poly_by_plane(liq_poly,normal,pPLICold(i0,j0,k0,4),icontp,icontn,ierr)
-               if (icontp.gt.0) then
-                  call poly_vol_centroid(liq_poly,vol_liq,bary)
-                  vol_liq=abs(vol_liq)
-               else
-                  vol_liq=0.0_WP; bary=0.0_WP
-               end if
-               ! Liquid volume moments
-               subVflux( 1 )=vol_liq
-               subVflux(3:5)=vol_liq*bary
-               ! Gas volume moments = total - liquid
-               subVflux( 2 )=vol_tot-vol_liq
-               if (abs(subVflux(2)).gt.tiny(1.0_WP)) then
-                  subVflux(6:8)=(vol_tot*centroid-vol_liq*bary)
-               end if
-               ! Q fluxes (same as tet2flux_plic)
-               subQflux(1)=subVflux(1)*pQold(i0,j0,k0,1)/(       VF0)
-               subQflux(2)=subVflux(2)*pQold(i0,j0,k0,2)/(1.0_WP-VF0)
-               subQflux(3)=subVflux(1)*pQold(i0,j0,k0,3)/(       VF0)
-               subQflux(4)=subVflux(2)*pQold(i0,j0,k0,4)/(1.0_WP-VF0)
-               subQflux(5:7)=sum(subQflux(1:2))*pQold(i0,j0,k0,5:7)/max(sum(pQold(i0,j0,k0,1:2)),this%rho_floor)
-            end if
-            
-            myVflux=myVflux+subVflux
-            myQflux=myQflux+subQflux
-         end do
-         
-      end subroutine tet2flux_poly
 
       !> RK2 vertex projection back in time
       function project(p1,mydt) result(p2)
@@ -2187,9 +2014,9 @@ contains
          jpc=floor((pos(2)-this%amr%ylo)*dyi-0.5_WP)
          kpc=floor((pos(3)-this%amr%zlo)*dzi-0.5_WP)
          ! Clamp to array bounds
-         ipc=max(lbound(pU,1),min(ubound(pU,1)-1,ipc))
-         jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
-         kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
+         !ipc=max(lbound(pU,1),min(ubound(pU,1)-1,ipc))
+         !jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
+         !kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
          ! Cell-centered weights
          wxc1=(pos(1)-(this%amr%xlo+(real(ipc,WP)+0.5_WP)*dx))*dxi
          wyc1=(pos(2)-(this%amr%ylo+(real(jpc,WP)+0.5_WP)*dy))*dyi
