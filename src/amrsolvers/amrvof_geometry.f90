@@ -506,20 +506,6 @@ contains
       dir=cross_sum/max(mag,tiny(1.0_WP))
       ! Move vertex 9
       poly(:,9)=poly(:,9)+adjustment*dir
-      ! DEBUG: Verify corrected volume matches target
-      block
-         real(WP) :: final_vol
-         integer :: ntet
-         final_vol = 0.0_WP
-         do ntet = 1,8
-            final_vol = final_vol + tet_vol([poly(:,tet_map(1,ntet)), poly(:,tet_map(2,ntet)), &
-            &                                poly(:,tet_map(3,ntet)), poly(:,tet_map(4,ntet))])
-         end do
-         if (abs(final_vol - target_volume) > 1.0e-10_WP) then
-            print*, 'correct_flux_poly FAILED: target=', target_volume, 'got=', final_vol, 'diff=', final_vol-target_volume
-         end if
-      end block
-
    end subroutine correct_flux_poly
 
    !> Cut a hex cell by a plane and compute liquid/gas volumes and barycenters
