@@ -2694,6 +2694,12 @@ contains
             if (klo.lt.dlo(3)) call apply_bc_face(3, -1, this%vof_lo_bc(3), ilo, ihi, jlo, jhi, klo, dlo(3)-1, dlo(3), this%amr%zlo)
             if (khi.gt.dhi(3)) call apply_bc_face(3, +1, this%vof_hi_bc(3), ilo, ihi, jlo, jhi, dhi(3)+1, khi, dhi(3), this%amr%zhi)
          end if
+
+         ! Enforce strict VF/PLIC consistency as C->F interpolation is meaningless
+         do kg=klo,khi; do jg=jlo,jhi; do ig=ilo,ihi
+            if (pVF(ig,jg,kg,1).lt.VFlo.or.pVF(ig,jg,kg,1).gt.VFhi) pPLIC(ig,jg,kg,:)=[0.0_WP,0.0_WP,0.0_WP,sign(1.0e10_WP,pVF(ig,jg,kg,1)-0.5_WP)]
+         end do; end do; end do
+
       end do
       call amrex_mfiter_destroy(mfi)
       

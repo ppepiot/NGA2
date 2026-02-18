@@ -37,4 +37,4 @@ Max time: 1e2
 # Output
 Output period:     1e-1
 Checkpoint period: 1
-Restart from:      restart/drop_barfoot!restart/drop_3.10000E+01
+Restart from:      restart/drop_3.10000E+01
