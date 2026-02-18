@@ -1890,6 +1890,8 @@ contains
          real(WP), dimension(3,8) :: vert
          real(WP), dimension(3) :: a,b,c,bary,normal,bary_tot
          real(WP) :: mu,my_vol,dist,VF0,vol_tot
+
+         ! Zero out flux arrays
          myVflux=0.0_WP
          myQflux=0.0_WP
 
@@ -1950,9 +1952,9 @@ contains
             vert(:,4+n1)=(1.0_WP-mu)*vert(:,v1)+mu*vert(:,v2)
          end do
 
-         ! Cut the minority phase
+         ! Cut the minority phase (safer as we subtract small from large)
          if (VF0.gt.0.5_WP) then
-            ! Liquid is dominant → compute gas (micro-phase) directly
+            ! Liquid is dominant → compute gas directly
             do n1=1,cut_nntet(icase)-1
                a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
                b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
@@ -1963,11 +1965,11 @@ contains
                myVflux( 2 )=myVflux( 2 )+my_vol
                myVflux(6:8)=myVflux(6:8)+my_vol*bary
             end do
-            ! Liquid = total - gas (safe: subtracting small from large)
+            ! Liquid = total - gas
             myVflux( 1 )=vol_tot-myVflux( 2 )
             myVflux(3:5)=vol_tot*bary_tot-myVflux(6:8)
          else
-            ! Gas is dominant → compute liquid (micro-phase) directly
+            ! Gas is dominant → compute liquid directly
             do n1=cut_ntets(icase),cut_nntet(icase),-1
                a=vert(:,cut_vtet(1,n1,icase))-vert(:,cut_vtet(4,n1,icase))
                b=vert(:,cut_vtet(2,n1,icase))-vert(:,cut_vtet(4,n1,icase))
@@ -1978,16 +1980,20 @@ contains
                myVflux( 1 )=myVflux( 1 )+my_vol
                myVflux(3:5)=myVflux(3:5)+my_vol*bary
             end do
-            ! Gas = total - liquid (safe: subtracting small from large)
+            ! Gas = total - liquid
             myVflux( 2 )=vol_tot-myVflux( 1 )
             myVflux(6:8)=vol_tot*bary_tot-myVflux(3:5)
          end if
 
-         ! Compute Q flux from Qold
-         myQflux(1)=myVflux(1)*pQold(i0,j0,k0,1)/(       VF0)
-         myQflux(2)=myVflux(2)*pQold(i0,j0,k0,2)/(1.0_WP-VF0)
-         myQflux(3)=myVflux(1)*pQold(i0,j0,k0,3)/(       VF0)
-         myQflux(4)=myVflux(2)*pQold(i0,j0,k0,4)/(1.0_WP-VF0)
+         ! Compute Q flux from Qold (guard may be needed at C/F boundaries)
+         if (VF0.ge.VFlo) then
+            myQflux(1)=myVflux(1)*pQold(i0,j0,k0,1)/VF0
+            myQflux(3)=myVflux(1)*pQold(i0,j0,k0,3)/VF0
+         end if
+         if (VF0.le.VFhi) then
+            myQflux(2)=myVflux(2)*pQold(i0,j0,k0,2)/(1.0_WP-VF0)
+            myQflux(4)=myVflux(2)*pQold(i0,j0,k0,4)/(1.0_WP-VF0)
+         end if
          myQflux(5:7)=sum(myQflux(1:2))*pQold(i0,j0,k0,5:7)/max(sum(pQold(i0,j0,k0,1:2)),this%rho_floor)
          
       end subroutine tet2flux_plic

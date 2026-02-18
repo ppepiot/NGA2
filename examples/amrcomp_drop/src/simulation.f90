@@ -687,8 +687,6 @@ contains
          
          ! ===== RK2 Stage 2: Q* = Qold + dt/2*dQdt, dQdt* = f(t+dt/2, Q*) =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=dQdt)
-         !call fs%cleanup_Q(fs%Q)
-         !call fs%VF%average_down()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call check_Q('RK1   ')
          call fs%apply_relax()
@@ -697,8 +695,6 @@ contains
 
          ! ===== RK2 Final: Q = Qold + dt*dQdt* =====
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=dQdt)
-         !call fs%cleanup_Q(fs%Q)
-         !call fs%VF%average_down()
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
          call check_Q('RK2   ')
          call fs%apply_relax()
