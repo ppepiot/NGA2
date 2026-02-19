@@ -273,8 +273,7 @@ contains
          ! Compute viscosities
          call get_viscosities()
          ! Add artificial bulk viscosity
-         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
-         call fs%beta%multiply(src=fs%Q,srccomp=1)
+         call fs%add_viscartif(dt=time%dt)
       end block init_regridding
       
       ! Initialize visualization
@@ -414,8 +413,7 @@ contains
          call get_viscosities()
 
          ! Add artificial bulk viscosity
-         call fs%get_viscartif(dt=time%dt,beta=fs%beta)
-         call fs%beta%multiply(src=fs%Q,srccomp=1)
+         call fs%add_viscartif(dt=time%dt)
          
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time%t)
