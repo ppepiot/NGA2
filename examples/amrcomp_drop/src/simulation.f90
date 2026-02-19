@@ -180,7 +180,7 @@ contains
       integer :: lvl,i,j,k
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pTG,pVF,pQ,pVisc,pBeta,pDiff
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pTG,pVF,pQ,pVisc,pBeta,pDiff,pRHOL,pRHOG
       real(WP) :: r_cyl,blend,mu_g,mu_l,k_g,k_l
       real(WP), parameter :: Tmax_visc=10.0_WP
       real(WP), parameter :: myeps=1.0e-15_WP
@@ -194,6 +194,8 @@ contains
             pVisc=>fs%visc%mf(lvl)%dataptr(mfi)
             pBeta=>fs%beta%mf(lvl)%dataptr(mfi)
             pDiff=>fs%diff%mf(lvl)%dataptr(mfi)
+            pRHOL=>fs%RHOL%mf(lvl)%dataptr(mfi)
+            pRHOG=>fs%RHOG%mf(lvl)%dataptr(mfi)
             ! Get tilebox with overlap
             bx=mfi%growntilebox(fs%nover)
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
@@ -217,8 +219,8 @@ contains
                r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2+(amr%zlo+(real(k,WP)+0.5_WP)*amr%dz(lvl))**2)
                if (r_cyl.gt.R_spg) then
                   blend=min((r_cyl-R_spg)/L_spg,1.0_WP)**2
-                  pVisc(i,j,k,1)=max(pVisc(i,j,k,1),blend*nu_spg*sum(pQ(i,j,k,1:2)))
-                  pDiff(i,j,k,1)=max(pDiff(i,j,k,1),blend*nu_spg*sum(pQ(i,j,k,1:2)))
+                  pVisc(i,j,k,1)=max(pVisc(i,j,k,1),blend*nu_spg/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),myeps)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),myeps)))
+                  pDiff(i,j,k,1)=max(pDiff(i,j,k,1),blend*nu_spg/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),myeps)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),myeps)))
                end if
             end do; end do; end do
          end do
