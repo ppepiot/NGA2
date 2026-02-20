@@ -168,7 +168,7 @@ contains
          call param_read('Base nx',amr%nx)
          call param_read('Base ny',amr%ny)
          call param_read('Base nz',amr%nz)
-         amr%xlo=-5.0_WP; amr%xhi=+15.0_WP
+         amr%xlo=-05.0_WP; amr%xhi=+15.0_WP
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
@@ -194,7 +194,6 @@ contains
          ! Set molecular viscosity
          call param_read('Reynolds number',visc_mol)
          visc_mol=1.0_WP/visc_mol
-         call fs%visc%setval(val=visc_mol)
          ! Set pressure convergence
          fs%psolver%max_iter=20
          fs%psolver%tol_rel=1.0e-5_WP
@@ -236,7 +235,7 @@ contains
          call amr%init_from_scratch(time=time%t)
          ! Set viscosity: molecular + SGS
          call fs%visc%setval(val=visc_mol)
-         !call fs%add_vreman(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
       end block init_regridding
 
       ! Initialize visualization
@@ -246,6 +245,7 @@ contains
          call viz%add_scalar(fs%U,1,'U')
          call viz%add_scalar(fs%V,1,'V')
          call viz%add_scalar(fs%W,1,'W')
+         call viz%add_scalar(fs%visc,1,'visc')
          call viz%add_scalar(fs%P,1,'pressure')
          call viz%add_scalar(fs%div,1,'divergence')
          call viz%add_scalar(VF,1,'VF')
@@ -406,7 +406,7 @@ contains
 
          ! Update viscosity
          call fs%visc%setval(val=visc_mol)
-         !call fs%add_vreman(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
 
          ! Monitor output
          call fs%get_info()

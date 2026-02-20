@@ -224,7 +224,7 @@ contains
       ! Store amrgrid pointer
       this%amr=>amr
 
-      ! Initialize staggered velocity (do we need ghosts?)
+      ! Initialize staggered velocity
       call this%U%initialize(amr,name='U',ncomp=1,ng=1,nodal=[.true. ,.false.,.false.]); this%U%parent=>this
       call this%V%initialize(amr,name='V',ncomp=1,ng=1,nodal=[.false.,.true. ,.false.]); this%V%parent=>this
       call this%W%initialize(amr,name='W',ncomp=1,ng=1,nodal=[.false.,.false.,.true. ]); this%W%parent=>this
@@ -232,22 +232,25 @@ contains
       call this%Vold%initialize(amr,name='Vold',ncomp=1,ng=1,nodal=[.false.,.true. ,.false.]); this%Vold%parent=>this
       call this%Wold%initialize(amr,name='Wold',ncomp=1,ng=1,nodal=[.false.,.false.,.true. ]); this%Wold%parent=>this
 
-      ! Initialize pressure (cell-centered) (do we need ghosts?)
-      call this%P%initialize(amr,name='P',ncomp=1,ng=1); this%P%parent=>this
-
-      ! Initialize divergence (cell-centered, no ghosts needed)
-      call this%div%initialize(amr,name='div',ncomp=1,ng=0); this%div%parent=>this
-
-      ! Initialize viscosity (cell-centered, 1 ghost for face interpolation)
-      call this%visc%initialize(amr,name='visc',ncomp=1,ng=1); this%visc%parent=>this
-      if (.not.amr%xper) then; this%visc%lo_bc(1,1)=amrex_bc_foextrap; this%visc%hi_bc(1,1)=amrex_bc_foextrap; end if
-      if (.not.amr%yper) then; this%visc%lo_bc(2,1)=amrex_bc_foextrap; this%visc%hi_bc(2,1)=amrex_bc_foextrap; end if
-      if (.not.amr%zper) then; this%visc%lo_bc(3,1)=amrex_bc_foextrap; this%visc%hi_bc(3,1)=amrex_bc_foextrap; end if
-
       ! Set velocity fillbc callbacks to shared handler
       this%U%fillbc=>velocity_fillbc
       this%V%fillbc=>velocity_fillbc
       this%W%fillbc=>velocity_fillbc
+
+      ! Initialize pressure with Neumann BCs
+      call this%P%initialize(amr,name='P',ncomp=1,ng=1); this%P%parent=>this
+      if (.not.amr%xper) then; this%P%lo_bc(1,1)=amrex_bc_foextrap; this%P%hi_bc(1,1)=amrex_bc_foextrap; end if
+      if (.not.amr%yper) then; this%P%lo_bc(2,1)=amrex_bc_foextrap; this%P%hi_bc(2,1)=amrex_bc_foextrap; end if
+      if (.not.amr%zper) then; this%P%lo_bc(3,1)=amrex_bc_foextrap; this%P%hi_bc(3,1)=amrex_bc_foextrap; end if
+
+      ! Initialize divergence (no ghosts needed)
+      call this%div%initialize(amr,name='div',ncomp=1,ng=0); this%div%parent=>this
+
+      ! Initialize viscosity with Neumann BCs
+      call this%visc%initialize(amr,name='visc',ncomp=1,ng=1); this%visc%parent=>this
+      if (.not.amr%xper) then; this%visc%lo_bc(1,1)=amrex_bc_foextrap; this%visc%hi_bc(1,1)=amrex_bc_foextrap; end if
+      if (.not.amr%yper) then; this%visc%lo_bc(2,1)=amrex_bc_foextrap; this%visc%hi_bc(2,1)=amrex_bc_foextrap; end if
+      if (.not.amr%zper) then; this%visc%lo_bc(3,1)=amrex_bc_foextrap; this%visc%hi_bc(3,1)=amrex_bc_foextrap; end if
 
       ! Initialize pressure solver
       call this%psolver%initialize(amr,type=amrmg_cstcoef)
@@ -406,8 +409,14 @@ contains
       class(amrincomp), intent(inout) :: this
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
+      integer :: lvl
+      ! Average down and fill ghosts
       call this%average_down_velocity(lbase)
       call this%average_down_pressure(lbase)
+      do lvl=lbase,this%amr%clvl()
+         call this%fill_velocity_lvl(lvl,time)
+         call this%P%fill_lvl(lvl,time)
+      end do
       ! Rebuild pressure solver operators for new grid
       call this%psolver%setup()
    end subroutine post_regrid
@@ -498,8 +507,8 @@ contains
       class(amrincomp), intent(inout) :: this
       real(WP), intent(in) :: time
       integer :: lvl
-      do lvl = 0, this%amr%clvl()
-         call this%fill_velocity_lvl(lvl, time)
+      do lvl=0,this%amr%clvl()
+         call this%fill_velocity_lvl(lvl,time)
       end do
    end subroutine fill_velocity
 
@@ -657,7 +666,7 @@ contains
       type(amrex_mfiter) :: mfi
       class(amrincomp), pointer :: solver
       real(WP), dimension(:,:,:,:), contiguous, pointer :: p
-      integer :: i,j,k,dlo(3),dhi(3),flo(3),fhi(3)
+      integer :: dlo(3),dhi(3),flo(3),fhi(3)
       integer :: ilo,ihi,jlo,jhi,klo,khi
       character(len=1) :: comp
 
@@ -716,7 +725,7 @@ contains
          implicit none
          integer, intent(in) :: bnd,bctype,face
          type(amrex_box) :: bc_bx
-         integer :: ii,jj,kk,dir,fill_edge,src_from,toff
+         integer :: i,j,k,dir,fill_edge,src_from,toff
          integer :: slo(3),shi(3)
          logical :: is_normal,is_lo
          ! Derive direction and side from face
@@ -745,16 +754,16 @@ contains
                call solver%user_bc(solver,p,bc_bx,comp,face,time)
             else
                ! Default to zero if no callback provided
-               do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1)
-                  p(ii,jj,kk,1)=0.0_WP
+               do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1)
+                  p(i,j,k,1)=0.0_WP
                end do; end do; end do
             end if
           case (amrex_bc_foextrap)
             ! Neumann: copy from interior
             select case (dir)
-             case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(src_from,jj,kk,1); end do; end do; end do
-             case (2); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,src_from,kk,1); end do; end do; end do
-             case (3); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,jj,src_from,1); end do; end do; end do
+             case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(src_from,j,k,1); end do; end do; end do
+             case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,src_from,k,1); end do; end do; end do
+             case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,src_from,1); end do; end do; end do
             end select
           case (amrex_bc_reflect_even)
             ! Symmetry: F(-n) = F(n) - ghosts only
@@ -763,16 +772,16 @@ contains
             if (is_normal) then
                ! Normal: mirror across wall face (source=2*bnd-ii)
                select case (dir)
-                case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(2*bnd-ii,jj,kk,1); end do; end do; end do
-                case (2); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,2*bnd-jj,kk,1); end do; end do; end do
-                case (3); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,jj,2*bnd-kk,1); end do; end do; end do
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(2*bnd-i,j,k,1); end do; end do; end do
+                case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,2*bnd-j,k,1); end do; end do; end do
+                case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,2*bnd-k,1); end do; end do; end do
                end select
             else
                ! Tangent: mirror around half-cell (source=2*bnd-ii+toff)
                select case (dir)
-                case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(2*bnd-ii+toff,jj,kk,1); end do; end do; end do
-                case (2); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,2*bnd-jj+toff,kk,1); end do; end do; end do
-                case (3); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=p(ii,jj,2*bnd-kk+toff,1); end do; end do; end do
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(2*bnd-i+toff,j,k,1); end do; end do; end do
+                case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,2*bnd-j+toff,k,1); end do; end do; end do
+                case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,2*bnd-k+toff,1); end do; end do; end do
                end select
             end if
           case (amrex_bc_reflect_odd)
@@ -782,22 +791,22 @@ contains
             if (is_normal) then
                ! Zero the wall face
                select case (dir)
-                case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); p(bnd,jj,kk,1)=0.0_WP; end do; end do
-                case (2); do kk=slo(3),shi(3); do ii=slo(1),shi(1); p(ii,bnd,kk,1)=0.0_WP; end do; end do
-                case (3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,bnd,1)=0.0_WP; end do; end do
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); p(bnd,j,k,1)=0.0_WP; end do; end do
+                case (2); do k=slo(3),shi(3); do i=slo(1),shi(1); p(i,bnd,k,1)=0.0_WP; end do; end do
+                case (3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,bnd,1)=0.0_WP; end do; end do
                end select
                ! Mirror across wall face (source=2*bnd-ii)
                select case (dir)
-                case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(2*bnd-ii,jj,kk,1); end do; end do; end do
-                case (2); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(ii,2*bnd-jj,kk,1); end do; end do; end do
-                case (3); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(ii,jj,2*bnd-kk,1); end do; end do; end do
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(2*bnd-i,j,k,1); end do; end do; end do
+                case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(i,2*bnd-j,k,1); end do; end do; end do
+                case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(i,j,2*bnd-k,1); end do; end do; end do
                end select
             else
                ! Tangent: mirror around half-cell (source=2*bnd-ii+toff)
                select case (dir)
-                case (1); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(2*bnd-ii+toff,jj,kk,1); end do; end do; end do
-                case (2); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(ii,2*bnd-jj+toff,kk,1); end do; end do; end do
-                case (3); do kk=slo(3),shi(3); do jj=slo(2),shi(2); do ii=slo(1),shi(1); p(ii,jj,kk,1)=-p(ii,jj,2*bnd-kk+toff,1); end do; end do; end do
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(2*bnd-i+toff,j,k,1); end do; end do; end do
+                case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(i,2*bnd-j+toff,k,1); end do; end do; end do
+                case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=-p(i,j,2*bnd-k+toff,1); end do; end do; end do
                end select
             end if
          end select
