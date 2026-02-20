@@ -37,6 +37,9 @@ module simulation
    ! Monitoring
    type(monitor) :: mfile,cflfile,gridfile
 
+   ! Physical parameters
+   real(WP) :: visc_mol
+
 contains
 
    !> Levelset function for sphere
@@ -61,10 +64,14 @@ contains
       type(amrex_box) :: bx
       character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW
-      real(WP) :: dx,dy,dz,dist,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz,gradU_mag,Re_cell
+      real(WP) :: dx,dy,dz,dxi,dyi,dzi,dist,gradU_mag,Re_cell
+      real(WP), dimension(3,3) :: gradU
       integer :: i,j,k
-      dx=solver%amr%dx(lvl); dy=solver%amr%dy(lvl); dz=solver%amr%dz(lvl)
       tags=tags_ptr
+      ! Get mesh spacing
+      dx=solver%amr%dx(lvl); dxi=1.0_WP/dx
+      dy=solver%amr%dy(lvl); dyi=1.0_WP/dy
+      dz=solver%amr%dz(lvl); dzi=1.0_WP/dz
       call solver%amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
          bx=mfi%tilebox()
@@ -73,23 +80,20 @@ contains
          pV=>solver%V%mf(lvl)%dataptr(mfi)
          pW=>solver%W%mf(lvl)%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Skip if close to outflow (within 5 units)
-            if (solver%amr%xlo+(real(i,WP)+0.5_WP)*dx.gt.solver%amr%xhi-5.0_WP) cycle
-            ! Diagonal gradients
-            dudx=(pU(i+1,j,k,1)-pU(i,j,k,1))/dx
-            dvdy=(pV(i,j+1,k,1)-pV(i,j,k,1))/dy
-            dwdz=(pW(i,j,k+1,1)-pW(i,j,k,1))/dz
-            ! Off-diagonal gradients
-            dudy=0.25_WP*(pU(i,j+1,k,1)+pU(i+1,j+1,k,1)-pU(i,j-1,k,1)-pU(i+1,j-1,k,1))/(2.0_WP*dy)
-            dudz=0.25_WP*(pU(i,j,k+1,1)+pU(i+1,j,k+1,1)-pU(i,j,k-1,1)-pU(i+1,j,k-1,1))/(2.0_WP*dz)
-            dvdx=0.25_WP*(pV(i+1,j,k,1)+pV(i+1,j+1,k,1)-pV(i-1,j,k,1)-pV(i-1,j+1,k,1))/(2.0_WP*dx)
-            dvdz=0.25_WP*(pV(i,j,k+1,1)+pV(i,j+1,k+1,1)-pV(i,j,k-1,1)-pV(i,j+1,k-1,1))/(2.0_WP*dz)
-            dwdx=0.25_WP*(pW(i+1,j,k,1)+pW(i+1,j,k+1,1)-pW(i-1,j,k,1)-pW(i-1,j,k+1,1))/(2.0_WP*dx)
-            dwdy=0.25_WP*(pW(i,j+1,k,1)+pW(i,j+1,k+1,1)-pW(i,j-1,k,1)-pW(i,j-1,k+1,1))/(2.0_WP*dy)
+            ! Velocity gradient tensor
+            gradU(1,1)=        dxi*   (pU(i+1,j,k,1)      -pU(i,j,k,1)        )
+            gradU(2,1)=0.25_WP*dyi*sum(pU(i:i+1,j:j+1,k,1)-pU(i:i+1,j-1:j,k,1))
+            gradU(3,1)=0.25_WP*dzi*sum(pU(i:i+1,j,k:k+1,1)-pU(i:i+1,j,k-1:k,1))
+            gradU(1,2)=0.25_WP*dxi*sum(pV(i:i+1,j:j+1,k,1)-pV(i-1:i,j:j+1,k,1))
+            gradU(2,2)=        dyi*   (pV(i,j+1,k,1)      -pV(i,j,k,1)        )
+            gradU(3,2)=0.25_WP*dzi*sum(pV(i,j:j+1,k:k+1,1)-pV(i,j:j+1,k-1:k,1))
+            gradU(1,3)=0.25_WP*dxi*sum(pW(i:i+1,j,k:k+1,1)-pW(i-1:i,j,k:k+1,1))
+            gradU(2,3)=0.25_WP*dyi*sum(pW(i,j:j+1,k:k+1,1)-pW(i,j-1:j,k:k+1,1))
+            gradU(3,3)=        dzi*   (pW(i,j,k+1,1)      -pW(i,j,k,1)        )
             ! |∇u| = sqrt(sum of all gradients squared)
-            gradU_mag=sqrt(dudx**2+dudy**2+dudz**2+dvdx**2+dvdy**2+dvdz**2+dwdx**2+dwdy**2+dwdz**2)
+            gradU_mag=sqrt(sum(gradU**2))
             ! Normalize into a local Reynolds number
-            Re_cell=solver%rho*gradU_mag*min(dx,dy,dz)**2/solver%visc
+            Re_cell=solver%rho*gradU_mag*min(dx,dy,dz)**2/visc_mol
             ! Tagged based on cell Re value
             if (Re_cell.gt.Re_tag) tagarr(i,j,k,1)=SETtag
             ! Also tag based on closeness to sphere surface
@@ -101,15 +105,14 @@ contains
    end subroutine my_tagger
 
    !> Dirichlet BC: uniform inflow Uin at xlo/xhi for U
-   subroutine dirichlet_velocity(solver,bx,p,comp,face,time,geom)
-      use amrex_amr_module, only: amrex_box,amrex_geometry
+   subroutine dirichlet_velocity(solver,p,bx,comp,face,time)
+      use amrex_amr_module, only: amrex_box
       class(amrincomp), intent(in) :: solver
-      type(amrex_box), intent(in) :: bx
       real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
+      type(amrex_box), intent(in) :: bx
       character(len=1), intent(in) :: comp
       integer, intent(in) :: face
       real(WP), intent(in) :: time
-      type(amrex_geometry), intent(in) :: geom
       integer :: i,j,k
       ! face: 1=xlo, 2=xhi, 3=ylo, 4=yhi, 5=zlo, 6=zhi
       select case (comp)
@@ -147,7 +150,7 @@ contains
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             call initialize_volume_moments(lo=[data%amr%xlo+real(i  ,WP)*dx,data%amr%ylo+real(j  ,WP)*dy,data%amr%zlo+real(k  ,WP)*dz], &
             &                              hi=[data%amr%xlo+real(i+1,WP)*dx,data%amr%ylo+real(j+1,WP)*dy,data%amr%zlo+real(k+1,WP)*dz], &
-            &                              levelset=sphere_levelset,time=time,level=4,VFlo=VFlo,VF=pVF(i,j,k,1),BL=BL,BG=BG)
+            &                              levelset=sphere_levelset,time=time,level=3,VFlo=VFlo,VF=pVF(i,j,k,1),BL=BL,BG=BG)
             pVF(i,j,k,1)=max(pVF(i,j,k,1),VFlo)
          end do; end do; end do
       end do
@@ -188,9 +191,10 @@ contains
          use amrex_amr_module, only: amrex_bc_ext_dir,amrex_bc_foextrap
          ! Create flow solver
          call fs%initialize(amr)
-         ! Set viscosity
-         call param_read('Reynolds number',fs%visc)
-         fs%visc=1.0_WP/fs%visc
+         ! Set molecular viscosity
+         call param_read('Reynolds number',visc_mol)
+         visc_mol=1.0_WP/visc_mol
+         call fs%visc%setval(val=visc_mol)
          ! Set pressure convergence
          fs%psolver%max_iter=20
          fs%psolver%tol_rel=1.0e-5_WP
@@ -201,7 +205,7 @@ contains
          fs%U%hi_bc(1,1)=amrex_bc_foextrap
          fs%V%hi_bc(1,1)=amrex_bc_foextrap
          fs%W%hi_bc(1,1)=amrex_bc_foextrap
-         fs%user_dirichlet=>dirichlet_velocity
+         fs%user_bc=>dirichlet_velocity
       end block create_flow_solver
 
       ! Create workspace arrays
@@ -230,6 +234,9 @@ contains
          call param_read('Tagging Reynolds',Re_tag)
          ! Create initial grid
          call amr%init_from_scratch(time=time%t)
+         ! Set viscosity: molecular + SGS
+         call fs%visc%setval(val=visc_mol)
+         !call fs%add_vreman(dt=time%dt)
       end block init_regridding
 
       ! Initialize visualization
@@ -320,7 +327,7 @@ contains
             call fs%W%lincomb(a=0.5_WP,src1=fs%W,b=0.5_WP,src2=fs%Wold)
 
             ! Compute advective momentum RHS
-            call fs%get_dmomdt(U=fs%U,V=fs%V,W=fs%W,drhoUdt=resU,drhoVdt=resV,drhoWdt=resW,time=time%t)
+            call fs%get_dmomdt(U=fs%U,V=fs%V,W=fs%W,drhoUdt=resU,drhoVdt=resV,drhoWdt=resW)
 
             ! Increment velocity
             call fs%U%lincomb(a=1.0_WP,src1=fs%Uold,b=time%dt/fs%rho,src2=resU)
@@ -367,7 +374,7 @@ contains
             call fs%fill_velocity(time%t)
 
             ! Correct outflow for mass conservation
-            call fs%correct_outflow()
+            call fs%correct_outflow(VF=VF)
 
             ! Compute divergence
             call fs%get_div()
@@ -396,6 +403,10 @@ contains
             call amr%regrid(baselvl=0,time=time%t)
             call gridfile%write()
          end if
+
+         ! Update viscosity
+         call fs%visc%setval(val=visc_mol)
+         !call fs%add_vreman(dt=time%dt)
 
          ! Monitor output
          call fs%get_info()
