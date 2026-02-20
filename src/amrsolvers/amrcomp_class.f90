@@ -10,10 +10,8 @@ module amrcomp_class
    implicit none
    private
 
-   ! Expose type and dispatchers
+   ! Expose type
    public :: amrcomp
-   public :: amrcomp_on_init,amrcomp_on_coarse,amrcomp_on_remake
-   public :: amrcomp_on_clear,amrcomp_tagging,amrcomp_postregrid
 
    !> AMR Compressible solver type
    type, extends(amrsolver) :: amrcomp

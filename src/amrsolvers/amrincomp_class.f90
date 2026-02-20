@@ -14,10 +14,8 @@ module amrincomp_class
    implicit none
    private
 
-   ! Expose type and dispatchers
+   ! Expose type
    public :: amrincomp
-   public :: amrincomp_on_init, amrincomp_on_coarse, amrincomp_on_remake
-   public :: amrincomp_on_clear, amrincomp_tagging, amrincomp_postregrid
 
    !> AMR Incompressible solver type
    type, extends(amrsolver) :: amrincomp

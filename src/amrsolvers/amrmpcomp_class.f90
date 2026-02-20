@@ -22,10 +22,8 @@ module amrmpcomp_class
    integer, parameter, public :: BC_REFLECT = 3  !< Symmetry (mirror across boundary)
    integer, parameter, public :: BC_USER    = 4  !< User-defined callback
 
-   ! Expose type and dispatchers
+   ! Expose type
    public :: amrmpcomp
-   public :: amrmpcomp_on_init,amrmpcomp_on_coarse,amrmpcomp_on_remake
-   public :: amrmpcomp_on_clear,amrmpcomp_tagging,amrmpcomp_postregrid
 
    !> AMR Compressible Multiphase solver type
    type, extends(amrsolver) :: amrmpcomp
@@ -149,6 +147,8 @@ module amrmpcomp_class
       procedure :: on_remake
       procedure :: on_clear
       procedure :: post_regrid
+      procedure :: tagging
+      procedure :: get_cost
       ! Physics
       procedure :: get_primitive
       procedure :: get_conserved
@@ -322,93 +322,17 @@ contains
       call this%on_clear(lvl)
    end subroutine amrmpcomp_on_clear
 
-   !> Dispatch tagging: VOF interface tagging + user callback
+   !> Dispatch tagging: calls type-bound method then user callback
    subroutine amrmpcomp_tagging(ctx,lvl,tags,time)
-      use amrex_amr_module, only: amrex_tagboxarray,amrex_mfiter,amrex_box,amrex_multifab
-      use amrgrid_class, only: SETtag
-      use iso_c_binding, only: c_f_pointer,c_char
+      use iso_c_binding, only: c_f_pointer
       implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(c_ptr), intent(in) :: tags
       real(WP), intent(in) :: time
       type(amrmpcomp), pointer :: this
-      type(amrex_tagboxarray) :: tba
-      type(amrex_multifab) :: band
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: bx
-      character(kind=c_char), contiguous, pointer :: tagarr(:,:,:,:)
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pBand
-      integer :: i,j,k,dir,n,layer
-      integer, dimension(3) :: ind
-      integer :: eff_buffer
-      
       call c_f_pointer(ctx,this)
-      tba=tags
-      
-      ! Build band MultiFab with 1 ghost cell
-      call this%amr%mfab_build(lvl=lvl,mfab=band,ncomp=1,nover=1)
-      call band%setval(0.0_WP)
-      
-      ! Effective buffer (shrink at coarser levels)
-      eff_buffer=max(1,this%regrid_buffer/(2**(this%amr%clvl()-lvl)))
-      
-      ! Pass 1: Mark interface cells (band=1)
-      call this%amr%mfiter_build(lvl,mfi)
-      do while (mfi%next())
-         bx=mfi%tilebox()
-         pVF  =>this%VF%mf(lvl)%dataptr(mfi)
-         pBand=>band%dataptr(mfi)
-         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            ! Flag all obvious mixture cells
-            if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
-               pBand(i,j,k,1)=1.0_WP
-               cycle
-            end if
-            ! Check for implicit interfaces (pure cell adjacent to opposite phase)
-            do dir=1,3; do n=-1,+1,2
-               ind=[i,j,k]; ind(dir)=ind(dir)+n
-               if (pVF(i,j,k,1).lt.VFlo.and.pVF(ind(1),ind(2),ind(3),1).gt.VFhi.or.&
-               &   pVF(i,j,k,1).gt.VFhi.and.pVF(ind(1),ind(2),ind(3),1).lt.VFlo) then
-                  pBand(i,j,k,1)=1.0_WP
-                  cycle
-               end if
-            end do; end do
-         end do; end do; end do
-      end do
-      call this%amr%mfiter_destroy(mfi)
-      call band%fill_boundary(this%amr%geom(lvl))
-      
-      ! Pass 2: Grow band by effective buffer layers
-      do layer=2,eff_buffer
-         call this%amr%mfiter_build(lvl,mfi)
-         do while (mfi%next())
-            bx=mfi%tilebox()
-            pBand=>band%dataptr(mfi)
-            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-               if (pBand(i,j,k,1).eq.0.0_WP.and.any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.real(layer-1,WP))) pBand(i,j,k,1)=real(layer,WP)
-            end do; end do; end do
-         end do
-         call this%amr%mfiter_destroy(mfi)
-         call band%fill_boundary(this%amr%geom(lvl))
-      end do
-      
-      ! Pass 3: Set tags from band
-      call this%amr%mfiter_build(lvl,mfi)
-      do while (mfi%next())
-         bx=mfi%tilebox()
-         tagarr=>tba%dataPtr(mfi)
-         pBand =>band%dataptr(mfi)
-         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-            if (pBand(i,j,k,1).gt.0.0_WP) tagarr(i,j,k,1)=SETtag
-         end do; end do; end do
-      end do
-      call this%amr%mfiter_destroy(mfi)
-      
-      ! Cleanup
-      call this%amr%mfab_destroy(band)
-      
-      ! Call user tagging if provided
+      call this%tagging(lvl,tags,time)
       if (associated(this%user_tagging)) call this%user_tagging(this,lvl,tags,time)
    end subroutine amrmpcomp_tagging
 
@@ -424,61 +348,17 @@ contains
       call this%post_regrid(lbase,time)
    end subroutine amrmpcomp_postregrid
 
-   !> Dispatch cost: fills per-box costs for load balancing
-   !> Estimates cost based on number of mixed cells (VFlo < VF < VFhi)
-   !> per new box, sampled from old VF data via box intersection.
-   !> ba is the new BoxArray being distributed.
+   !> Dispatch cost: calls type-bound method
    subroutine amrmpcomp_get_cost(ctx,lvl,nboxes,costs,ba)
-      use iso_c_binding, only: c_f_pointer,c_associated
-      use amrex_amr_module, only: amrex_boxarray,amrex_box,amrex_mfiter,&
-      &                           amrex_mfiter_build,amrex_mfiter_destroy,amrex_intersection
-      use parallel, only: MPI_REAL_WP
-      use mpi_f08, only: MPI_ALLREDUCE,MPI_SUM,MPI_IN_PLACE
+      use iso_c_binding, only: c_f_pointer
       implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl,nboxes
       real(WP), intent(inout) :: costs(nboxes)
       type(amrex_boxarray), intent(in) :: ba
       type(amrmpcomp), pointer :: this
-      type(amrex_mfiter) :: mfi
-      type(amrex_box) :: old_bx,new_bx,isect
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
-      integer :: n,i,j,k,ierr
-      ! Recover solver object
       call c_f_pointer(ctx,this)
-      ! Guard: if VF data doesn't exist yet, return uniform costs
-      if (.not.allocated(this%VF%mf)) then; costs=1.0_WP; return; end if
-      if (.not.c_associated(this%VF%mf(lvl)%p)) then; costs=1.0_WP; return; end if
-      ! Coarser levels are never mixed
-      if (lvl.lt.this%amr%clvl()) then
-         do n=1,nboxes
-            new_bx=ba%get_box(n-1)
-            costs(n)=real(new_bx%numpts(),WP)
-         end do
-         return
-      end if
-      ! At finest level, count mixed cells per new box from local old data
-      costs=0.0_WP
-      call amrex_mfiter_build(mfi,this%VF%mf(lvl),tiling=.false.)
-      do while (mfi%next())
-         old_bx=mfi%tilebox()
-         pVF=>this%VF%mf(lvl)%dataptr(mfi)
-         do n=1,nboxes
-            new_bx=ba%get_box(n-1)  ! 0-indexed
-            if (.not.old_bx%intersects(new_bx)) cycle
-            isect=amrex_intersection(old_bx,new_bx)
-            do k=isect%lo(3),isect%hi(3); do j=isect%lo(2),isect%hi(2); do i=isect%lo(1),isect%hi(1)
-               if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
-                  costs(n)=costs(n)+this%SLcost
-               else
-                  costs(n)=costs(n)+1.0_WP
-               end if
-            end do; end do; end do
-         end do
-      end do
-      call amrex_mfiter_destroy(mfi)
-      ! Allreduce: sum partial mixed-cell counts across ranks
-      call MPI_ALLREDUCE(MPI_IN_PLACE,costs,nboxes,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
+      call this%get_cost(lvl,nboxes,costs,ba)
    end subroutine amrmpcomp_get_cost
 
    ! ============================================================================
@@ -834,6 +714,143 @@ contains
       call this%Q%fill(time)
       call this%get_primitive(this%Q)
    end subroutine post_regrid
+
+   !> Tag cells near interface with regrid_buffer layer growth
+   subroutine tagging(this,lvl,tags,time)
+      use amrex_amr_module, only: amrex_tagboxarray,amrex_mfiter,amrex_box,amrex_multifab
+      use amrgrid_class, only: SETtag
+      use iso_c_binding, only: c_char
+      implicit none
+      class(amrmpcomp), intent(inout) :: this
+      integer, intent(in) :: lvl
+      type(c_ptr), intent(in) :: tags
+      real(WP), intent(in) :: time
+      type(amrex_tagboxarray) :: tba
+      type(amrex_multifab) :: band
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      character(kind=c_char), dimension(:,:,:,:), contiguous, pointer :: tagarr
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pBand
+      integer :: i,j,k,dir,n,layer
+      integer, dimension(3) :: ind
+      integer :: eff_buffer
+      
+      tba=tags
+      
+      ! Build band MultiFab with 1 ghost cell
+      call this%amr%mfab_build(lvl=lvl,mfab=band,ncomp=1,nover=1)
+      call band%setval(0.0_WP)
+      
+      ! Effective buffer (shrink at coarser levels)
+      eff_buffer=max(1,this%regrid_buffer/(2**(this%amr%clvl()-lvl)))
+      
+      ! Pass 1: Mark interface cells (band=1)
+      call this%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         bx=mfi%tilebox()
+         pVF  =>this%VF%mf(lvl)%dataptr(mfi)
+         pBand=>band%dataptr(mfi)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Flag all obvious mixture cells
+            if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
+               pBand(i,j,k,1)=1.0_WP
+               cycle
+            end if
+            ! Check for implicit interfaces (pure cell adjacent to opposite phase)
+            do dir=1,3; do n=-1,+1,2
+               ind=[i,j,k]; ind(dir)=ind(dir)+n
+               if (pVF(i,j,k,1).lt.VFlo.and.pVF(ind(1),ind(2),ind(3),1).gt.VFhi.or.&
+               &   pVF(i,j,k,1).gt.VFhi.and.pVF(ind(1),ind(2),ind(3),1).lt.VFlo) then
+                  pBand(i,j,k,1)=1.0_WP
+                  cycle
+               end if
+            end do; end do
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      call band%fill_boundary(this%amr%geom(lvl))
+      
+      ! Pass 2: Grow band by effective buffer layers
+      do layer=2,eff_buffer
+         call this%amr%mfiter_build(lvl,mfi)
+         do while (mfi%next())
+            bx=mfi%tilebox()
+            pBand=>band%dataptr(mfi)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               if (pBand(i,j,k,1).eq.0.0_WP.and.any(pBand(i-1:i+1,j-1:j+1,k-1:k+1,1).eq.real(layer-1,WP))) pBand(i,j,k,1)=real(layer,WP)
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         call band%fill_boundary(this%amr%geom(lvl))
+      end do
+      
+      ! Pass 3: Set tags from band
+      call this%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         bx=mfi%tilebox()
+         tagarr=>tba%dataPtr(mfi)
+         pBand =>band%dataptr(mfi)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            if (pBand(i,j,k,1).gt.0.0_WP) tagarr(i,j,k,1)=SETtag
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      
+      ! Cleanup
+      call this%amr%mfab_destroy(band)
+   end subroutine tagging
+
+   !> Estimate per-box costs for load balancing
+   !> Cost based on number of mixed cells vs pure cells
+   subroutine get_cost(this,lvl,nboxes,costs,ba)
+      use iso_c_binding, only: c_associated
+      use amrex_amr_module, only: amrex_boxarray,amrex_box,amrex_mfiter,&
+      &                           amrex_mfiter_build,amrex_mfiter_destroy,amrex_intersection
+      use parallel, only: MPI_REAL_WP
+      use mpi_f08, only: MPI_ALLREDUCE,MPI_SUM,MPI_IN_PLACE
+      implicit none
+      class(amrmpcomp), intent(inout) :: this
+      integer, intent(in) :: lvl,nboxes
+      real(WP), intent(inout) :: costs(nboxes)
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: old_bx,new_bx,isect
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
+      integer :: n,i,j,k,ierr
+      ! Guard: if VF data doesn't exist yet, return uniform costs
+      if (.not.allocated(this%VF%mf)) then; costs=1.0_WP; return; end if
+      if (.not.c_associated(this%VF%mf(lvl)%p)) then; costs=1.0_WP; return; end if
+      ! Coarser levels are never mixed
+      if (lvl.lt.this%amr%clvl()) then
+         do n=1,nboxes
+            new_bx=ba%get_box(n-1)
+            costs(n)=real(new_bx%numpts(),WP)
+         end do
+         return
+      end if
+      ! At finest level, count mixed cells per new box from local old data
+      costs=0.0_WP
+      call amrex_mfiter_build(mfi,this%VF%mf(lvl),tiling=.false.)
+      do while (mfi%next())
+         old_bx=mfi%tilebox()
+         pVF=>this%VF%mf(lvl)%dataptr(mfi)
+         do n=1,nboxes
+            new_bx=ba%get_box(n-1)  ! 0-indexed
+            if (.not.old_bx%intersects(new_bx)) cycle
+            isect=amrex_intersection(old_bx,new_bx)
+            do k=isect%lo(3),isect%hi(3); do j=isect%lo(2),isect%hi(2); do i=isect%lo(1),isect%hi(1)
+               if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
+                  costs(n)=costs(n)+this%SLcost
+               else
+                  costs(n)=costs(n)+1.0_WP
+               end if
+            end do; end do; end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+      ! Allreduce: sum partial mixed-cell counts across ranks
+      call MPI_ALLREDUCE(MPI_IN_PLACE,costs,nboxes,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
+   end subroutine get_cost
 
    !> Internal fillbc for Q - calls default_fillbc first, then user_bc for ext_dir faces
    subroutine Q_fillbc(this,mf,scomp,ncomp,time,geom)
@@ -2089,7 +2106,7 @@ contains
          integer :: i,j,k,ii,jj,kk,direction,direction2
          real(WP), dimension(0:188) :: moments
          real(WP), dimension(3) :: normal,center,lo,hi
-         real(WP) :: m000,m100,m010,m001,temp,vf_cell
+         real(WP) :: m000,m100,m010,m001,temp
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCliq,pCgas,pPLIC
          logical :: flip
          type(amrex_mfiter) :: mfi
@@ -2110,20 +2127,18 @@ contains
                do j=bx%lo(2),bx%hi(2)
                   do i=bx%lo(1),bx%hi(1)
 
-                     vf_cell=pVF(i,j,k,1)
-
                      ! Handle full cells: set trivial plane
-                     if (vf_cell.lt.VFlo.or.vf_cell.gt.VFhi) then
+                     if (pVF(i,j,k,1).lt.VFlo.or.pVF(i,j,k,1).gt.VFhi) then
                         pPLIC(i,j,k,1)=0.0_WP  ! nx
                         pPLIC(i,j,k,2)=0.0_WP  ! ny
                         pPLIC(i,j,k,3)=0.0_WP  ! nz
-                        pPLIC(i,j,k,4)=sign(1.0e10_WP,vf_cell-0.5_WP)  ! d
+                        pPLIC(i,j,k,4)=sign(1.0e10_WP,pVF(i,j,k,1)-0.5_WP)  ! d
                         cycle
                      end if
 
                      ! Liquid-gas symmetry
                      flip=.false.
-                     if (vf_cell.ge.0.5_WP) flip=.true.
+                     if (pVF(i,j,k,1).ge.0.5_WP) flip=.true.
 
                      ! Initialize geometric moments
                      m000=0.0_WP; m100=0.0_WP; m010=0.0_WP; m001=0.0_WP
@@ -2227,7 +2242,7 @@ contains
                      pPLIC(i,j,k,1)=normal(1)
                      pPLIC(i,j,k,2)=normal(2)
                      pPLIC(i,j,k,3)=normal(3)
-                     pPLIC(i,j,k,4)=get_plane_dist(normal,lo,hi,vf_cell)
+                     pPLIC(i,j,k,4)=get_plane_dist(normal,lo,hi,pVF(i,j,k,1))
                   
                   end do
                end do
@@ -2284,7 +2299,7 @@ contains
       call this%smesh%reset()
 
       ! Compute new polygons
-      call this%amr%mfiter_build(lvl,mfi)
+      call this%amr%mfiter_build(lvl,mfi,tiling=.false.)
       do while (mfi%next())
 
          ! Get local and grown boxes

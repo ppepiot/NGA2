@@ -15,10 +15,8 @@ module amrscalar_class
    implicit none
    private
 
-   ! Expose type and dispatchers
+   ! Expose type
    public :: amrscalar
-   public :: amrscalar_on_init, amrscalar_on_coarse, amrscalar_on_remake
-   public :: amrscalar_on_clear, amrscalar_tagging, amrscalar_postregrid
 
    !> Constant density scalar solver object definition
    type, extends(amrsolver) :: amrscalar

@@ -62,7 +62,6 @@ module simulation
    !> Sponge parameters
    real(WP) :: R_spg=3.0_WP
    real(WP) :: L_spg=1.0_WP
-   real(WP) :: nu_spg=0.01_WP
 
    !> Tagging parameters
    real(WP) :: Rec_tag=huge(1.0_WP)
@@ -181,10 +180,14 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pTG,pVF,pQ,pVisc,pBeta,pDiff,pRHOL,pRHOG
-      real(WP) :: r_cyl,blend,mu_g,mu_l,k_g,k_l
+      real(WP) :: r_cyl,blend,nu_spg,mu_g,mu_l,k_g,k_l
       real(WP), parameter :: Tmax_visc=10.0_WP
       real(WP), parameter :: myeps=1.0e-15_WP
+      real(WP), parameter :: max_cfl=0.5_WP
       do lvl=0,amr%clvl()
+         ! Get maximum allowable kinematic viscosity in the sponge
+         nu_spg=max_cfl*min(amr%dx(lvl)**2,amr%dy(lvl)**2,amr%dz(lvl)**2)/(4.0_WP*time%dt)
+         ! Loop over domain
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
             ! Get pointers to data
