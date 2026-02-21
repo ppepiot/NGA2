@@ -51,7 +51,7 @@ module simulation
    real(WP) :: M2,Xs                  !< Post-shock Mach and shock location
    real(WP) :: Ms                     !< Shock Mach number
    real(WP) :: density_ratio          !< rhoL1/rhoG1
-   real(WP) :: sound_ratio            !< cL1/cG1
+   real(WP) :: ML                     !< Liquid Mach number
    real(WP) :: Reynolds,visc_ratio    !< Viscosity 
    real(WP) :: Prandtl ,diff_ratio    !< Heat diffusivity
    
@@ -377,14 +377,14 @@ contains
          use messager, only: log,die
          use string,   only: str_long
          character(len=str_long) :: message
-         real(WP) :: A,B,C,c1,cL0
+         real(WP) :: A,B,C
          ! Gas EoS parameters (ideal gas = stiffened gas with Pinf=0)
          call param_read('GammaG',GammaG)
          PinfG=0.0_WP
          ! Liquid EoS: gamma only, PinfL is computed below
          call param_read('GammaL',GammaL)
          ! Shock parameters (gas phase, uses GammaG)
-         call param_read('Mach number',M2)
+         call param_read('Gas Mach number',M2)
          call param_read('Shock location',Xs)
          ! Post-shock normalization: rhoG2=1, Deltau=1, T2=1
          rhoG2=1.0_WP
@@ -406,13 +406,11 @@ contains
          u1=0.0_WP
          ! CvG from T2=1
          CvG=pG2/(rhoG2*(GammaG-1.0_WP))
-         ! Liquid state from density and sound-speed ratios (pre-shock, AIAA nondim)
+         ! Liquid state from density ratio and liquid Mach number
          call param_read('Density ratio',density_ratio)
-         call param_read('Sound speed ratio',sound_ratio)
-         c1=sqrt(GammaG*pG1/rhoG1)
-         cL0=sound_ratio*c1
-         rhoL1=density_ratio*rhoG1
-         PinfL=pG1*(density_ratio*GammaG/GammaL*sound_ratio**2-1.0_WP)
+         call param_read('Liquid Mach number',ML)
+         rhoL1=density_ratio
+         PinfL=rhoL1/(GammaL*ML**2)-pG1
          pL1=pG1                                                        ! Force pressure equilibrium
          CvL=(pL1+PinfL)/(rhoL1*(GammaL-1.0_WP)*get_TG(rhoG1,pG1))      ! Force thermal equilibrium
          ! Viscous parameters
@@ -427,7 +425,7 @@ contains
          write(message,'("[Shock Mach]      Ms=",es12.5)') Ms; call log(message)
          write(message,'("[Pre-shock]  rhoG1=",es12.5," pG1=",es12.5)') rhoG1,pG1; call log(message)
          write(message,'("[Post-shock] rhoG2=",es12.5," pG2=",es12.5)') rhoG2,pG2; call log(message)
-         write(message,'("[Liquid] rhoL1=",es12.5," pL1=",es12.5," cL0=",es12.5)') rhoL1,pL1,cL0; call log(message)
+         write(message,'("[Liquid] rhoL1=",es12.5," pL1=",es12.5," ML=",es12.5)') rhoL1,pL1,ML; call log(message)
          write(message,'("[Liquid] GammaL=",es12.5," PinfL=",es12.5," CvL=",es12.5)') GammaL,PinfL,CvL; call log(message)
          write(message,'("[Gas]    GammaG=",es12.5," PinfG=",es12.5," CvG=",es12.5)') GammaG,PinfG,CvG; call log(message)
          write(message,'("[Visc]   Re=",es12.5," mu*=",es12.5," Suth_n=",es12.5," Suth_T=",es12.5)') Reynolds,visc_ratio,Suth_n,Suth_T; call log(message)
