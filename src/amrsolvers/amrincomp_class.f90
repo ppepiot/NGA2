@@ -759,12 +759,24 @@ contains
                end do; end do; end do
             end if
           case (amrex_bc_foextrap)
-            ! Neumann: copy from interior
-            select case (dir)
-             case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(src_from,j,k,1); end do; end do; end do
-             case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,src_from,k,1); end do; end do; end do
-             case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,src_from,1); end do; end do; end do
-            end select
+            ! Neumann: zero-gradient extrapolation
+            if (is_normal) then
+               ! Normal component: boundary face is a solver DOF (set by correct_outflow/projection)
+               ! Only fill ghosts beyond it, copying from the boundary face value
+               if (is_lo) then; shi(dir)=bnd-1; else; slo(dir)=bnd+1; end if
+               select case (dir)
+                case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(bnd,j,k,1); end do; end do; end do
+                case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,bnd,k,1); end do; end do; end do
+                case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,bnd,1); end do; end do; end do
+               end select
+            else
+                ! Tangent component: fill ghosts from boundary
+                select case (dir)
+                 case (1); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(src_from,j,k,1); end do; end do; end do
+                 case (2); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,src_from,k,1); end do; end do; end do
+                 case (3); do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1); p(i,j,k,1)=p(i,j,src_from,1); end do; end do; end do
+                end select
+            end if
           case (amrex_bc_reflect_even)
             ! Symmetry: F(-n) = F(n) - ghosts only
             ! Adjust slab to ghosts only
@@ -968,21 +980,44 @@ contains
    ! ============================================================================
 
    !> Compute divergence of velocity into internal div field, update divmax
+   !> Uses composite fine masking so covered coarse cells don't pollute divmax
    subroutine get_div(this)
-      use amrex_interface, only: amrmfab_compute_divergence
+      use amrex_amr_module, only: amrex_mfiter, amrex_box, amrex_imultifab, amrex_imultifab_build, amrex_imultifab_destroy
+      use amrex_interface,  only: amrmfab_compute_divergence, amrmask_make_fine
       implicit none
       class(amrincomp), intent(inout) :: this
-      integer :: lvl
+      integer :: lvl, i, j, k
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      type(amrex_imultifab) :: mask
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pDiv
+      integer, dimension(:,:,:,:), contiguous, pointer :: pMask
       ! Use our wrapper to amrex's 2nd order staggered divergence
       do lvl = 0, this%amr%clvl()
          call amrmfab_compute_divergence(this%div%mf(lvl), &
             this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), &
             this%amr%geom(lvl))
       end do
-      ! Update divmax
+      ! Update divmax using composite fine masking
       this%divmax = 0.0_WP
       do lvl = 0, this%amr%clvl()
-         this%divmax = max(this%divmax, this%div%norm0(lvl=lvl))
+         ! Build fine mask for this level (if not finest)
+         if (lvl.lt.this%amr%clvl()) then
+            call amrex_imultifab_build(mask, this%amr%ba(lvl), this%amr%dm(lvl), 1, 0)
+            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rref(lvl), this%amr%rref(lvl), this%amr%rref(lvl)], 0, 1)
+         end if
+         call this%amr%mfiter_build(lvl, mfi)
+         do while (mfi%next())
+            bx = mfi%tilebox()
+            pDiv => this%div%mf(lvl)%dataptr(mfi)
+            if (lvl.lt.this%amr%clvl()) pMask => mask%dataptr(mfi)
+            do k = bx%lo(3), bx%hi(3); do j = bx%lo(2), bx%hi(2); do i = bx%lo(1), bx%hi(1)
+               if (lvl.lt.this%amr%clvl()) then; if (pMask(i,j,k,1).eq.0) cycle; end if
+               this%divmax = max(this%divmax, abs(pDiv(i,j,k,1)))
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         if (lvl.lt.this%amr%clvl()) call amrex_imultifab_destroy(mask)
       end do
    end subroutine get_div
 
