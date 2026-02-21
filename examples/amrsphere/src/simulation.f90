@@ -114,15 +114,20 @@ contains
       integer, intent(in) :: face
       real(WP), intent(in) :: time
       integer :: i,j,k
-      ! face: 1=xlo, 2=xhi, 3=ylo, 4=yhi, 5=zlo, 6=zhi
-      select case (comp)
-       case ('U')
-         select case (face)
-          case (1)  ! xlo - Inflow Dirichlet condition
-            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-               p(i,j,k,1)=1.0_WP
-            end do; end do; end do
-         end select
+      select case (face)
+         case (1)  ! Inflow in X-
+            select case (comp)
+               ! U=1
+               case ('U')
+                  do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                     p(i,j,k,1)=1.0_WP
+                  end do; end do; end do
+               ! V=0, W=0
+               case ('V','W')
+                  do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                     p(i,j,k,1)=0.0_WP
+                  end do; end do; end do
+            end select
       end select
    end subroutine dirichlet_velocity
 
@@ -199,8 +204,8 @@ contains
          fs%psolver%tol_rel=1.0e-5_WP
          ! Set boundary conditions
          fs%U%lo_bc(1,1)=amrex_bc_ext_dir
-         fs%V%lo_bc(1,1)=amrex_bc_foextrap
-         fs%W%lo_bc(1,1)=amrex_bc_foextrap
+         fs%V%lo_bc(1,1)=amrex_bc_ext_dir
+         fs%W%lo_bc(1,1)=amrex_bc_ext_dir
          fs%U%hi_bc(1,1)=amrex_bc_foextrap
          fs%V%hi_bc(1,1)=amrex_bc_foextrap
          fs%W%hi_bc(1,1)=amrex_bc_foextrap
