@@ -1021,46 +1021,48 @@ contains
       end do
    end subroutine get_div
 
-   !> Compute pressure gradient into user-provided face amrdata
-   subroutine get_pgrad(this, dPdx, dPdy, dPdz)
+   !> Compute pressure gradient into user-provided face amrdata (assumes ghost cells are filled)
+   subroutine get_pgrad(this,dPdx,dPdy,dPdz)
       implicit none
       class(amrincomp), intent(inout) :: this
-      type(amrdata), intent(inout) :: dPdx, dPdy, dPdz
-      integer :: lvl, i, j, k
+      type(amrdata), intent(inout) :: dPdx,dPdy,dPdz
+      integer :: lvl,i,j,k
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pP, pGx, pGy, pGz
-      real(WP) :: dxi, dyi, dzi
-
-      do lvl = 0, this%amr%clvl()
-         dxi = 1.0_WP / this%amr%dx(lvl)
-         dyi = 1.0_WP / this%amr%dy(lvl)
-         dzi = 1.0_WP / this%amr%dz(lvl)
-
-         call this%amr%mfiter_build(lvl, mfi)
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pP,pGx,pGy,pGz
+      real(WP) :: dxi,dyi,dzi
+      do lvl=0,this%amr%clvl()
+         dxi=1.0_WP/this%amr%dx(lvl)
+         dyi=1.0_WP/this%amr%dy(lvl)
+         dzi=1.0_WP/this%amr%dz(lvl)
+         call this%amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
-            bx = mfi%tilebox()
-            pP  => this%P%mf(lvl)%dataptr(mfi)
-            pGx => dPdx%mf(lvl)%dataptr(mfi)
-            pGy => dPdy%mf(lvl)%dataptr(mfi)
-            pGz => dPdz%mf(lvl)%dataptr(mfi)
-
-            do k = bx%lo(3), bx%hi(3)
-               do j = bx%lo(2), bx%hi(2)
-                  do i = bx%lo(1), bx%hi(1)
-                     pGx(i,j,k,1) = (pP(i,j,k,1) - pP(i-1,j,k,1)) * dxi
-                     pGy(i,j,k,1) = (pP(i,j,k,1) - pP(i,j-1,k,1)) * dyi
-                     pGz(i,j,k,1) = (pP(i,j,k,1) - pP(i,j,k-1,1)) * dzi
-                  end do
-               end do
-            end do
+            pP=>this%P%mf(lvl)%dataptr(mfi)
+            pGx=>dPdx%mf(lvl)%dataptr(mfi)
+            pGy=>dPdy%mf(lvl)%dataptr(mfi)
+            pGz=>dPdz%mf(lvl)%dataptr(mfi)
+            ! dP/dx at x-faces
+            bx=mfi%nodaltilebox(1)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pGx(i,j,k,1)=(pP(i,j,k,1)-pP(i-1,j,k,1))*dxi
+            end do; end do; end do
+            ! dP/dy at y-faces
+            bx=mfi%nodaltilebox(2)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pGy(i,j,k,1)=(pP(i,j,k,1)-pP(i,j-1,k,1))*dyi
+            end do; end do; end do
+            ! dP/dz at z-faces
+            bx=mfi%nodaltilebox(3)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               pGz(i,j,k,1)=(pP(i,j,k,1)-pP(i,j,k-1,1))*dzi
+            end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
       end do
    end subroutine get_pgrad
 
-   !> Compute momentum advection RHS for all levels
-   !> drhoUdt = -∇·(ρuu), drhoVdt = -∇·(ρuv), drhoWdt = -∇·(ρuw)
+   !> Compute momentum advection and viscous terms for all levels
+   !> No pressure gradient, user can add it in the main loop
    !> Uses flux averaging at C/F interfaces for conservation
    subroutine get_dmomdt(this,U,V,W,drhoUdt,drhoVdt,drhoWdt)
       use amrex_amr_module, only: amrex_multifab,amrex_multifab_destroy,amrex_mfiter,amrex_box
@@ -1077,7 +1079,7 @@ contains
       type(amrex_box) :: bx
       integer :: lvl,i,j,k
       real(WP) :: dxi,dyi,dzi
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW,pP
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFUx,pFUy,pFUz
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFVx,pFVy,pFVz
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFWx,pFWy,pFWz
@@ -1110,7 +1112,6 @@ contains
             ! Cell-centered tile
             bx=mfi%tilebox()
             ! Get pointers to data
-            pP=>this%P%mf(lvl)%dataptr(mfi)
             pU=>U%mf(lvl)%dataptr(mfi)
             pV=>V%mf(lvl)%dataptr(mfi)
             pW=>W%mf(lvl)%dataptr(mfi)
@@ -1126,9 +1127,9 @@ contains
             pVisc=>this%visc%mf(lvl)%dataptr(mfi)
             ! Diagonal fluxes
             do k=bx%lo(3)-1,bx%hi(3)+1; do j=bx%lo(2)-1,bx%hi(2)+1; do i=bx%lo(1)-1,bx%hi(1)+1
-               pFUx(i,j,k,1)=-0.25_WP*this%rho*sum(pU(i:i+1,j,k,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pU(i+1,j,k,1)-pU(i,j,k,1))*dxi
-               pFVy(i,j,k,1)=-0.25_WP*this%rho*sum(pV(i,j:j+1,k,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pV(i,j+1,k,1)-pV(i,j,k,1))*dyi
-               pFWz(i,j,k,1)=-0.25_WP*this%rho*sum(pW(i,j,k:k+1,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pW(i,j,k+1,1)-pW(i,j,k,1))*dzi
+               pFUx(i,j,k,1)=-0.25_WP*this%rho*sum(pU(i:i+1,j,k,1))**2+2.0_WP*pVisc(i,j,k,1)*(pU(i+1,j,k,1)-pU(i,j,k,1))*dxi
+               pFVy(i,j,k,1)=-0.25_WP*this%rho*sum(pV(i,j:j+1,k,1))**2+2.0_WP*pVisc(i,j,k,1)*(pV(i,j+1,k,1)-pV(i,j,k,1))*dyi
+               pFWz(i,j,k,1)=-0.25_WP*this%rho*sum(pW(i,j,k:k+1,1))**2+2.0_WP*pVisc(i,j,k,1)*(pW(i,j,k+1,1)-pW(i,j,k,1))*dzi
             end do; end do; end do
             ! xy-edge (FUy, FVx): nodal in x,y; cell in z -> [lo,hi] in z; [lo,hi+1] in x,y
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)+1; do i=bx%lo(1),bx%hi(1)+1
