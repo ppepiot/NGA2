@@ -85,6 +85,8 @@ contains
          pV=>solver%V%mf(lvl)%dataptr(mfi)
          pW=>solver%W%mf(lvl)%dataptr(mfi)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! No refinement 5D from the outflow
+            if (solver%amr%xlo+(real(i,WP)+0.5_WP)*dx.gt.solver%amr%xhi-5.0_WP) cycle
             ! Velocity gradient tensor
             gradU(1,1)=        dxi*   (pU(i+1,j,k,1)      -pU(i,j,k,1)        )
             gradU(2,1)=0.25_WP*dyi*sum(pU(i:i+1,j:j+1,k,1)-pU(i:i+1,j-1:j,k,1))
