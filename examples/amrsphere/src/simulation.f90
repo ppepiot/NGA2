@@ -379,12 +379,13 @@ contains
             ! Compute divergence
             call fs%get_div()
 
-            ! Solve pressure Poisson
+            ! Solve pressure Poisson and increment pressure
             call fs%div%mult(val=fs%rho/time%dt)
-            call fs%psolver%solve(rhs=fs%div,phi=fs%P)
+            call fs%psolver%solve(rhs=fs%div)
+            call fs%P%add(src=fs%psolver%sol)
 
             ! Get gradients and correct velocity
-            call fs%psolver%get_fluxes(phi=fs%P,flux_x=resU,flux_y=resV,flux_z=resW)
+            call fs%psolver%get_fluxes(flux_x=resU,flux_y=resV,flux_z=resW)
             call fs%U%saxpy(a=time%dt/fs%rho,src=resU)
             call fs%V%saxpy(a=time%dt/fs%rho,src=resV)
             call fs%W%saxpy(a=time%dt/fs%rho,src=resW)

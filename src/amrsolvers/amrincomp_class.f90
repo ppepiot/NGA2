@@ -1042,7 +1042,7 @@ contains
       type(amrex_box) :: bx
       integer :: lvl,i,j,k
       real(WP) :: dxi,dyi,dzi
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW,pP
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFUx,pFUy,pFUz
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFVx,pFVy,pFVz
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pFWx,pFWy,pFWz
@@ -1075,6 +1075,7 @@ contains
             ! Cell-centered tile
             bx=mfi%tilebox()
             ! Get pointers to data
+            pP=>this%P%mf(lvl)%dataptr(mfi)
             pU=>U%mf(lvl)%dataptr(mfi)
             pV=>V%mf(lvl)%dataptr(mfi)
             pW=>W%mf(lvl)%dataptr(mfi)
@@ -1090,9 +1091,9 @@ contains
             pVisc=>this%visc%mf(lvl)%dataptr(mfi)
             ! Diagonal fluxes
             do k=bx%lo(3)-1,bx%hi(3)+1; do j=bx%lo(2)-1,bx%hi(2)+1; do i=bx%lo(1)-1,bx%hi(1)+1
-               pFUx(i,j,k,1)=-0.25_WP*this%rho*sum(pU(i:i+1,j,k,1))**2+2.0_WP*pVisc(i,j,k,1)*(pU(i+1,j,k,1)-pU(i,j,k,1))*dxi
-               pFVy(i,j,k,1)=-0.25_WP*this%rho*sum(pV(i,j:j+1,k,1))**2+2.0_WP*pVisc(i,j,k,1)*(pV(i,j+1,k,1)-pV(i,j,k,1))*dyi
-               pFWz(i,j,k,1)=-0.25_WP*this%rho*sum(pW(i,j,k:k+1,1))**2+2.0_WP*pVisc(i,j,k,1)*(pW(i,j,k+1,1)-pW(i,j,k,1))*dzi
+               pFUx(i,j,k,1)=-0.25_WP*this%rho*sum(pU(i:i+1,j,k,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pU(i+1,j,k,1)-pU(i,j,k,1))*dxi
+               pFVy(i,j,k,1)=-0.25_WP*this%rho*sum(pV(i,j:j+1,k,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pV(i,j+1,k,1)-pV(i,j,k,1))*dyi
+               pFWz(i,j,k,1)=-0.25_WP*this%rho*sum(pW(i,j,k:k+1,1))**2-pP(i,j,k,1)+2.0_WP*pVisc(i,j,k,1)*(pW(i,j,k+1,1)-pW(i,j,k,1))*dzi
             end do; end do; end do
             ! xy-edge (FUy, FVx): nodal in x,y; cell in z -> [lo,hi] in z; [lo,hi+1] in x,y
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)+1; do i=bx%lo(1),bx%hi(1)+1

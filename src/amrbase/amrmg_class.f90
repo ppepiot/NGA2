@@ -62,6 +62,8 @@ module amrmg_class
       type(amrex_poisson), private :: poisson
       type(amrex_abeclaplacian), private :: abeclap
       type(amrex_multigrid), private :: multigrid
+      ! Internal solution storage for incremental solves
+      type(amrdata) :: sol  
    contains
       procedure :: initialize
       procedure :: setup
@@ -80,6 +82,8 @@ contains
    !> Initialize solver with grid and type
    subroutine initialize(this, amr, type)
       use messager, only: die, log
+      use amrdata_class, only: amrex_interp_none
+      implicit none
       class(amrmg), intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
       integer, intent(in) :: type  !< amrmg_cstcoef or amrmg_varcoef (required)
@@ -118,6 +122,10 @@ contains
          this%hi_bc(3) = amrmg_bc_neumann
       end if
 
+      ! Initialize internal solution storage
+      call this%sol%initialize(amr,name='sol',ncomp=1,ng=1,interp=amrex_interp_none); call this%sol%register()
+
+      ! Log setup info
       if (type .eq. amrmg_cstcoef) then
          call log('[amrmg] Initialized constant-coefficient solver')
       else
@@ -129,6 +137,7 @@ contains
    !> For varcoef type, bcoef fields must be provided
    subroutine setup(this, acoef, bcoef_x, bcoef_y, bcoef_z)
       use messager, only: die
+      implicit none
       class(amrmg), intent(inout) :: this
       type(amrdata), intent(in), optional :: acoef
       type(amrdata), intent(in), optional :: bcoef_x, bcoef_y, bcoef_z
@@ -205,18 +214,21 @@ contains
    end subroutine setup
 
    !> Solve - uses stored operator and multigrid
-   !> @param phi Solution field (in: initial guess with BC in ghosts, out: solution)
    !> @param rhs Right-hand side field
-   subroutine solve(this, phi, rhs)
+   !> @param phi Optional solution field (in: initial guess with BC in ghosts, out: solution)
+   subroutine solve(this, rhs, phi)
       use messager, only: die
       class(amrmg), intent(inout) :: this
-      type(amrdata), intent(inout) :: phi
       type(amrdata), intent(in) :: rhs
+      type(amrdata), intent(inout), optional :: phi
 
       type(amrex_multifab), dimension(:), allocatable :: sol, rhsmf
 
       if (this%type .eq. -1) call die('[amrmg solve] Solver not initialized')
       if (.not. this%setup_done) call die('[amrmg solve] Solver not setup')
+
+      ! Zero internal storage if not using user's phi
+      if (.not.present(phi)) call this%sol%setval(val=0.0_WP)
 
       ! Build solution/rhs arrays
       build_arrays: block
@@ -224,7 +236,11 @@ contains
          allocate(sol(0:this%amr%clvl()))
          allocate(rhsmf(0:this%amr%clvl()))
          do lev = 0, this%amr%clvl()
-            sol(lev) = phi%mf(lev)
+            if (present(phi)) then
+               sol(lev) = phi%mf(lev)
+            else
+               sol(lev) = this%sol%mf(lev)
+            end if
             rhsmf(lev) = rhs%mf(lev)
          end do
       end block build_arrays
@@ -381,13 +397,13 @@ contains
    !> @param flux_x X-face-centered flux output
    !> @param flux_y Y-face-centered flux output
    !> @param flux_z Z-face-centered flux output
-   subroutine get_fluxes(this, phi, flux_x, flux_y, flux_z)
+   subroutine get_fluxes(this, flux_x, flux_y, flux_z, phi)
       use iso_c_binding, only: c_ptr
       use messager, only: die
       use amrex_interface, only: amrmlmg_get_fluxes
       class(amrmg), intent(in) :: this
-      type(amrdata), intent(in) :: phi
       type(amrdata), intent(inout) :: flux_x, flux_y, flux_z
+      type(amrdata), intent(in), optional :: phi
 
       type(c_ptr), dimension(:), allocatable :: sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs
       integer :: lev, nlevs
@@ -403,7 +419,11 @@ contains
       allocate(fz_ptrs(0:this%amr%clvl()))
 
       do lev = 0, this%amr%clvl()
-         sol_ptrs(lev) = phi%mf(lev)%p
+         if (present(phi)) then
+            sol_ptrs(lev) = phi%mf(lev)%p
+         else
+            sol_ptrs(lev) = this%sol%mf(lev)%p
+         end if
          fx_ptrs(lev) = flux_x%mf(lev)%p
          fy_ptrs(lev) = flux_y%mf(lev)%p
          fz_ptrs(lev) = flux_z%mf(lev)%p
@@ -488,6 +508,7 @@ contains
    subroutine finalize(this)
       class(amrmg), intent(inout) :: this
       if (this%setup_done) call this%destroy()
+      call this%sol%finalize()
       nullify(this%amr)
       this%type = -1
    end subroutine finalize
