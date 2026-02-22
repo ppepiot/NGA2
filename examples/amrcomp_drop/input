@@ -6,8 +6,8 @@ Max level: 5
 
 # Regridding parameters
 Regrid nsteps: 10
-Tagging Rec:   100
-Tagging Res:   100
+Tagging Rec:   50
+Tagging Res:   10
 
 # Gammas
 GammaG: 1.3
@@ -37,4 +37,4 @@ Max time: 1e2
 # Output
 Output period:     1e-1
 Checkpoint period: 1
-Restart from:      !restart/drop_3.50000E+01
+Restart from:      !restart/drop_1.80000E+01

@@ -1180,7 +1180,7 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
-         real(WP) :: Fc,alpha
+         real(WP) :: Fc
          ! Get finest level info
          lvl=this%amr%clvl()
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
@@ -1231,14 +1231,10 @@ contains
                end do
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
-               ! Constant blending of SL momentum fluxes with centered fluxes
-               !pFx(i,j,k,5)=this%SLblend*pFx(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1))
-               !pFx(i,j,k,6)=this%SLblend*pFx(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1))
-               !pFx(i,j,k,7)=this%SLblend*pFx(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1))
-               ! Locally adaptive SL/centered momentum blending
-               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,5))/(abs(Fc)+abs(pFx(i,j,k,5))+tiny(1.0_WP)); pFx(i,j,k,5)=alpha*pFx(i,j,k,5)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,6))/(abs(Fc)+abs(pFx(i,j,k,6))+tiny(1.0_WP)); pFx(i,j,k,6)=alpha*pFx(i,j,k,6)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,7))/(abs(Fc)+abs(pFx(i,j,k,7))+tiny(1.0_WP)); pFx(i,j,k,7)=alpha*pFx(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Minmod momentum flux limiting
+               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1)); pFx(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFx(i,j,k,5))),pFx(i,j,k,5)),pFx(i,j,k,5),Fc*pFx(i,j,k,5).gt.0.0_WP)
+               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1)); pFx(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFx(i,j,k,6))),pFx(i,j,k,6)),pFx(i,j,k,6),Fc*pFx(i,j,k,6).gt.0.0_WP)
+               Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1)); pFx(i,j,k,7)=merge(sign(min(abs(Fc),abs(pFx(i,j,k,7))),pFx(i,j,k,7)),pFx(i,j,k,7),Fc*pFx(i,j,k,7).gt.0.0_WP)
             end do; end do; end do
             ! Y-fluxes
             fbx=mfi%nodaltilebox(2)
@@ -1268,14 +1264,10 @@ contains
                end do
                ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
-               ! Constant blending of SL momentum fluxes with centered fluxes
-               !pFy(i,j,k,5)=this%SLblend*pFy(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1))
-               !pFy(i,j,k,6)=this%SLblend*pFy(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1))
-               !pFy(i,j,k,7)=this%SLblend*pFy(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1))
-               ! Locally adaptive SL/centered momentum blending
-               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,5))/(abs(Fc)+abs(pFy(i,j,k,5))+tiny(1.0_WP)); pFy(i,j,k,5)=alpha*pFy(i,j,k,5)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,6))/(abs(Fc)+abs(pFy(i,j,k,6))+tiny(1.0_WP)); pFy(i,j,k,6)=alpha*pFy(i,j,k,6)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,7))/(abs(Fc)+abs(pFy(i,j,k,7))+tiny(1.0_WP)); pFy(i,j,k,7)=alpha*pFy(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Minmod momentum flux limiting
+               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1)); pFy(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFy(i,j,k,5))),pFy(i,j,k,5)),pFy(i,j,k,5),Fc*pFy(i,j,k,5).gt.0.0_WP)
+               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1)); pFy(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFy(i,j,k,6))),pFy(i,j,k,6)),pFy(i,j,k,6),Fc*pFy(i,j,k,6).gt.0.0_WP)
+               Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1)); pFy(i,j,k,7)=merge(sign(min(abs(Fc),abs(pFy(i,j,k,7))),pFy(i,j,k,7)),pFy(i,j,k,7),Fc*pFy(i,j,k,7).gt.0.0_WP)
             end do; end do; end do
             ! Z-fluxes
             fbx=mfi%nodaltilebox(3)
@@ -1305,14 +1297,10 @@ contains
                end do
                ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
-               ! Constant blending of SL momentum fluxes with centered fluxes
-               !pFz(i,j,k,5)=this%SLblend*pFz(i,j,k,5)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1))
-               !pFz(i,j,k,6)=this%SLblend*pFz(i,j,k,6)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1))
-               !pFz(i,j,k,7)=this%SLblend*pFz(i,j,k,7)+(1.0_WP-this%SLblend)*sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1))
-               ! Locally adaptive SL/centered momentum blending
-               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,5))/(abs(Fc)+abs(pFz(i,j,k,5))+tiny(1.0_WP)); pFz(i,j,k,5)=alpha*pFz(i,j,k,5)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,6))/(abs(Fc)+abs(pFz(i,j,k,6))+tiny(1.0_WP)); pFz(i,j,k,6)=alpha*pFz(i,j,k,6)+(1.0_WP-alpha)*Fc
-               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,7))/(abs(Fc)+abs(pFz(i,j,k,7))+tiny(1.0_WP)); pFz(i,j,k,7)=alpha*pFz(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Minmod momentum flux limiting
+               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1)); pFz(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFz(i,j,k,5))),pFz(i,j,k,5)),pFz(i,j,k,5),Fc*pFz(i,j,k,5).gt.0.0_WP)
+               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1)); pFz(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFz(i,j,k,6))),pFz(i,j,k,6)),pFz(i,j,k,6),Fc*pFz(i,j,k,6).gt.0.0_WP)
+               Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1)); pFz(i,j,k,7)=merge(sign(min(abs(Fc),abs(pFz(i,j,k,7))),pFz(i,j,k,7)),pFz(i,j,k,7),Fc*pFz(i,j,k,7).gt.0.0_WP)
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
