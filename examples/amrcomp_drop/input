@@ -1,13 +1,13 @@
 # AMR grid
 Base nx:   32
 Base ny:   32
-Base nz:   32
+Base nz:   1
 Max level: 5
 
 # Regridding parameters
 Regrid nsteps: 10
-Tagging Rec:   50
-Tagging Res:   10
+Tagging Rec:   100
+Tagging Res:   100
 
 # Gammas
 GammaG: 1.3

@@ -11,7 +11,6 @@ module amrscalar_class
    use amrio_class,      only: amrio
    use amrex_amr_module, only: amrex_multifab, amrex_boxarray, amrex_distromap, &
    &                           amrex_mfiter, amrex_box, amrex_fab
-   use amrex_multifabutil_module, only: amrex_average_down_faces
    implicit none
    private
 
@@ -243,7 +242,7 @@ contains
       call this%SC%setval(val=0.0_WP, lvl=lvl)
       call this%SCold%setval(val=0.0_WP, lvl=lvl)
       ! Reset flux register for fine levels (if using refluxing)
-      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)])
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse
@@ -258,7 +257,7 @@ contains
       ! SCold just needs geometry
       call this%SCold%reset_level(lvl, ba, dm)
       ! Reset flux register (if using refluxing)
-      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)])
    end subroutine on_coarse
 
 
@@ -274,7 +273,7 @@ contains
       ! SCold just needs new geometry
       call this%SCold%reset_level(lvl, ba, dm)
       ! Rebuild flux register for fine levels (if using refluxing)
-      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, this%amr%rref(lvl-1))
+      if (this%use_refluxing .and. lvl .ge. 1) call this%flux%reset_level(lvl, ba, dm, [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)])
    end subroutine on_remake
 
 
@@ -341,6 +340,7 @@ contains
    !> Calculate dSC/dt for all levels (all-level API)
    !> Uses flux averaging if use_refluxing=.false., FluxRegister if .true.
    subroutine get_dSCdt(this, U, V, W, SC, dSCdt)
+      use amrex_interface, only: amrmfab_average_down_faces
       implicit none
       class(amrscalar), intent(inout) :: this
       class(amrdata), intent(in) :: U, V, W        ! Face-centered velocity
@@ -427,7 +427,10 @@ contains
       if (.not.this%use_refluxing) then
          ! Flux averaging: average fine fluxes down to coarse
          do lvl = this%amr%clvl(), 1, -1
-            call amrex_average_down_faces(flx(:,lvl), flx(:,lvl-1), this%amr%geom(lvl-1), 1, this%nscalar, this%amr%rref(lvl-1))
+            call amrmfab_average_down_faces(flx(1,lvl)%p, flx(2,lvl)%p, flx(3,lvl)%p, &
+            &   flx(1,lvl-1)%p, flx(2,lvl-1)%p, flx(3,lvl-1)%p, &
+            &   this%amr%geom(lvl-1)%p, 1, this%nscalar, &
+            &   [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)])
          end do
       end if
 

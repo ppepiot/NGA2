@@ -81,6 +81,7 @@ contains
       real(WP), intent(in) :: t
       real(WP) :: G
       G=0.5_WP-sqrt(xyz(1)**2+xyz(2)**2+xyz(3)**2)
+      if (amr%nz.eq.1) G=0.5_WP-sqrt(xyz(1)**2+xyz(2)**2) ! Enable quasi-2D runs
    end function sphere_levelset
 
    !> Liquid EOS: P=f(RHO,I) - Stiffened gas
@@ -184,9 +185,12 @@ contains
       real(WP), parameter :: Tmax_visc=10.0_WP
       real(WP), parameter :: myeps=1.0e-15_WP
       real(WP), parameter :: max_cfl=0.5_WP
+      ! Get maximum allowable kinematic viscosity in the sponge at finest level
+      nu_spg=max_cfl*min(amr%dx(amr%clvl())**2,amr%dy(amr%clvl())**2,amr%dz(amr%clvl())**2)/(4.0_WP*time%dt)
+      ! Loop over levels
       do lvl=0,amr%clvl()
-         ! Get maximum allowable kinematic viscosity in the sponge
-         nu_spg=max_cfl*min(amr%dx(lvl)**2,amr%dy(lvl)**2,amr%dz(lvl)**2)/(4.0_WP*time%dt)
+         ! Get maximum allowable kinematic viscosity in the sponge at that level
+         !nu_spg=max_cfl*min(amr%dx(lvl)**2,amr%dy(lvl)**2,amr%dz(lvl)**2)/(4.0_WP*time%dt)
          ! Loop over domain
          call amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
@@ -220,10 +224,11 @@ contains
                pDiff(i,j,k,1)=1.0_WP/(pVF(i,j,k,1)/max(k_l,myeps)+(1.0_WP-pVF(i,j,k,1))/max(k_g,myeps)) ! Harmonic averaging
                ! Apply sponge layer viscosity
                r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2+(amr%zlo+(real(k,WP)+0.5_WP)*amr%dz(lvl))**2)
+               if (amr%nz.eq.1) r_cyl=sqrt((amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl))**2) ! Enable quasi-2D runs
                if (r_cyl.gt.R_spg) then
                   blend=min((r_cyl-R_spg)/L_spg,1.0_WP)**2
                   pVisc(i,j,k,1)=max(pVisc(i,j,k,1),blend*nu_spg/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),myeps)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),myeps)))
-                  pDiff(i,j,k,1)=max(pDiff(i,j,k,1),blend*nu_spg/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),myeps)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),myeps)))
+                  !pDiff(i,j,k,1)=max(pDiff(i,j,k,1),blend*nu_spg/(pVF(i,j,k,1)/max(pRHOL(i,j,k,1),myeps)+(1.0_WP-pVF(i,j,k,1))/max(pRHOG(i,j,k,1),myeps)))
                end if
             end do; end do; end do
          end do
@@ -442,6 +447,11 @@ contains
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
          amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
          call param_read('Max level',amr%maxlvl)
+         ! Enable quasi-2D
+         if (amr%nz.eq.1) then
+            amr%zlo=-0.5_WP*(amr%yhi-amr%ylo)/real(amr%ny*2**amr%maxlvl,WP)
+            amr%zhi=+0.5_WP*(amr%yhi-amr%ylo)/real(amr%ny*2**amr%maxlvl,WP)
+         end if
          call amr%initialize()
       end block create_amrgrid
 
@@ -548,7 +558,7 @@ contains
       ! Initialize visualization
       create_viz: block
          ! Create visualization object
-         call viz%initialize(amr,'drop')
+         call viz%initialize(amr,'drop',use_hdf5=.false.)
          call viz%add_scalar(fs%VF,1,'VF')
          call viz%add_scalar(fs%RHOL,1,'RHOL')
          call viz%add_scalar(fs%RHOG,1,'RHOG')

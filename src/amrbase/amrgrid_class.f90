@@ -127,8 +127,10 @@ module amrgrid_class
       integer :: nmax=32
       ! Blocking factor
       integer :: nbloc=8
-      ! Refinement ratio
-      integer, dimension(:), allocatable :: rref
+      ! Per direction refinement ratios
+      integer, dimension(:), allocatable :: rrefx
+      integer, dimension(:), allocatable :: rrefy
+      integer, dimension(:), allocatable :: rrefz
       ! Geometry object at each level
       type(amrex_geometry), dimension(:), allocatable :: geom
       ! Shortcut for domain volume
@@ -229,14 +231,29 @@ contains
          use amrex_amr_module, only: amrex_parmparse,amrex_parmparse_build,amrex_parmparse,amrex_parmparse_destroy
          type(amrex_parmparse) :: pp
          integer, dimension(3) :: per
+         integer, dimension(3*this%maxlvl) :: rr_vect
+         integer :: i
          call amrex_parmparse_build(pp,'amr')
          call pp%addarr('n_cell'         ,[this%nx,this%ny,this%nz])
          if (this%maxlvl.lt.0) call die('[amrgrid initialize] maxlvl must be >= 0')
          call pp%add   ('max_level'      ,this%maxlvl)
          call pp%add   ('blocking_factor',this%nbloc)
+         if (this%nx.eq.1) call pp%add('blocking_factor_x',1)
+         if (this%ny.eq.1) call pp%add('blocking_factor_y',1)
+         if (this%nz.eq.1) call pp%add('blocking_factor_z',1)
          call pp%add   ('max_grid_size'  ,this%nmax)
-         if (.not.allocated(this%rref)) this%rref=[2]
-         call pp%addarr('ref_ratio'      ,this%rref)
+         if (.not.allocated(this%rrefx)) this%rrefx=[2]
+         if (.not.allocated(this%rrefy)) this%rrefy=[2]
+         if (.not.allocated(this%rrefz)) this%rrefz=[2]
+         if (this%nx.eq.1) this%rrefx=[1]
+         if (this%ny.eq.1) this%rrefy=[1]
+         if (this%nz.eq.1) this%rrefz=[1]
+         do i=1,this%maxlvl
+            rr_vect(3*i-2)=this%rrefx(min(i,size(this%rrefx)))
+            rr_vect(3*i-1)=this%rrefy(min(i,size(this%rrefy)))
+            rr_vect(3*i-0)=this%rrefz(min(i,size(this%rrefz)))
+         end do
+         call pp%addarr('ref_ratio_vect',rr_vect)
          call amrex_parmparse_destroy(pp)
          call amrex_parmparse_build(pp,'geometry')
          call pp%add   ('coord_sys'      ,this%coordsys)
@@ -245,8 +262,8 @@ contains
          if (this%yper) per(2)=1
          if (this%zper) per(3)=1
          call pp%addarr('is_periodic',per)
-         call pp%addarr('prob_lo'    ,[this%xlo,this%ylo,this%zlo])
-         call pp%addarr('prob_hi'    ,[this%xhi,this%yhi,this%zhi])
+         call pp%addarr('prob_lo',[this%xlo,this%ylo,this%zlo])
+         call pp%addarr('prob_hi',[this%xhi,this%yhi,this%zhi])
          call amrex_parmparse_destroy(pp)
       end block set_params
       ! Create an amrcore object using our C++ interface
@@ -285,9 +302,11 @@ contains
       end block store_geometries
       ! Store effective refinement ratio
       store_ref_ratio: block
-         use amrex_interface, only: amrcore_get_ref_ratio
-         if (allocated(this%rref)) deallocate(this%rref); allocate(this%rref(0:this%maxlvl-1))
-         call amrcore_get_ref_ratio(this%rref,this%amrcore)
+         use amrex_interface, only: amrcore_get_ref_ratio_xyz
+         if (allocated(this%rrefx)) deallocate(this%rrefx); allocate(this%rrefx(0:this%maxlvl-1))
+         if (allocated(this%rrefy)) deallocate(this%rrefy); allocate(this%rrefy(0:this%maxlvl-1))
+         if (allocated(this%rrefz)) deallocate(this%rrefz); allocate(this%rrefz(0:this%maxlvl-1))
+         call amrcore_get_ref_ratio_xyz(this%rrefx,this%rrefy,this%rrefz,this%amrcore)
       end block store_ref_ratio
       ! Store parallel info
       store_parallel_info: block
@@ -330,7 +349,9 @@ contains
          this%amrcore=c_null_ptr
       end if
       ! Deallocate allocatable arrays
-      if (allocated(this%rref)) deallocate(this%rref)
+      if (allocated(this%rrefx)) deallocate(this%rrefx)
+      if (allocated(this%rrefy)) deallocate(this%rrefy)
+      if (allocated(this%rrefz)) deallocate(this%rrefz)
       if (allocated(this%geom)) deallocate(this%geom)
       if (allocated(this%dx))   deallocate(this%dx)
       if (allocated(this%dy))   deallocate(this%dy)
@@ -516,7 +537,9 @@ contains
          write(output_unit,'("AMR Cartesian grid [",a,"]")') trim(this%name)
          write(output_unit,'(" > amr level = ",i2)') this%clvl()
          write(output_unit,'(" > max level = ",i2)') this%maxlvl
-         if (allocated(this%rref)) write(output_unit,'(" > ref ratio = ",100(" ",i0))') this%rref
+         if (allocated(this%rrefx)) write(output_unit,'(" > ref ratio x = ",100(" ",i0))') this%rrefx
+         if (allocated(this%rrefy)) write(output_unit,'(" > ref ratio y = ",100(" ",i0))') this%rrefy
+         if (allocated(this%rrefz)) write(output_unit,'(" > ref ratio z = ",100(" ",i0))') this%rrefz
          write(output_unit,'(" >    extent = [",es12.5,",",es12.5,"]x[",es12.5,",",es12.5,"]x[",es12.5,",",es12.5,"]")') this%xlo,this%xhi,this%ylo,this%yhi,this%zlo,this%zhi
          write(output_unit,'(" >  periodic = ",l1,"x",l1,"x",l1)') this%xper,this%yper,this%zper
          ! Loop over levels

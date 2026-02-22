@@ -457,7 +457,7 @@ contains
       real(WP), intent(in) :: time
       type(c_ptr) :: ctx_u, ctx_v, ctx_w
       type(c_funptr) :: bc_dispatch
-      integer :: rr, lo_bc(9), hi_bc(9)
+      integer :: rr(3), lo_bc(9), hi_bc(9)
       real(WP) :: t_old, t_new
 
       ! Get contexts for each velocity component
@@ -482,7 +482,7 @@ contains
          hi_bc(1:3) = this%U%hi_bc(:,1)
          hi_bc(4:6) = this%V%hi_bc(:,1)
          hi_bc(7:9) = this%W%hi_bc(:,1)
-         rr = this%amr%rref(lvl-1)
+         rr = [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)]
          ! Call 3-component divfree FillPatch from two levels
          call amrmfab_fillpatch_two_faces( &
          &   this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), time, &
@@ -524,7 +524,7 @@ contains
       real(WP), intent(in) :: time
       type(c_ptr) :: ctx_u, ctx_v, ctx_w
       type(c_funptr) :: bc_dispatch
-      integer :: rr, lo_bc(9), hi_bc(9)
+      integer :: rr(3), lo_bc(9), hi_bc(9)
       ! Get contexts for each velocity component
       ctx_u = c_loc(this%U); ctx_v = c_loc(this%V); ctx_w = c_loc(this%W)
       bc_dispatch = c_funloc(amrdata_fillbc)
@@ -535,7 +535,7 @@ contains
       hi_bc(1:3) = this%U%hi_bc(:,1)
       hi_bc(4:6) = this%V%hi_bc(:,1)
       hi_bc(7:9) = this%W%hi_bc(:,1)
-      rr = this%amr%rref(lvl-1)
+      rr = [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)]
       ! Call 3-component divfree FillCoarsePatch
       call amrmfab_fillcoarsepatch_faces( &
       &   this%U%mf(lvl), this%V%mf(lvl), this%W%mf(lvl), time, &
@@ -582,7 +582,7 @@ contains
       real(WP), intent(in) :: time
       type(c_ptr) :: ctx_u, ctx_v, ctx_w
       type(c_funptr) :: bc_dispatch
-      integer :: rr, lo_bc(9), hi_bc(9)
+      integer :: rr(3), lo_bc(9), hi_bc(9)
       real(WP) :: t_old, t_new
 
       ! Get contexts for each velocity component
@@ -607,7 +607,7 @@ contains
          hi_bc(1:3) = this%U%hi_bc(:,1)
          hi_bc(4:6) = this%V%hi_bc(:,1)
          hi_bc(7:9) = this%W%hi_bc(:,1)
-         rr = this%amr%rref(lvl-1)
+         rr = [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)]
          ! Call 3-component divfree FillPatch
          call amrmfab_fillpatch_two_faces( &
          &   Udest, Vdest, Wdest, time, &
@@ -893,7 +893,7 @@ contains
             dhi=this%amr%geom(lvl)%domain%hi
             if (lvl.lt.this%amr%clvl()) then
                call amrex_imultifab_build(mask,this%amr%ba(lvl),this%amr%dm(lvl),1,0)
-               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rref(lvl),this%amr%rref(lvl),this%amr%rref(lvl)],0,1)
+               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],0,1)
             end if
             call this%amr%mfiter_build(lvl,mfi,tiling=.false.)
             do while (mfi%next())
@@ -1004,7 +1004,7 @@ contains
          ! Build fine mask for this level (if not finest)
          if (lvl.lt.this%amr%clvl()) then
             call amrex_imultifab_build(mask, this%amr%ba(lvl), this%amr%dm(lvl), 1, 0)
-            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rref(lvl), this%amr%rref(lvl), this%amr%rref(lvl)], 0, 1)
+            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], 0, 1)
          end if
          call this%amr%mfiter_build(lvl, mfi)
          do while (mfi%next())
@@ -1153,16 +1153,16 @@ contains
       ! Average down fluxes (fine -> coarse) for conservation
       do lvl=this%amr%clvl(),1,-1
          ! Cell-centered fluxes
-         call amrmfab_average_down_cell(fmf=FUx(lvl),cmf=FUx(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_cell(fmf=FVy(lvl),cmf=FVy(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_cell(fmf=FWz(lvl),cmf=FWz(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_cell(fmf=FUx(lvl),cmf=FUx(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_cell(fmf=FVy(lvl),cmf=FVy(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_cell(fmf=FWz(lvl),cmf=FWz(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
          ! Edge-centered fluxes
-         call amrmfab_average_down_edge(fmf=FUy(lvl),cmf=FUy(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_edge(fmf=FVx(lvl),cmf=FVx(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_edge(fmf=FUz(lvl),cmf=FUz(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_edge(fmf=FWx(lvl),cmf=FWx(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_edge(fmf=FVz(lvl),cmf=FVz(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
-         call amrmfab_average_down_edge(fmf=FWy(lvl),cmf=FWy(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FUy(lvl),cmf=FUy(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FVx(lvl),cmf=FVx(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FUz(lvl),cmf=FUz(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FWx(lvl),cmf=FWx(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FVz(lvl),cmf=FVz(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
+         call amrmfab_average_down_edge(fmf=FWy(lvl),cmf=FWy(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1),ngcrse=0)
       end do
 
       ! Compute divergence to get momentum RHS
@@ -1375,7 +1375,7 @@ contains
          ! Build fine mask for this level (if not finest)
          if (lvl .lt. this%amr%clvl()) then
             call amrex_imultifab_build(mask, this%amr%ba(lvl), this%amr%dm(lvl), 1, 0)
-            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rref(lvl), this%amr%rref(lvl), this%amr%rref(lvl)], 0, 1)
+            call amrmask_make_fine(mask, this%amr%ba(lvl+1), [this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], 0, 1)
          end if
 
          call this%amr%mfiter_build(lvl, mfi)

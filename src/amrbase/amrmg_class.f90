@@ -279,6 +279,7 @@ contains
    subroutine solve_level(this, lev, phi_mf, rhs_mf, phi_crse_mf, acoef_mf, bcoef_x_mf, bcoef_y_mf, bcoef_z_mf)
       use messager, only: die, log
       use string, only: str_long
+      use amrex_interface, only: amrlinop_set_coarse_fine_bc,amrmlmg_get_niters
       class(amrmg), intent(inout) :: this
       integer, intent(in) :: lev
       type(amrex_multifab), intent(inout) :: phi_mf
@@ -292,7 +293,7 @@ contains
       type(amrex_boxarray) :: ba(0:0)
       type(amrex_distromap) :: dm(0:0)
       type(amrex_multifab) :: sol(0:0), rhsmf(0:0)
-      integer :: rref
+      integer, dimension(3) :: rref
 
       ! Validate inputs
       if (this%type .eq. -1) call die('[amrmg solve_level] Solver not initialized')
@@ -305,7 +306,7 @@ contains
          dm(0) = this%amr%get_distromap(lev)
          sol(0) = phi_mf
          rhsmf(0) = rhs_mf
-         if (lev .gt. 0) rref = this%amr%rref(lev-1)
+         if (lev .gt. 0) rref = [this%amr%rrefx(lev-1),this%amr%rrefy(lev-1),this%amr%rrefz(lev-1)]
       end block setup_arrays
 
       ! Solve based on operator type
@@ -321,7 +322,7 @@ contains
                max_coarsening_level=30)
             call linop%set_domain_bc(this%lo_bc, this%hi_bc)
             ! Set C/F BC if on refined level
-            if (lev .gt. 0) call linop%set_coarse_fine_bc(phi_crse_mf, rref)
+            if (lev .gt. 0) call amrlinop_set_coarse_fine_bc(linop%p, phi_crse_mf%p, rref)
             call linop%set_level_bc(0, sol(0))
             ! Solve
             call amrex_multigrid_build(mlmg, linop)
@@ -330,10 +331,7 @@ contains
             call mlmg%set_bottom_solver(this%bottom_solver)
             this%res = mlmg%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
             ! Get iteration count before cleanup
-            get_niters_p: block
-               use amrex_interface, only: amrmlmg_get_niters
-               this%niter = amrmlmg_get_niters(mlmg%p)
-            end block get_niters_p
+            this%niter = amrmlmg_get_niters(mlmg%p)
             call amrex_multigrid_destroy(mlmg)
             call amrex_poisson_destroy(linop)
          end block poisson_solve
@@ -359,7 +357,7 @@ contains
                call linop%set_bcoeffs(0, bcoef)
             end if
             ! Set C/F BC if on refined level
-            if (lev .gt. 0) call linop%set_coarse_fine_bc(phi_crse_mf, rref)
+            if (lev .gt. 0) call amrlinop_set_coarse_fine_bc(linop%p, phi_crse_mf%p, rref)
             call linop%set_level_bc(0, sol(0))
             ! Solve
             call amrex_multigrid_build(mlmg, linop)
@@ -368,10 +366,7 @@ contains
             call mlmg%set_bottom_solver(this%bottom_solver)
             this%res = mlmg%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
             ! Get iteration count before cleanup
-            get_niters_a: block
-               use amrex_interface, only: amrmlmg_get_niters
-               this%niter = amrmlmg_get_niters(mlmg%p)
-            end block get_niters_a
+            this%niter = amrmlmg_get_niters(mlmg%p)
             call amrex_multigrid_destroy(mlmg)
             call amrex_abeclaplacian_destroy(linop)
          end block abeclap_solve

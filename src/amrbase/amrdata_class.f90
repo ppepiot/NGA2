@@ -465,7 +465,7 @@ contains
       ! Call C++ wrapper
       call amrmfab_fillcoarsepatch(this%mf(lvl), time, this%mf(lvl-1), &
       &   this%amr%geom(lvl-1), this%amr%geom(lvl), data_ctx, bc_dispatch_ptr, &
-      &   1, 1, this%ncomp, this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
+      &   1, 1, this%ncomp, [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)], this%interp, this%lo_bc, this%hi_bc, this%ncomp)
    end subroutine fill_from_coarse
 
    !> Fill ghost cells and coarse-fine boundary data at a single level
@@ -499,7 +499,7 @@ contains
          &   t_new, this%mf(lvl-1), this%amr%geom(lvl-1), &
          &   t_old, this%mf(lvl), t_new, this%mf(lvl), this%amr%geom(lvl), &
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
-         &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
+         &   [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)], this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if
       ! For nodal/face data: reconcile shared valid faces
       if (any(this%nodal)) call this%mf(lvl)%override_sync(this%amr%geom(lvl))
@@ -547,7 +547,7 @@ contains
          &   t_new, this%mf(lvl-1), this%amr%geom(lvl-1), &
          &   t_old, this%mf(lvl), t_new, this%mf(lvl), this%amr%geom(lvl), &
          &   data_ctx, bc_dispatch_ptr, time, 1, 1, this%ncomp, &
-         &   this%amr%rref(lvl-1), this%interp, this%lo_bc, this%hi_bc, this%ncomp)
+         &   [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)], this%interp, this%lo_bc, this%hi_bc, this%ncomp)
       end if
       ! For nodal/face data: reconcile shared valid faces
       if (any(this%nodal)) call dest%override_sync(this%amr%geom(lvl))
@@ -606,13 +606,13 @@ contains
       ! Pass geometry for periodic fix-up
       select case (nodal_count)
        case (0) ! Cell-centered
-         call amrmfab_average_down_cell(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
        case (1) ! Face-centered
-         call amrmfab_average_down_face(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_face(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
        case (2) ! Edge-centered
-         call amrmfab_average_down_edge(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_edge(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
        case (3) ! Node-centered
-         call amrmfab_average_down_node(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=this%amr%rref(lvl), cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_node(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
       end select
    end subroutine average_downto
 

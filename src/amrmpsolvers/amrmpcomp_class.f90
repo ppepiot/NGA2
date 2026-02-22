@@ -1546,9 +1546,9 @@ contains
          use amrex_interface, only: amrmfab_average_down_face
          integer :: lvl
          do lvl=this%amr%clvl(),1,-1
-            call amrmfab_average_down_face(fmf=Fx(lvl),cmf=Fx(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1))
-            call amrmfab_average_down_face(fmf=Fy(lvl),cmf=Fy(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1))
-            call amrmfab_average_down_face(fmf=Fz(lvl),cmf=Fz(lvl-1),rr=this%amr%rref(lvl-1),cgeom=this%amr%geom(lvl-1))
+            call amrmfab_average_down_face(fmf=Fx(lvl),cmf=Fx(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1))
+            call amrmfab_average_down_face(fmf=Fy(lvl),cmf=Fy(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1))
+            call amrmfab_average_down_face(fmf=Fz(lvl),cmf=Fz(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1))
          end do
       end block c_f_consistency
       
@@ -2967,9 +2967,9 @@ contains
       lb=0; if (present(lbase)) lb=lbase
       ! Average valid cells from fine to coarse
       do lvl=this%amr%clvl()-1,lb,-1
-         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1)  ,cmf=this%VF%mf(lvl)  ,rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
-         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1),cmf=this%Cliq%mf(lvl),rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
-         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1),cmf=this%Cgas%mf(lvl),rr=this%amr%rref(lvl),cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%VF%mf(lvl+1)  ,cmf=this%VF%mf(lvl)  ,rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cliq%mf(lvl+1),cmf=this%Cliq%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%Cgas%mf(lvl+1),cmf=this%Cgas%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
       end do
       ! Sync ghost cells on all levels + fix periodic barycenters
       call this%sync_moments()
@@ -3461,7 +3461,7 @@ contains
             ! Build fine mask for this level (if not finest)
             if (lvl.lt.this%amr%clvl()) then
                call amrex_imultifab_build(mask,this%amr%ba(lvl),this%amr%dm(lvl),1,0)
-               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rref(lvl),this%amr%rref(lvl),this%amr%rref(lvl)],0,1)
+               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],0,1)
             end if
             ! Manual loops for discontinuous variables
             call this%amr%mfiter_build(lvl,mfi)
@@ -3533,7 +3533,7 @@ contains
             ! Build fine mask for this level (if not finest)
             if (lvl.lt.this%amr%clvl()) then
                call amrex_imultifab_build(mask,this%amr%ba(lvl),this%amr%dm(lvl),1,0)
-               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rref(lvl),this%amr%rref(lvl),this%amr%rref(lvl)],0,1)
+               call amrmask_make_fine(mask,this%amr%ba(lvl+1),[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],0,1)
             end if
             ! Loop over tiles
             call this%amr%mfiter_build(lvl,mfi)

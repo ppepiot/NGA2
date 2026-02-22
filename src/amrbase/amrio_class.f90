@@ -172,9 +172,10 @@ contains
             write(iunit,'(A,1X,ES23.16)') trim(scurrent%name), scurrent%ptr
             scurrent => scurrent%next
          end do
-         ! Write refinement ratio per level
+         ! Write per-direction refinement ratio per level
          do lev = 0, this%amr%maxlvl
-            write(iunit,'(I0,A,I0)') lev, ' ', this%amr%rref(min(lev, this%amr%maxlvl-1))
+            m = min(lev, this%amr%maxlvl-1)
+            write(iunit,'(I0,3(A,I0))') lev, ' ', this%amr%rrefx(m), ' ', this%amr%rrefy(m), ' ', this%amr%rrefz(m)
          end do
          ! Write per-level BoxArrays (lo/hi per box)
          write(iunit,'(A)') 'BOXARRAYS'
