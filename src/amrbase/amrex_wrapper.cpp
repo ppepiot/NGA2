@@ -564,7 +564,16 @@ void amrplotfile_write_native(const char *name, int nlevels, void **mf_ptrs,
     varname_vec[i] = std::string(varnames[i]);
   }
 
-  amrex::WriteMultiLevelPlotfile(std::string(name), nlevels, mf_vec,
+  // Pre-delete existing directory to avoid AMReX ".old" rename
+  std::string dirstr(name);
+  if (amrex::ParallelDescriptor::IOProcessor()) {
+    if (amrex::FileExists(dirstr)) {
+      amrex::FileSystem::RemoveAll(dirstr);
+    }
+  }
+  amrex::ParallelDescriptor::Barrier();
+
+  amrex::WriteMultiLevelPlotfile(dirstr, nlevels, mf_vec,
                                  varname_vec, geom_vec, time, steps_vec,
                                  rr_vec);
 }
