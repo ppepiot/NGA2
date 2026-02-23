@@ -1180,7 +1180,7 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
-         real(WP) :: Fc
+         real(WP) :: Fc,alpha
          ! Get finest level info
          lvl=this%amr%clvl()
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
@@ -1231,6 +1231,14 @@ contains
                end do
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
+               ! Triangular momentum flux limiting
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1)); alpha=min(1.0_WP,abs(Fc-pFx(i,j,k,5))/(abs(pFx(i,j,k,5))+tiny(1.0_WP))); pFx(i,j,k,5)=alpha*pFx(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1)); alpha=min(1.0_WP,abs(Fc-pFx(i,j,k,6))/(abs(pFx(i,j,k,6))+tiny(1.0_WP))); pFx(i,j,k,6)=alpha*pFx(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1)); alpha=min(1.0_WP,abs(Fc-pFx(i,j,k,7))/(abs(pFx(i,j,k,7))+tiny(1.0_WP))); pFx(i,j,k,7)=alpha*pFx(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Van Leer momentum flux limiting
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,5))/(abs(Fc)+abs(pFx(i,j,k,5))+tiny(1.0_WP)); pFx(i,j,k,5)=alpha*pFx(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,6))/(abs(Fc)+abs(pFx(i,j,k,6))+tiny(1.0_WP)); pFx(i,j,k,6)=alpha*pFx(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1)); alpha=abs(Fc-pFx(i,j,k,7))/(abs(Fc)+abs(pFx(i,j,k,7))+tiny(1.0_WP)); pFx(i,j,k,7)=alpha*pFx(i,j,k,7)+(1.0_WP-alpha)*Fc
                ! Minmod momentum flux limiting
                Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1)); pFx(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFx(i,j,k,5))),pFx(i,j,k,5)),pFx(i,j,k,5),Fc*pFx(i,j,k,5).gt.0.0_WP)
                Fc=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1)); pFx(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFx(i,j,k,6))),pFx(i,j,k,6)),pFx(i,j,k,6),Fc*pFx(i,j,k,6).gt.0.0_WP)
@@ -1264,6 +1272,14 @@ contains
                end do
                ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
+               ! Triangular momentum flux limiting
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1)); alpha=min(1.0_WP,abs(Fc-pFy(i,j,k,5))/(abs(pFy(i,j,k,5))+tiny(1.0_WP))); pFy(i,j,k,5)=alpha*pFy(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1)); alpha=min(1.0_WP,abs(Fc-pFy(i,j,k,6))/(abs(pFy(i,j,k,6))+tiny(1.0_WP))); pFy(i,j,k,6)=alpha*pFy(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1)); alpha=min(1.0_WP,abs(Fc-pFy(i,j,k,7))/(abs(pFy(i,j,k,7))+tiny(1.0_WP))); pFy(i,j,k,7)=alpha*pFy(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Van Leer momentum flux limiting
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,5))/(abs(Fc)+abs(pFy(i,j,k,5))+tiny(1.0_WP)); pFy(i,j,k,5)=alpha*pFy(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,6))/(abs(Fc)+abs(pFy(i,j,k,6))+tiny(1.0_WP)); pFy(i,j,k,6)=alpha*pFy(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1)); alpha=abs(Fc-pFy(i,j,k,7))/(abs(Fc)+abs(pFy(i,j,k,7))+tiny(1.0_WP)); pFy(i,j,k,7)=alpha*pFy(i,j,k,7)+(1.0_WP-alpha)*Fc
                ! Minmod momentum flux limiting
                Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1)); pFy(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFy(i,j,k,5))),pFy(i,j,k,5)),pFy(i,j,k,5),Fc*pFy(i,j,k,5).gt.0.0_WP)
                Fc=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1)); pFy(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFy(i,j,k,6))),pFy(i,j,k,6)),pFy(i,j,k,6),Fc*pFy(i,j,k,6).gt.0.0_WP)
@@ -1297,6 +1313,14 @@ contains
                end do
                ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
+               ! Triangular momentum flux limiting
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1)); alpha=min(1.0_WP,abs(Fc-pFz(i,j,k,5))/(abs(pFz(i,j,k,5))+tiny(1.0_WP))); pFz(i,j,k,5)=alpha*pFz(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1)); alpha=min(1.0_WP,abs(Fc-pFz(i,j,k,6))/(abs(pFz(i,j,k,6))+tiny(1.0_WP))); pFz(i,j,k,6)=alpha*pFz(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1)); alpha=min(1.0_WP,abs(Fc-pFz(i,j,k,7))/(abs(pFz(i,j,k,7))+tiny(1.0_WP))); pFz(i,j,k,7)=alpha*pFz(i,j,k,7)+(1.0_WP-alpha)*Fc
+               ! Van Leer momentum flux limiting
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,5))/(abs(Fc)+abs(pFz(i,j,k,5))+tiny(1.0_WP)); pFz(i,j,k,5)=alpha*pFz(i,j,k,5)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,6))/(abs(Fc)+abs(pFz(i,j,k,6))+tiny(1.0_WP)); pFz(i,j,k,6)=alpha*pFz(i,j,k,6)+(1.0_WP-alpha)*Fc
+               !Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1)); alpha=abs(Fc-pFz(i,j,k,7))/(abs(Fc)+abs(pFz(i,j,k,7))+tiny(1.0_WP)); pFz(i,j,k,7)=alpha*pFz(i,j,k,7)+(1.0_WP-alpha)*Fc
                ! Minmod momentum flux limiting
                Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1)); pFz(i,j,k,5)=merge(sign(min(abs(Fc),abs(pFz(i,j,k,5))),pFz(i,j,k,5)),pFz(i,j,k,5),Fc*pFz(i,j,k,5).gt.0.0_WP)
                Fc=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1)); pFz(i,j,k,6)=merge(sign(min(abs(Fc),abs(pFz(i,j,k,6))),pFz(i,j,k,6)),pFz(i,j,k,6),Fc*pFz(i,j,k,6).gt.0.0_WP)
@@ -1319,7 +1343,7 @@ contains
          real(WP), dimension(-2: 0) :: wenop
          real(WP), dimension(-1:+1) :: wenom
          real(WP), dimension(1:3,1:3) :: gradU
-         real(WP) :: w,div,vel
+         real(WP) :: w,div,vel,visc_f,beta_f
          real(WP), parameter :: eps=1.0e-15_WP
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
@@ -1401,10 +1425,13 @@ contains
                   gradU(2,3)=0.25_WP*dyi*(pW(i-1,j+1,k,1)-pW(i-1,j-1,k,1)+pW(i,j+1,k,1)-pW(i,j-1,k,1))
                   gradU(3,3)=0.25_WP*dzi*(pW(i-1,j,k+1,1)-pW(i-1,j,k-1,1)+pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
+                  ! Viscosities at x-face
+                  visc_f=2.0_WP*product(pVisc(i-1:i,j,k,1))/(sum(pVisc(i-1:i,j,k,1))+tiny(1.0_WP))
+                  beta_f=2.0_WP*product(pBeta(i-1:i,j,k,1))/(sum(pBeta(i-1:i,j,k,1))+tiny(1.0_WP))
                   ! Viscous stress at x-face
-                  pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(1,1)+gradU(1,1))+0.5_WP*(sum(pBeta(i-1:i,j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i-1:i,j,k,1)))*div
-                  pFx(i,j,k,6)=pFx(i,j,k,6)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(2,1)+gradU(1,2))
-                  pFx(i,j,k,7)=pFx(i,j,k,7)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
+                  pFx(i,j,k,5)=pFx(i,j,k,5)+visc_f*(gradU(1,1)+gradU(1,1))+(beta_f-2.0_WP/3.0_WP*visc_f)*div
+                  pFx(i,j,k,6)=pFx(i,j,k,6)+visc_f*(gradU(2,1)+gradU(1,2))
+                  pFx(i,j,k,7)=pFx(i,j,k,7)+visc_f*(gradU(3,1)+gradU(1,3))
                   ! Phasic heat diffusion flux (pure cells only)
                   if (all(pVF(i-1:i,j,k,1).gt.VFhi)) pFx(i,j,k,3)=pFx(i,j,k,3)+0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTL(i,j,k,1)-pTL(i-1,j,k,1))
                   if (all(pVF(i-1:i,j,k,1).lt.VFlo)) pFx(i,j,k,4)=pFx(i,j,k,4)+0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pTG(i,j,k,1)-pTG(i-1,j,k,1))
@@ -1458,10 +1485,13 @@ contains
                   gradU(2,3)=dyi*(pW(i,j,k,1)-pW(i,j-1,k,1))
                   gradU(3,3)=0.25_WP*dzi*(pW(i,j-1,k+1,1)-pW(i,j-1,k-1,1)+pW(i,j,k+1,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
+                  ! Viscosities at y-face
+                  visc_f=2.0_WP*product(pVisc(i,j-1:j,k,1))/(sum(pVisc(i,j-1:j,k,1))+tiny(1.0_WP))
+                  beta_f=2.0_WP*product(pBeta(i,j-1:j,k,1))/(sum(pBeta(i,j-1:j,k,1))+tiny(1.0_WP))
                   ! Viscous stress at y-face
-                  pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(1,2)+gradU(2,1))
-                  pFy(i,j,k,6)=pFy(i,j,k,6)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(2,2)+gradU(2,2))+0.5_WP*(sum(pBeta(i,j-1:j,k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j-1:j,k,1)))*div
-                  pFy(i,j,k,7)=pFy(i,j,k,7)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
+                  pFy(i,j,k,5)=pFy(i,j,k,5)+visc_f*(gradU(1,2)+gradU(2,1))
+                  pFy(i,j,k,6)=pFy(i,j,k,6)+visc_f*(gradU(2,2)+gradU(2,2))+(beta_f-2.0_WP/3.0_WP*visc_f)*div
+                  pFy(i,j,k,7)=pFy(i,j,k,7)+visc_f*(gradU(3,2)+gradU(2,3))
                   ! Phasic heat diffusion flux (pure cells only)
                   if (all(pVF(i,j-1:j,k,1).gt.VFhi)) pFy(i,j,k,3)=pFy(i,j,k,3)+0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
                   if (all(pVF(i,j-1:j,k,1).lt.VFlo)) pFy(i,j,k,4)=pFy(i,j,k,4)+0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pTG(i,j,k,1)-pTG(i,j-1,k,1))
@@ -1515,10 +1545,13 @@ contains
                   gradU(2,3)=0.25_WP*dyi*(pW(i,j+1,k-1,1)-pW(i,j-1,k-1,1)+pW(i,j+1,k,1)-pW(i,j-1,k,1))
                   gradU(3,3)=dzi*(pW(i,j,k,1)-pW(i,j,k-1,1))
                   div=gradU(1,1)+gradU(2,2)+gradU(3,3)
+                  ! Viscosities at z-face
+                  visc_f=2.0_WP*product(pVisc(i,j,k-1:k,1))/(sum(pVisc(i,j,k-1:k,1))+tiny(1.0_WP))
+                  beta_f=2.0_WP*product(pBeta(i,j,k-1:k,1))/(sum(pBeta(i,j,k-1:k,1))+tiny(1.0_WP))
                   ! Viscous stress at z-face
-                  pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(1,3)+gradU(3,1))
-                  pFz(i,j,k,6)=pFz(i,j,k,6)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(2,3)+gradU(3,2))
-                  pFz(i,j,k,7)=pFz(i,j,k,7)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
+                  pFz(i,j,k,5)=pFz(i,j,k,5)+visc_f*(gradU(1,3)+gradU(3,1))
+                  pFz(i,j,k,6)=pFz(i,j,k,6)+visc_f*(gradU(2,3)+gradU(3,2))
+                  pFz(i,j,k,7)=pFz(i,j,k,7)+visc_f*(gradU(3,3)+gradU(3,3))+(beta_f-2.0_WP/3.0_WP*visc_f)*div
                   ! Phasic heat diffusion flux (pure cells only)
                   if (all(pVF(i,j,k-1:k,1).gt.VFhi)) pFz(i,j,k,3)=pFz(i,j,k,3)+0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
                   if (all(pVF(i,j,k-1:k,1).lt.VFlo)) pFz(i,j,k,4)=pFz(i,j,k,4)+0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pTG(i,j,k,1)-pTG(i,j,k-1,1))
