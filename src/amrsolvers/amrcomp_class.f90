@@ -898,7 +898,7 @@ contains
          dz=this%amr%dz(lvl); dzi=1.0_WP/dz
          
          ! Max beta from CFL
-         max_beta=max_cfl*min(dx**2,dy**2,dz**2)/(4.0_WP*dt)
+         max_beta=max_cfl*this%amr%min_meshsize(lvl)**2/(4.0_WP*dt)
          
          ! Build temp multifabs
          call this%amr%mfab_build(lvl=lvl,mfab=scratch,ncomp=1,nover=1); call scratch%setval(0.0_WP)
@@ -944,7 +944,7 @@ contains
                &       +max(abs(pScratch(i,j+1,k,1)-pScratch(i,j,k,1)),abs(pScratch(i,j,k,1)-pScratch(i,j-1,k,1)))*dy**2 &
                &       +max(abs(pScratch(i,j,k+1,1)-pScratch(i,j,k,1)),abs(pScratch(i,j,k,1)-pScratch(i,j,k-1,1)))*dz**2
                ! Floor vorticity with sound speed
-               vort=max(vort,(0.05_WP*pC(i,j,k,1)/min(dx,dy,dz))**2)
+               vort=max(vort,(0.05_WP*pC(i,j,k,1)/this%amr%min_meshsize(lvl))**2)
                ! Compute beta
                pBeta_t(i,j,k,1)=myCartif*grad_div*min(4.0_WP/3.0_WP*pScratch(i,j,k,1)**2/(pScratch(i,j,k,1)**2+vort+1.0e-15_WP),1.0_WP)
                ! Clip to max
@@ -1033,7 +1033,7 @@ contains
          dz=this%amr%dz(lvl); dzi=1.0_WP/dz
          
          ! Max visc from CFL
-         max_visc=max_cfl*min(dx**2,dy**2,dz**2)/(4.0_WP*dt)
+         max_visc=max_cfl*this%amr%min_meshsize(lvl)**2/(4.0_WP*dt)
          
          ! Build temp multifab for eddy viscosity at this level (nover ghost cells)
          call this%amr%mfab_build(lvl=lvl,mfab=visc_t,ncomp=1,nover=this%nover); call visc_t%setval(0.0_WP)
@@ -1172,17 +1172,17 @@ contains
             call MPI_ALLREDUCE(MPI_IN_PLACE,viscmax,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
          end block get_viscmax
          ! Convective+acoustic
-         this%CFLc_x=max(this%CFLc_x,(Umax+Cmax)*dt/this%amr%dx(lvl))
-         this%CFLc_y=max(this%CFLc_y,(Vmax+Cmax)*dt/this%amr%dy(lvl))
-         this%CFLc_z=max(this%CFLc_z,(Wmax+Cmax)*dt/this%amr%dz(lvl))
+         if (this%amr%nx.gt.1) this%CFLc_x=max(this%CFLc_x,(Umax+Cmax)*dt/this%amr%dx(lvl))
+         if (this%amr%ny.gt.1) this%CFLc_y=max(this%CFLc_y,(Vmax+Cmax)*dt/this%amr%dy(lvl))
+         if (this%amr%nz.gt.1) this%CFLc_z=max(this%CFLc_z,(Wmax+Cmax)*dt/this%amr%dz(lvl))
          ! Acoustic
-         this%CFLa_x=max(this%CFLa_x,Cmax*dt/this%amr%dx(lvl))
-         this%CFLa_y=max(this%CFLa_y,Cmax*dt/this%amr%dy(lvl))
-         this%CFLa_z=max(this%CFLa_z,Cmax*dt/this%amr%dz(lvl))
+         if (this%amr%nx.gt.1) this%CFLa_x=max(this%CFLa_x,Cmax*dt/this%amr%dx(lvl))
+         if (this%amr%ny.gt.1) this%CFLa_y=max(this%CFLa_y,Cmax*dt/this%amr%dy(lvl))
+         if (this%amr%nz.gt.1) this%CFLa_z=max(this%CFLa_z,Cmax*dt/this%amr%dz(lvl))
          ! Viscous
-         this%CFLv_x=max(this%CFLv_x,4.0_WP*viscmax*dt/this%amr%dx(lvl)**2)
-         this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt/this%amr%dy(lvl)**2)
-         this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt/this%amr%dz(lvl)**2)
+         if (this%amr%nx.gt.1) this%CFLv_x=max(this%CFLv_x,4.0_WP*viscmax*dt/this%amr%dx(lvl)**2)
+         if (this%amr%ny.gt.1) this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt/this%amr%dy(lvl)**2)
+         if (this%amr%nz.gt.1) this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt/this%amr%dz(lvl)**2)
       end do
       ! Return max CFL
       cfl=max(this%CFLc_x,this%CFLc_y,this%CFLc_z,this%CFLa_x,this%CFLa_y,this%CFLa_z,this%CFLv_x,this%CFLv_y,this%CFLv_z)
@@ -1221,7 +1221,7 @@ contains
       end do
 
       ! Conserved integrals at base level
-      dV=this%amr%dx(0)*this%amr%dy(0)*this%amr%dz(0)
+      dV=this%amr%cell_vol(0)
       do n=1,this%Q%ncomp
          this%Qint(n)=this%Q%get_sum(lvl=0,comp=n)*dV
       end do
@@ -1242,7 +1242,7 @@ contains
          this%rhoKint=0.0_WP
          do lvl=0,this%amr%clvl()
             ! Get cell volume
-            dV=this%amr%dx(lvl)*this%amr%dy(lvl)*this%amr%dz(lvl)
+            dV=this%amr%cell_vol(lvl)
             ! Build fine mask for this level (if not finest)
             if (lvl.lt.this%amr%clvl()) then
                call amrex_imultifab_build(mask,this%amr%ba(lvl),this%amr%dm(lvl),1,0)

@@ -1250,7 +1250,7 @@ contains
          dy=this%amr%dy(lvl); dyi=1.0_WP/dy
          dz=this%amr%dz(lvl); dzi=1.0_WP/dz
          ! Max visc from CFL
-         max_visc=max_cfl*min(dx**2,dy**2,dz**2)/(4.0_WP*dt)
+         max_visc=max_cfl*this%amr%min_meshsize(lvl)**2/(4.0_WP*dt)
          ! Build temp multifab for eddy viscosity (1 ghost for filtering)
          call this%amr%mfab_build(lvl=lvl,mfab=visc_t,ncomp=1,nover=1); call visc_t%setval(0.0_WP)
          ! Phase 1: Compute kinematic eddy viscosity
@@ -1362,15 +1362,15 @@ contains
       end do
 
       ! Momentum integrals (rho * U * dV, summed over cells at level 0)
-      this%rhoUint = this%rho * this%U%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
-      this%rhoVint = this%rho * this%V%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
-      this%rhoWint = this%rho * this%W%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
+      this%rhoUint = this%rho * this%U%get_sum(lvl=0) * this%amr%cell_vol(0)
+      this%rhoVint = this%rho * this%V%get_sum(lvl=0) * this%amr%cell_vol(0)
+      this%rhoWint = this%rho * this%W%get_sum(lvl=0) * this%amr%cell_vol(0)
 
       ! Kinetic energy integral: 0.5 * rho * (Uc^2 + Vc^2 + Wc^2) * dV
       ! Uses composite integration with fine masking to avoid double-counting
       this%rhoKint = 0.0_WP
       do lvl = 0, this%amr%clvl()
-         dV = this%amr%dx(lvl) * this%amr%dy(lvl) * this%amr%dz(lvl)
+         dV = this%amr%cell_vol(lvl)
 
          ! Build fine mask for this level (if not finest)
          if (lvl .lt. this%amr%clvl()) then
@@ -1420,7 +1420,7 @@ contains
       real(WP), intent(out) :: cfl
       real(WP), intent(out), optional :: cflc
       integer :: lvl
-      real(WP) :: dx, Umax_lvl, Vmax_lvl, Wmax_lvl, visc_cfl
+      real(WP) :: Umax_lvl, Vmax_lvl, Wmax_lvl
       ! Reset CFLs
       this%CFLc_x = 0.0_WP; this%CFLc_y = 0.0_WP; this%CFLc_z = 0.0_WP
       this%CFLv_x = 0.0_WP; this%CFLv_y = 0.0_WP; this%CFLv_z = 0.0_WP
@@ -1430,15 +1430,13 @@ contains
          Vmax_lvl = this%V%norm0(lvl=lvl)
          Wmax_lvl = this%W%norm0(lvl=lvl)
          ! Convective CFL
-         this%CFLc_x = max(this%CFLc_x, dt * Umax_lvl / this%amr%dx(lvl))
-         this%CFLc_y = max(this%CFLc_y, dt * Vmax_lvl / this%amr%dy(lvl))
-         this%CFLc_z = max(this%CFLc_z, dt * Wmax_lvl / this%amr%dz(lvl))
+         if (this%amr%nx.gt.1) this%CFLc_x = max(this%CFLc_x, dt * Umax_lvl / this%amr%dx(lvl))
+         if (this%amr%ny.gt.1) this%CFLc_y = max(this%CFLc_y, dt * Vmax_lvl / this%amr%dy(lvl))
+         if (this%amr%nz.gt.1) this%CFLc_z = max(this%CFLc_z, dt * Wmax_lvl / this%amr%dz(lvl))
          ! Viscous CFL (explicit stability: dt < dx^2 / (4*nu))
-         dx = min(this%amr%dx(lvl), this%amr%dy(lvl), this%amr%dz(lvl))
-         visc_cfl = 4.0_WP * this%visc%norm0(lvl=lvl) * dt / (this%rho * dx**2)
-         this%CFLv_x = max(this%CFLv_x, visc_cfl)
-         this%CFLv_y = max(this%CFLv_y, visc_cfl)
-         this%CFLv_z = max(this%CFLv_z, visc_cfl)
+         if (this%amr%nx.gt.1) this%CFLv_x = max(this%CFLv_x, 4.0_WP * this%visc%norm0(lvl=lvl) * dt / (this%rho * this%amr%dx(lvl)**2))
+         if (this%amr%ny.gt.1) this%CFLv_y = max(this%CFLv_y, 4.0_WP * this%visc%norm0(lvl=lvl) * dt / (this%rho * this%amr%dy(lvl)**2))
+         if (this%amr%nz.gt.1) this%CFLv_z = max(this%CFLv_z, 4.0_WP * this%visc%norm0(lvl=lvl) * dt / (this%rho * this%amr%dz(lvl)**2))
       end do
       ! Compute max overall CFL
       this%CFL = max(this%CFLc_x, this%CFLc_y, this%CFLc_z, this%CFLv_x, this%CFLv_y, this%CFLv_z)

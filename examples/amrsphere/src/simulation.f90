@@ -100,7 +100,7 @@ contains
             ! |∇u| = sqrt(sum of all gradients squared)
             gradU_mag=sqrt(sum(gradU**2))
             ! Normalize into a local Reynolds number
-            Re_cell=solver%rho*gradU_mag*min(dx,dy,dz)**2/visc_mol
+            Re_cell=solver%rho*gradU_mag*solver%amr%min_meshsize(lvl)**2/visc_mol
             ! Tagged based on cell Re value
             if (Re_cell.gt.Re_tag) tagarr(i,j,k,1)=SETtag
             ! Also tag based on closeness to sphere surface

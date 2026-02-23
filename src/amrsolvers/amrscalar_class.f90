@@ -332,7 +332,7 @@ contains
             this%SCmin(nsc) = min(this%SCmin(nsc), this%SC%get_min(lvl=lvl, comp=nsc))
             this%SCmax(nsc) = max(this%SCmax(nsc), this%SC%get_max(lvl=lvl, comp=nsc))
          end do
-         this%SCint(nsc) = this%SC%get_sum(lvl=0, comp=nsc) * (this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)) / this%amr%vol
+         this%SCint(nsc) = this%SC%get_sum(lvl=0, comp=nsc) * this%amr%cell_vol(0) / this%amr%vol
       end do
    end subroutine get_info
 

@@ -2025,7 +2025,7 @@ contains
       end do
 
       ! Compute volume integral at level 0
-      this%VFint = this%VF%get_sum(lvl=0) * this%amr%dx(0) * this%amr%dy(0) * this%amr%dz(0)
+      this%VFint = this%VF%get_sum(lvl=0) * this%amr%cell_vol(0)
 
       ! Reduce across MPI ranks
       call MPI_ALLREDUCE(MPI_IN_PLACE, this%VFint, 1, MPI_REAL_WP, MPI_SUM, this%amr%comm, ierr)
@@ -2077,9 +2077,10 @@ contains
       Vmax = V%norm0()
       Wmax = W%norm0()
       ! Compute directional CFLs
-      CFLx = dt * Umax / this%amr%dx(lvl)
-      CFLy = dt * Vmax / this%amr%dy(lvl)
-      CFLz = dt * Wmax / this%amr%dz(lvl)
+      CFLx=0.0_WP; CFLy=0.0_WP; CFLz=0.0_WP
+      if (this%amr%nx.gt.1) CFLx = dt * Umax / this%amr%dx(lvl)
+      if (this%amr%ny.gt.1) CFLy = dt * Vmax / this%amr%dy(lvl)
+      if (this%amr%nz.gt.1) CFLz = dt * Wmax / this%amr%dz(lvl)
       ! Return max CFL
       cfl = max(CFLx, CFLy, CFLz)
    end subroutine get_cfl

@@ -272,10 +272,10 @@ contains
             ! Get dilatation
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
             ! Tag based on cell Reynolds numbers
-            Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
+            Rec=rho*vort_mag*solver%amr%min_meshsize(lvl)**2/mu
             if (Rec.gt.Rec_tag) tagarr(i,j,k,1)=SETtag
             ! Also tag based on cell shock Reynolds number
-            Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
+            Res=rho*abs(div_neg)*solver%amr%min_meshsize(lvl)**2/mu
             if (Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
             ! Tag near sphere surface
             dist=sphere_levelset([solver%amr%xlo+(real(i,WP)+0.5_WP)*dx,solver%amr%ylo+(real(j,WP)+0.5_WP)*dy,solver%amr%zlo+(real(k,WP)+0.5_WP)*dz],time)

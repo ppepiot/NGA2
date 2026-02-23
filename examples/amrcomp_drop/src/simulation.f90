@@ -186,7 +186,7 @@ contains
       real(WP), parameter :: myeps=1.0e-15_WP
       real(WP), parameter :: max_cfl=0.5_WP
       ! Get maximum allowable kinematic viscosity in the sponge at finest level
-      nu_spg=max_cfl*min(amr%dx(amr%clvl())**2,amr%dy(amr%clvl())**2,amr%dz(amr%clvl())**2)/(4.0_WP*time%dt)
+      nu_spg=max_cfl*amr%min_meshsize(amr%clvl())**2/(4.0_WP*time%dt)
       ! Loop over levels
       do lvl=0,amr%clvl()
          ! Get maximum allowable kinematic viscosity in the sponge at that level
@@ -362,10 +362,10 @@ contains
             ! Get dilatation
             div_neg=min(dudx+dvdy+dwdz,0.0_WP)
             ! Tag based on cell Reynolds numbers
-            Rec=rho*vort_mag*min(dx,dy,dz)**2/mu
+            Rec=rho*vort_mag*solver%amr%min_meshsize(lvl)**2/mu
             if (Rec.gt.Rec_tag) tagarr(i,j,k,1)=SETtag
             ! Also tag based on cell shock Reynolds number
-            Res=rho*abs(div_neg)*min(dx,dy,dz)**2/mu
+            Res=rho*abs(div_neg)*solver%amr%min_meshsize(lvl)**2/mu
             if (Res.gt.Res_tag) tagarr(i,j,k,1)=SETtag
          end do; end do; end do
       end do

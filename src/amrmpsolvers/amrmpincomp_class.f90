@@ -1489,7 +1489,7 @@ contains
          dz=this%amr%dz(lvl); dzi=1.0_WP/dz
          
          ! Max visc from CFL
-         max_visc=max_cfl*min(dx**2,dy**2,dz**2)/(4.0_WP*dt)
+         max_visc=max_cfl*this%amr%min_meshsize(lvl)**2/(4.0_WP*dt)
          
          ! Build temp multifab for eddy viscosity at this level (nover ghost cells)
          call this%amr%mfab_build(lvl=lvl,mfab=visc_t,ncomp=1,nover=this%nover); call visc_t%setval(0.0_WP)
@@ -1624,13 +1624,13 @@ contains
             call MPI_ALLREDUCE(MPI_IN_PLACE,viscmax,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
          end block get_viscmax
          ! Convective
-         this%CFLc_x=max(this%CFLc_x,Umax*dt/this%amr%dx(lvl))
-         this%CFLc_y=max(this%CFLc_y,Vmax*dt/this%amr%dy(lvl))
-         this%CFLc_z=max(this%CFLc_z,Wmax*dt/this%amr%dz(lvl))
+         if (this%amr%nx.gt.1) this%CFLc_x=max(this%CFLc_x,Umax*dt/this%amr%dx(lvl))
+         if (this%amr%ny.gt.1) this%CFLc_y=max(this%CFLc_y,Vmax*dt/this%amr%dy(lvl))
+         if (this%amr%nz.gt.1) this%CFLc_z=max(this%CFLc_z,Wmax*dt/this%amr%dz(lvl))
          ! Viscous
-         this%CFLv_x=max(this%CFLv_x,4.0_WP*viscmax*dt/this%amr%dx(lvl)**2)
-         this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt/this%amr%dy(lvl)**2)
-         this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt/this%amr%dz(lvl)**2)
+         if (this%amr%nx.gt.1) this%CFLv_x=max(this%CFLv_x,4.0_WP*viscmax*dt/this%amr%dx(lvl)**2)
+         if (this%amr%ny.gt.1) this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt/this%amr%dy(lvl)**2)
+         if (this%amr%nz.gt.1) this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt/this%amr%dz(lvl)**2)
       end do
       ! Return max CFL
       cfl=max(this%CFLc_x,this%CFLc_y,this%CFLc_z,this%CFLv_x,this%CFLv_y,this%CFLv_z)
@@ -1676,7 +1676,7 @@ contains
       end block extrema
 
       ! Conserved integrals at base level
-      dV=this%amr%dx(0)*this%amr%dy(0)*this%amr%dz(0)
+      dV=this%amr%cell_vol(0)
       this%VFint=this%VF%get_sum(lvl=0)*dV
 
       ! Kinetic energy integral: 0.5 * rho * (U^2 + V^2 + W^2) * dV
@@ -1693,7 +1693,7 @@ contains
          real(WP) :: rho
          do lvl=0,this%amr%clvl()
             ! Get cell volume
-            dV=this%amr%dx(lvl)*this%amr%dy(lvl)*this%amr%dz(lvl)
+            dV=this%amr%cell_vol(lvl)
             ! Build fine mask for this level (if not finest)
             if (lvl.lt.this%amr%clvl()) then
                call amrex_imultifab_build(mask,this%amr%ba(lvl),this%amr%dm(lvl),1,0)

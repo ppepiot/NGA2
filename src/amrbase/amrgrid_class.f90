@@ -135,9 +135,10 @@ module amrgrid_class
       type(amrex_geometry), dimension(:), allocatable :: geom
       ! Shortcut for domain volume
       real(WP) :: vol
-      ! Shortcut to cell size per level
+      ! Shortcut to cell sizes per level
       real(WP), dimension(:), allocatable :: dx,dy,dz
-      real(WP) :: min_meshsize
+      real(WP), dimension(:), allocatable :: min_meshsize
+      real(WP), dimension(:), allocatable :: cell_vol
       ! Parallel info
       type(MPI_Comm) :: comm            !< Communicator for our group
       integer        :: nproc           !< Number of processors
@@ -328,8 +329,20 @@ contains
          end do
          ! Total domain volume
          this%vol=(this%xhi-this%xlo)*(this%yhi-this%ylo)*(this%zhi-this%zlo)
-         ! Smallest mesh size
-         this%min_meshsize=min(this%dx(this%maxlvl),this%dy(this%maxlvl),this%dz(this%maxlvl))
+         ! Cell volume at each level
+         allocate(this%cell_vol(0:this%maxlvl))
+         do lvl=0,this%maxlvl
+            this%cell_vol(lvl)=this%dx(lvl)*this%dy(lvl)*this%dz(lvl)
+         end do
+         ! Smallest mesh size per level (excludes single-cell directions)
+         allocate(this%min_meshsize(0:this%maxlvl))
+         do lvl=0,this%maxlvl
+            this%min_meshsize(lvl)=huge(1.0_WP)
+            if (this%nx.gt.1) this%min_meshsize(lvl)=min(this%min_meshsize(lvl),this%dx(lvl))
+            if (this%ny.gt.1) this%min_meshsize(lvl)=min(this%min_meshsize(lvl),this%dy(lvl))
+            if (this%nz.gt.1) this%min_meshsize(lvl)=min(this%min_meshsize(lvl),this%dz(lvl))
+            if (this%min_meshsize(lvl).ge.huge(1.0_WP)) this%min_meshsize(lvl)=this%dx(lvl)
+         end do
       end block compute_shortcuts
       ! Print info
       if (verbose.gt.1) call this%print()
@@ -356,6 +369,8 @@ contains
       if (allocated(this%dx))   deallocate(this%dx)
       if (allocated(this%dy))   deallocate(this%dy)
       if (allocated(this%dz))   deallocate(this%dz)
+      if (allocated(this%min_meshsize)) deallocate(this%min_meshsize)
+      if (allocated(this%cell_vol))     deallocate(this%cell_vol)
       ! Deallocate callback lists
       if (allocated(this%on_init))   deallocate(this%on_init)
       if (allocated(this%on_coarse)) deallocate(this%on_coarse)
