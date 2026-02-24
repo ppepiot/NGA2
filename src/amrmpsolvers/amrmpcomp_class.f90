@@ -1334,7 +1334,8 @@ contains
          real(WP), dimension(-2: 0) :: wenop
          real(WP), dimension(-1:+1) :: wenom
          real(WP), dimension(1:3,1:3) :: gradU
-         real(WP) :: w,div,vel,visc_f,beta_f
+         real(WP) :: w,div,vel,visc_f,beta_f,irho_f
+         real(WP), dimension(-2:+1) :: Pmix
          real(WP), parameter :: eps=1.0e-15_WP
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
@@ -1376,6 +1377,10 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pU(i-1:i,j,k,1))
+                     ! Rhie-Chow correction
+                     irho_f=2.0_WP/max(sum(pQ(i-1:i,j,k,1:2)),this%rho_floor)
+                     Pmix=pVF(i-2:i+1,j,k,1)*pPL(i-2:i+1,j,k,1)+(1.0_WP-pVF(i-2:i+1,j,k,1))*pPG(i-2:i+1,j,k,1)
+                     vel=vel+0.25_WP*dt*dxi*irho_f*(Pmix(1)-3.0_WP*Pmix(0)+3.0_WP*Pmix(-1)-Pmix(-2))
                      ! WENO liquid mass and energy fluxes
                      if (any(pVF(i-1:i,j,k,1).ge.VFlo)) then
                         w=weno_weight((abs(pQ(i-1,j,k,1)-pQ(i-2,j,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i-1,j,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
@@ -1436,6 +1441,10 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pV(i,j-1:j,k,1))
+                     ! Rhie-Chow correction
+                     irho_f=2.0_WP/max(sum(pQ(i,j-1:j,k,1:2)),this%rho_floor)
+                     Pmix=pVF(i,j-2:j+1,k,1)*pPL(i,j-2:j+1,k,1)+(1.0_WP-pVF(i,j-2:j+1,k,1))*pPG(i,j-2:j+1,k,1)
+                     vel=vel+0.25_WP*dt*dyi*irho_f*(Pmix(1)-3.0_WP*Pmix(0)+3.0_WP*Pmix(-1)-Pmix(-2))
                      ! WENO liquid mass and energy fluxes
                      if (any(pVF(i,j-1:j,k,1).ge.VFlo)) then
                         w=weno_weight((abs(pQ(i,j-1,k,1)-pQ(i,j-2,k,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j-1,k,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
@@ -1496,6 +1505,10 @@ contains
                   if (.not.in_band) then
                      ! Face velocity
                      vel=0.5_WP*sum(pW(i,j,k-1:k,1))
+                     ! Rhie-Chow correction
+                     irho_f=2.0_WP/max(sum(pQ(i,j,k-1:k,1:2)),this%rho_floor)
+                     Pmix=pVF(i,j,k-2:k+1,1)*pPL(i,j,k-2:k+1,1)+(1.0_WP-pVF(i,j,k-2:k+1,1))*pPG(i,j,k-2:k+1,1)
+                     vel=vel+0.25_WP*dt*dzi*irho_f*(Pmix(1)-3.0_WP*Pmix(0)+3.0_WP*Pmix(-1)-Pmix(-2))
                      ! WENO liquid mass and energy fluxes
                      if (any(pVF(i,j,k-1:k,1).ge.VFlo)) then
                         w=weno_weight((abs(pQ(i,j,k-1,1)-pQ(i,j,k-2,1))+eps)/(abs(pQ(i,j,k,1)-pQ(i,j,k-1,1))+eps)); wenop=0.5_WP*[-w,1.0_WP+2.0_WP*w,1.0_WP-w]
