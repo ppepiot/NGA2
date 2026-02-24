@@ -3195,6 +3195,7 @@ contains
          do n=1,nfilter
             call scratch%setval(0.0_WP)
             call scratch%copy(srcmf=beta_t,srccomp=1,dstcomp=1,nc=1,ng=0)
+            call this%amr%mfab_validextrap(lvl=lvl,mfab=scratch)
             call scratch%fill_boundary(this%amr%geom(lvl))
             call this%amr%mfab_foextrap(lvl=lvl,mfab=scratch)
             call this%amr%mfiter_build(lvl,mfi)
@@ -3216,6 +3217,7 @@ contains
          call amrex_multifab_destroy(scratch)
          
          ! Fill beta_t ghosts after filtering
+         call this%amr%mfab_validextrap(lvl=lvl,mfab=beta_t)
          call beta_t%fill_boundary(this%amr%geom(lvl))
          call this%amr%mfab_foextrap(lvl=lvl,mfab=beta_t)
          
@@ -3329,6 +3331,7 @@ contains
          do n=1,nfilter
             call scratch%setval(0.0_WP)
             call scratch%copy(srcmf=visc_t,srccomp=1,dstcomp=1,nc=1,ng=0)
+            call this%amr%mfab_validextrap(lvl=lvl,mfab=scratch)
             call scratch%fill_boundary(this%amr%geom(lvl))
             call this%amr%mfab_foextrap(lvl=lvl,mfab=scratch)
             call this%amr%mfiter_build(lvl,mfi)
@@ -3348,6 +3351,7 @@ contains
          call amrex_multifab_destroy(scratch)
          
          ! Fill visc_t ghosts after filtering
+         call this%amr%mfab_validextrap(lvl=lvl,mfab=visc_t)
          call visc_t%fill_boundary(this%amr%geom(lvl))
          call this%amr%mfab_foextrap(lvl=lvl,mfab=visc_t)
 

@@ -196,6 +196,7 @@ module amrgrid_class
       procedure :: mfab_build                !< Build multifab at a given level
       procedure :: mfab_destroy              !< Destroy multifab
       procedure :: mfab_foextrap             !< Apply fo_extrap BCs to multifab
+      procedure :: mfab_validextrap          !< Extrapolate ghost cells from nearest valid cell
    end type amrgrid
 
    ! Instance counter for automated AMReX lifecycle management
@@ -1019,6 +1020,44 @@ contains
       call amrex_mfiter_destroy(mfi)
    end subroutine mfab_foextrap
 
+
+   !> Extrapolate all ghost cells from nearest valid cell of the same FAB
+   subroutine mfab_validextrap(this,lvl,mfab)
+      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy,amrex_box
+      implicit none
+      class(amrgrid), intent(inout) :: this
+      integer, intent(in) :: lvl
+      type(amrex_multifab), intent(inout) :: mfab
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: vbx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: p
+      integer :: i,j,k,n,nc,ic,jc,kc
+      integer :: ilo,ihi,jlo,jhi,klo,khi
+      ! Loop over FABs
+      nc=mfab%ncomp()
+      call amrex_mfiter_build(mfi,mfab,tiling=.false.)
+      do while(mfi%next())
+         p=>mfab%dataptr(mfi)
+         vbx=mfi%validbox()
+         ilo=lbound(p,1); ihi=ubound(p,1)
+         jlo=lbound(p,2); jhi=ubound(p,2)
+         klo=lbound(p,3); khi=ubound(p,3)
+         do n=1,nc
+            do k=klo,khi; do j=jlo,jhi; do i=ilo,ihi
+               ! Skip valid cells
+               if (i.ge.vbx%lo(1).and.i.le.vbx%hi(1).and. &
+               &   j.ge.vbx%lo(2).and.j.le.vbx%hi(2).and. &
+               &   k.ge.vbx%lo(3).and.k.le.vbx%hi(3)) cycle
+               ! Clamp to valid box and copy
+               ic=max(vbx%lo(1),min(vbx%hi(1),i))
+               jc=max(vbx%lo(2),min(vbx%hi(2),j))
+               kc=max(vbx%lo(3),min(vbx%hi(3),k))
+               p(i,j,k,n)=p(ic,jc,kc,n)
+            end do; end do; end do
+         end do
+      end do
+      call amrex_mfiter_destroy(mfi)
+   end subroutine mfab_validextrap
 
    !> Finalization of amrex
    subroutine finalize_amrex()
