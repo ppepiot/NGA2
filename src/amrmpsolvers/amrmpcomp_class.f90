@@ -1226,8 +1226,8 @@ contains
                do nn=1,4; fijk(1,nn)=merge(i-1,i,0.5_WP*sum(pU(i-1:i,j,k,1)).gt.0.0_WP); end do
                ! --- SL purity check (x-face) ---
                nSL_total=nSL_total+1.0_WP
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bblo=[minval(fijk(1,1:8)),minval(fijk(2,1:8)),minval(fijk(3,1:8))]
+               bbhi=[maxval(fijk(1,1:8)),maxval(fijk(2,1:8)),maxval(fijk(3,1:8))]
                if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
                   nSL_pure_bb=nSL_pure_bb+1.0_WP
                   if (pPLICold(i-1,j,k,4).gt.0.0_WP) then
@@ -1285,8 +1285,8 @@ contains
                do nn=1,4; fijk(2,nn)=merge(j-1,j,0.5_WP*sum(pV(i,j-1:j,k,1)).gt.0.0_WP); end do
                ! --- SL purity check (y-face) ---
                nSL_total=nSL_total+1.0_WP
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bblo=[minval(fijk(1,1:8)),minval(fijk(2,1:8)),minval(fijk(3,1:8))]
+               bbhi=[maxval(fijk(1,1:8)),maxval(fijk(2,1:8)),maxval(fijk(3,1:8))]
                if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
                   nSL_pure_bb=nSL_pure_bb+1.0_WP
                   if (pPLICold(i,j-1,k,4).gt.0.0_WP) then
@@ -1344,8 +1344,8 @@ contains
                do nn=1,4; fijk(3,nn)=merge(k-1,k,0.5_WP*sum(pW(i,j,k-1:k,1)).gt.0.0_WP); end do
                ! --- SL purity check (z-face) ---
                nSL_total=nSL_total+1.0_WP
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bblo=[minval(fijk(1,1:8)),minval(fijk(2,1:8)),minval(fijk(3,1:8))]
+               bbhi=[maxval(fijk(1,1:8)),maxval(fijk(2,1:8)),maxval(fijk(3,1:8))]
                if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
                   nSL_pure_bb=nSL_pure_bb+1.0_WP
                   if (pPLICold(i,j,k-1,4).gt.0.0_WP) then
