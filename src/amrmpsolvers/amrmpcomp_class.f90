@@ -1170,6 +1170,8 @@ contains
       ! Phase 1a: Semi-Lagrangian fluxes at finest level
       semilagrangian_fluxes: block
          use amrvof_geometry, only: tet_sign,tet_map,correct_flux_poly
+         use mpi_f08,  only: MPI_ALLREDUCE,MPI_SUM,MPI_IN_PLACE
+         use parallel, only: MPI_REAL_WP
          integer :: lvl,i,j,k,n,nn
          real(WP), dimension(3,9) :: face
          real(WP), dimension(3,4) :: tet
@@ -1181,11 +1183,16 @@ contains
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx
          real(WP) :: Fc,alpha,alpha0
+         ! SL purity diagnostics
+         real(WP) :: nSL_total,nSL_pure_bb,nSL_pure_weno
+         integer :: bblo(3),bbhi(3),ierr_diag
          ! Get finest level info
          lvl=this%amr%clvl()
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
          dy=this%amr%dy(lvl); dyi=1.0_WP/this%amr%dy(lvl)
          dz=this%amr%dz(lvl); dzi=1.0_WP/this%amr%dz(lvl)
+         ! Initialize SL purity diagnostics
+         nSL_total=0.0_WP; nSL_pure_bb=0.0_WP; nSL_pure_weno=0.0_WP
          ! Loop over finest level tiles
          call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
          do while (mfi%next())
@@ -1217,6 +1224,27 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(1,nn)=merge(i-1,i,0.5_WP*sum(pU(i-1:i,j,k,1)).gt.0.0_WP); end do
+               ! --- SL purity check (x-face) ---
+               nSL_total=nSL_total+1.0_WP
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
+                  nSL_pure_bb=nSL_pure_bb+1.0_WP
+                  if (pPLICold(i-1,j,k,4).gt.0.0_WP) then
+                     if (0.5_WP*sum(pU(i-1:i,j,k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i-2:i,j,k,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i-1:i+1,j,k,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  else
+                     if (0.5_WP*sum(pU(i-1:i,j,k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i-2:i,j,k,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i-1:i+1,j,k,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  end if
+               end if
+               ! --- end SL purity check (x-face) ---
                ! Decompose into tets, cut, and accumulate
                pVx(i,j,k,1:8)=0.0_WP
                pFx(i,j,k,1:7)=0.0_WP
@@ -1255,6 +1283,27 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(2,nn)=merge(j-1,j,0.5_WP*sum(pV(i,j-1:j,k,1)).gt.0.0_WP); end do
+               ! --- SL purity check (y-face) ---
+               nSL_total=nSL_total+1.0_WP
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
+                  nSL_pure_bb=nSL_pure_bb+1.0_WP
+                  if (pPLICold(i,j-1,k,4).gt.0.0_WP) then
+                     if (0.5_WP*sum(pV(i,j-1:j,k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i,j-2:j,k,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i,j-1:j+1,k,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  else
+                     if (0.5_WP*sum(pV(i,j-1:j,k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i,j-2:j,k,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i,j-1:j+1,k,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  end if
+               end if
+               ! --- end SL purity check (y-face) ---
                ! Decompose into tets, cut, and accumulate
                pVy(i,j,k,1:8)=0.0_WP
                pFy(i,j,k,1:7)=0.0_WP
@@ -1293,6 +1342,27 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(3,nn)=merge(k-1,k,0.5_WP*sum(pW(i,j,k-1:k,1)).gt.0.0_WP); end do
+               ! --- SL purity check (z-face) ---
+               nSL_total=nSL_total+1.0_WP
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               if (all(abs(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4)).gt.1.0e9_WP)) then
+                  nSL_pure_bb=nSL_pure_bb+1.0_WP
+                  if (pPLICold(i,j,k-1,4).gt.0.0_WP) then
+                     if (0.5_WP*sum(pW(i,j,k-1:k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i,j,k-2:k,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i,j,k-1:k+1,1).ge.VFlo)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  else
+                     if (0.5_WP*sum(pW(i,j,k-1:k,1)).gt.0.0_WP) then
+                        if (all(pVFold(i,j,k-2:k,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     else
+                        if (all(pVFold(i,j,k-1:k+1,1).le.VFhi)) nSL_pure_weno=nSL_pure_weno+1.0_WP
+                     end if
+                  end if
+               end if
+               ! --- end SL purity check (z-face) ---
                ! Decompose into tets, cut, and accumulate
                pVz(i,j,k,1:8)=0.0_WP
                pFz(i,j,k,1:7)=0.0_WP
@@ -1319,6 +1389,14 @@ contains
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
+         ! SL purity diagnostics — reduce and print
+         call MPI_ALLREDUCE(MPI_IN_PLACE,nSL_total,    1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr_diag)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,nSL_pure_bb,  1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr_diag)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,nSL_pure_weno,1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr_diag)
+         if (this%amr%amroot) then
+            print '(a,3(1x,es12.5),2(1x,f6.2,a))','[SL diag]',nSL_total,nSL_pure_bb,nSL_pure_weno, &
+            & 100.0_WP*nSL_pure_bb/max(nSL_total,1.0_WP),'% bb',100.0_WP*nSL_pure_weno/max(nSL_total,1.0_WP),'% weno'
+         end if
          ! Nullify pointers
          nullify(pU,pV,pW,pPLICold,pQold,pVFold)
       end block semilagrangian_fluxes
