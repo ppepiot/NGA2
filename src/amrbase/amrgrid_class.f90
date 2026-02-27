@@ -12,6 +12,7 @@ module amrgrid_class
 
    ! Expose type/constructor/methods
    public :: amrgrid
+   public :: mfab_rebuild
 
    ! Tag constants for use in tagging callbacks (match AMReX TagBox::TagVal enum)
    character(kind=c_char), parameter, public :: CLRtag = char(0)  !< Clear tag
@@ -1065,6 +1066,20 @@ contains
       implicit none
       call amrex_finalize()
    end subroutine finalize_amrex
+
+   !> Rebuild a multifab and set to zero
+   subroutine mfab_rebuild(mf,ba,dm,nc,ng)
+      use amrex_amr_module, only: amrex_multifab,amrex_multifab_build,amrex_multifab_destroy, &
+      &                           amrex_boxarray,amrex_distromap
+      implicit none
+      type(amrex_multifab), intent(inout) :: mf
+      type(amrex_boxarray), intent(in) :: ba
+      type(amrex_distromap), intent(in) :: dm
+      integer, intent(in) :: nc,ng
+      call amrex_multifab_destroy(mf)
+      call amrex_multifab_build(mf=mf,ba=ba,dm=dm,nc=nc,ng=ng)
+      call mf%setval(0.0_WP)
+   end subroutine mfab_rebuild
 
 
 end module amrgrid_class

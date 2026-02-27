@@ -5,13 +5,14 @@ module amrdata_class
    use string,           only: str_medium
    use amrgrid_class,    only: amrgrid
    use amrex_amr_module, only: amrex_multifab,amrex_boxarray,amrex_distromap,&
-   &                           amrex_multifab_build,amrex_multifab_destroy,amrex_geometry,&
+   &                           amrex_geometry,amrex_interp_pc,&
    &                           amrex_interp_cell_cons,amrex_interp_face_linear,amrex_interp_node_bilinear
    implicit none
    private
 
    public :: amrdata
    public :: amrdata_on_init,amrdata_on_coarse,amrdata_on_remake,amrdata_on_clear,amrdata_fillbc
+   public :: amrex_interp_pc,amrex_interp_cell_cons,amrex_interp_face_linear,amrex_interp_node_bilinear
    public :: default_fillbc
 
    ! Special interpolation modes for amrdata
@@ -192,6 +193,7 @@ contains
 
    !> Finalize the amrdata object
    subroutine finalize(this)
+      use amrex_amr_module, only: amrex_multifab_destroy
       class(amrdata), intent(inout) :: this
       integer :: i
       ! Destroy all MultiFabs
@@ -238,6 +240,7 @@ contains
 
    !> Reset mfab on a level given new BoxArray and DistroMap
    subroutine reset_level(this,lvl,ba,dm)
+      use amrex_amr_module, only: amrex_multifab_build,amrex_multifab_destroy
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
       type(amrex_boxarray),  intent(in) :: ba
@@ -248,6 +251,7 @@ contains
 
    !> Destroy mfab on a level
    subroutine clear_level(this,lvl)
+      use amrex_amr_module, only: amrex_multifab_destroy
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
       call amrex_multifab_destroy(this%mf(lvl))
@@ -575,15 +579,16 @@ contains
       end do
    end subroutine sync
 
-   !> Average down from finest level to coarsest (ensures level consistency)
+   !> Average down from finest level to lbase (ensures level consistency)
    !> Simply calls average_downto in a loop from finest to coarsest
-   subroutine average_down(this)
+   subroutine average_down(this,lbase)
       implicit none
       class(amrdata), intent(inout) :: this
-      integer :: lvl
-      if (.not.associated(this%amr)) return
+      integer, intent(in), optional :: lbase
+      integer :: lvl,lb
+      lb=0; if (present(lbase)) lb=lbase
       ! Loop from finest to coarsest
-      do lvl = this%amr%clvl()-1, 0, -1
+      do lvl=this%amr%clvl()-1,lb,-1
          call this%average_downto(lvl)
       end do
    end subroutine average_down
@@ -593,26 +598,25 @@ contains
    !> - nodal_count=1 (face): amrmfab_average_down_face
    !> - nodal_count=2 (edge): amrmfab_average_down_edge
    !> - nodal_count=3 (node): amrmfab_average_down_node
-   subroutine average_downto(this, lvl)
-      use amrex_interface, only: amrmfab_average_down_cell, amrmfab_average_down_face, &
-      &                          amrmfab_average_down_edge, amrmfab_average_down_node
+   subroutine average_downto(this,lvl)
+      use messager, only: die
+      use amrex_interface, only: amrmfab_average_down_cell,amrmfab_average_down_face, &
+      &                          amrmfab_average_down_edge,amrmfab_average_down_node
       implicit none
       class(amrdata), intent(inout) :: this
       integer, intent(in) :: lvl
-      integer :: nodal_count
-      if (.not.associated(this%amr)) return
-      if (lvl.lt.0 .or. lvl.ge.this%amr%clvl()) return
-      nodal_count = count(this%nodal)
+      ! Check that level is valid
+      if (lvl.lt.0.or.lvl.ge.this%amr%clvl()) call die('[amrdata average_downto] invalid level provided')
       ! Pass geometry for periodic fix-up
-      select case (nodal_count)
+      select case (count(this%nodal))
        case (0) ! Cell-centered
-         call amrmfab_average_down_cell(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_cell(fmf=this%mf(lvl+1),cmf=this%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
        case (1) ! Face-centered
-         call amrmfab_average_down_face(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_face(fmf=this%mf(lvl+1),cmf=this%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
        case (2) ! Edge-centered
-         call amrmfab_average_down_edge(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_edge(fmf=this%mf(lvl+1),cmf=this%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
        case (3) ! Node-centered
-         call amrmfab_average_down_node(fmf=this%mf(lvl+1), cmf=this%mf(lvl), rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)], cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_node(fmf=this%mf(lvl+1),cmf=this%mf(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
       end select
    end subroutine average_downto
 
