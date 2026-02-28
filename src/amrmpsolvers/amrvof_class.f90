@@ -60,6 +60,21 @@ module amrvof_class
       real(WP) :: VFmax=0.0_WP
       real(WP) :: VFint=0.0_WP
       
+      ! Per-rank timing accumulators (reset by get_info)
+      real(WP) :: wt_advance=0.0_WP    !< Full advance_vof
+      real(WP) :: wt_sl=0.0_WP         !< SL flux+update
+      real(WP) :: wt_plic=0.0_WP       !< Full build_plic
+      real(WP) :: wt_plicnet=0.0_WP    !< PLICnet reconstruction loop
+      real(WP) :: wt_polygon=0.0_WP    !< Polygon extraction loop
+      ! Reduced timing (min/max across ranks)
+      real(WP) :: wtmax_advance=0.0_WP, wtmin_advance=0.0_WP
+      real(WP) :: wtmax_sl=0.0_WP,      wtmin_sl=0.0_WP
+      real(WP) :: wtmax_plic=0.0_WP,    wtmin_plic=0.0_WP
+      real(WP) :: wtmax_plicnet=0.0_WP, wtmin_plicnet=0.0_WP
+      real(WP) :: wtmax_polygon=0.0_WP, wtmin_polygon=0.0_WP
+      ! Load distribution diagnostics
+      integer :: nmixed_max=0, nmixed_min=0
+      
       ! Surface mesh for visualization
       type(surfmesh) :: smesh
 
@@ -143,6 +158,7 @@ contains
 
    !> Dispatch on_init: calls type-bound method then user callback
    subroutine amrvof_on_init(ctx,lvl,time,ba,dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -156,6 +172,7 @@ contains
 
    !> Dispatch on_coarse: calls type-bound method
    subroutine amrvof_on_coarse(ctx,lvl,time,ba,dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -168,6 +185,7 @@ contains
 
    !> Dispatch on_remake: calls type-bound method
    subroutine amrvof_on_remake(ctx,lvl,time,ba,dm)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -180,6 +198,7 @@ contains
 
    !> Dispatch on_clear: calls type-bound method
    subroutine amrvof_on_clear(ctx,lvl)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
       type(amrvof), pointer :: this
@@ -189,6 +208,7 @@ contains
 
    !> Dispatch post_regrid: calls type-bound method
    subroutine amrvof_postregrid(ctx,lbase,time)
+      implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
@@ -230,6 +250,7 @@ contains
    !> Initialize the VOF solver
    subroutine initialize(this,amr,name)
       use amrdata_class, only: amrex_interp_pc
+      implicit none
       class(amrvof), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr
       character(len=*), intent(in), optional :: name
@@ -266,6 +287,7 @@ contains
    !> Finalize the VOF solver
    subroutine finalize(this)
       use amrex_amr_module, only: amrex_multifab_destroy
+      implicit none
       class(amrvof), intent(inout) :: this
       ! Finalize VF/VFold amrdata
       call this%VF%finalize()
@@ -293,6 +315,7 @@ contains
    !> Override on_init: reset VF/VFold level layout, rebuild finest-level mfabs
    subroutine on_init(this,lvl,time,ba,dm)
       use amrgrid_class, only: mfab_rebuild
+      implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -315,6 +338,7 @@ contains
    !> Override on_coarse: create new fine level from coarse, rebuild finest-level mfabs
    subroutine on_coarse(this,lvl,time,ba,dm)
       use amrgrid_class, only: mfab_rebuild
+      implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -364,6 +388,7 @@ contains
    !> Override on_remake: migrate VF on regrid, rebuild finest-level mfabs and fill with parallel_copy
    subroutine on_remake(this,lvl,time,ba,dm)
       use amrgrid_class, only: mfab_rebuild
+      implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
       real(WP), intent(in) :: time
@@ -424,6 +449,7 @@ contains
    !> Override on_clear: clear VF/VFold at level, destroy finest-level mfabs
    subroutine on_clear(this,lvl)
       use amrex_amr_module, only: amrex_multifab_destroy
+      implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lvl
       call this%VF%clear_level(lvl)
@@ -440,6 +466,7 @@ contains
 
    !> Override post_regrid: average down VF
    subroutine post_regrid(this,lbase,time)
+      implicit none
       class(amrvof), intent(inout) :: this
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
@@ -577,6 +604,7 @@ contains
 
    !> Copy current state to old state
    subroutine store_old(this)
+      implicit none
       class(amrvof), intent(inout) :: this
       ! Copy VF to VFold
       call this%VFold%copy(src=this%VF)
@@ -604,6 +632,7 @@ contains
       !> Fill at a level
       subroutine fill_lvl(lvl)
          use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy
+         implicit none
          integer, intent(in) :: lvl
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: vbx,bc_bx
@@ -789,9 +818,14 @@ contains
 
    !> Build PLIC reconstruction from VF and barycenters using PLICnet
    subroutine build_plic(this,time)
+      use mpi_f08, only: MPI_Wtime
+      implicit none
       class(amrvof), intent(inout) :: this
       real(WP), intent(in) :: time
+      real(WP) :: t0
       integer :: lvl
+      ! Start timer
+      t0=MPI_Wtime()
 
       ! Perform PLICnet reconstruction
       call this%build_plicnet(time)
@@ -808,6 +842,8 @@ contains
          call this%fill(lvl,time)
       end do
 
+      ! End timer
+      this%wt_plic=this%wt_plic+(MPI_Wtime()-t0)
    end subroutine build_plic
 
    !> PLICnet interface reconstruction
@@ -816,6 +852,7 @@ contains
       use mathtools, only: normalize
       use amrvof_geometry, only: get_plane_dist
       use amrex_amr_module, only: amrex_mfiter
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrvof), intent(inout) :: this
       real(WP), intent(in) :: time
@@ -823,11 +860,13 @@ contains
       real(WP) :: dx,dy,dz,dxi,dyi,dzi
       real(WP), dimension(0:188) :: moments
       real(WP), dimension(3) :: normal,center,lo,hi
-      real(WP) :: m000,m100,m010,m001,temp
+      real(WP) :: m000,m100,m010,m001,temp,t0
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC
       logical :: flip
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
+      ! Start timer
+      t0=MPI_Wtime()
       ! Only build at finest level
       lvl=this%amr%maxlvl
       ! Get cell size at this level
@@ -935,15 +974,19 @@ contains
       call this%amr%mfiter_destroy(mfi)
       ! Fill ghosts (sync + periodic correction + physical BC)
       call this%fill(lvl,time)
+      ! End timer
+      this%wt_plicnet=this%wt_plicnet+(MPI_Wtime()-t0)
    end subroutine build_plicnet
 
    !> Build polygons from PLIC planes
    subroutine build_polygons(this)
+      use mpi_f08, only: MPI_Wtime
       use amrvof_geometry, only: cut_hex_polygon
       use amrex_amr_module, only: amrex_mfiter
+      implicit none
       class(amrvof), intent(inout) :: this
       integer :: lvl
-      real(WP) :: dx,dy,dz
+      real(WP) :: dx,dy,dz,t0
       integer :: i,j,k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC
       real(WP), dimension(3) :: lo,hi
@@ -956,11 +999,11 @@ contains
       integer, dimension(:,:,:), allocatable :: poly_nv_local       ! (ilo:ihi, jlo:jhi, klo:khi)
       real(WP), dimension(3,6) :: poly_verts
       integer :: poly_nv
+      ! Start timer
+      t0=MPI_Wtime()
       ! Get level and cell size
       lvl=this%amr%maxlvl
-      dx=this%amr%dx(lvl)
-      dy=this%amr%dy(lvl)
-      dz=this%amr%dz(lvl)
+      dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
       ! Reset polygon storage
       call this%smesh%reset()
       ! Compute new polygons
@@ -1007,6 +1050,8 @@ contains
          deallocate(polygon_local,poly_nv_local)
       end do
       call this%amr%mfiter_destroy(mfi)
+      ! End timer
+      this%wt_polygon=this%wt_polygon+(MPI_Wtime()-t0)
    end subroutine build_polygons
 
    !> Reset VF and barycenters from PLIC plane to ensure consistency
@@ -1014,6 +1059,7 @@ contains
    subroutine reset_moments(this)
       use amrvof_geometry, only: cut_hex_vol
       use amrex_amr_module, only: amrex_mfiter
+      implicit none
       class(amrvof), intent(inout) :: this
       integer :: lvl,i,j,k
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC
@@ -1080,6 +1126,7 @@ contains
    !> User must provide MultiFabs at finest level with >= 2 ghost cells filled
    subroutine advance_vof(this,U,V,W,dt,time)
       use amrex_amr_module, only: amrex_multifab,amrex_mfiter
+      use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrvof), intent(inout) :: this
       type(amrex_multifab), intent(in) :: U,V,W
@@ -1089,10 +1136,12 @@ contains
       logical :: is_staggered
       integer :: lvl
       real(WP) :: dx,dy,dz,dxi,dyi,dzi,vol
-
+      real(WP) :: t0,t1
       ! Shared variables for internal functions
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW ! Velocity used for project
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLICold ! PLIC old used in tet2flux_plic
+      ! Start full routine timer
+      t0=MPI_Wtime()
 
       ! Level at which we're working
       lvl=this%amr%maxlvl
@@ -1175,6 +1224,7 @@ contains
       call this%amr%mfab_build(lvl=lvl,mfab=Fz,ncomp=8,nover=0,atface=[.false.,.false.,.true. ]); call Fz%setval(0.0_WP)
       
       ! Phase 1: Compute all fluxes
+      t1=MPI_Wtime() ! Start SL timer
       compute_fluxes: block
          use amrvof_geometry, only: tet_sign,tet_map,correct_flux_poly
          type(amrex_mfiter) :: mfi
@@ -1337,6 +1387,7 @@ contains
          end do
          call this%amr%mfiter_destroy(mfi)
       end block update_vf
+      this%wt_sl=this%wt_sl+(MPI_Wtime()-t1) ! End SL timer
 
       ! Cleanup flux multifabs
       call this%amr%mfab_destroy(Fx)
@@ -1349,11 +1400,14 @@ contains
       ! Sync and apply BC
       call this%fill(lvl,time)
 
+      ! End full routine timer
+      this%wt_advance=this%wt_advance+(MPI_Wtime()-t0)
    contains
       
       !> Recursive function that cuts a tet by grid planes to compute fluxes
       recursive function tet2flux(mytet, myind) result(myflux)
          use amrvof_geometry, only: cut_side, cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert
+         implicit none
          real(WP), dimension(3,4), intent(in) :: mytet
          integer, dimension(3,4), intent(in) :: myind
          real(WP), dimension(8) :: myflux
@@ -1450,6 +1504,7 @@ contains
       function tet2flux_plic(mytet, i0, j0, k0) result(myflux)
          use amrvof_geometry, only: cut_v1, cut_v2, cut_vtet, cut_ntets, cut_nvert, cut_nntet, tet_vol
          use messager, only: die
+         implicit none
          real(WP), dimension(3,4), intent(in) :: mytet
          integer, intent(in) :: i0, j0, k0
          real(WP), dimension(8) :: myflux
@@ -1641,6 +1696,7 @@ contains
    !> Compute advective CFL at finest level
    !> Takes external staggered velocity MultiFabs and returns max CFL
    subroutine get_cfl(this,U,V,W,dt,cfl)
+      implicit none
       class(amrvof), intent(inout) :: this
       type(amrex_multifab), intent(in) :: U,V,W  !< Staggered velocity at clvl
       real(WP), intent(in) :: dt
@@ -1669,28 +1725,59 @@ contains
    !> Get solver information
    subroutine get_info(this)
       use parallel, only: MPI_REAL_WP
-      use mpi_f08
+      use mpi_f08, only: MPI_ALLREDUCE,MPI_IN_PLACE,MPI_MAX,MPI_MIN,MPI_INTEGER
+      implicit none
       class(amrvof), intent(inout) :: this
-      integer :: lvl,ierr
-      ! Initialize
-      this%VFmin=+huge(1.0_WP)
-      this%VFmax=-huge(1.0_WP)
-      this%VFint=0.0_WP
-      ! Loop over levels
-      do lvl=0,this%amr%clvl()
-         this%VFmin=min(this%VFmin,this%VF%get_min(lvl=lvl))
-         this%VFmax=max(this%VFmax,this%VF%get_max(lvl=lvl))
-      end do
-      ! Compute volume integral at level 0
+      integer :: ierr
+      
+      ! Get min/max at finest level and integral at level 0
+      this%VFmin=this%VF%get_min(lvl=this%amr%maxlvl)
+      this%VFmax=this%VF%get_max(lvl=this%amr%maxlvl)
       this%VFint=this%VF%get_sum(lvl=0)*this%amr%cell_vol(0)
-      ! Reduce across MPI ranks
-      call MPI_ALLREDUCE(MPI_IN_PLACE,this%VFint,1,MPI_REAL_WP,MPI_SUM,this%amr%comm,ierr)
+      
+      ! Load distribution diagnostics at finest level
+      load_distribution: block
+         use amrex_amr_module, only: amrex_mfiter
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: bx
+         integer :: nmixed
+         integer :: i,j,k
+         nmixed=0
+         call this%amr%mfiter_build(this%amr%maxlvl,mfi)
+         do while (mfi%next())
+            pVF=>this%VF%mf(this%amr%maxlvl)%dataptr(mfi)
+            bx=mfi%tilebox()
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) nmixed=nmixed+1
+            end do; end do; end do
+         end do
+         call this%amr%mfiter_destroy(mfi)
+         this%nmixed_max=nmixed; call MPI_ALLREDUCE(MPI_IN_PLACE,this%nmixed_max,1,MPI_INTEGER,MPI_MAX,this%amr%comm,ierr)
+         this%nmixed_min=nmixed; call MPI_ALLREDUCE(MPI_IN_PLACE,this%nmixed_min,1,MPI_INTEGER,MPI_MIN,this%amr%comm,ierr)
+      end block load_distribution
+
+      ! Reduce per-rank timing to min/max across ranks
+      call MPI_ALLREDUCE(this%wt_advance, this%wtmax_advance,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_advance, this%wtmin_advance,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_sl,      this%wtmax_sl,     1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_sl,      this%wtmin_sl,     1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plic,    this%wtmax_plic,   1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plic,    this%wtmin_plic,   1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plicnet, this%wtmax_plicnet,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_plicnet, this%wtmin_plicnet,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_polygon, this%wtmax_polygon,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_polygon, this%wtmin_polygon,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      ! Reset per-rank timing accumulators for next interval
+      this%wt_advance=0.0_WP; this%wt_sl=0.0_WP; this%wt_plic=0.0_WP; this%wt_plicnet=0.0_WP; this%wt_polygon=0.0_WP
+
    end subroutine get_info
 
    !> Print solver info to screen
    subroutine amrvof_print(this)
       use messager, only: log
       use string, only: str_long
+      implicit none
       class(amrvof), intent(in) :: this
       character(len=str_long) :: message
       call log("VOF solver: "//trim(this%name))
@@ -1706,6 +1793,7 @@ contains
    !> Register checkpoint
    subroutine register_checkpoint(this,io)
       use amrio_class, only: amrio
+      implicit none
       class(amrvof), intent(inout) :: this
       class(amrio), intent(inout) :: io
       call io%add_data(this%VF,'VF')
@@ -1717,6 +1805,7 @@ contains
    !> Restore checkpoint
    subroutine restore_checkpoint(this,io,dirname,time)
       use amrio_class, only: amrio
+      implicit none
       class(amrvof), intent(inout) :: this
       class(amrio), intent(inout) :: io
       character(len=*), intent(in) :: dirname
