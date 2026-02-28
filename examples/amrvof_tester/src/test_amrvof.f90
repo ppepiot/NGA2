@@ -37,7 +37,7 @@ module mod_test_amrvof
    type(event) :: regrid_evt
 
    ! Monitoring
-   type(monitor) :: mfile,gridfile
+   type(monitor) :: mfile,gridfile,timing
 
 contains
 
@@ -196,6 +196,23 @@ contains
          call gridfile%add_column(amr%minRSS,'Minimum RSS')
          call gridfile%add_column(amr%avgRSS,'Average RSS')
          call gridfile%write()
+         ! Create timing monitor
+         timing=monitor(amRoot=amr%amRoot,name='timing')
+         call timing%add_column(time%n,'Timestep')
+         call timing%add_column(time%t,'Time')
+         call timing%add_column(vof%nmixed_max,'nmixed_max')
+         call timing%add_column(vof%nmixed_min,'nmixed_min')
+         call timing%add_column(vof%wtmax_advance,'wtmax_advance')
+         call timing%add_column(vof%wtmin_advance,'wtmin_advance')
+         call timing%add_column(vof%wtmax_sl,'wtmax_sl')
+         call timing%add_column(vof%wtmin_sl,'wtmin_sl')
+         call timing%add_column(vof%wtmax_plic,'wtmax_plic')
+         call timing%add_column(vof%wtmin_plic,'wtmin_plic')
+         call timing%add_column(vof%wtmax_plicnet,'wtmax_plicnet')
+         call timing%add_column(vof%wtmin_plicnet,'wtmin_plicnet')
+         call timing%add_column(vof%wtmax_polygon,'wtmax_polygon')
+         call timing%add_column(vof%wtmin_polygon,'wtmin_polygon')
+         call timing%write()
       end block create_monitor
 
       ! Time integration loop
@@ -293,6 +310,7 @@ contains
          ! Monitor output
          call vof%get_info()
          call mfile%write()
+         call timing%write()
 
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time=time%t)
@@ -321,6 +339,7 @@ contains
          ! Finalize monitoring
          call mfile%finalize()
          call gridfile%finalize()
+         call timing%finalize()
       end block cleanup
 
       call log("=== VOF Advection Test Complete ===")
