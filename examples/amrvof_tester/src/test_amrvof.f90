@@ -212,6 +212,8 @@ contains
          call timing%add_column(vof%wtmin_plicnet,'wtmin_plicnet')
          call timing%add_column(vof%wtmax_polygon,'wtmax_polygon')
          call timing%add_column(vof%wtmin_polygon,'wtmin_polygon')
+         call timing%add_column(vof%wtmax_remap,'wtmax_remap')
+         call timing%add_column(vof%wtmin_remap,'wtmin_remap')
          call timing%write()
       end block create_monitor
 

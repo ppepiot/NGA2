@@ -66,12 +66,14 @@ module amrvof_class
       real(WP) :: wt_plic=0.0_WP       !< Full build_plic
       real(WP) :: wt_plicnet=0.0_WP    !< PLICnet reconstruction loop
       real(WP) :: wt_polygon=0.0_WP    !< Polygon extraction loop
+      real(WP) :: wt_remap=0.0_WP      !< Box remap
       ! Reduced timing (min/max across ranks)
       real(WP) :: wtmax_advance=0.0_WP, wtmin_advance=0.0_WP
       real(WP) :: wtmax_sl=0.0_WP,      wtmin_sl=0.0_WP
       real(WP) :: wtmax_plic=0.0_WP,    wtmin_plic=0.0_WP
       real(WP) :: wtmax_plicnet=0.0_WP, wtmin_plicnet=0.0_WP
       real(WP) :: wtmax_polygon=0.0_WP, wtmin_polygon=0.0_WP
+      real(WP) :: wtmax_remap=0.0_WP,   wtmin_remap=0.0_WP
       ! Load distribution diagnostics
       integer :: nmixed_max=0, nmixed_min=0
       
@@ -1132,7 +1134,7 @@ contains
       type(amrex_multifab), intent(in) :: U,V,W
       real(WP), intent(in) :: dt
       real(WP), intent(in) :: time
-      type(amrex_multifab) :: band,Fx,Fy,Fz
+      type(amrex_multifab) :: band,Vx,Vy,Vz
       logical :: is_staggered
       integer :: lvl
       real(WP) :: dx,dy,dz,dxi,dyi,dzi,vol
@@ -1218,22 +1220,28 @@ contains
          call band%fill_boundary(this%amr%geom(lvl))
       end block build_band
 
-      ! Build face-centered flux MultiFabs (8 components: Lvol, Gvol, Lbar(3), Gbar(3))
-      call this%amr%mfab_build(lvl=lvl,mfab=Fx,ncomp=8,nover=0,atface=[.true. ,.false.,.false.]); call Fx%setval(0.0_WP)
-      call this%amr%mfab_build(lvl=lvl,mfab=Fy,ncomp=8,nover=0,atface=[.false.,.true. ,.false.]); call Fy%setval(0.0_WP)
-      call this%amr%mfab_build(lvl=lvl,mfab=Fz,ncomp=8,nover=0,atface=[.false.,.false.,.true. ]); call Fz%setval(0.0_WP)
-      
+      ! Build face-centered volume flux MultiFabs (8 components: Lvol, Gvol, Lbar(3), Gbar(3))
+      call this%amr%mfab_build(lvl=lvl,mfab=Vx,ncomp=8,nover=0,atface=[.true. ,.false.,.false.]); call Vx%setval(0.0_WP)
+      call this%amr%mfab_build(lvl=lvl,mfab=Vy,ncomp=8,nover=0,atface=[.false.,.true. ,.false.]); call Vy%setval(0.0_WP)
+      call this%amr%mfab_build(lvl=lvl,mfab=Vz,ncomp=8,nover=0,atface=[.false.,.false.,.true. ]); call Vz%setval(0.0_WP)
+
       ! Phase 1: Compute all fluxes
       t1=MPI_Wtime() ! Start SL timer
       compute_fluxes: block
-         use amrvof_geometry, only: tet_sign,tet_map,correct_flux_poly
-         type(amrex_mfiter) :: mfi
-         type(amrex_box) :: fbx
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pFx,pFy,pFz
+         use amrvof_geometry, only: tet_sign,tet_map,correct_flux_poly,flux_poly_moments,remap_box_staggered
          integer :: i,j,k,n,nn
          real(WP), dimension(3,9) :: face
          real(WP), dimension(3,4) :: tet
          integer , dimension(3,4) :: ijk
+         integer , dimension(3,9) :: fijk
+         real(WP), dimension(:,:,:,:), allocatable :: proj
+         integer, dimension(3) :: bblo,bbhi
+         logical :: bb_pure_liq,bb_pure_gas
+         real(WP) :: fvol,vel,t_remap
+         real(WP), dimension(3) :: fbary
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: fbx,nbx
          call this%amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
             ! Get data pointers: PLICold, band, velocity, fluxes
@@ -1242,84 +1250,137 @@ contains
             pU =>U%dataptr(mfi)
             pV =>V%dataptr(mfi)
             pW =>W%dataptr(mfi)
-            pFx=>Fx%dataptr(mfi)
-            pFy=>Fy%dataptr(mfi)
-            pFz=>Fz%dataptr(mfi)
+            pVx=>Vx%dataptr(mfi)
+            pVy=>Vy%dataptr(mfi)
+            pVz=>Vz%dataptr(mfi)
+            ! Remap all tile nodes via RK2
+            t_remap=MPI_Wtime()
+            nbx=mfi%nodaltilebox()
+            allocate(proj(3,nbx%lo(1):nbx%hi(1),nbx%lo(2):nbx%hi(2),nbx%lo(3):nbx%hi(3)))
+            call remap_box_staggered(nbx,dt,this%amr%xlo,this%amr%ylo,this%amr%zlo,dx,dy,dz,lbound(pU),lbound(pV),lbound(pW),pU,pV,pW,proj)
+            this%wt_remap=this%wt_remap+(MPI_Wtime()-t_remap)
             ! X-fluxes: loop over nodaltilebox(1)
             fbx=mfi%nodaltilebox(1)
             do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
                ! Skip if outside band
                if (maxval(pBand(i-1:i,j,k,1)).eq.0.0_WP) cycle
-               ! Face vertices: 1-4 current position, 5-8 projected back, 9 at backface barycenter
-               face(:,1)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,5)=project(face(:,1),-dt)
-               face(:,2)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,6)=project(face(:,2),-dt)
-               face(:,3)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,7)=project(face(:,3),-dt)
-               face(:,4)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=project(face(:,4),-dt)
+               ! Build face velocity
+               vel=merge(pU(i,j,k,1),0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)),is_staggered)
+               ! Build flux polyhedron
+               face(:,1)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,5)=proj(:,i,j  ,k  )
+               face(:,2)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,6)=proj(:,i,j  ,k+1)
+               face(:,3)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,7)=proj(:,i,j+1,k+1)
+               face(:,4)=[this%amr%xlo+real(i,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=proj(:,i,j+1,k  )
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
-               ! Set 9th vertex to inforce target volume
-               call correct_flux_poly(poly=face,target_volume=dt*dy*dz*merge(pU(i,j,k,1),0.5_WP*(pU(i-1,j,k,1)+pU(i,j,k,1)),is_staggered))
-               ! Compute sign of each tet and accumulate flux
-               pFx(i,j,k,1:8)=0.0_WP
-               do n=1,8
-                  ! Get the vertices and indices
-                  do nn=1,4
-                     tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+               call correct_flux_poly(poly=face,target_volume=dt*dy*dz*vel)
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(1,nn)=merge(i-1,i,vel.gt.0.0_WP); end do
+               ! Check polyhedron bounding box
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Compute volume flux
+               pVx(i,j,k,:)=0.0_WP
+               if (bb_pure_liq.or.bb_pure_gas) then
+                  ! Lightweight path
+                  call flux_poly_moments(face,fvol,fbary)
+                  if (bb_pure_liq) then
+                     pVx(i,j,k,1)=fvol; pVx(i,j,k,3:5)=fbary
+                  else
+                     pVx(i,j,k,2)=fvol; pVx(i,j,k,6:8)=fbary
+                  end if
+               else
+                  ! Decompose into tets, cut, and accumulate
+                  do n=1,8
+                     do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
+                     pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
                   end do
-                  ! Cut tet and accumulate
-                  pFx(i,j,k,1:8)=pFx(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
-               end do
+               end if
             end do; end do; end do
             ! Y-fluxes: loop over nodaltilebox(2)
             fbx=mfi%nodaltilebox(2)
             do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
                ! Skip if outside band
                if (maxval(pBand(i,j-1:j,k,1)).eq.0.0_WP) cycle
-               ! Face vertices: 1-4 current position, 5-8 projected back, 9 at backface barycenter
-               face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,5)=project(face(:,1),-dt)
-               face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,6)=project(face(:,2),-dt)
-               face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,7)=project(face(:,3),-dt)
-               face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=project(face(:,4),-dt)
+               ! Build face velocity
+               vel=merge(pV(i,j,k,1),0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)),is_staggered)
+               ! Build flux polyhedron
+               face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,5)=proj(:,i+1,j,k+1)
+               face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]; face(:,6)=proj(:,i  ,j,k+1)
+               face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,7)=proj(:,i  ,j,k  )
+               face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]; face(:,8)=proj(:,i+1,j,k  )
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
-               ! Set 9th vertex to inforce target volume
-               call correct_flux_poly(poly=face,target_volume=dt*dz*dx*merge(pV(i,j,k,1),0.5_WP*(pV(i,j-1,k,1)+pV(i,j,k,1)),is_staggered))
-               ! Compute sign of each tet and accumulate flux
-               pFy(i,j,k,1:8)=0.0_WP
-               do n=1,8
-                  ! Get the vertices and indices
-                  do nn=1,4
-                     tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+               call correct_flux_poly(poly=face,target_volume=dt*dz*dx*vel)
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(2,nn)=merge(j-1,j,vel.gt.0.0_WP); end do
+               ! Check polyhedron bounding box
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Compute volume flux
+               pVy(i,j,k,:)=0.0_WP
+               if (bb_pure_liq.or.bb_pure_gas) then
+                  ! Lightweight path
+                  call flux_poly_moments(face,fvol,fbary)
+                  if (bb_pure_liq) then
+                     pVy(i,j,k,1)=fvol; pVy(i,j,k,3:5)=fbary
+                  else
+                     pVy(i,j,k,2)=fvol; pVy(i,j,k,6:8)=fbary
+                  end if
+               else
+                  ! Decompose into tets, cut, and accumulate
+                  do n=1,8
+                     do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
+                     pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
                   end do
-                  ! Cut tet and accumulate
-                  pFy(i,j,k,1:8)=pFy(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
-               end do
+               end if
             end do; end do; end do
             ! Z-fluxes: loop over nodaltilebox(3)
             fbx=mfi%nodaltilebox(3)
             do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
                ! Skip if outside band
                if (maxval(pBand(i,j,k-1:k,1)).eq.0.0_WP) cycle
-               ! Face vertices: 1-4 current position, 5-8 projected back, 9 at backface barycenter
-               face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,5)=project(face(:,1),-dt)
-               face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,6)=project(face(:,2),-dt)
-               face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,7)=project(face(:,3),-dt)
-               face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,8)=project(face(:,4),-dt)
+               ! Build face velocity
+               vel=merge(pW(i,j,k,1),0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)),is_staggered)
+               ! Build flux polyhedron
+               face(:,1)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,5)=proj(:,i+1,j  ,k)
+               face(:,2)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,6)=proj(:,i  ,j  ,k)
+               face(:,3)=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,7)=proj(:,i  ,j+1,k)
+               face(:,4)=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k,WP)*dz]; face(:,8)=proj(:,i+1,j+1,k)
                face(:,9)=0.25_WP*(face(:,5)+face(:,6)+face(:,7)+face(:,8))
-               ! Set 9th vertex to inforce target volume
-               call correct_flux_poly(poly=face,target_volume=dt*dx*dy*merge(pW(i,j,k,1),0.5_WP*(pW(i,j,k-1,1)+pW(i,j,k,1)),is_staggered))
-               ! Compute sign of each tet and accumulate flux
-               pFz(i,j,k,1:8)=0.0_WP
-               do n=1,8
-                  ! Get the vertices and indices
-                  do nn=1,4
-                     tet(:,nn)=face(:,tet_map(nn,n))
-                     ijk(:,nn)=floor([(tet(1,nn)-this%amr%xlo)*dxi,(tet(2,nn)-this%amr%ylo)*dyi,(tet(3,nn)-this%amr%zlo)*dzi])
+               call correct_flux_poly(poly=face,target_volume=dt*dx*dy*vel)
+               ! Compute face indices
+               do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
+               do nn=1,4; fijk(3,nn)=merge(k-1,k,vel.gt.0.0_WP); end do
+               ! Check polyhedron bounding box
+               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
+               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
+               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Compute volume flux
+               pVz(i,j,k,:)=0.0_WP
+               if (bb_pure_liq.or.bb_pure_gas) then
+                  ! Lightweight path
+                  call flux_poly_moments(face,fvol,fbary)
+                  if (bb_pure_liq) then
+                     pVz(i,j,k,1)=fvol; pVz(i,j,k,3:5)=fbary
+                  else
+                     pVz(i,j,k,2)=fvol; pVz(i,j,k,6:8)=fbary
+                  end if
+               else
+                  ! Decompose into tets, cut, and accumulate
+                  do n=1,8
+                     do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
+                     pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
                   end do
-                  ! Cut tet and accumulate
-                  pFz(i,j,k,1:8)=pFz(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
-               end do
+               end if
             end do; end do; end do
+            ! Deallocate proj for this tile
+            deallocate(proj)
          end do
          call this%amr%mfiter_destroy(mfi)
       end block compute_fluxes
@@ -1329,7 +1390,7 @@ contains
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: bx
          integer :: i,j,k
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pFx,pFy,pFz
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pVFold,pCLold,pCGold
          real(WP) :: Lvol_old,Lvol_new,Lvol_flux
          real(WP) :: Gvol_old,Gvol_new,Gvol_flux
@@ -1348,9 +1409,9 @@ contains
             pU=>U%dataptr(mfi)
             pV=>V%dataptr(mfi)
             pW=>W%dataptr(mfi)
-            pFx=>Fx%dataptr(mfi)
-            pFy=>Fy%dataptr(mfi)
-            pFz=>Fz%dataptr(mfi)
+            pVx=>Vx%dataptr(mfi)
+            pVy=>Vy%dataptr(mfi)
+            pVz=>Vz%dataptr(mfi)
             ! Loop over tilebox
             bx=mfi%tilebox()
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
@@ -1362,10 +1423,10 @@ contains
                Lbar_old=pCLold(i,j,k,1:3)
                Gbar_old=pCGold(i,j,k,1:3)
                ! Net flux (outflow positive)
-               Lvol_flux=pFx(i+1,j,k,1)  -pFx(i,j,k,1)  +pFy(i,j+1,k,1)  -pFy(i,j,k,1)  +pFz(i,j,k+1,1)  -pFz(i,j,k,1)
-               Gvol_flux=pFx(i+1,j,k,2)  -pFx(i,j,k,2)  +pFy(i,j+1,k,2)  -pFy(i,j,k,2)  +pFz(i,j,k+1,2)  -pFz(i,j,k,2)
-               Lbar_flux=pFx(i+1,j,k,3:5)-pFx(i,j,k,3:5)+pFy(i,j+1,k,3:5)-pFy(i,j,k,3:5)+pFz(i,j,k+1,3:5)-pFz(i,j,k,3:5)
-               Gbar_flux=pFx(i+1,j,k,6:8)-pFx(i,j,k,6:8)+pFy(i,j+1,k,6:8)-pFy(i,j,k,6:8)+pFz(i,j,k+1,6:8)-pFz(i,j,k,6:8)
+               Lvol_flux=pVx(i+1,j,k,1)  -pVx(i,j,k,1)  +pVy(i,j+1,k,1)  -pVy(i,j,k,1)  +pVz(i,j,k+1,1)  -pVz(i,j,k,1)
+               Gvol_flux=pVx(i+1,j,k,2)  -pVx(i,j,k,2)  +pVy(i,j+1,k,2)  -pVy(i,j,k,2)  +pVz(i,j,k+1,2)  -pVz(i,j,k,2)
+               Lbar_flux=pVx(i+1,j,k,3:5)-pVx(i,j,k,3:5)+pVy(i,j+1,k,3:5)-pVy(i,j,k,3:5)+pVz(i,j,k+1,3:5)-pVz(i,j,k,3:5)
+               Gbar_flux=pVx(i+1,j,k,6:8)-pVx(i,j,k,6:8)+pVy(i,j+1,k,6:8)-pVy(i,j,k,6:8)+pVz(i,j,k+1,6:8)-pVz(i,j,k,6:8)
                ! New phasic volumes
                Lvol_new=Lvol_old-Lvol_flux
                Gvol_new=Gvol_old-Gvol_flux
@@ -1390,9 +1451,9 @@ contains
       this%wt_sl=this%wt_sl+(MPI_Wtime()-t1) ! End SL timer
 
       ! Cleanup flux multifabs
-      call this%amr%mfab_destroy(Fx)
-      call this%amr%mfab_destroy(Fy)
-      call this%amr%mfab_destroy(Fz)
+      call this%amr%mfab_destroy(Vx)
+      call this%amr%mfab_destroy(Vy)
+      call this%amr%mfab_destroy(Vz)
 
       ! Clean up band multifab
       call this%amr%mfab_destroy(band)
@@ -1768,8 +1829,10 @@ contains
       call MPI_ALLREDUCE(this%wt_plicnet, this%wtmin_plicnet,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
       call MPI_ALLREDUCE(this%wt_polygon, this%wtmax_polygon,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
       call MPI_ALLREDUCE(this%wt_polygon, this%wtmin_polygon,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_remap,   this%wtmax_remap,  1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+      call MPI_ALLREDUCE(this%wt_remap,   this%wtmin_remap,  1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr)
       ! Reset per-rank timing accumulators for next interval
-      this%wt_advance=0.0_WP; this%wt_sl=0.0_WP; this%wt_plic=0.0_WP; this%wt_plicnet=0.0_WP; this%wt_polygon=0.0_WP
+      this%wt_advance=0.0_WP; this%wt_sl=0.0_WP; this%wt_plic=0.0_WP; this%wt_plicnet=0.0_WP; this%wt_polygon=0.0_WP; this%wt_remap=0.0_WP
 
    end subroutine get_info
 

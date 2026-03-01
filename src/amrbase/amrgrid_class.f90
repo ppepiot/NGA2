@@ -162,7 +162,7 @@ module amrgrid_class
       type(tagger_wrapper), dimension(:), allocatable :: taggers
       type(postregrid_wrapper), dimension(:), allocatable :: postregrid_funcs
       ! Default tiling for mfiter_build
-      logical :: default_tiling = .true.
+      logical :: default_tiling = .false.
       ! Cost callback (single, not list) and load balancing strategy
       type(get_cost_wrapper) :: get_cost_func
       integer :: lb_strat = 0           ! 0=SFC (default), 1=KnapSack

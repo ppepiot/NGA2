@@ -15,6 +15,8 @@ module amrvof_geometry
    public :: cut_hex_polygon, hex_poly_nvert, get_hex_poly_nvert
    public :: convex_poly, tet_to_poly, clip_poly_by_plane
    public :: poly_vol_centroid, poly_vol
+   public :: remap_box_staggered
+   public :: flux_poly_moments
 
    ! Cutting tables from mpcomp_class_noirl
    ! tet_map: maps a hex cell (8 vertices + center) to 8 tetrahedra
@@ -507,6 +509,30 @@ contains
       ! Move vertex 9
       poly(:,9)=poly(:,9)+adjustment*dir
    end subroutine correct_flux_poly
+
+   !> Compute total signed volume and volume-weighted barycenter of a
+   !> corrected 9-vertex flux polyhedron using tet_map(4,8) decomposition
+   !> No PLIC cutting, no grid-plane recursion.
+   pure subroutine flux_poly_moments(poly,vol,bary)
+      implicit none
+      real(WP), dimension(3,9), intent(in)  :: poly
+      real(WP),                 intent(out) :: vol
+      real(WP), dimension(3),   intent(out) :: bary
+      real(WP), dimension(3) :: a,b,c,centroid
+      real(WP) :: svol
+      integer :: n
+      vol =0.0_WP
+      bary=0.0_WP
+      do n=1,8
+         a=poly(:,tet_map(1,n))-poly(:,tet_map(4,n))
+         b=poly(:,tet_map(2,n))-poly(:,tet_map(4,n))
+         c=poly(:,tet_map(3,n))-poly(:,tet_map(4,n))
+         svol=(-a(1)*(b(2)*c(3)-c(2)*b(3))+a(2)*(b(1)*c(3)-c(1)*b(3))-a(3)*(b(1)*c(2)-c(1)*b(2)))/6.0_WP
+         centroid=0.25_WP*(poly(:,tet_map(1,n))+poly(:,tet_map(2,n))+poly(:,tet_map(3,n))+poly(:,tet_map(4,n)))
+         vol=vol+svol
+         bary=bary+svol*centroid
+      end do
+   end subroutine flux_poly_moments
 
    !> Cut a hex cell by a plane and compute liquid/gas volumes and barycenters
    !> hex(:,1:8) = 8 vertices of hex cell (standard ordering)
@@ -1036,5 +1062,106 @@ contains
          end do
       end do
    end function poly_vol
+
+   !> =========================================================================
+   !> Remap all nodes in a box via RK2 back-projection (staggered velocity)
+   !>
+   !> For each node (ii,jj,kk) in [bx%lo:bx%hi+1]:
+   !>   Stage 1: velocity at vertex
+   !>   Stage 2: velocity at half-step position
+   !>
+   !> proj(1:3,ii,jj,kk) = projected position of node (ii,jj,kk)
+   !> =========================================================================
+   pure subroutine remap_box_staggered(bx,dt,xlo,ylo,zlo,dx,dy,dz,Ulo,Vlo,Wlo,U,V,W,proj)
+      use amrex_amr_module, only: amrex_box
+      implicit none
+      type(amrex_box), intent(in) :: bx
+      real(WP), intent(in) :: dt
+      real(WP), intent(in) :: xlo,ylo,zlo
+      real(WP), intent(in) :: dx,dy,dz
+      integer, dimension(4), intent(in) :: Ulo,Vlo,Wlo
+      real(WP), dimension(Ulo(1):,Ulo(2):,Ulo(3):,Ulo(4):), intent(in) :: U
+      real(WP), dimension(Vlo(1):,Vlo(2):,Vlo(3):,Vlo(4):), intent(in) :: V
+      real(WP), dimension(Wlo(1):,Wlo(2):,Wlo(3):,Wlo(4):), intent(in) :: W
+      real(WP), dimension(:,bx%lo(1):,bx%lo(2):,bx%lo(3):), intent(out) :: proj
+      ! Local
+      integer :: ii,jj,kk
+      real(WP) :: px,py,pz
+      real(WP) :: u1,v1,w1
+      real(WP) :: hx,hy,hz
+      real(WP) :: u2,v2,w2
+      real(WP) :: dxi,dyi,dzi
+      ! For stage 2 trilinear
+      integer  :: ipc,jpc,kpc
+      integer  :: ipu,jpv,kpw
+      real(WP) :: wxc,wyc,wzc,wxc2,wyc2,wzc2
+      real(WP) :: wxu,wyv,wzw,wxu2,wyv2,wzw2
+      ! Precompute inverse mesh
+      dxi=1.0_WP/dx; dyi=1.0_WP/dy; dzi=1.0_WP/dz
+      ! Loop over all nodes in box
+      do kk=bx%lo(3),bx%hi(3)
+         do jj=bx%lo(2),bx%hi(2)
+            do ii=bx%lo(1),bx%hi(1)
+               ! Physical position of node (ii,jj,kk)
+               px=xlo+real(ii,WP)*dx
+               py=ylo+real(jj,WP)*dy
+               pz=zlo+real(kk,WP)*dz
+               ! Stage 1
+               hx=px-0.5_WP*dt*0.25_WP*sum(U(ii,jj-1:jj,kk-1:kk,1))
+               hy=py-0.5_WP*dt*0.25_WP*sum(V(ii-1:ii,jj,kk-1:kk,1))
+               hz=pz-0.5_WP*dt*0.25_WP*sum(W(ii-1:ii,jj-1:jj,kk,1))
+               ! Stage 2
+               ! Cell-centered indices
+               ipc = floor((hx - xlo)*dxi - 0.5_WP)
+               jpc = floor((hy - ylo)*dyi - 0.5_WP)
+               kpc = floor((hz - zlo)*dzi - 0.5_WP)
+               ! Face-centered indices
+               ipu = floor((hx - xlo)*dxi)
+               jpv = floor((hy - ylo)*dyi)
+               kpw = floor((hz - zlo)*dzi)
+               ! Clamp to array bounds
+               ipu = max(lbound(U,1), min(ubound(U,1)-1, ipu))
+               jpc = max(lbound(U,2), min(ubound(U,2)-1, jpc))
+               kpc = max(lbound(U,3), min(ubound(U,3)-1, kpc))
+               ipc = max(lbound(V,1), min(ubound(V,1)-1, ipc))
+               jpv = max(lbound(V,2), min(ubound(V,2)-1, jpv))
+               kpw = max(lbound(W,3), min(ubound(W,3)-1, kpw))
+               ! Cell-centered weights
+               wxc = (hx - (xlo + (real(ipc,WP)+0.5_WP)*dx))*dxi
+               wyc = (hy - (ylo + (real(jpc,WP)+0.5_WP)*dy))*dyi
+               wzc = (hz - (zlo + (real(kpc,WP)+0.5_WP)*dz))*dzi
+               wxc = max(0.0_WP, min(1.0_WP, wxc)); wxc2 = 1.0_WP - wxc
+               wyc = max(0.0_WP, min(1.0_WP, wyc)); wyc2 = 1.0_WP - wyc
+               wzc = max(0.0_WP, min(1.0_WP, wzc)); wzc2 = 1.0_WP - wzc
+               ! Face-centered weights
+               wxu = (hx - (xlo + real(ipu,WP)*dx))*dxi
+               wyv = (hy - (ylo + real(jpv,WP)*dy))*dyi
+               wzw = (hz - (zlo + real(kpw,WP)*dz))*dzi
+               wxu = max(0.0_WP, min(1.0_WP, wxu)); wxu2 = 1.0_WP - wxu
+               wyv = max(0.0_WP, min(1.0_WP, wyv)); wyv2 = 1.0_WP - wyv
+               wzw = max(0.0_WP, min(1.0_WP, wzw)); wzw2 = 1.0_WP - wzw
+               ! U at x-faces: face-centered in x, cell-centered in y,z
+               u2 = wzc *(wyc *(wxu *U(ipu+1,jpc+1,kpc+1,1)+wxu2*U(ipu,jpc+1,kpc+1,1)) + &
+               &          wyc2*(wxu *U(ipu+1,jpc  ,kpc+1,1)+wxu2*U(ipu,jpc  ,kpc+1,1))) + &
+               &    wzc2*(wyc *(wxu *U(ipu+1,jpc+1,kpc  ,1)+wxu2*U(ipu,jpc+1,kpc  ,1)) + &
+               &          wyc2*(wxu *U(ipu+1,jpc  ,kpc  ,1)+wxu2*U(ipu,jpc  ,kpc  ,1)))
+               ! V at y-faces: cell-centered in x, face-centered in y, cell-centered in z
+               v2 = wzc *(wyv *(wxc *V(ipc+1,jpv+1,kpc+1,1)+wxc2*V(ipc,jpv+1,kpc+1,1)) + &
+               &          wyv2*(wxc *V(ipc+1,jpv  ,kpc+1,1)+wxc2*V(ipc,jpv  ,kpc+1,1))) + &
+               &    wzc2*(wyv *(wxc *V(ipc+1,jpv+1,kpc  ,1)+wxc2*V(ipc,jpv+1,kpc  ,1)) + &
+               &          wyv2*(wxc *V(ipc+1,jpv  ,kpc  ,1)+wxc2*V(ipc,jpv  ,kpc  ,1)))
+               ! W at z-faces: cell-centered in x,y, face-centered in z
+               w2 = wzw *(wyc *(wxc *W(ipc+1,jpc+1,kpw+1,1)+wxc2*W(ipc,jpc+1,kpw+1,1)) + &
+               &          wyc2*(wxc *W(ipc+1,jpc  ,kpw+1,1)+wxc2*W(ipc,jpc  ,kpw+1,1))) + &
+               &    wzw2*(wyc *(wxc *W(ipc+1,jpc+1,kpw  ,1)+wxc2*W(ipc,jpc+1,kpw  ,1)) + &
+               &          wyc2*(wxc *W(ipc+1,jpc  ,kpw  ,1)+wxc2*W(ipc,jpc  ,kpw  ,1)))
+               ! Full-step projected position
+               proj(1,ii,jj,kk) = px - dt*u2
+               proj(2,ii,jj,kk) = py - dt*v2
+               proj(3,ii,jj,kk) = pz - dt*w2
+            end do
+         end do
+      end do
+   end subroutine remap_box_staggered
 
 end module amrvof_geometry
