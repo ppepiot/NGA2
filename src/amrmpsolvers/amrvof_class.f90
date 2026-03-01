@@ -1228,7 +1228,7 @@ contains
       ! Phase 1: Compute all fluxes
       t1=MPI_Wtime() ! Start SL timer
       compute_fluxes: block
-         use amrvof_geometry, only: tet_sign,tet_map,correct_flux_poly,flux_poly_moments,remap_box_staggered
+         use amrvof_geometry, only: tet_sign,tet_map,tet_vol,correct_flux_poly,flux_poly_moments,remap_box_staggered
          integer :: i,j,k,n,nn
          real(WP), dimension(3,9) :: face
          real(WP), dimension(3,4) :: tet
@@ -1295,7 +1295,21 @@ contains
                   ! Decompose into tets, cut, and accumulate
                   do n=1,8
                      do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
-                     pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     ! Per-tet purity check
+                     bblo=[minval(ijk(1,:)),minval(ijk(2,:)),minval(ijk(3,:))]
+                     bbhi=[maxval(ijk(1,:)),maxval(ijk(2,:)),maxval(ijk(3,:))]
+                     bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+                     bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+                     if (bb_pure_liq.or.bb_pure_gas) then
+                        fvol=tet_vol(tet); fbary=0.25_WP*(tet(:,1)+tet(:,2)+tet(:,3)+tet(:,4))
+                        if (bb_pure_liq) then
+                           pVx(i,j,k,1)=pVx(i,j,k,1)+fvol; pVx(i,j,k,3:5)=pVx(i,j,k,3:5)+fvol*fbary
+                        else
+                           pVx(i,j,k,2)=pVx(i,j,k,2)+fvol; pVx(i,j,k,6:8)=pVx(i,j,k,6:8)+fvol*fbary
+                        end if
+                     else
+                        pVx(i,j,k,1:8)=pVx(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     end if
                   end do
                end if
             end do; end do; end do
@@ -1335,7 +1349,21 @@ contains
                   ! Decompose into tets, cut, and accumulate
                   do n=1,8
                      do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
-                     pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     ! Per-tet purity check
+                     bblo=[minval(ijk(1,:)),minval(ijk(2,:)),minval(ijk(3,:))]
+                     bbhi=[maxval(ijk(1,:)),maxval(ijk(2,:)),maxval(ijk(3,:))]
+                     bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+                     bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+                     if (bb_pure_liq.or.bb_pure_gas) then
+                        fvol=tet_vol(tet); fbary=0.25_WP*(tet(:,1)+tet(:,2)+tet(:,3)+tet(:,4))
+                        if (bb_pure_liq) then
+                           pVy(i,j,k,1)=pVy(i,j,k,1)+fvol; pVy(i,j,k,3:5)=pVy(i,j,k,3:5)+fvol*fbary
+                        else
+                           pVy(i,j,k,2)=pVy(i,j,k,2)+fvol; pVy(i,j,k,6:8)=pVy(i,j,k,6:8)+fvol*fbary
+                        end if
+                     else
+                        pVy(i,j,k,1:8)=pVy(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     end if
                   end do
                end if
             end do; end do; end do
@@ -1375,7 +1403,21 @@ contains
                   ! Decompose into tets, cut, and accumulate
                   do n=1,8
                      do nn=1,4; tet(:,nn)=face(:,tet_map(nn,n)); ijk(:,nn)=fijk(:,tet_map(nn,n)); end do
-                     pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     ! Per-tet purity check
+                     bblo=[minval(ijk(1,:)),minval(ijk(2,:)),minval(ijk(3,:))]
+                     bbhi=[maxval(ijk(1,:)),maxval(ijk(2,:)),maxval(ijk(3,:))]
+                     bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
+                     bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+                     if (bb_pure_liq.or.bb_pure_gas) then
+                        fvol=tet_vol(tet); fbary=0.25_WP*(tet(:,1)+tet(:,2)+tet(:,3)+tet(:,4))
+                        if (bb_pure_liq) then
+                           pVz(i,j,k,1)=pVz(i,j,k,1)+fvol; pVz(i,j,k,3:5)=pVz(i,j,k,3:5)+fvol*fbary
+                        else
+                           pVz(i,j,k,2)=pVz(i,j,k,2)+fvol; pVz(i,j,k,6:8)=pVz(i,j,k,6:8)+fvol*fbary
+                        end if
+                     else
+                        pVz(i,j,k,1:8)=pVz(i,j,k,1:8)+tet_sign(tet)*tet2flux(tet,ijk)
+                     end if
                   end do
                end if
             end do; end do; end do
