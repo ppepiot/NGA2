@@ -17,6 +17,8 @@ module amrvof_geometry
    public :: poly_vol_centroid, poly_vol
    public :: remap_box_staggered
    public :: flux_poly_moments
+   public :: R3D_MAXV, r3d_poly, r3d_init_tet, r3d_clip, r3d_split, r3d_moments
+   public :: tet2flux_r3d
 
    ! Cutting tables from mpcomp_class_noirl
    ! tet_map: maps a hex cell (8 vertices + center) to 8 tetrahedra
@@ -248,6 +250,18 @@ module amrvof_geometry
       integer  :: fnv(POLY_MAXF)                  ! vertices per face
       integer  :: fv(POLY_MAXFV, POLY_MAXF)       ! face->vertex indices
    end type convex_poly
+
+   ! =========================================================================
+   ! r3d polyhedron type (Powell & Abel, 2015)
+   ! Vertex + 3-neighbor representation for fast convex polyhedron clipping
+   ! =========================================================================
+   integer, parameter :: R3D_MAXV = 24  ! tet(4) + splits/clips create additional verts
+
+   type :: r3d_poly
+      integer  :: nv = 0            ! number of vertices in buffer
+      real(WP) :: pos(3, R3D_MAXV)  ! vertex positions
+      integer  :: nbr(3, R3D_MAXV)  ! 3 neighbor indices per vertex
+   end type r3d_poly
 
 contains
 
@@ -1163,5 +1177,640 @@ contains
          end do
       end do
    end subroutine remap_box_staggered
+
+   ! =========================================================================
+   ! r3d routines: polyhedron clipping via vertex+neighbor representation
+   ! Translated from Powell & Abel (2015), r3d library (LANL, BSD license)
+   ! Convention: signed distance = d + n·x. Positive = kept, negative = clipped.
+   ! =========================================================================
+
+   !> Initialize r3d_poly from a tetrahedron (4 vertices)
+   !> Neighbor wiring matches r3d_init_tet from r3d.c
+   pure subroutine r3d_init_tet(poly, tet)
+      implicit none
+      type(r3d_poly), intent(out) :: poly
+      real(WP), dimension(3,4), intent(in) :: tet
+      poly%nv = 4
+      poly%pos(:,1) = tet(:,1)
+      poly%pos(:,2) = tet(:,2)
+      poly%pos(:,3) = tet(:,3)
+      poly%pos(:,4) = tet(:,4)
+      ! Connectivity (1-indexed, matches r3d's 0-indexed +1)
+      poly%nbr(:,1) = [2, 4, 3]
+      poly%nbr(:,2) = [3, 4, 1]
+      poly%nbr(:,3) = [1, 4, 2]
+      poly%nbr(:,4) = [2, 3, 1]
+   end subroutine r3d_init_tet
+
+   !> Clip r3d_poly in-place, keeping the side where d + n·x > 0
+   !> Vertices with d + n·x < 0 are removed.
+   !> Returns .true. if successful, .false. if MAXV exceeded.
+   pure subroutine r3d_clip(poly, normal, dist, ierr)
+      implicit none
+      type(r3d_poly), intent(inout) :: poly
+      real(WP), dimension(3), intent(in) :: normal
+      real(WP), intent(in) :: dist
+      integer, intent(out) :: ierr
+      ! Local
+      real(WP) :: sdist(R3D_MAXV)
+      integer  :: clipped(R3D_MAXV)
+      integer  :: onv, v, np, vcur, vnext, vstart, pnext, numkept
+      real(WP) :: smin, smax, wa, wb
+      ierr = 0
+      if (poly%nv.le.0) return
+      ! Step 1: Compute signed distances, classify vertices
+      onv = poly%nv
+      smin = +huge(1.0_WP); smax = -huge(1.0_WP)
+      clipped(1:onv) = 0
+      do v = 1, onv
+         sdist(v) = dist + normal(1)*poly%pos(1,v) + normal(2)*poly%pos(2,v) + normal(3)*poly%pos(3,v)
+         if (sdist(v).lt.smin) smin = sdist(v)
+         if (sdist(v).gt.smax) smax = sdist(v)
+         if (sdist(v).lt.0.0_WP) clipped(v) = 1
+      end do
+      ! Trivial cases
+      if (smin.ge.0.0_WP) return         ! all kept
+      if (smax.le.0.0_WP) then; poly%nv = 0; return; end if  ! all clipped
+      ! Step 2: Create new vertices on crossing edges
+      do vcur = 1, onv
+         if (clipped(vcur).eq.1) cycle
+         do np = 1, 3
+            vnext = poly%nbr(np, vcur)
+            if (clipped(vnext).eq.0) cycle
+            ! Crossing edge: vcur (kept) to vnext (clipped)
+            if (poly%nv.ge.R3D_MAXV) then; ierr = 1; return; end if
+            poly%nv = poly%nv + 1
+            ! Interpolate position: weighted average
+            wa = -sdist(vnext); wb = sdist(vcur)
+            poly%pos(:, poly%nv) = (wa*poly%pos(:,vcur) + wb*poly%pos(:,vnext)) / (wa + wb)
+            sdist(poly%nv) = 0.0_WP
+            clipped(poly%nv) = 0
+            ! Wire: new vertex's nbr(1) points to vcur
+            poly%nbr(1, poly%nv) = vcur
+            ! Replace vcur's neighbor from vnext to new vertex
+            poly%nbr(np, vcur) = poly%nv
+         end do
+      end do
+      ! Step 3: Cap wiring — connect new vertices to each other
+      do vstart = onv + 1, poly%nv
+         vcur = vstart
+         vnext = poly%nbr(1, vcur)  ! the kept vertex this was connected to
+         do
+            ! Find which slot of vnext points to vcur
+            do np = 1, 3
+               if (poly%nbr(np, vnext).eq.vcur) exit
+            end do
+            vcur = vnext
+            pnext = mod(np, 3) + 1  ! (np+1) mod 3, 1-indexed
+            vnext = poly%nbr(pnext, vcur)
+            if (vcur.gt.onv) exit  ! landed on another new vertex
+         end do
+         poly%nbr(3, vstart) = vcur
+         poly%nbr(2, vcur) = vstart
+      end do
+      ! Step 4: Compact — remove clipped vertices, reindex
+      numkept = 0
+      do v = 1, poly%nv
+         if (clipped(v).eq.0) then
+            numkept = numkept + 1
+            poly%pos(:, numkept) = poly%pos(:, v)
+            poly%nbr(:, numkept) = poly%nbr(:, v)
+            clipped(v) = numkept  ! reuse as reindex map
+         end if
+      end do
+      poly%nv = numkept
+      do v = 1, poly%nv
+         do np = 1, 3
+            poly%nbr(np, v) = clipped(poly%nbr(np, v))
+         end do
+      end do
+   end subroutine r3d_clip
+
+   !> Split r3d_poly by plane into positive (d+n·x > 0) and negative halves.
+   !> Input poly is destroyed. Both output polys are valid r3d_polys.
+   pure subroutine r3d_split(poly, normal, dist, pos_half, neg_half, ierr)
+      implicit none
+      type(r3d_poly), intent(inout) :: poly
+      real(WP), dimension(3), intent(in) :: normal
+      real(WP), intent(in) :: dist
+      type(r3d_poly), intent(out) :: pos_half, neg_half
+      integer, intent(out) :: ierr
+      ! Local
+      real(WP) :: sdist(R3D_MAXV)
+      integer  :: side(R3D_MAXV)  ! 0 = positive (kept), 1 = negative
+      integer  :: onv, v, np, npnxt, vcur, vnext, vstart, pnext, nright, cside
+      real(WP) :: wa, wb
+      real(WP), dimension(3) :: newpos
+      ierr = 0
+      pos_half%nv = 0; neg_half%nv = 0
+      if (poly%nv.le.0) return
+      ! Compute signed distances
+      onv = poly%nv
+      nright = 0
+      side(1:onv) = 0
+      do v = 1, onv
+         sdist(v) = dist + normal(1)*poly%pos(1,v) + normal(2)*poly%pos(2,v) + normal(3)*poly%pos(3,v)
+         if (sdist(v).lt.0.0_WP) then; side(v) = 1; nright = nright + 1; end if
+      end do
+      ! Trivial cases
+      if (nright.eq.0) then; pos_half = poly; return; end if
+      if (nright.eq.onv) then; neg_half = poly; return; end if
+      ! Create new vertices on crossing edges — TWO per crossing (one per side)
+      do vcur = 1, onv
+         if (side(vcur).eq.1) cycle  ! only process positive-side vertices
+         do np = 1, 3
+            vnext = poly%nbr(np, vcur)
+            if (side(vnext).eq.0) cycle
+            ! Crossing edge: vcur (positive) to vnext (negative)
+            wa = -sdist(vnext); wb = sdist(vcur)
+            newpos = (wa*poly%pos(:,vcur) + wb*poly%pos(:,vnext)) / (wa + wb)
+            ! Positive-side new vertex
+            if (poly%nv.ge.R3D_MAXV) then; ierr = 1; return; end if
+            poly%nv = poly%nv + 1
+            poly%pos(:, poly%nv) = newpos
+            side(poly%nv) = 0  ! positive side
+            poly%nbr(1, poly%nv) = vcur
+            poly%nbr(np, vcur) = poly%nv
+            ! Negative-side new vertex
+            if (poly%nv.ge.R3D_MAXV) then; ierr = 1; return; end if
+            poly%nv = poly%nv + 1
+            poly%pos(:, poly%nv) = newpos
+            side(poly%nv) = 1  ! negative side
+            poly%nbr(1, poly%nv) = vnext
+            ! Find which slot of vnext pointed to vcur, replace
+            do npnxt = 1, 3
+               if (poly%nbr(npnxt, vnext).eq.vcur) exit
+            end do
+            poly%nbr(npnxt, vnext) = poly%nv
+         end do
+      end do
+      ! Cap wiring — same face-chase as r3d_clip, for ALL new vertices
+      do vstart = onv + 1, poly%nv
+         vcur = vstart
+         vnext = poly%nbr(1, vcur)
+         do
+            do np = 1, 3
+               if (poly%nbr(np, vnext).eq.vcur) exit
+            end do
+            vcur = vnext
+            pnext = mod(np, 3) + 1
+            vnext = poly%nbr(pnext, vcur)
+            if (vcur.gt.onv) exit
+         end do
+         poly%nbr(3, vstart) = vcur
+         poly%nbr(2, vcur) = vstart
+      end do
+      ! Separate into two polys by side, reindex
+      pos_half%nv = 0; neg_half%nv = 0
+      do v = 1, poly%nv
+         cside = side(v)
+         if (cside.eq.0) then
+            pos_half%nv = pos_half%nv + 1
+            pos_half%pos(:, pos_half%nv) = poly%pos(:, v)
+            pos_half%nbr(:, pos_half%nv) = poly%nbr(:, v)
+            side(v) = pos_half%nv  ! reindex map
+         else
+            neg_half%nv = neg_half%nv + 1
+            neg_half%pos(:, neg_half%nv) = poly%pos(:, v)
+            neg_half%nbr(:, neg_half%nv) = poly%nbr(:, v)
+            side(v) = neg_half%nv  ! reindex map
+         end if
+      end do
+      ! Fix neighbor indices
+      do v = 1, pos_half%nv; do np = 1, 3
+         pos_half%nbr(np, v) = side(pos_half%nbr(np, v))
+      end do; end do
+      do v = 1, neg_half%nv; do np = 1, 3
+         neg_half%nbr(np, v) = side(neg_half%nbr(np, v))
+      end do; end do
+   end subroutine r3d_split
+
+   !> Compute volume and volume-weighted centroid of an r3d_poly
+   !> Uses face traversal via edge marks + fan triangulation (divergence theorem).
+   !> Volume is signed — sign depends on face winding.
+   pure subroutine r3d_moments(poly, vol, centroid)
+      implicit none
+      type(r3d_poly), intent(in) :: poly
+      real(WP), intent(out) :: vol
+      real(WP), dimension(3), intent(out) :: centroid
+      ! Local
+      integer :: emarks(3, R3D_MAXV)
+      integer :: vstart, pstart, vcur, vnext, pnext, np
+      real(WP), dimension(3) :: v0, v1, v2
+      real(WP) :: sixv
+      vol = 0.0_WP; centroid = 0.0_WP
+      if (poly%nv.le.0) return
+      ! Initialize edge marks
+      emarks = 0
+      ! Loop over all vertex-edge pairs to find face starting points
+      do vstart = 1, poly%nv
+         do pstart = 1, 3
+            if (emarks(pstart, vstart).eq.1) cycle
+            ! Initialize face loop
+            pnext = pstart
+            vcur = vstart
+            emarks(pnext, vcur) = 1
+            vnext = poly%nbr(pnext, vcur)
+            v0 = poly%pos(:, vcur)
+            ! Move to second edge
+            do np = 1, 3
+               if (poly%nbr(np, vnext).eq.vcur) exit
+            end do
+            vcur = vnext
+            pnext = mod(np, 3) + 1
+            emarks(pnext, vcur) = 1
+            vnext = poly%nbr(pnext, vcur)
+            ! Fan triangulation around v0
+            do while (vnext.ne.vstart)
+               v2 = poly%pos(:, vcur)
+               v1 = poly%pos(:, vnext)
+               ! Signed volume of tet (origin, v0, v2, v1) × 6
+               sixv = -v2(1)*v1(2)*v0(3) + v1(1)*v2(2)*v0(3) &
+               &      +v2(1)*v0(2)*v1(3) - v0(1)*v2(2)*v1(3) &
+               &      -v1(1)*v0(2)*v2(3) + v0(1)*v1(2)*v2(3)
+               vol = vol + sixv / 6.0_WP
+               centroid = centroid + (sixv / 6.0_WP) * 0.25_WP * (v0 + v1 + v2)
+               ! Advance to next edge on this face
+               do np = 1, 3
+                  if (poly%nbr(np, vnext).eq.vcur) exit
+               end do
+               vcur = vnext
+               pnext = mod(np, 3) + 1
+               emarks(pnext, vcur) = 1
+               vnext = poly%nbr(pnext, vcur)
+            end do
+         end do
+      end do
+      ! Normalize centroid
+      if (abs(vol).gt.tiny(1.0_WP)) centroid = centroid / vol
+   end subroutine r3d_moments
+
+   ! =========================================================================
+   ! Drop-in replacement for recursive tet2flux using r3d polyhedron clipping.
+   ! Iterative stack-based grid-plane bisection + PLIC clip.
+   ! All hot-path data is flat arrays — no derived types.
+   !
+   ! Output: flux(1:8) = [Lvol, Gvol, Lwcen(3), Gwcen(3)]
+   !   where volumes are unsigned and barycenters are volume-weighted.
+   !   Caller applies tet_sign externally (same as old tet2flux).
+   !
+   ! PLIC convention: liquid is n·x < dist.
+   ! =========================================================================
+   pure subroutine tet2flux_r3d(tet, ijk, PLIC, PLlo, xlo, ylo, zlo, dx, dy, dz, flux)
+      implicit none
+      real(WP), dimension(3,4), intent(in)  :: tet
+      integer,  dimension(3,4), intent(in)  :: ijk
+      integer,  dimension(4),   intent(in)  :: PLlo
+      real(WP), dimension(PLlo(1):,PLlo(2):,PLlo(3):,PLlo(4):), intent(in) :: PLIC
+      real(WP), intent(in) :: xlo, ylo, zlo, dx, dy, dz
+      real(WP), dimension(8), intent(out) :: flux
+      ! Parameters
+      integer, parameter :: MXV = 48, SMAX = 16
+      ! Stack storage — flat arrays
+      real(WP) :: spos(3, MXV, SMAX)
+      integer  :: snbr(3, MXV, SMAX)
+      integer  :: snv(SMAX)
+      integer  :: silo(3, SMAX), sihi(3, SMAX)
+      integer  :: sp
+      ! Work arrays
+      real(WP) :: wpos(3, MXV)
+      integer  :: wnbr(3, MXV)
+      integer  :: wnv
+      ! Scratch
+      real(WP) :: sd(MXV)
+      integer  :: tag(MXV)
+
+      ! Locals
+      integer  :: ilo(3), ihi(3), dir, i0, j0, k0
+      integer  :: v, np, vcur, vnext, vstart, pnext, npnxt, iter
+      integer  :: onv, nright, numkept
+      real(WP) :: dsmin, dsmax, wa, wb, plane_pos
+      real(WP), dimension(3) :: newpos
+      real(WP) :: vol_tot, vol_liq
+      real(WP), dimension(3) :: wcen_tot, wcen_liq
+      
+      flux = 0.0_WP
+      
+      ! Compute cell index range
+      ilo = [minval(ijk(1,:)), minval(ijk(2,:)), minval(ijk(3,:))]
+      ihi = [maxval(ijk(1,:)), maxval(ijk(2,:)), maxval(ijk(3,:))]
+      
+      ! Single-cell fast path: direct tet vol + PLIC
+      if (ilo(1).eq.ihi(1) .and. ilo(2).eq.ihi(2) .and. ilo(3).eq.ihi(3)) then
+         call tet_plic(tet(:,1), tet(:,2), tet(:,3), tet(:,4), ilo(1), ilo(2), ilo(3), flux)
+         return
+      end if
+      
+      ! Initialize r3d from tet
+      wnv = 4
+      wpos(:,1:4) = tet(:,1:4)
+      wnbr(:,1) = [2, 4, 3]; wnbr(:,2) = [3, 4, 1]
+      wnbr(:,3) = [1, 4, 2]; wnbr(:,4) = [2, 3, 1]
+      
+      ! Push initial entry
+      sp = 1
+      spos(:, 1:4, 1) = wpos(:, 1:4)
+      snbr(:, 1:4, 1) = wnbr(:, 1:4)
+      snv(1) = 4; silo(:, 1) = ilo; sihi(:, 1) = ihi
+      
+      ! === Process stack ===
+      stack_loop: do while (sp.gt.0)
+         ! Pop
+         wnv = snv(sp)
+         wpos(:, 1:wnv) = spos(:, 1:wnv, sp)
+         wnbr(:, 1:wnv) = snbr(:, 1:wnv, sp)
+         ilo = silo(:, sp); ihi = sihi(:, sp)
+         sp = sp - 1
+         
+         ! --- LEAF: single cell → compute moments + PLIC cut ---
+         if (ilo(1).eq.ihi(1) .and. ilo(2).eq.ihi(2) .and. ilo(3).eq.ihi(3)) then
+            i0 = ilo(1); j0 = ilo(2); k0 = ilo(3)
+            ! Compute total moments (un-normalized: vol_tot, wcen_tot = vol*centroid)
+            call flat_moments(wpos, wnbr, wnv, vol_tot, wcen_tot)
+            if (vol_tot.lt.0.0_WP) then; vol_tot = -vol_tot; wcen_tot = -wcen_tot; end if
+            ! Check purity
+            if (PLIC(i0,j0,k0,4).gt.+1.0e9_WP) then
+               flux(1) = flux(1) + vol_tot
+               flux(3:5) = flux(3:5) + wcen_tot
+               cycle stack_loop
+            else if (PLIC(i0,j0,k0,4).lt.-1.0e9_WP) then
+               flux(2) = flux(2) + vol_tot
+               flux(6:8) = flux(6:8) + wcen_tot
+               cycle stack_loop
+            end if
+            
+            ! Mixed cell: clip by PLIC for liquid, gas by subtraction
+            ! Signed distances: sd = dist - n·x (positive = kept = liquid)
+            onv = wnv
+            dsmin = +huge(1.0_WP); dsmax = -huge(1.0_WP)
+            tag(1:onv) = 0
+            do v = 1, onv
+               sd(v) = PLIC(i0,j0,k0,4) - (PLIC(i0,j0,k0,1)*wpos(1,v) &
+               &      + PLIC(i0,j0,k0,2)*wpos(2,v) + PLIC(i0,j0,k0,3)*wpos(3,v))
+               if (sd(v).lt.dsmin) dsmin = sd(v)
+               if (sd(v).gt.dsmax) dsmax = sd(v)
+               if (sd(v).lt.0.0_WP) tag(v) = 1
+            end do
+            
+            ! Trivial PLIC cases
+            if (dsmin.ge.0.0_WP) then
+               ! All liquid
+               flux(1) = flux(1) + vol_tot; flux(3:5) = flux(3:5) + wcen_tot
+               cycle stack_loop
+            else if (dsmax.le.0.0_WP) then
+               ! All gas
+               flux(2) = flux(2) + vol_tot; flux(6:8) = flux(6:8) + wcen_tot
+               cycle stack_loop
+            end if
+            
+            ! Inline r3d_clip: create intersection vertices
+            do vcur = 1, onv
+               if (tag(vcur).eq.1) cycle
+               do np = 1, 3
+                  vnext = wnbr(np, vcur)
+                  if (tag(vnext).eq.0) cycle
+                   if (wnv.ge.MXV) error stop '[tet2flux_r3d] clip vertex overflow'
+                  wnv = wnv + 1
+                  wa = -sd(vnext); wb = sd(vcur)
+                  wpos(:, wnv) = (wa*wpos(:,vcur) + wb*wpos(:,vnext)) / (wa + wb)
+                  sd(wnv) = 0.0_WP; tag(wnv) = 0
+                  wnbr(1, wnv) = vcur; wnbr(np, vcur) = wnv
+               end do
+            end do
+            ! Cap wiring (PLIC clip)
+            do vstart = onv + 1, wnv
+               vcur = vstart; vnext = wnbr(1, vcur)
+               do iter = 1, MXV
+                  do np = 1, 3; if (wnbr(np, vnext).eq.vcur) exit; end do
+                  vcur = vnext; pnext = mod(np, 3) + 1; vnext = wnbr(pnext, vcur)
+                  if (vcur.gt.onv) exit
+               end do
+               if (iter.gt.MXV) error stop '[tet2flux_r3d] PLIC cap wiring failed'
+               wnbr(3, vstart) = vcur; wnbr(2, vcur) = vstart
+            end do
+            ! Compact
+            numkept = 0
+            do v = 1, wnv
+               if (tag(v).eq.0) then
+                  numkept = numkept + 1
+                  wpos(:, numkept) = wpos(:, v); wnbr(:, numkept) = wnbr(:, v)
+                  tag(v) = numkept
+               end if
+            end do
+            wnv = numkept
+            do v = 1, wnv; do np = 1, 3; wnbr(np, v) = tag(wnbr(np, v)); end do; end do
+            
+            ! Compute liquid moments
+            vol_liq = 0.0_WP; wcen_liq = 0.0_WP
+            if (wnv.gt.0) then
+               call flat_moments(wpos, wnbr, wnv, vol_liq, wcen_liq)
+               if (vol_liq.lt.0.0_WP) then; vol_liq = -vol_liq; wcen_liq = -wcen_liq; end if
+            end if
+            
+            ! Accumulate
+            flux(1) = flux(1) + vol_liq
+            flux(3:5) = flux(3:5) + wcen_liq
+            flux(2) = flux(2) + (vol_tot - vol_liq)
+            flux(6:8) = flux(6:8) + (wcen_tot - wcen_liq)
+            cycle stack_loop
+         end if
+         
+         ! --- INTERNAL: find spanning direction and split ---
+         if (ihi(1).gt.ilo(1)) then
+            dir = 1; plane_pos = xlo + real(ilo(1)+1, WP) * dx
+         else if (ihi(2).gt.ilo(2)) then
+            dir = 2; plane_pos = ylo + real(ilo(2)+1, WP) * dy
+         else
+            dir = 3; plane_pos = zlo + real(ilo(3)+1, WP) * dz
+         end if
+         
+         ! Classify vertices by grid plane
+         onv = wnv; nright = 0; tag(1:onv) = 0
+         do v = 1, onv
+            sd(v) = wpos(dir, v) - plane_pos
+            if (sd(v).lt.0.0_WP) then; tag(v) = 1; nright = nright + 1; end if
+         end do
+         
+         ! Trivial split (safety)
+         if (nright.eq.0) then
+            if (sp+1.gt.SMAX) error stop '[tet2flux_r3d] Stack overflow (trivial+)'
+            sp = sp + 1; spos(:, 1:wnv, sp) = wpos(:, 1:wnv); snbr(:, 1:wnv, sp) = wnbr(:, 1:wnv)
+            snv(sp) = wnv; silo(:, sp) = ilo; silo(dir, sp) = ilo(dir) + 1; sihi(:, sp) = ihi
+            cycle stack_loop
+         else if (nright.eq.onv) then
+            if (sp+1.gt.SMAX) error stop '[tet2flux_r3d] Stack overflow (trivial-)'
+            sp = sp + 1; spos(:, 1:wnv, sp) = wpos(:, 1:wnv); snbr(:, 1:wnv, sp) = wnbr(:, 1:wnv)
+            snv(sp) = wnv; silo(:, sp) = ilo; sihi(:, sp) = ihi; sihi(dir, sp) = ilo(dir)
+            cycle stack_loop
+         end if
+          ! Inline r3d_split: create TWO new vertices per crossing edge
+          do vcur = 1, onv
+             if (tag(vcur).eq.1) cycle
+             do np = 1, 3
+                vnext = wnbr(np, vcur)
+                if (tag(vnext).eq.0) cycle
+                ! Need room for TWO new vertices — check BEFORE creating either
+                if (wnv+2.gt.MXV) error stop '[tet2flux_r3d] split vertex overflow'
+                wa = -sd(vnext); wb = sd(vcur)
+                newpos = (wa*wpos(:,vcur) + wb*wpos(:,vnext)) / (wa + wb)
+                ! Positive-side (hi) new vertex
+                wnv = wnv + 1
+                wpos(:, wnv) = newpos; tag(wnv) = 0
+                wnbr(1, wnv) = vcur; wnbr(np, vcur) = wnv
+                ! Negative-side (lo) new vertex
+                wnv = wnv + 1
+                wpos(:, wnv) = newpos; tag(wnv) = 1
+                wnbr(1, wnv) = vnext
+                do npnxt = 1, 3; if (wnbr(npnxt, vnext).eq.vcur) exit; end do
+                wnbr(npnxt, vnext) = wnv
+             end do
+          end do
+          ! Cap wiring (split)
+          do vstart = onv + 1, wnv
+             vcur = vstart; vnext = wnbr(1, vcur)
+             do iter = 1, MXV
+                do np = 1, 3; if (wnbr(np, vnext).eq.vcur) exit; end do
+                vcur = vnext; pnext = mod(np, 3) + 1; vnext = wnbr(pnext, vcur)
+                if (vcur.gt.onv) exit
+             end do
+             wnbr(3, vstart) = vcur; wnbr(2, vcur) = vstart
+          end do
+          ! Separate into hi (tag=0) and lo (tag=1) halves, push both
+          if (sp+2.gt.SMAX) error stop '[tet2flux_r3d] Stack overflow'
+          ! Hi half -> sp+1, Lo half -> sp+2
+          sp = sp + 2
+          snv(sp-1) = 0; snv(sp) = 0
+          silo(:, sp-1) = ilo; silo(dir, sp-1) = ilo(dir) + 1; sihi(:, sp-1) = ihi
+          silo(:, sp)   = ilo; sihi(:, sp) = ihi; sihi(dir, sp) = ilo(dir)
+          ! Distribute vertices — save original side before overwriting tag
+          do v = 1, wnv
+             numkept = tag(v)  ! save original side (0 or 1)
+             if (numkept.eq.0) then
+                snv(sp-1) = snv(sp-1) + 1
+                spos(:, snv(sp-1), sp-1) = wpos(:, v)
+                snbr(:, snv(sp-1), sp-1) = wnbr(:, v)
+                tag(v) = snv(sp-1)
+             else
+                snv(sp) = snv(sp) + 1
+                spos(:, snv(sp), sp) = wpos(:, v)
+                snbr(:, snv(sp), sp) = wnbr(:, v)
+                tag(v) = snv(sp)
+             end if
+          end do
+           ! Fix neighbor indices
+           do v = 1, snv(sp-1); do np = 1, 3
+              snbr(np, v, sp-1) = tag(snbr(np, v, sp-1))
+           end do; end do
+           do v = 1, snv(sp); do np = 1, 3
+              snbr(np, v, sp) = tag(snbr(np, v, sp))
+           end do; end do
+           ! Pop empty halves
+          if (snv(sp).eq.0) sp = sp - 1
+          if (sp.gt.0) then; if (snv(sp).eq.0) sp = sp - 1; end if
+         
+      end do stack_loop
+      
+   contains
+      
+      !> Fast tet PLIC cut for single-cell case (no r3d overhead)
+      pure subroutine tet_plic(v1, v2, v3, v4, ic, jc, kc, fl)
+         real(WP), dimension(3), intent(in) :: v1, v2, v3, v4
+         integer, intent(in) :: ic, jc, kc
+         real(WP), dimension(8), intent(inout) :: fl
+         real(WP), dimension(3) :: a, b, c, bary, normal
+         real(WP) :: my_vol, dist, dd(4), mu
+         real(WP), dimension(3,8) :: vert
+         integer :: icase, n1, vv1, vv2
+         real(WP) :: sub_vol
+         real(WP), dimension(3) :: sub_bary
+         ! Compute tet volume
+         a = v1 - v4; b = v2 - v4; c = v3 - v4
+         my_vol = abs(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
+         bary = 0.25_WP*(v1 + v2 + v3 + v4)
+         ! Check purity
+         if (PLIC(ic,jc,kc,4).gt.+1.0e9_WP) then
+            fl(1) = fl(1) + my_vol; fl(3:5) = fl(3:5) + my_vol*bary; return
+         else if (PLIC(ic,jc,kc,4).lt.-1.0e9_WP) then
+            fl(2) = fl(2) + my_vol; fl(6:8) = fl(6:8) + my_vol*bary; return
+         end if
+         ! PLIC cut using existing tables
+         normal = PLIC(ic,jc,kc,1:3); dist = PLIC(ic,jc,kc,4)
+         dd(1) = normal(1)*v1(1) + normal(2)*v1(2) + normal(3)*v1(3) - dist
+         dd(2) = normal(1)*v2(1) + normal(2)*v2(2) + normal(3)*v2(3) - dist
+         dd(3) = normal(1)*v3(1) + normal(2)*v3(2) + normal(3)*v3(3) - dist
+         dd(4) = normal(1)*v4(1) + normal(2)*v4(2) + normal(3)*v4(3) - dist
+         icase = 1 + int(0.5_WP + sign(0.5_WP, dd(1))) &
+               + 2 * int(0.5_WP + sign(0.5_WP, dd(2))) &
+               + 4 * int(0.5_WP + sign(0.5_WP, dd(3))) &
+               + 8 * int(0.5_WP + sign(0.5_WP, dd(4)))
+         vert(:,1) = v1; vert(:,2) = v2; vert(:,3) = v3; vert(:,4) = v4
+         do n1 = 1, cut_nvert(icase)
+            vv1 = cut_v1(n1, icase); vv2 = cut_v2(n1, icase)
+            mu = min(1.0_WP,max(0.0_WP,-dd(vv1)/(sign(abs(dd(vv2)-dd(vv1))+epsilon(1.0_WP),dd(vv2)-dd(vv1)))))
+            vert(:, 4 + n1) = (1.0_WP - mu) * vert(:, vv1) + mu * vert(:, vv2)
+         end do
+         ! Gas tets
+         do n1 = 1, cut_nntet(icase) - 1
+            a = vert(:, cut_vtet(1, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            b = vert(:, cut_vtet(2, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            c = vert(:, cut_vtet(3, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            sub_vol = abs(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
+            sub_bary = 0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
+            &                  +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
+            fl(2) = fl(2) + sub_vol; fl(6:8) = fl(6:8) + sub_vol*sub_bary
+         end do
+         ! Liquid tets
+         do n1 = cut_ntets(icase), cut_nntet(icase), -1
+            a = vert(:, cut_vtet(1, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            b = vert(:, cut_vtet(2, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            c = vert(:, cut_vtet(3, n1, icase)) - vert(:, cut_vtet(4, n1, icase))
+            sub_vol = abs(a(1)*(b(2)*c(3)-c(2)*b(3)) - a(2)*(b(1)*c(3)-c(1)*b(3)) + a(3)*(b(1)*c(2)-c(1)*b(2))) / 6.0_WP
+            sub_bary = 0.25_WP*(vert(:,cut_vtet(1,n1,icase))+vert(:,cut_vtet(2,n1,icase)) &
+            &                  +vert(:,cut_vtet(3,n1,icase))+vert(:,cut_vtet(4,n1,icase)))
+            fl(1) = fl(1) + sub_vol; fl(3:5) = fl(3:5) + sub_vol*sub_bary
+         end do
+      end subroutine tet_plic
+      
+      !> Compute volume and un-normalized weighted centroid of flat r3d poly
+      !! Returns vol (signed) and wcen = vol * centroid_position
+      pure subroutine flat_moments(pos, nbr, nv, vol, wcen)
+         real(WP), dimension(3,MXV), intent(in) :: pos
+         integer,  dimension(3,MXV), intent(in) :: nbr
+         integer, intent(in) :: nv
+         real(WP), intent(out) :: vol
+         real(WP), dimension(3), intent(out) :: wcen
+         integer :: em(3, MXV)
+         integer :: vs, ps, vc, vn, pn, p, fiter
+         real(WP), dimension(3) :: fv0, fv1, fv2
+         real(WP) :: sv, sv24
+         vol = 0.0_WP; wcen = 0.0_WP
+         if (nv.le.0) return
+         em(:, 1:nv) = 0
+         do vs = 1, nv
+            do ps = 1, 3
+               if (em(ps, vs).eq.1) cycle
+               pn = ps; vc = vs
+               em(pn, vc) = 1; vn = nbr(pn, vc)
+               fv0 = pos(:, vc)
+               do p = 1, 3; if (nbr(p, vn).eq.vc) exit; end do
+               vc = vn; pn = mod(p, 3) + 1
+               em(pn, vc) = 1; vn = nbr(pn, vc)
+               do fiter = 1, 3*nv
+                  if (vn.eq.vs) exit
+                  fv2 = pos(:, vc); fv1 = pos(:, vn)
+                  sv = -fv2(1)*fv1(2)*fv0(3) + fv1(1)*fv2(2)*fv0(3) &
+                  &    +fv2(1)*fv0(2)*fv1(3) - fv0(1)*fv2(2)*fv1(3) &
+                  &    -fv1(1)*fv0(2)*fv2(3) + fv0(1)*fv1(2)*fv2(3)
+                  sv24 = sv / 24.0_WP
+                  vol = vol + 4.0_WP * sv24
+                  wcen = wcen + sv24 * (fv0 + fv1 + fv2)
+                  do p = 1, 3; if (nbr(p, vn).eq.vc) exit; end do
+                  vc = vn; pn = mod(p, 3) + 1
+                  em(pn, vc) = 1; vn = nbr(pn, vc)
+               end do
+            end do
+         end do
+      end subroutine flat_moments
+   end subroutine tet2flux_r3d
 
 end module amrvof_geometry

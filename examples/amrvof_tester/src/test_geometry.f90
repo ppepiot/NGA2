@@ -546,6 +546,296 @@ contains
       
       call log("=== All poly vs tet tests passed! ===")
       
+      ! === r3d tests ===
+      call test_r3d()
+      
    end subroutine test_poly_vs_tet
+   
+   
+   !> Test r3d routines against existing poly/tet routines
+   !! Verifies sign conventions, volume/centroid matching, split conservation,
+   !! and grid+PLIC pipeline equivalence.
+   subroutine test_r3d()
+      use amrvof_geometry, only: tet_vol, R3D_MAXV, r3d_poly, r3d_init_tet, &
+         r3d_clip, r3d_split, r3d_moments, &
+         convex_poly, tet_to_poly, clip_poly_by_plane, poly_vol_centroid, &
+         cut_tet_vol
+      real(WP) :: tol
+      
+      call log("=== Testing r3d routines ===")
+      tol = 1.0e-12_WP
+      
+      ! R1: Unclipped tet — r3d_moments should match tet_vol and poly centroid
+      test_r3d_init: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp
+         real(WP) :: vol_tet, vol_r3d
+         real(WP), dimension(3) :: cen_r3d
+         real(WP) :: err_v, err_c
+         
+         tet(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         
+         vol_tet = tet_vol(tet)
+         call r3d_init_tet(rp, tet)
+         call r3d_moments(rp, vol_r3d, cen_r3d)
+         
+         err_v = abs(vol_r3d - vol_tet)
+         err_c = maxval(abs(cen_r3d - [0.25_WP, 0.25_WP, 0.25_WP]))
+         
+         call log("  R1 (init): vol_tet="//rtoa(vol_tet)//" vol_r3d="//rtoa(vol_r3d)//" err="//rtoa(err_v))
+         call log("  R1 centroid: ("//rtoa(cen_r3d(1))//","//rtoa(cen_r3d(2))//","//rtoa(cen_r3d(3))//") err="//rtoa(err_c))
+         if (err_v.gt.tol) call die("R1 failed: r3d volume mismatch")
+         if (err_c.gt.tol) call die("R1 failed: r3d centroid mismatch")
+      end block test_r3d_init
+      
+      ! R2: Sign preservation — positive vs negative winding
+      test_r3d_sign: block
+         real(WP), dimension(3,4) :: tet_pos, tet_neg
+         type(r3d_poly) :: rp_pos, rp_neg
+         real(WP) :: vol_pos, vol_neg, vol_pos_tet, vol_neg_tet
+         real(WP), dimension(3) :: cen_pos, cen_neg
+         
+         tet_pos(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet_pos(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet_pos(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet_pos(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         ! Swap v3,v4 for negative winding
+         tet_neg = tet_pos
+         tet_neg(:,3) = tet_pos(:,4)
+         tet_neg(:,4) = tet_pos(:,3)
+         
+         vol_pos_tet = tet_vol(tet_pos)
+         vol_neg_tet = tet_vol(tet_neg)
+         
+         call r3d_init_tet(rp_pos, tet_pos)
+         call r3d_moments(rp_pos, vol_pos, cen_pos)
+         call r3d_init_tet(rp_neg, tet_neg)
+         call r3d_moments(rp_neg, vol_neg, cen_neg)
+         
+         call log("  R2 (sign): vol_pos="//rtoa(vol_pos)//" vol_neg="//rtoa(vol_neg))
+         call log("  R2 tet_vol: pos="//rtoa(vol_pos_tet)//" neg="//rtoa(vol_neg_tet))
+         if (abs(vol_pos - vol_pos_tet).gt.tol) call die("R2 failed: pos r3d != tet_vol")
+         if (abs(vol_neg - vol_neg_tet).gt.tol) call die("R2 failed: neg r3d != tet_vol")
+         if (vol_pos * vol_neg .gt. 0.0_WP) call die("R2 failed: signs should be opposite")
+      end block test_r3d_sign
+      
+      ! R3: Single plane clip — r3d_clip vs clip_poly_by_plane
+      ! r3d_clip keeps d + n·x > 0, clip_poly_by_plane keeps n·x < dist.
+      ! To keep same side (n·x < dist):
+      !   clip_poly_by_plane(poly, n, dist)
+      !   r3d_clip(rp, -n, dist)  =>  dist + (-n)·x > 0  =>  n·x < dist
+      test_r3d_clip: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp
+         type(convex_poly) :: poly
+         real(WP) :: vol_r3d, vol_poly
+         real(WP), dimension(3) :: cen_r3d, cen_poly, normal
+         real(WP) :: dist
+         integer :: icontp, icontn, ierr
+         real(WP) :: err_v, err_c
+         
+         tet(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         
+         normal = [1.0_WP, 0.0_WP, 0.0_WP]
+         dist = 0.4_WP
+         
+         ! Poly path: keep n·x < dist (x < 0.4)
+         call tet_to_poly(tet, poly)
+         call clip_poly_by_plane(poly, normal, dist, icontp, icontn, ierr)
+         call poly_vol_centroid(poly, vol_poly, cen_poly)
+         vol_poly = abs(vol_poly)
+         
+         ! r3d path: keep n·x < dist => r3d_clip(-n, dist)
+         call r3d_init_tet(rp, tet)
+         call r3d_clip(rp, -normal, dist, ierr)
+         call r3d_moments(rp, vol_r3d, cen_r3d)
+         vol_r3d = abs(vol_r3d)
+         
+         err_v = abs(vol_r3d - vol_poly)
+         err_c = maxval(abs(cen_r3d - cen_poly))
+         call log("  R3 (clip x<0.4): V_poly="//rtoa(vol_poly)//" V_r3d="//rtoa(vol_r3d)//" err="//rtoa(err_v))
+         call log("  R3 centroid err="//rtoa(err_c))
+         if (err_v.gt.tol) call die("R3 failed: clip volume mismatch")
+         if (err_c.gt.tol) call die("R3 failed: clip centroid mismatch")
+      end block test_r3d_clip
+      
+      ! R4: r3d_split conservation — both halves sum to original
+      test_r3d_split: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp, rp_pos, rp_neg
+         real(WP) :: vol_tet, vol_pos, vol_neg
+         real(WP), dimension(3) :: cen_pos, cen_neg, normal
+         real(WP) :: dist
+         integer :: ierr
+         real(WP) :: err
+         
+         tet(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         vol_tet = tet_vol(tet)
+         
+         normal = [0.0_WP, 1.0_WP, 0.0_WP]
+         dist = -0.3_WP  ! split at y = 0.3: d + n·y = 0 => y = 0.3
+         
+         call r3d_init_tet(rp, tet)
+         call r3d_split(rp, normal, dist, rp_pos, rp_neg, ierr)
+         if (ierr.ne.0) call die("R4 failed: r3d_split error")
+         call r3d_moments(rp_pos, vol_pos, cen_pos)
+         call r3d_moments(rp_neg, vol_neg, cen_neg)
+         
+         err = abs(vol_pos + vol_neg - vol_tet)
+         call log("  R4 (split): V_pos="//rtoa(vol_pos)//" V_neg="//rtoa(vol_neg)//" sum err="//rtoa(err))
+         if (err.gt.tol) call die("R4 failed: split volume conservation")
+      end block test_r3d_split
+      
+      ! R5: Grid + PLIC pipeline — r3d_split by grid plane, r3d_clip by PLIC
+      ! Compare against cut_tet_vol for each sub-piece
+      test_r3d_pipeline: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp, rp_lo, rp_hi, rp_liq
+         real(WP) :: vol_tet
+         real(WP) :: vol_lo, vol_hi
+         real(WP) :: vol_lo_liq, vol_hi_liq, vol_tot_liq
+         real(WP), dimension(3) :: cen_lo, cen_hi, cen_lo_liq, cen_hi_liq
+         real(WP), dimension(3) :: plic_n
+         real(WP) :: plic_dist
+         integer :: ierr
+         real(WP) :: err
+         ! Reference from cut_tet_vol
+         real(WP) :: vol_liq_ref, vol_gas_ref
+         real(WP), dimension(3) :: bary_liq_ref, bary_gas_ref
+         real(WP), dimension(4) :: plic_plane
+         
+         tet(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         vol_tet = tet_vol(tet)
+         
+         plic_n = [1.0_WP, 1.0_WP, 1.0_WP] / sqrt(3.0_WP)
+         plic_dist = 0.3_WP
+         
+         ! Step 1: Split by x=0.4 grid plane
+         ! r3d_split: d + n·x > 0 is "positive" half
+         ! For x=0.4 split: normal=(1,0,0), dist=-0.4 => x > 0.4 = pos, x < 0.4 = neg
+         call r3d_init_tet(rp, tet)
+         call r3d_split(rp, [1.0_WP, 0.0_WP, 0.0_WP], -0.4_WP, rp_hi, rp_lo, ierr)
+         if (ierr.ne.0) call die("R5 pipeline: split error")
+         call r3d_moments(rp_lo, vol_lo, cen_lo)
+         call r3d_moments(rp_hi, vol_hi, cen_hi)
+         
+         err = abs(vol_lo + vol_hi - vol_tet)
+         call log("  R5 (pipeline): grid split err="//rtoa(err))
+         if (err.gt.tol) call die("R5 pipeline: grid split not conservative")
+         
+         ! Step 2: Clip each by PLIC — keep liquid (n·x < dist)
+         ! r3d_clip: negate normal only => r3d_clip(rp, -plic_n, plic_dist)
+         rp_liq = rp_lo
+         call r3d_clip(rp_liq, -plic_n, plic_dist, ierr)
+         if (ierr.ne.0) call die("R5 pipeline: clip lo error")
+         call r3d_moments(rp_liq, vol_lo_liq, cen_lo_liq)
+         
+         rp_liq = rp_hi
+         call r3d_clip(rp_liq, -plic_n, plic_dist, ierr)
+         if (ierr.ne.0) call die("R5 pipeline: clip hi error")
+         call r3d_moments(rp_liq, vol_hi_liq, cen_hi_liq)
+         
+         vol_tot_liq = abs(vol_lo_liq) + abs(vol_hi_liq)
+         
+         ! Reference: cut_tet_vol on the full tet
+         plic_plane = [plic_n(1), plic_n(2), plic_n(3), plic_dist]
+         call cut_tet_vol(tet, plic_plane, vol_liq_ref, vol_gas_ref, bary_liq_ref, bary_gas_ref)
+         
+         err = abs(vol_tot_liq - vol_liq_ref)
+         call log("  R5 (pipeline): V_liq_r3d="//rtoa(vol_tot_liq)//" V_liq_ref="//rtoa(vol_liq_ref)//" err="//rtoa(err))
+         if (err.gt.tol) call die("R5 pipeline: total liquid volume mismatch vs cut_tet_vol")
+      end block test_r3d_pipeline
+      
+      ! R6: Trivial clips — all kept / all clipped
+      test_r3d_trivial: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp
+         real(WP) :: vol_tet, vol_r3d
+         real(WP), dimension(3) :: cen_r3d
+         integer :: ierr
+         
+         tet(:,1) = [0.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,2) = [1.0_WP, 0.0_WP, 0.0_WP]
+         tet(:,3) = [0.0_WP, 1.0_WP, 0.0_WP]
+         tet(:,4) = [0.0_WP, 0.0_WP, 1.0_WP]
+         vol_tet = tet_vol(tet)
+         
+         ! All kept: keep x < 2.0 — r3d_clip(-n, dist) => dist+(-n)·x > 0 => x < 2
+         call r3d_init_tet(rp, tet)
+         call r3d_clip(rp, [-1.0_WP, 0.0_WP, 0.0_WP], 2.0_WP, ierr)
+         call r3d_moments(rp, vol_r3d, cen_r3d)
+         if (abs(vol_r3d - vol_tet).gt.tol) call die("R6 failed: trivial keep-all")
+         call log("  R6 (trivial keep): vol="//rtoa(vol_r3d)//" expected="//rtoa(vol_tet))
+         
+         ! All clipped: keep x < -1.0 — r3d_clip(-n, dist) => -1+(-x) > 0 => x < -1
+         call r3d_init_tet(rp, tet)
+         call r3d_clip(rp, [-1.0_WP, 0.0_WP, 0.0_WP], -1.0_WP, ierr)
+         call r3d_moments(rp, vol_r3d, cen_r3d)
+         if (abs(vol_r3d).gt.tol) call die("R6 failed: trivial clip-all")
+         call log("  R6 (trivial clip): vol="//rtoa(vol_r3d)//" expected=0")
+      end block test_r3d_trivial
+      
+      ! R7: Diagonal PLIC — compare r3d vs poly vs tet all three ways
+      test_r3d_vs_all: block
+         real(WP), dimension(3,4) :: tet
+         type(r3d_poly) :: rp
+         type(convex_poly) :: poly
+         real(WP), dimension(4) :: plane
+         real(WP) :: vol_r3d_liq, vol_poly_liq, vol_tet_liq, vol_tet_gas
+         real(WP), dimension(3) :: cen_r3d, cen_poly, bary_liq, bary_gas
+         integer :: icontp, icontn, ierr
+         real(WP) :: err_rv, err_pv, err_rc, err_pc
+         
+         tet(:,1) = [0.1_WP, 0.2_WP, 0.0_WP]
+         tet(:,2) = [0.9_WP, 0.1_WP, 0.1_WP]
+         tet(:,3) = [0.3_WP, 0.8_WP, 0.2_WP]
+         tet(:,4) = [0.2_WP, 0.3_WP, 0.7_WP]
+         
+         plane(1:3) = [0.6_WP, 0.8_WP, 0.0_WP]  ! already unit length
+         plane(4) = 0.5_WP
+         
+         ! Tet decomposition
+         call cut_tet_vol(tet, plane, vol_tet_liq, vol_tet_gas, bary_liq, bary_gas)
+         
+         ! Poly clipping
+         call tet_to_poly(tet, poly)
+         call clip_poly_by_plane(poly, plane(1:3), plane(4), icontp, icontn, ierr)
+         call poly_vol_centroid(poly, vol_poly_liq, cen_poly)
+         vol_poly_liq = abs(vol_poly_liq)
+         
+         ! r3d clipping: keep n·x < dist => r3d_clip(-n, dist)
+         call r3d_init_tet(rp, tet)
+         call r3d_clip(rp, -plane(1:3), plane(4), ierr)
+         call r3d_moments(rp, vol_r3d_liq, cen_r3d)
+         vol_r3d_liq = abs(vol_r3d_liq)
+         
+         err_rv = abs(vol_r3d_liq - vol_tet_liq)
+         err_pv = abs(vol_poly_liq - vol_tet_liq)
+         err_rc = maxval(abs(cen_r3d - bary_liq))
+         err_pc = maxval(abs(cen_poly - bary_liq))
+         
+         call log("  R7 (3-way): V_tet="//rtoa(vol_tet_liq)//" V_poly="//rtoa(vol_poly_liq)//" V_r3d="//rtoa(vol_r3d_liq))
+         call log("  R7 vol err: r3d="//rtoa(err_rv)//" poly="//rtoa(err_pv))
+         call log("  R7 cen err: r3d="//rtoa(err_rc)//" poly="//rtoa(err_pc))
+         if (err_rv.gt.tol) call die("R7 failed: r3d vol vs tet")
+         if (err_rc.gt.tol) call die("R7 failed: r3d centroid vs tet")
+      end block test_r3d_vs_all
+      
+      call log("=== All r3d tests passed! ===")
+      
+   end subroutine test_r3d
 
 end module mod_test_geometry
+
