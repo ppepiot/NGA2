@@ -79,12 +79,12 @@ module amrscalar_class
 
    !> Abstract interface for user-overridable tagging callback
    abstract interface
-      subroutine scalar_tagging_iface(solver, lvl, tags, time)
+      subroutine scalar_tagging_iface(solver, lvl, time, tags)
          import :: amrscalar, c_ptr, WP
          class(amrscalar), intent(inout) :: solver
          integer, intent(in) :: lvl
-         type(c_ptr), intent(in) :: tags
          real(WP), intent(in) :: time
+         type(c_ptr), intent(in) :: tags
       end subroutine scalar_tagging_iface
    end interface
 
@@ -142,15 +142,15 @@ contains
    end subroutine amrscalar_on_clear
 
    !> Dispatch tagging: calls user's procedure pointer with typed solver
-   subroutine amrscalar_tagging(ctx, lvl, tags, time)
+   subroutine amrscalar_tagging(ctx, lvl, time, tags)
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
-      type(c_ptr), intent(in) :: tags
       real(WP), intent(in) :: time
+      type(c_ptr), intent(in) :: tags
       type(amrscalar), pointer :: this
       call c_f_pointer(ctx, this)
       ! User-provided tagging
-      if (associated(this%user_tagging)) call this%user_tagging(this, lvl, tags, time)
+      if (associated(this%user_tagging)) call this%user_tagging(this, lvl, time, tags)
    end subroutine amrscalar_tagging
 
    !> Dispatch post_regrid: calls type-bound method

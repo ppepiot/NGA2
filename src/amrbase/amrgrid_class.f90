@@ -20,14 +20,14 @@ module amrgrid_class
 
    !> Abstract interface for user-provided tagging callback (with context)
    abstract interface
-      subroutine tagging_callback(ctx,lvl,tags,time)
+      subroutine tagging_callback(ctx,lvl,time,tags)
          use iso_c_binding, only: c_ptr
          use precision, only: WP
          implicit none
          type(c_ptr), intent(in) :: ctx   !< User context pointer
          integer, intent(in) :: lvl
-         type(c_ptr), intent(in) :: tags  !< amrex_tagboxarray C pointer
          real(WP), intent(in) :: time
+         type(c_ptr), intent(in) :: tags  !< amrex_tagboxarray C pointer
       end subroutine tagging_callback
    end interface
 
@@ -668,7 +668,7 @@ contains
       ! Call all registered tagging callbacks with their context
       if (allocated(this_grid%taggers)) then
          do i=1,size(this_grid%taggers)
-            call this_grid%taggers(i)%f(this_grid%taggers(i)%ctx, int(lvl), tags, real(time, WP))
+            call this_grid%taggers(i)%f(this_grid%taggers(i)%ctx, int(lvl), real(time, WP), tags)
          end do
       end if
    end subroutine dispatch_err_est

@@ -56,14 +56,14 @@ contains
    end function sphere_levelset
 
    !> Tagger for this case based on velocity gradient magnitude and distance to sphere surface
-   subroutine my_tagger(solver,lvl,tags_ptr,time)
+   subroutine my_tagger(solver,lvl,time,tags_ptr)
       use iso_c_binding,    only: c_ptr,c_char
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_tagboxarray
       use amrgrid_class,    only: SETtag
       class(amrincomp), intent(inout) :: solver
       integer, intent(in) :: lvl
-      type(c_ptr), intent(in) :: tags_ptr
       real(WP), intent(in) :: time
+      type(c_ptr), intent(in) :: tags_ptr
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
@@ -112,14 +112,15 @@ contains
    end subroutine my_tagger
 
    !> Dirichlet BC: uniform inflow Uin at xlo/xhi for U
-   subroutine dirichlet_velocity(solver,p,bx,comp,face,time)
+   subroutine dirichlet_velocity(solver,lvl,time,face,bx,comp,p)
       use amrex_amr_module, only: amrex_box
       class(amrincomp), intent(in) :: solver
-      real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
+      integer, intent(in) :: lvl
+      real(WP), intent(in) :: time
+      integer, intent(in) :: face
       type(amrex_box), intent(in) :: bx
       character(len=1), intent(in) :: comp
-      integer, intent(in) :: face
-      real(WP), intent(in) :: time
+      real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
       integer :: i,j,k
       select case (face)
        case (1)  ! Inflow in X-

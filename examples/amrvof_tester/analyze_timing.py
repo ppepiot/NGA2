@@ -20,7 +20,6 @@ sl_max  = data[:, 6];  sl_min  = data[:, 7]
 pl_max  = data[:, 8];  pl_min  = data[:, 9]
 pn_max  = data[:, 10]; pn_min  = data[:, 11]
 pg_max  = data[:, 12]; pg_min  = data[:, 13]
-rm_max  = data[:, 14]; rm_min  = data[:, 15]
 
 # ── Summary table ──
 print(f"\n{'='*60}")
@@ -28,7 +27,7 @@ print(f"  AMRVOF TIMING ANALYSIS  ({len(step)} steps, t=[{time[0]:.3f}, {time[-1
 print(f"{'='*60}\n")
 print(f"  Comm-free timers (the ones that matter):")
 print(f"  {'':10s} {'avg_max':>9s} {'avg_min':>9s} {'ratio':>6s} {'imbal':>9s}")
-for name, mx, mn in [('SL',sl_max,sl_min),('PLICnet',pn_max,pn_min),('Polygon',pg_max,pg_min),('Remap',rm_max,rm_min)]:
+for name, mx, mn in [('SL',sl_max,sl_min),('PLICnet',pn_max,pn_min),('Polygon',pg_max,pg_min)]:
     am, an = mx.mean(), mn.mean()
     r = f"{am/an:.2f}x" if an > 0 else "n/a"
     print(f"  {name:10s} {am:9.5f} {an:9.5f} {r:>6s} {(am-an):9.5f}")
@@ -38,16 +37,16 @@ print(f"  {'':10s} {'avg_max':>9s} {'avg_min':>9s}")
 for name, mx, mn in [('advance',adv_max,adv_min),('PLIC',pl_max,pl_min)]:
     print(f"  {name:10s} {mx.mean():9.5f} {mn.mean():9.5f}")
 
-print(f"\n  Cost breakdown (% of advance_max):")
+print(f"\n  advance_vof breakdown (% of advance_max):")
 sl_pct = sl_max.mean()/adv_max.mean()*100
-pn_pct = pn_max.mean()/adv_max.mean()*100
-pg_pct = pg_max.mean()/adv_max.mean()*100
-pl_pct = pl_max.mean()/adv_max.mean()*100
-rm_pct = rm_max.mean()/adv_max.mean()*100
-print(f"    SL:      {sl_pct:5.1f}%")
-print(f"    PLIC:    {pl_pct:5.1f}%  (PLICnet: {pn_pct:.1f}%, Polygon: {pg_pct:.1f}%)")
-print(f"    Remap:   {rm_pct:5.1f}%")
-print(f"    Other:   {100-sl_pct-pl_pct-rm_pct:5.1f}%  (comms, band, cleanup)")
+print(f"    SL:      {sl_pct:5.1f}%  (remap + fluxes + update)")
+print(f"    Other:   {100-sl_pct:5.1f}%  (setup, fill, comms)")
+print(f"\n  build_plic breakdown (% of plic_max):")
+pn_pct = pn_max.mean()/pl_max.mean()*100 if pl_max.mean() > 0 else 0
+pg_pct = pg_max.mean()/pl_max.mean()*100 if pl_max.mean() > 0 else 0
+print(f"    PLICnet: {pn_pct:5.1f}%")
+print(f"    Polygon: {pg_pct:5.1f}%")
+print(f"    Other:   {100-pn_pct-pg_pct:5.1f}%  (setup, comms)")
 
 print(f"\n  Load distribution (mixed cells at finest level):")
 print(f"    avg max: {nm_max.mean():.0f}   avg min: {nm_min.mean():.0f}   ratio: {nm_max.mean()/nm_min.mean():.2f}x")
@@ -66,8 +65,6 @@ ax.plot(time, sl_min*1e3, 'C0-', lw=0.5)
 ax.fill_between(time, pn_min*1e3, pn_max*1e3, alpha=0.3, color='C1', label='PLICnet (min–max)')
 ax.plot(time, pn_max*1e3, 'C1-', lw=0.5)
 ax.fill_between(time, pg_min*1e3, pg_max*1e3, alpha=0.3, color='C2', label='Polygon (min–max)')
-ax.fill_between(time, rm_min*1e3, rm_max*1e3, alpha=0.3, color='C5', label='Remap (min–max)')
-ax.plot(time, rm_max*1e3, 'C5-', lw=0.5)
 ax.set_ylabel('Wall time (ms)')
 ax.set_title('Comm-free component timing')
 ax.legend(loc='upper left', fontsize=8)

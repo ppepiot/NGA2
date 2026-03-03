@@ -142,7 +142,7 @@ contains
       ! Create VOF solver
       create_vof_solver: block
          call vof%initialize(amr,name='sphere_vof')
-         vof%user_init=>sphere_init
+         vof%user_vof_init=>sphere_init
       end block create_vof_solver
 
       ! Initialize regridding
@@ -212,8 +212,6 @@ contains
          call timing%add_column(vof%wtmin_plicnet,'wtmin_plicnet')
          call timing%add_column(vof%wtmax_polygon,'wtmax_polygon')
          call timing%add_column(vof%wtmin_polygon,'wtmin_polygon')
-         call timing%add_column(vof%wtmax_remap,'wtmax_remap')
-         call timing%add_column(vof%wtmin_remap,'wtmin_remap')
          call timing%write()
       end block create_monitor
 
@@ -285,7 +283,7 @@ contains
          end block set_velocity
 
          ! Compute CFL and update dt based on CFL constraint
-         call vof%get_cfl(U=U,V=V,W=W,dt=time%dt,cfl=time%cfl)
+         call vof%get_vof_cfl(U=U,V=V,W=W,dt=time%dt,cfl=time%cfl)
          call time%adjust_dt()
          call time%increment()
 

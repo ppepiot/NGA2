@@ -34,6 +34,8 @@ module amrdata_class
       logical :: nodal(3) = [.false., .false., .false.]    !< false=cell, true=vertex in that direction
       integer :: interp=amrex_interp_cell_cons             !< Interpolation method
       integer, dimension(:,:), allocatable :: lo_bc,hi_bc  !< Boundary conditions: lo_bc(3,ncomp), hi_bc(3,ncomp)
+      ! Cache level index for fillbc callback
+      integer :: fill_lvl_cache=-1
       ! Callback pointers (set to defaults in initialize)
       procedure(on_init_iface),   pointer, nopass :: on_init   => null()
       procedure(on_coarse_iface), pointer, nopass :: on_coarse => null()
@@ -467,6 +469,7 @@ contains
       end select
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call C++ wrapper
+      this%fill_lvl_cache=lvl ! Cache current level
       call amrmfab_fillcoarsepatch(this%mf(lvl), time, this%mf(lvl-1), &
       &   this%amr%geom(lvl-1), this%amr%geom(lvl), data_ctx, bc_dispatch_ptr, &
       &   1, 1, this%ncomp, [this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)], this%interp, this%lo_bc, this%hi_bc, this%ncomp)
@@ -494,6 +497,7 @@ contains
       end select
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call appropriate FillPatch (scomp/dcomp use 1-indexed Fortran convention)
+      this%fill_lvl_cache=lvl ! Cache current level
       if (lvl .eq. 0) then
          call amrmfab_fillpatch_single(this%mf(0), t_old, this%mf(0), &
          &   t_new, this%mf(0), this%amr%geom(0), data_ctx, bc_dispatch_ptr, &
@@ -542,6 +546,7 @@ contains
       end select
       bc_dispatch_ptr = c_funloc(amrdata_fillbc)
       ! Call appropriate FillPatch
+      this%fill_lvl_cache=lvl ! Cache current level
       if (lvl .eq. 0) then
          call amrmfab_fillpatch_single(dest, t_old, this%mf(0), &
          &   t_new, this%mf(0), this%amr%geom(0), data_ctx, bc_dispatch_ptr, &

@@ -100,26 +100,27 @@ module amrincomp_class
 
    !> Abstract interface for user-overridable tagging callback
    abstract interface
-      subroutine incomp_tagging_iface(solver,lvl,tags,time)
+      subroutine incomp_tagging_iface(solver,lvl,time,tags)
          import :: amrincomp,c_ptr,WP
          class(amrincomp), intent(inout) :: solver
          integer, intent(in) :: lvl
-         type(c_ptr), intent(in) :: tags
          real(WP), intent(in) :: time
+         type(c_ptr), intent(in) :: tags
       end subroutine incomp_tagging_iface
    end interface
 
    !> Abstract interface for user-provided velocity BC callback
    !> Called for ext_dir faces; user fills the boundary box with their own values
    abstract interface
-      subroutine incomp_bc_iface(solver,p,bc_bx,comp,face,time)
+      subroutine incomp_bc_iface(solver,lvl,time,face,bx,comp,p)
          import :: amrincomp,amrex_box,WP
          class(amrincomp), intent(in) :: solver
-         real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
-         type(amrex_box), intent(in) :: bc_bx              !< Boundary box to fill
-         character(len=1), intent(in) :: comp              !< 'U', 'V', or 'W'
-         integer, intent(in) :: face                       !< 1=xlo,2=xhi,3=ylo,4=yhi,5=zlo,6=zhi
+         integer, intent(in) :: lvl
          real(WP), intent(in) :: time
+         integer, intent(in) :: face                       !< 1=xlo,2=xhi,3=ylo,4=yhi,5=zlo,6=zhi
+         type(amrex_box), intent(in) :: bx                 !< Boundary box to fill
+         character(len=1), intent(in) :: comp              !< 'U', 'V', or 'W'
+         real(WP), dimension(:,:,:,:), pointer, intent(inout) :: p
       end subroutine incomp_bc_iface
    end interface
 
@@ -180,15 +181,15 @@ contains
    end subroutine amrincomp_on_clear
 
    !> Dispatch tagging: calls user callback if set
-   subroutine amrincomp_tagging(ctx,lvl,tags,time)
+   subroutine amrincomp_tagging(ctx,lvl,time,tags)
       implicit none
       type(c_ptr), intent(in) :: ctx
       integer, intent(in) :: lvl
-      type(c_ptr), intent(in) :: tags
       real(WP), intent(in) :: time
+      type(c_ptr), intent(in) :: tags
       type(amrincomp), pointer :: this
       call c_f_pointer(ctx,this)
-      if (associated(this%user_tagging)) call this%user_tagging(this,lvl,tags,time)
+      if (associated(this%user_tagging)) call this%user_tagging(this,lvl,time,tags)
    end subroutine amrincomp_tagging
 
    !> Dispatch post_regrid: calls type-bound method
@@ -668,6 +669,7 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: p
       integer :: dlo(3),dhi(3),flo(3),fhi(3)
       integer :: ilo,ihi,jlo,jhi,klo,khi
+      integer :: lvl
       character(len=1) :: comp
 
       ! Get point to solver
@@ -676,10 +678,11 @@ contains
          solver=>s
       end select
 
-      ! Get domain bounds and component ID
+      ! Get domain bounds, component ID, and level
       dlo=geom%domain%lo
       dhi=geom%domain%hi
       comp=this%name(1:1)  ! 'U', 'V', or 'W'
+      lvl=this%fill_lvl_cache
 
       ! Compute staggered domain bounds for this component
       ! Cell domain: [dlo, dhi]. Face domains extend by 1 in staggered direction.
@@ -751,7 +754,7 @@ contains
             ! User-controlled: fill via user callback
             if (associated(solver%user_bc)) then
                bc_bx=amrex_box(slo,shi)
-               call solver%user_bc(solver,p,bc_bx,comp,face,time)
+               call solver%user_bc(solver=solver,lvl=lvl,time=time,face=face,bx=bc_bx,comp=comp,p=p)
             else
                ! Default to zero if no callback provided
                do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1)

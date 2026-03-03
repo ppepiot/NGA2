@@ -293,17 +293,18 @@ contains
    end subroutine shockdrop_init
 
    !> Apply inflow BC at low-x (face=1)
-   subroutine shock_dirichlet(solver,pQ,bc_bx,face,time)
+   subroutine shock_dirichlet(solver,lvl,time,face,bx,pQ)
       use amrex_amr_module, only: amrex_box
       class(amrmpcomp), intent(inout) :: solver
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
-      type(amrex_box), intent(in) :: bc_bx
-      integer, intent(in) :: face
+      integer, intent(in) :: lvl
       real(WP), intent(in) :: time
+      integer, intent(in) :: face
+      type(amrex_box), intent(in) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
       integer :: i,j,k
       select case (face)
        case (1)  ! X-LOW: Dirichlet inflow with post-shock (gas only, no liquid)
-         do k=bc_bx%lo(3),bc_bx%hi(3); do j=bc_bx%lo(2),bc_bx%hi(2); do i=bc_bx%lo(1),bc_bx%hi(1)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             pQ(i,j,k,1)=0.0_WP                  ! No liquid
             pQ(i,j,k,2)=rhoG2                   ! Gas density
             pQ(i,j,k,3)=0.0_WP                  ! No liquid energy
@@ -316,14 +317,14 @@ contains
    end subroutine shock_dirichlet
 
    !> Tagger based on vorticity, divergence, and VF gradient
-   subroutine my_tagger(solver,lvl,tags_ptr,time)
+   subroutine my_tagger(solver,lvl,time,tags_ptr)
       use iso_c_binding,    only: c_ptr,c_char
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_tagboxarray
       use amrgrid_class,    only: SETtag
       class(amrmpcomp), intent(inout) :: solver
       integer, intent(in) :: lvl
-      type(c_ptr), intent(in) :: tags_ptr
       real(WP), intent(in) :: time
+      type(c_ptr), intent(in) :: tags_ptr
       type(amrex_tagboxarray) :: tags
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
@@ -498,7 +499,7 @@ contains
             fs%vof_lo_bc(1)=BC_GAS
             fs%Q%lo_bc(1,:)=amrex_bc_ext_dir
             fs%Q%hi_bc(1,:)=amrex_bc_foextrap
-            fs%user_bc=>shock_dirichlet
+            fs%user_mpcomp_bc=>shock_dirichlet
          end if
       end block create_solver
       
