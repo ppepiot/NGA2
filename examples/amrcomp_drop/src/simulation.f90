@@ -249,30 +249,39 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF,pCliq,pCgas
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pVF,pCL,pCG
       real(WP), dimension(3) :: BL,BG
       real(WP) :: dx,dy,dz,myVF,IEL,x_cc,rhoG,pG,uG,H
       integer :: i,j,k
+      integer, parameter :: nref=3
+      ! Get mesh size
       dx=solver%amr%dx(lvl); dy=solver%amr%dy(lvl); dz=solver%amr%dz(lvl)
+      ! Get internal energy of liquid
       IEL=get_IL(rhoL1,pL1)
+      ! Use passed ba/dm since grid is being constructed
       call amrex_mfiter_build(mfi,ba,dm,tiling=.false.)
       do while (mfi%next())
          ! Get pointers to data
-         pQ   =>solver%Q%mf(lvl)%dataptr(mfi)
-         pVF  =>solver%VF%mf(lvl)%dataptr(mfi)
-         pCliq=>solver%Cliq%mf(lvl)%dataptr(mfi)
-         pCgas=>solver%Cgas%mf(lvl)%dataptr(mfi)
+         pQ =>solver%Q%mf(lvl)%dataptr(mfi)
+         pVF=>solver%VF%mf(lvl)%dataptr(mfi)
+         if (lvl.eq.solver%amr%maxlvl) then
+            pCL=>solver%CL%dataptr(mfi)
+            pCG=>solver%CG%dataptr(mfi)
+         end if
          ! Loop over grown tilebox
          bx=mfi%growntilebox(solver%nover)
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             ! Compute VF and barycenters from levelset
             call initialize_volume_moments(lo=[solver%amr%xlo+real(i  ,WP)*dx,solver%amr%ylo+real(j  ,WP)*dy,solver%amr%zlo+real(k  ,WP)*dz], &
             &                              hi=[solver%amr%xlo+real(i+1,WP)*dx,solver%amr%ylo+real(j+1,WP)*dy,solver%amr%zlo+real(k+1,WP)*dz], &
-            &                              levelset=sphere_levelset,time=time,level=3,VFlo=VFlo,VF=myVF,BL=BL,BG=BG)
-            ! Store volume moments
+            &                              levelset=sphere_levelset,time=time,level=nref,VFlo=VFlo,VF=myVF,BL=BL,BG=BG)
+            ! Store volume fraction
             pVF(i,j,k,1)=myVF
-            pCliq(i,j,k,1:3)=BL
-            pCgas(i,j,k,1:3)=BG
+            ! Store barycenters
+            if (lvl.eq.solver%amr%maxlvl) then
+               pCL(i,j,k,:)=BL
+               pCG(i,j,k,:)=BG
+            end if
             ! Compute local gas state from shock profile
             x_cc=solver%amr%xlo+(real(i,WP)+0.5_WP)*dx
             H=Hshock(x=Xs-x_cc,delta=0.5_WP*dx)
@@ -316,7 +325,7 @@ contains
       end select
    end subroutine shock_dirichlet
 
-   !> Tagger based on vorticity, divergence, and VF gradient
+   !> Tagger based on normalized velocity gradient
    subroutine my_tagger(solver,lvl,time,tags_ptr)
       use iso_c_binding,    only: c_ptr,c_char
       use amrex_amr_module, only: amrex_mfiter,amrex_box,amrex_tagboxarray
@@ -339,10 +348,12 @@ contains
       tags=tags_ptr
       call solver%amr%mfiter_build(lvl,mfi)
       do while (mfi%next())
-         bx=mfi%tilebox()
+         ! Get pointers to data
          tagarr=>tags%dataPtr(mfi)
          pQ=>solver%Q%mf(lvl)%dataptr(mfi)
          pVisc=>solver%visc%mf(lvl)%dataptr(mfi)
+         ! Loop over tile
+         bx=mfi%tilebox()
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             ! Get rho and mu
             rho=sum(pQ(i,j,k,1:2))
@@ -493,10 +504,10 @@ contains
          ! Provide pressure relaxation model
          fs%relax=>P_relax_implicit
          ! Set initial conditions
-         fs%user_init=>shockdrop_init
+         fs%user_mpcomp_init=>shockdrop_init
          ! Set BCs
          if (.not.amr%xper) then
-            fs%vof_lo_bc(1)=BC_GAS
+            fs%lo_bc(1)=BC_GAS
             fs%Q%lo_bc(1,:)=amrex_bc_ext_dir
             fs%Q%hi_bc(1,:)=amrex_bc_foextrap
             fs%user_mpcomp_bc=>shock_dirichlet
@@ -519,7 +530,7 @@ contains
          regrid_evt=event(time=time,name='Regrid')
          call param_read('Regrid nsteps',regrid_evt%nper)
          ! Set case-specific tagging
-         fs%user_tagging=>my_tagger
+         fs%user_mpcomp_tagging=>my_tagger
          call param_read('Tagging Rec',Rec_tag)
          call param_read('Tagging Res',Res_tag)
          ! Build the grid
@@ -668,8 +679,6 @@ contains
          call tfile%add_column(fs%wtmin_plicnet,'plicnet_min')
          call tfile%add_column(fs%wtmax_polygon,'polygon_max')
          call tfile%add_column(fs%wtmin_polygon,'polygon_min')
-         call tfile%add_column(fs%ncells_max,'cells_max')
-         call tfile%add_column(fs%ncells_min,'cells_min')
          call tfile%add_column(fs%nmixed_max,'mixed_max')
          call tfile%add_column(fs%nmixed_min,'mixed_min')
          call tfile%write()
@@ -691,10 +700,7 @@ contains
          
          ! Remember old state
          call fs%Qold%copy(src=fs%Q)
-         call fs%VFold%copy(src=fs%VF)
-         call fs%Cliqold%copy(src=fs%Cliq)
-         call fs%Cgasold%copy(src=fs%Cgas)
-         call fs%PLICold%copy(src=fs%PLIC)
+         call fs%store_old()
          
          ! ===== RK2 Stage 1: dQdt = f(t, Q) =====
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,dt=0.5_WP*time%dt,time=time%t)
@@ -714,8 +720,8 @@ contains
          call fs%apply_relax()
          call check_Q('RELAX2')
 
-         ! Rebuild PLIC and reset moments
-         call fs%build_plic(time%t); call fs%reset_moments()
+         ! Rebuild PLIC
+         call fs%build_plic(time%t)
 
          ! Recompute primitive variables
          call fs%get_primitive(fs%Q)

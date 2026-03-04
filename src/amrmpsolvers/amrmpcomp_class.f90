@@ -7,12 +7,12 @@ module amrmpcomp_class
    use amrdata_class,    only: amrdata
    use amrsolver_class,  only: amrsolver
    use amrex_amr_module, only: amrex_box,amrex_boxarray,amrex_distromap
-   use amrvof_class,     only: amrvof,VFlo,VFhi,vol_eps
+   use amrvof_class,     only: amrvof,VFlo,VFhi,vol_eps,BC_LIQ,BC_GAS,BC_REFLECT,BC_USER
    implicit none
    private
 
-   ! Expose type
-   public :: amrmpcomp
+   ! Expose type and constants
+   public :: amrmpcomp,VFlo,VFhi,BC_LIQ,BC_GAS,BC_REFLECT,BC_USER
 
    !> AMR compressible multiphase solver type
    type, extends(amrvof) :: amrmpcomp
@@ -1021,6 +1021,8 @@ contains
                   pFz(i,j,k,7)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1))
                end if
             end do; end do; end do
+            ! Deallocate proj for this tile
+            deallocate(proj)
          end do
          call this%amr%mfiter_destroy(mfi)
       end block semilagrangian_fluxes
