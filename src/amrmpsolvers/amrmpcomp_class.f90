@@ -1732,7 +1732,6 @@ contains
    !> Apply pressure relaxation to mixture cells
    subroutine apply_relax(this)
       use amrex_amr_module, only: amrex_mfiter,amrex_box
-      use amrvof_geometry,  only: get_plane_dist,cut_hex_vol
       use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
@@ -1740,12 +1739,8 @@ contains
       real(WP) :: t0
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pQ,pPLIC,pCL,pCG
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pQ,pCL,pCG
       real(WP) :: dx,dy,dz
-      !real(WP), dimension(3) :: lo,hi,cell_center,bary_liq,bary_gas
-      !real(WP), dimension(3,8) :: hex
-      !real(WP), dimension(4) :: plane
-      !real(WP) :: vol_liq,vol_gas
       ! If no relaxation model was provided, return
       if (.not.associated(this%relax)) return
       ! Start timer
@@ -1758,7 +1753,6 @@ contains
          ! Get pointers to data
          pVF  =>this%VF%mf(lvl)%dataptr(mfi)
          pQ   =>this%Q%mf(lvl)%dataptr(mfi)
-         pPLIC=>this%PLIC%dataptr(mfi)
          pCL  =>this%CL%dataptr(mfi)
          pCG  =>this%CG%dataptr(mfi)
          ! Loop over grown tiles
@@ -1767,35 +1761,18 @@ contains
             ! Only relax mixture cells
             if (pVF(i,j,k,1).lt.VFlo.or.pVF(i,j,k,1).gt.VFhi) cycle
             ! Apply user-provided relaxation model (modifies VF and Q)
-            call this%relax(pVF(i,j,k,1),pQ(i,j,k,:))
-            ! ! Adjust PLIC plane to match new VF
-            ! lo=[this%amr%xlo+real(i  ,WP)*dx,this%amr%ylo+real(j  ,WP)*dy,this%amr%zlo+real(k  ,WP)*dz]
-            ! hi=[this%amr%xlo+real(i+1,WP)*dx,this%amr%ylo+real(j+1,WP)*dy,this%amr%zlo+real(k+1,WP)*dz]
-            ! cell_center=0.5_WP*(lo+hi)
-            ! ! Reposition plane: keep normal, adjust distance for new VF
-            ! pPLIC(i,j,k,4)=get_plane_dist(pPLIC(i,j,k,1:3),lo,hi,pVF(i,j,k,1))
-            ! ! Recompute barycenters from adjusted PLIC
-            ! hex(:,1)=[lo(1),lo(2),lo(3)]; hex(:,2)=[hi(1),lo(2),lo(3)]
-            ! hex(:,3)=[hi(1),hi(2),lo(3)]; hex(:,4)=[lo(1),hi(2),lo(3)]
-            ! hex(:,5)=[lo(1),lo(2),hi(3)]; hex(:,6)=[hi(1),lo(2),hi(3)]
-            ! hex(:,7)=[hi(1),hi(2),hi(3)]; hex(:,8)=[lo(1),hi(2),hi(3)]
-            ! plane=pPLIC(i,j,k,1:4)
-            ! call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas)
-            ! pVF(i,j,k,1)=vol_liq/(dx*dy*dz)
-            ! pCL(i,j,k,1:3)=bary_liq
-            ! pCG(i,j,k,1:3)=bary_gas
-            ! Handle newly-pure cells from relaxation
+            call this%relax(VF=pVF(i,j,k,1),Q=pQ(i,j,k,:))
+            ! Ensure consistency with modified VF
             if (pVF(i,j,k,1).lt.VFlo) then
+               ! Pure liquid
                pVF(i,j,k,1)=0.0_WP
-               pPLIC(i,j,k,:)=[0.0_WP,0.0_WP,0.0_WP,-1.0e10_WP]
                pCL(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                pCG(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                pQ(i,j,k,1)=0.0_WP
                pQ(i,j,k,3)=0.0_WP
-            end if
-            if (pVF(i,j,k,1).gt.VFhi) then
+            else if (pVF(i,j,k,1).gt.VFhi) then
+               ! Pure gas
                pVF(i,j,k,1)=1.0_WP
-               pPLIC(i,j,k,:)=[0.0_WP,0.0_WP,0.0_WP,+1.0e10_WP]
                pCL(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                pCG(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                pQ(i,j,k,2)=0.0_WP

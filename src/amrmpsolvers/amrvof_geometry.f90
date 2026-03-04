@@ -339,7 +339,7 @@ contains
       d = alpha * norm + dot_product(normal, cellctr)
       
    end function get_plane_dist
-   
+
    !> Compute volume of tetrahedron given 4 vertices
    !> v(:,1:4) are the vertex coordinates
    pure function tet_vol(v) result(vol)
