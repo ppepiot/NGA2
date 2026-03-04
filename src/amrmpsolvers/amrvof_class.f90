@@ -1703,17 +1703,12 @@ contains
             jpv=floor((pos(2)-this%amr%ylo)*dyi)
             kpw=floor((pos(3)-this%amr%zlo)*dzi)
             ! Clamp to array bounds
-            if (ipu<lbound(pU,1).or.ipu>ubound(pU,1)-1.or.jpc<lbound(pU,2).or.jpc>ubound(pU,2)-1.or. &
-                kpc<lbound(pU,3).or.kpc>ubound(pU,3)-1.or.ipc<lbound(pV,1).or.ipc>ubound(pV,1)-1.or. &
-                jpv<lbound(pV,2).or.jpv>ubound(pV,2)-1.or.kpw<lbound(pW,3).or.kpw>ubound(pW,3)-1) then
-               print*,'Interpolation out of bounds',ipu,jpc,kpc,ipc,jpv,kpw
-            end if
-            ipu=max(lbound(pU,1),min(ubound(pU,1)-1,ipu))
-            jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
-            kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
-            ipc=max(lbound(pV,1),min(ubound(pV,1)-1,ipc))
-            jpv=max(lbound(pV,2),min(ubound(pV,2)-1,jpv))
-            kpw=max(lbound(pW,3),min(ubound(pW,3)-1,kpw))
+            !ipu=max(lbound(pU,1),min(ubound(pU,1)-1,ipu))
+            !jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
+            !kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
+            !ipc=max(lbound(pV,1),min(ubound(pV,1)-1,ipc))
+            !jpv=max(lbound(pV,2),min(ubound(pV,2)-1,jpv))
+            !kpw=max(lbound(pW,3),min(ubound(pW,3)-1,kpw))
             ! Cell-centered weights
             wxc1=(pos(1)-(this%amr%xlo+(real(ipc,WP)+0.5_WP)*dx))*dxi
             wyc1=(pos(2)-(this%amr%ylo+(real(jpc,WP)+0.5_WP)*dy))*dyi
@@ -1749,9 +1744,9 @@ contains
             jpc=floor((pos(2)-this%amr%ylo)*dyi-0.5_WP)
             kpc=floor((pos(3)-this%amr%zlo)*dzi-0.5_WP)
             ! Clamp to array bounds
-            ipc=max(lbound(pU,1),min(ubound(pU,1)-1,ipc))
-            jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
-            kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
+            !ipc=max(lbound(pU,1),min(ubound(pU,1)-1,ipc))
+            !jpc=max(lbound(pU,2),min(ubound(pU,2)-1,jpc))
+            !kpc=max(lbound(pU,3),min(ubound(pU,3)-1,kpc))
             ! Cell-centered weights
             wxc1=(pos(1)-(this%amr%xlo+(real(ipc,WP)+0.5_WP)*dx))*dxi
             wyc1=(pos(2)-(this%amr%ylo+(real(jpc,WP)+0.5_WP)*dy))*dyi
