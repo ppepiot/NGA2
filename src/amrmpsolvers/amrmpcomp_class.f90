@@ -821,6 +821,7 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLICold ! PLICold used in tet2flux_plic
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQold    ! Qold used in tet2flux_plic
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold   ! VFold used in tet2flux_plic
+      logical :: crossed_plic ! Used in tet2flux/tet2flux_plic
       ! Start full routine timer
       t0=MPI_Wtime()
 
@@ -856,8 +857,6 @@ contains
          integer , dimension(3,4) :: ijk
          integer , dimension(3,9) :: fijk
          real(WP), dimension(:,:,:,:), allocatable :: proj
-         integer, dimension(3) :: bblo,bbhi
-         logical :: bb_pure_liq,bb_pure_gas
          real(WP) :: vel
          real(WP), dimension(8) :: Vflux
          real(WP), dimension(7) :: Qflux
@@ -909,11 +908,8 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(1,nn)=merge(i-1,i,vel.gt.0.0_WP); end do
-               ! Check polyhedron bounding box
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
-               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
-               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Are we crossing plic?
+               crossed_plic=.false.
                ! Decompose into tets, cut, and accumulate
                pVx(i,j,k,1:8)=0.0_WP
                pFx(i,j,k,1:7)=0.0_WP
@@ -929,7 +925,7 @@ contains
                ! Convert to flux rate
                pFx(i,j,k,1:7)=-pFx(i,j,k,1:7)/(dt*dy*dz)
                ! Switch to dissipation-free momentum flux for BB-pure regions
-               if (bb_pure_liq.or.bb_pure_gas) then
+               if (.not.crossed_plic) then
                   pFx(i,j,k,5)=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pU(i-1:i,j,k,1))
                   pFx(i,j,k,6)=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pV(i-1:i,j,k,1))
                   pFx(i,j,k,7)=sum(pFx(i,j,k,1:2))*0.5_WP*sum(pW(i-1:i,j,k,1))
@@ -952,11 +948,8 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(2,nn)=merge(j-1,j,vel.gt.0.0_WP); end do
-               ! Check polyhedron bounding box
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
-               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
-               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Are we crossing plic?
+               crossed_plic=.false.
                ! Decompose into tets, cut, and accumulate
                pVy(i,j,k,1:8)=0.0_WP
                pFy(i,j,k,1:7)=0.0_WP
@@ -972,7 +965,7 @@ contains
                ! Convert to flux rate
                pFy(i,j,k,1:7)=-pFy(i,j,k,1:7)/(dt*dz*dx)
                ! Switch to dissipation-free momentum flux for BB-pure regions
-               if (bb_pure_liq.or.bb_pure_gas) then
+               if (.not.crossed_plic) then
                   pFy(i,j,k,5)=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pU(i,j-1:j,k,1))
                   pFy(i,j,k,6)=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pV(i,j-1:j,k,1))
                   pFy(i,j,k,7)=sum(pFy(i,j,k,1:2))*0.5_WP*sum(pW(i,j-1:j,k,1))
@@ -995,11 +988,8 @@ contains
                ! Compute face indices
                do nn=1,9; fijk(:,nn)=floor([(face(1,nn)-this%amr%xlo)*dxi,(face(2,nn)-this%amr%ylo)*dyi,(face(3,nn)-this%amr%zlo)*dzi]); end do
                do nn=1,4; fijk(3,nn)=merge(k-1,k,vel.gt.0.0_WP); end do
-               ! Check polyhedron bounding box
-               bblo=[minval(fijk(1,:)),minval(fijk(2,:)),minval(fijk(3,:))]
-               bbhi=[maxval(fijk(1,:)),maxval(fijk(2,:)),maxval(fijk(3,:))]
-               bb_pure_liq=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).gt.+1.0e9_WP)) bb_pure_liq=.true.
-               bb_pure_gas=.false.; if (all(pPLICold(bblo(1):bbhi(1),bblo(2):bbhi(2),bblo(3):bbhi(3),4).lt.-1.0e9_WP)) bb_pure_gas=.true.
+               ! Are we crossing plic?
+               crossed_plic=.false.
                ! Decompose into tets, cut, and accumulate
                pVz(i,j,k,1:8)=0.0_WP
                pFz(i,j,k,1:7)=0.0_WP
@@ -1015,7 +1005,7 @@ contains
                ! Convert to flux rate
                pFz(i,j,k,1:7)=-pFz(i,j,k,1:7)/(dt*dx*dy)
                ! Switch to dissipation-free momentum flux for BB-pure regions
-               if (bb_pure_liq.or.bb_pure_gas) then
+               if (.not.crossed_plic) then
                   pFz(i,j,k,5)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pU(i,j,k-1:k,1))
                   pFz(i,j,k,6)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pV(i,j,k-1:k,1))
                   pFz(i,j,k,7)=sum(pFz(i,j,k,1:2))*0.5_WP*sum(pW(i,j,k-1:k,1))
@@ -1576,6 +1566,9 @@ contains
             myQflux=vol_tot*pQold(i0,j0,k0,:)
             return
          end if
+
+         ! If we get here, we ARE cutting by a PLIC plane
+         crossed_plic=.true.
          
          ! Get PLIC from this cell
          normal=pPLICold(i0,j0,k0,1:3)
