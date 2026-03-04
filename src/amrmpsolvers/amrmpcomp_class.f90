@@ -1546,6 +1546,7 @@ contains
    !    !> Recursive subroutine that cuts a tet by grid planes to compute volume and Q fluxes
    !    recursive subroutine tet2flux(mytet,myind,myVflux,myQflux)
    !       use amrvof_geometry, only: cut_side,cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert
+   !       implicit none
    !       real(WP), dimension(3,4), intent(in) :: mytet
    !       integer,  dimension(3,4), intent(in) :: myind
    !       real(WP), dimension(8),  intent(out) :: myVflux
@@ -1636,6 +1637,7 @@ contains
    !    !> Uses explicit stack instead of recursion for performance and GPU readiness
    !    subroutine tet2flux_flat(mytet,myind,myVflux,myQflux)
    !       use amrvof_geometry, only: cut_side,cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert,tet_vol
+   !       implicit none
    !       real(WP), dimension(3,4), intent(in) :: mytet
    !       integer,  dimension(3,4), intent(in) :: myind
    !       real(WP), dimension(8),   intent(out) :: myVflux
@@ -1745,6 +1747,7 @@ contains
    !    subroutine tet2flux_plic(mytet,i0,j0,k0,myVflux,myQflux)
    !       use amrvof_geometry, only: cut_v1,cut_v2,cut_vtet,cut_ntets,cut_nvert,cut_nntet,tet_vol
    !       use messager, only: die
+   !       implicit none
    !       real(WP), dimension(3,4), intent(in) :: mytet
    !       integer,  intent(in) :: i0,j0,k0
    !       real(WP), dimension(8),  intent(out) :: myVflux
