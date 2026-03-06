@@ -19,9 +19,9 @@ module amrincomp_class
    !> AMR Incompressible solver type
    type, extends(amrsolver) :: amrincomp
       ! User-configurable callbacks
-      procedure(incomp_init_iface), pointer, nopass :: user_init=>null()
-      procedure(incomp_tagging_iface), pointer, nopass :: user_tagging=>null()
-      procedure(incomp_bc_iface), pointer, nopass :: user_bc=>null()
+      procedure(incomp_init_iface), pointer, pass :: user_init=>null()
+      procedure(incomp_tagging_iface), pointer, pass :: user_tagging=>null()
+      procedure(incomp_bc_iface), pointer, pass :: user_bc=>null()
 
       ! Flow data
       type(amrdata) :: U,V,W            !< Current face velocities
@@ -141,7 +141,7 @@ contains
       type(amrincomp), pointer :: this
       call c_f_pointer(ctx,this)
       call this%on_init(lvl,time,ba,dm)
-      if (associated(this%user_init)) call this%user_init(this,lvl,time,ba,dm)
+      if (associated(this%user_init)) call this%user_init(lvl,time,ba,dm)
    end subroutine amrincomp_on_init
 
    !> Dispatch on_coarse: calls type-bound method
@@ -189,7 +189,7 @@ contains
       type(c_ptr), intent(in) :: tags
       type(amrincomp), pointer :: this
       call c_f_pointer(ctx,this)
-      if (associated(this%user_tagging)) call this%user_tagging(this,lvl,time,tags)
+      if (associated(this%user_tagging)) call this%user_tagging(lvl,time,tags)
    end subroutine amrincomp_tagging
 
    !> Dispatch post_regrid: calls type-bound method
@@ -344,7 +344,7 @@ contains
       call this%Vold%reset_level(lvl, ba, dm)
       call this%Wold%reset_level(lvl, ba, dm)
       ! Pressure on coarse
-      call this%P%on_coarse(this%P, lvl, time, ba, dm)
+      call this%P%on_coarse(lvl, time, ba, dm)
       ! Divergence and viscosity just need geometry
       call this%div%reset_level(lvl, ba, dm)
       call this%visc%reset_level(lvl, ba, dm)
@@ -382,7 +382,7 @@ contains
       call this%Vold%reset_level(lvl, ba, dm)
       call this%Wold%reset_level(lvl, ba, dm)
       ! Pressure remake
-      call this%P%on_remake(this%P, lvl, time, ba, dm)
+      call this%P%on_remake(lvl, time, ba, dm)
       ! Divergence and viscosity just need geometry
       call this%div%reset_level(lvl, ba, dm)
       call this%visc%reset_level(lvl, ba, dm)
@@ -754,7 +754,7 @@ contains
             ! User-controlled: fill via user callback
             if (associated(solver%user_bc)) then
                bc_bx=amrex_box(slo,shi)
-               call solver%user_bc(solver=solver,lvl=lvl,time=time,face=face,bx=bc_bx,comp=comp,p=p)
+               call solver%user_bc(lvl=lvl,time=time,face=face,bx=bc_bx,comp=comp,p=p)
             else
                ! Default to zero if no callback provided
                do k=slo(3),shi(3); do j=slo(2),shi(2); do i=slo(1),shi(1)

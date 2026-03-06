@@ -616,6 +616,7 @@ contains
          call mfile%add_column(fs%VFmin,'VFmin')
          call mfile%add_column(fs%VFmax,'VFmax')
          call mfile%add_column(fs%VFint,'VFint')
+         call mfile%add_column(fs%dPmax,'dPmax')
          call mfile%write()
          ! Create CFL monitor
          cflfile=monitor(amRoot=amr%amRoot,name='cfl')
@@ -709,7 +710,7 @@ contains
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=0.5_WP*time%dt,src=dQdt)
          call fs%Q%average_down(); call fs%Q%fill(time=time%t+0.5_WP*time%dt)
          call check_Q('RK1   ')
-         call fs%apply_relax()
+         call fs%apply_relax(time=time%t+0.5_WP*time%dt)
          call check_Q('RELAX1')
          call fs%get_dQdt(Q=fs%Q,dQdt=dQdt,dt=time%dt,time=time%t+0.5_WP*time%dt)
 
@@ -717,7 +718,7 @@ contains
          call fs%Q%copy(src=fs%Qold); call fs%Q%saxpy(a=time%dt,src=dQdt)
          call fs%Q%average_down(); call fs%Q%fill(time=time%t)
          call check_Q('RK2   ')
-         call fs%apply_relax()
+         call fs%apply_relax(time=time%t)
          call check_Q('RELAX2')
 
          ! Rebuild PLIC

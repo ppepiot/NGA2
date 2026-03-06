@@ -18,9 +18,9 @@ module amrmpcomp_class
    type, extends(amrvof) :: amrmpcomp
 
       ! User-configurable callbacks
-      procedure(mpcomp_init_iface   ), pointer, nopass :: user_mpcomp_init   =>null()
-      procedure(mpcomp_tagging_iface), pointer, nopass :: user_mpcomp_tagging=>null()
-      procedure(mpcomp_bc_iface     ), pointer, nopass :: user_mpcomp_bc     =>null()
+      procedure(mpcomp_init_iface   ), pointer, pass :: user_mpcomp_init   =>null()
+      procedure(mpcomp_tagging_iface), pointer, pass :: user_mpcomp_tagging=>null()
+      procedure(mpcomp_bc_iface     ), pointer, pass :: user_mpcomp_bc     =>null()
 
       ! Liquid equation of state function pointers: PL=PL(rho,I), CL=CL(rho,P), TL=TL(rho,P)
       procedure(eos_P_iface), pointer, nopass :: getPL=>null()
@@ -67,6 +67,7 @@ module amrmpcomp_class
       real(WP) :: PLmin=0.0_WP,PLmax=0.0_WP,PGmin=0.0_WP,PGmax=0.0_WP
       real(WP) :: TLmin=0.0_WP,TLmax=0.0_WP,TGmin=0.0_WP,TGmax=0.0_WP
       real(WP) :: Cmin=0.0_WP,Cmax=0.0_WP
+      real(WP) :: dPmax=0.0_WP
       real(WP), dimension(7) :: Qint=0.0_WP,Qmin=0.0_WP,Qmax=0.0_WP
       real(WP) :: rhoKint=0.0_WP
 
@@ -211,7 +212,7 @@ contains
       type(amrmpcomp), pointer :: this
       call c_f_pointer(ctx,this)
       call this%on_init(lvl,time,ba,dm)
-      if (associated(this%user_mpcomp_init)) call this%user_mpcomp_init(this,lvl,time,ba,dm)
+      if (associated(this%user_mpcomp_init)) call this%user_mpcomp_init(lvl,time,ba,dm)
    end subroutine amrmpcomp_on_init
 
    !> Dispatch on_coarse: calls type-bound method
@@ -271,7 +272,7 @@ contains
       type(amrmpcomp), pointer :: this
       call c_f_pointer(ctx,this)
       call this%tagging(lvl,time,tags)
-      if (associated(this%user_mpcomp_tagging)) call this%user_mpcomp_tagging(this,lvl,time,tags)
+      if (associated(this%user_mpcomp_tagging)) call this%user_mpcomp_tagging(lvl,time,tags)
    end subroutine amrmpcomp_tagging
 
    !> Dispatch cost: calls type-bound method
@@ -445,7 +446,7 @@ contains
       ! Parent handles VF interpolation and CL/CG/PLIC rebuild
       call this%amrvof%on_coarse(lvl,time,ba,dm)
       ! Conserved variables
-      call this%Q%on_coarse(this%Q,lvl,time,ba,dm)
+      call this%Q%on_coarse(lvl,time,ba,dm)
       call this%Qold%reset_level(lvl,ba,dm)
       ! Auxiliary / derived quantities (just reset, will be recomputed)
       call this%U%reset_level(lvl,ba,dm); call this%V%reset_level(lvl,ba,dm); call this%W%reset_level(lvl,ba,dm)
@@ -470,7 +471,7 @@ contains
       ! Parent handles VF remake and CL/CG/PLIC parallel_copy
       call this%amrvof%on_remake(lvl,time,ba,dm)
       ! Conserved variables
-      call this%Q%on_remake(this%Q,lvl,time,ba,dm)
+      call this%Q%on_remake(lvl,time,ba,dm)
       call this%Qold%reset_level(lvl,ba,dm)
       ! Auxiliary / derived quantities (just reset, will be recomputed)
       call this%U%reset_level(lvl,ba,dm); call this%V%reset_level(lvl,ba,dm); call this%W%reset_level(lvl,ba,dm)
@@ -634,32 +635,32 @@ contains
          ! X-LOW (face=1)
          if (this%lo_bc(1,1).eq.amrex_bc_ext_dir .and. ilo.lt.dlo(1)) then
             bc_bx=amrex_box([ilo,jlo,klo],[dlo(1)-1,jhi,khi])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=1,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=1,bx=bc_bx,pQ=p)
          end if
          ! X-HIGH (face=2)
          if (this%hi_bc(1,1).eq.amrex_bc_ext_dir .and. ihi.gt.dhi(1)) then
             bc_bx=amrex_box([dhi(1)+1,jlo,klo],[ihi,jhi,khi])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=2,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=2,bx=bc_bx,pQ=p)
          end if
          ! Y-LOW (face=3)
          if (this%lo_bc(2,1).eq.amrex_bc_ext_dir .and. jlo.lt.dlo(2)) then
             bc_bx=amrex_box([ilo,jlo,klo],[ihi,dlo(2)-1,khi])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=3,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=3,bx=bc_bx,pQ=p)
          end if
          ! Y-HIGH (face=4)
          if (this%hi_bc(2,1).eq.amrex_bc_ext_dir .and. jhi.gt.dhi(2)) then
             bc_bx=amrex_box([ilo,dhi(2)+1,klo],[ihi,jhi,khi])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=4,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=4,bx=bc_bx,pQ=p)
          end if
          ! Z-LOW (face=5)
          if (this%lo_bc(3,1).eq.amrex_bc_ext_dir .and. klo.lt.dlo(3)) then
             bc_bx=amrex_box([ilo,jlo,klo],[ihi,jhi,dlo(3)-1])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=5,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=5,bx=bc_bx,pQ=p)
          end if
          ! Z-HIGH (face=6)
          if (this%hi_bc(3,1).eq.amrex_bc_ext_dir .and. khi.gt.dhi(3)) then
             bc_bx=amrex_box([ilo,jlo,dhi(3)+1],[ihi,jhi,khi])
-            call solver%user_mpcomp_bc(solver=solver,lvl=lvl,time=time,face=6,bx=bc_bx,pQ=p)
+            call solver%user_mpcomp_bc(lvl=lvl,time=time,face=6,bx=bc_bx,pQ=p)
          end if
       end do
       call amrex_mfiter_destroy(mfi)
@@ -1729,12 +1730,13 @@ contains
       end do
    end subroutine clean_Q
 
-   !> Apply pressure relaxation to mixture cells
-   subroutine apply_relax(this)
+   !> Apply relaxation to mixture cells
+   subroutine apply_relax(this,time)
       use amrex_amr_module, only: amrex_mfiter,amrex_box
       use mpi_f08, only: MPI_Wtime
       implicit none
       class(amrmpcomp), intent(inout) :: this
+      real(WP), intent(in) :: time
       integer :: lvl,i,j,k
       real(WP) :: t0
       type(amrex_mfiter) :: mfi
@@ -1755,8 +1757,10 @@ contains
          pQ   =>this%Q%mf(lvl)%dataptr(mfi)
          pCL  =>this%CL%dataptr(mfi)
          pCG  =>this%CG%dataptr(mfi)
-         ! Loop over grown tiles
+         ! Loop over all cells
          bx=mfi%growntilebox(this%nover)
+         ! Loop over valid cells
+         !bx=mfi%tilebox()
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             ! Only relax mixture cells
             if (pVF(i,j,k,1).lt.VFlo.or.pVF(i,j,k,1).gt.VFhi) cycle
@@ -1781,6 +1785,9 @@ contains
          end do; end do; end do
       end do
       call this%amr%mfiter_destroy(mfi)
+      ! Sync and apply BC
+      !call this%fill(lvl=this%amr%maxlvl,time=time)
+      !call this%Q%fill(time=time)
       ! End timer
       this%wt_relax=this%wt_relax+(MPI_Wtime()-t0)
    end subroutine apply_relax
@@ -2162,6 +2169,7 @@ contains
          this%PLmin=huge(1.0_WP); this%PLmax=-huge(1.0_WP); this%PGmin=huge(1.0_WP); this%PGmax=-huge(1.0_WP)
          this%TLmin=huge(1.0_WP); this%TLmax=-huge(1.0_WP); this%TGmin=huge(1.0_WP); this%TGmax=-huge(1.0_WP)
          this%Cmin=huge(1.0_WP); this%Cmax=-huge(1.0_WP)
+         this%dPmax=0.0_WP
          this%Qmin=huge(1.0_WP); this%Qmax=-huge(1.0_WP)
          ! Traverse levels
          do lvl=0,this%amr%clvl()
@@ -2210,6 +2218,10 @@ contains
                      this%PGmin  =min(this%PGmin  ,pPG  (i,j,k,1)); this%PGmax  =max(this%PGmax  ,pPG  (i,j,k,1))
                      this%TGmin  =min(this%TGmin  ,pTG  (i,j,k,1)); this%TGmax  =max(this%TGmax  ,pTG  (i,j,k,1))
                   end if
+                  ! Pressure gap in mixed cells
+                  if (pVF(i,j,k,1).ge.VFlo.and.pVF(i,j,k,1).le.VFhi) then
+                     this%dPmax=max(this%dPmax,abs(pPL(i,j,k,1)-pPG(i,j,k,1)))
+                  end if
                end do; end do; end do
             end do
             call this%amr%mfiter_destroy(mfi)
@@ -2224,6 +2236,7 @@ contains
          call MPI_ALLREDUCE(MPI_IN_PLACE,this%IGmin  ,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr); call MPI_ALLREDUCE(MPI_IN_PLACE,this%IGmax  ,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
          call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmin  ,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr); call MPI_ALLREDUCE(MPI_IN_PLACE,this%PGmax  ,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
          call MPI_ALLREDUCE(MPI_IN_PLACE,this%TGmin  ,1,MPI_REAL_WP,MPI_MIN,this%amr%comm,ierr); call MPI_ALLREDUCE(MPI_IN_PLACE,this%TGmax  ,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
+         call MPI_ALLREDUCE(MPI_IN_PLACE,this%dPmax  ,1,MPI_REAL_WP,MPI_MAX,this%amr%comm,ierr)
       end block phasic_extrema
 
       ! Conserved integrals at base level

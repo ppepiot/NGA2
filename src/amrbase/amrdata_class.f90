@@ -37,13 +37,13 @@ module amrdata_class
       ! Cache level index for fillbc callback
       integer :: fill_lvl_cache=-1
       ! Callback pointers (set to defaults in initialize)
-      procedure(on_init_iface),   pointer, nopass :: on_init   => null()
-      procedure(on_coarse_iface), pointer, nopass :: on_coarse => null()
-      procedure(on_remake_iface), pointer, nopass :: on_remake => null()
-      procedure(on_clear_iface),  pointer, nopass :: on_clear  => null()
-      procedure(fillbc_iface),    pointer, nopass :: fillbc    => null()
+      procedure(on_init_iface),   pointer, pass :: on_init   => null()
+      procedure(on_coarse_iface), pointer, pass :: on_coarse => null()
+      procedure(on_remake_iface), pointer, pass :: on_remake => null()
+      procedure(on_clear_iface),  pointer, pass :: on_clear  => null()
+      procedure(fillbc_iface),    pointer, pass :: fillbc    => null()
       ! User-provided initialization callback
-      procedure(on_init_iface),   pointer, nopass :: user_init => null()
+      procedure(on_init_iface),   pointer, pass :: user_init => null()
    contains
       ! Lifecycle methods
       procedure :: initialize       !< Initialize amrdata with amrgrid and parameters
@@ -317,7 +317,7 @@ contains
          call this%mf(lvl)%setval(0.0_WP)
       end select
       ! User-provided initialization (called for all modes except none without user_init)
-      if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
+      if (associated(this%user_init)) call this%user_init(lvl, time, ba, dm)
    end subroutine default_on_init
 
    !> Default on_coarse: reset level and fill based on interp mode
@@ -335,7 +335,7 @@ contains
          ! Workspace mode: just allocate, don't fill
        case (amrex_interp_reinit)
          ! Reinit mode: call user_init instead of interpolating
-         if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
+         if (associated(this%user_init)) call this%user_init(lvl, time, ba, dm)
        case default
          ! Standard interpolation: fill from coarse
          call this%fill_from_coarse(lvl, time)
@@ -359,7 +359,7 @@ contains
        case (amrex_interp_reinit)
          ! Reinit mode: reallocate and call user_init
          call this%reset_level(lvl, ba, dm)
-         if (associated(this%user_init)) call this%user_init(this, lvl, time, ba, dm)
+         if (associated(this%user_init)) call this%user_init(lvl, time, ba, dm)
        case default
          ! Standard interpolation: FillPatch old data into new layout
          ! Build temp MultiFab with new layout (0 ghost cells for FillPatch)
@@ -398,7 +398,7 @@ contains
       mf = mf_ptr
       geom = geom_ptr
       ! Call the fillbc callback
-      call this%fillbc(this, mf, int(scomp), int(ncomp), real(time, WP), geom)
+      call this%fillbc(mf, int(scomp), int(ncomp), real(time, WP), geom)
    end subroutine amrdata_fillbc
 
    !> Dispatch callback for on_init
@@ -411,7 +411,7 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrdata), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%on_init(this, lvl, time, ba, dm)
+      call this%on_init(lvl, time, ba, dm)
    end subroutine amrdata_on_init
 
    !> Dispatch callback for on_coarse
@@ -424,7 +424,7 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrdata), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%on_coarse(this, lvl, time, ba, dm)
+      call this%on_coarse(lvl, time, ba, dm)
    end subroutine amrdata_on_coarse
 
    !> Dispatch callback for on_remake
@@ -437,7 +437,7 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrdata), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%on_remake(this, lvl, time, ba, dm)
+      call this%on_remake(lvl, time, ba, dm)
    end subroutine amrdata_on_remake
 
    !> Dispatch callback for on_clear
@@ -447,7 +447,7 @@ contains
       integer, intent(in) :: lvl
       type(amrdata), pointer :: this
       call c_f_pointer(ctx, this)
-      call this%on_clear(this, lvl)
+      call this%on_clear(lvl)
    end subroutine amrdata_on_clear
 
    !> Fill fine level from coarse only (for creating new fine levels)

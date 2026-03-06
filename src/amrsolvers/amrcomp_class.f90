@@ -16,9 +16,9 @@ module amrcomp_class
    !> AMR Compressible solver type
    type, extends(amrsolver) :: amrcomp
       ! User-configurable callbacks
-      procedure(comp_init_iface), pointer, nopass :: user_init=>null()
-      procedure(comp_tagging_iface), pointer, nopass :: user_tagging=>null()
-      procedure(comp_bc_iface), pointer, nopass :: user_bc=>null()
+      procedure(comp_init_iface), pointer, pass :: user_init=>null()
+      procedure(comp_tagging_iface), pointer, pass :: user_tagging=>null()
+      procedure(comp_bc_iface), pointer, pass :: user_bc=>null()
 
       ! Equation of state function pointers: P=P(rho,I), C=C(rho,P), T=T(rho,P)
       procedure(eos_P_iface), pointer, nopass :: getP=>null()
@@ -168,7 +168,7 @@ contains
       type(amrcomp), pointer :: this
       call c_f_pointer(ctx,this)
       call this%on_init(lvl,time,ba,dm)
-      if (associated(this%user_init)) call this%user_init(this,lvl,time,ba,dm)
+      if (associated(this%user_init)) call this%user_init(lvl,time,ba,dm)
    end subroutine amrcomp_on_init
 
    !> Dispatch on_coarse: calls type-bound method
@@ -220,7 +220,7 @@ contains
       type(c_ptr), intent(in) :: tags
       type(amrcomp), pointer :: this
       call c_f_pointer(ctx,this)
-      if (associated(this%user_tagging)) call this%user_tagging(this,lvl,time,tags)
+      if (associated(this%user_tagging)) call this%user_tagging(lvl,time,tags)
    end subroutine amrcomp_tagging
 
    !> Dispatch post_regrid: calls type-bound method
@@ -367,7 +367,7 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       ! Use conservative interpolation from coarse for Q
-      call this%Q%on_coarse(this%Q,lvl,time,ba,dm)
+      call this%Q%on_coarse(lvl,time,ba,dm)
       ! Qold just needs to be reset
       call this%Qold%reset_level(lvl,ba,dm)
       ! Derived variables are just reset
@@ -392,7 +392,7 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       ! Use on_remake from amrdata for Q
-      call this%Q%on_remake(this%Q,lvl,time,ba,dm)
+      call this%Q%on_remake(lvl,time,ba,dm)
       ! Qold just needs to be reset
       call this%Qold%reset_level(lvl,ba,dm)
       ! Derived variables are just reset
@@ -489,37 +489,37 @@ contains
          ! X-LOW (face=1)
          if (this%lo_bc(1,1).eq.amrex_bc_ext_dir .and. ilo.lt.dlo(1)) then
             bc_bx=amrex_box([ilo,jlo,klo],[dlo(1)-1,jhi,khi])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=1,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=1,bx=bc_bx,pQ=p)
          end if
 
          ! X-HIGH (face=2)
          if (this%hi_bc(1,1).eq.amrex_bc_ext_dir .and. ihi.gt.dhi(1)) then
             bc_bx=amrex_box([dhi(1)+1,jlo,klo],[ihi,jhi,khi])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=2,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=2,bx=bc_bx,pQ=p)
          end if
 
          ! Y-LOW (face=3)
          if (this%lo_bc(2,1).eq.amrex_bc_ext_dir .and. jlo.lt.dlo(2)) then
             bc_bx=amrex_box([ilo,jlo,klo],[ihi,dlo(2)-1,khi])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=3,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=3,bx=bc_bx,pQ=p)
          end if
 
          ! Y-HIGH (face=4)
          if (this%hi_bc(2,1).eq.amrex_bc_ext_dir .and. jhi.gt.dhi(2)) then
             bc_bx=amrex_box([ilo,dhi(2)+1,klo],[ihi,jhi,khi])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=4,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=4,bx=bc_bx,pQ=p)
          end if
 
          ! Z-LOW (face=5)
          if (this%lo_bc(3,1).eq.amrex_bc_ext_dir .and. klo.lt.dlo(3)) then
             bc_bx=amrex_box([ilo,jlo,klo],[ihi,jhi,dlo(3)-1])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=5,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=5,bx=bc_bx,pQ=p)
          end if
 
          ! Z-HIGH (face=6)
          if (this%hi_bc(3,1).eq.amrex_bc_ext_dir .and. khi.gt.dhi(3)) then
             bc_bx=amrex_box([ilo,jlo,dhi(3)+1],[ihi,jhi,khi])
-            call solver%user_bc(solver=solver,lvl=lvl,time=time,face=6,bx=bc_bx,pQ=p)
+            call solver%user_bc(lvl=lvl,time=time,face=6,bx=bc_bx,pQ=p)
          end if
 
       end do

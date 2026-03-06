@@ -31,9 +31,9 @@ module amrvof_class
    type, extends(amrsolver) :: amrvof
 
       ! User-configurable callbacks
-      procedure(vof_init_iface   ), pointer, nopass :: user_vof_init   =>null()
-      procedure(vof_tagging_iface), pointer, nopass :: user_vof_tagging=>null()
-      procedure(vof_bc_iface     ), pointer, nopass :: user_vof_bc     =>null()
+      procedure(vof_init_iface   ), pointer, pass :: user_vof_init   =>null()
+      procedure(vof_tagging_iface), pointer, pass :: user_vof_tagging=>null()
+      procedure(vof_bc_iface     ), pointer, pass :: user_vof_bc     =>null()
 
       ! Boundary conditions (per face, only used if direction is non-periodic)
       integer, dimension(3) :: lo_bc=BC_REFLECT
@@ -167,7 +167,7 @@ contains
       type(amrvof), pointer :: this
       call c_f_pointer(ctx,this)
       call this%on_init(lvl,time,ba,dm)
-      if (associated(this%user_vof_init)) call this%user_vof_init(this,lvl,time,ba,dm)
+      if (associated(this%user_vof_init)) call this%user_vof_init(lvl,time,ba,dm)
    end subroutine amrvof_on_init
 
    !> Dispatch on_coarse: calls type-bound method
@@ -227,7 +227,7 @@ contains
       type(amrvof), pointer :: this
       call c_f_pointer(ctx,this)
       call this%tagging(lvl,time,tags)
-      if (associated(this%user_vof_tagging)) call this%user_vof_tagging(this,lvl,time,tags)
+      if (associated(this%user_vof_tagging)) call this%user_vof_tagging(lvl,time,tags)
    end subroutine amrvof_tagging
 
    !> Dispatch cost: calls type-bound method
@@ -344,7 +344,7 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       ! Interpolate VF from coarse level and reset VFold
-      call this%VF%on_coarse(this%VF,lvl,time,ba,dm)
+      call this%VF%on_coarse(lvl,time,ba,dm)
       call this%VFold%reset_level(lvl,ba,dm)
       ! Build finest-level multifabs if we are at the finest level
       if (lvl.eq.this%amr%maxlvl) then
@@ -394,7 +394,7 @@ contains
       type(amrex_boxarray), intent(in) :: ba
       type(amrex_distromap), intent(in) :: dm
       ! Remake VF from existing+coarse data and reset VFold
-      call this%VF%on_remake(this%VF,lvl,time,ba,dm)
+      call this%VF%on_remake(lvl,time,ba,dm)
       call this%VFold%reset_level(lvl,ba,dm)
       ! Rebuild finest-level multifabs if we are at the finest level
       if (lvl.eq.this%amr%maxlvl) then
@@ -752,7 +752,7 @@ contains
                   if (associated(this%user_vof_bc)) then
                      bc_bx=amrex_box([i1,j1,k1],[i2,j2,k2])
                      face=2*dir-1+(1+side)/2
-                     call this%user_vof_bc(solver=this,lvl=lvl,time=time,face=face,bx=bc_bx,pVF=pVF,pCL=pCL,pCG=pCG,pPLIC=pPLIC)
+                     call this%user_vof_bc(lvl=lvl,time=time,face=face,bx=bc_bx,pVF=pVF,pCL=pCL,pCG=pCG,pPLIC=pPLIC)
                   end if
                end select
             end do; end do
