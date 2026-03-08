@@ -136,6 +136,39 @@ contains
 
    !> Implicit mechanical relaxation for stiffened gas EOS pair
    !> Solves quadratic for equilibrium pressure Peq where PL=PG=Peq,
+   !> then computes adjustments to VF and internal energies via p*dV work exchange.
+   !> Conserves: phasic masses Q(1:2), total internal energy Q(3)+Q(4), momentum Q(5:7)
+   ! subroutine P_relax_implicit(VF,Q,Peq,dVF,dQ)
+   !    use amrmpcomp_class, only: VFlo,VFhi
+   !    implicit none
+   !    real(WP),               intent(in) :: VF
+   !    real(WP), dimension(:), intent(in) :: Q
+   !    real(WP), intent(inout) :: Peq
+   !    real(WP), intent(out), optional :: dVF
+   !    real(WP), dimension(:), intent(out), optional :: dQ
+   !    real(WP) :: invG1G,invG1L,d0,d1,facG,facL,a,b,d
+   !    ! Skip if any conserved quantity is non-positive (EOS undefined)
+   !    if (any(Q(1:4).le.0.0_WP)) return
+   !    ! Precompute EOS constants
+   !    invG1L=1.0_WP/(GammaL-1.0_WP); d0=GammaL*PinfL*invG1L; d1=1.0_WP+invG1L
+   !    ! Switch behavior depending on how the subroutine is called
+   !    if (.not.present(dVF)) then
+   !       ! First mode: return Peq by solving a*Peq^2 + b*Peq + d = 0
+   !       invG1G=1.0_WP/(GammaG-1.0_WP); facG=GammaG*PinfG*invG1G; facL=invG1G+VF
+   !       a=d1*facL-VF*(invG1G+1.0_WP)
+   !       b=d1*(facG-Q(4))-VF*facG+d0*facL-Q(3)*(invG1G+1.0_WP)
+   !       d=d0*(facG-Q(4))-Q(3)*facG
+   !       if (b**2-4.0_WP*a*d.lt.0.0_WP) return
+   !       Peq=(-b+sqrt(b**2-4.0_WP*a*d))/(2.0_WP*a)
+   !    else
+   !       ! Second mode: use provided Peq to compute dVF and dQ
+   !       dVF=(VF*Peq+Q(3))/(d1*Peq+d0)-VF
+   !       dQ=0.0_WP; dQ(3)=-Peq*dVF; dQ(4)=+Peq*dVF
+   !    end if
+   ! end subroutine P_relax_implicit
+
+   !> Implicit mechanical relaxation for stiffened gas EOS pair
+   !> Solves quadratic for equilibrium pressure Peq where PL=PG=Peq,
    !> then adjusts VF and internal energies via p*dV work exchange.
    !> Conserves: phasic masses Q(1:2), total internal energy Q(3)+Q(4), momentum Q(5:7)
    subroutine P_relax_implicit(VF,Q)

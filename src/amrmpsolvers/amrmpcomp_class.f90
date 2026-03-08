@@ -173,6 +173,18 @@ module amrmpcomp_class
    end interface
 
    !> Abstract interface for pressure relaxation callback
+   ! abstract interface
+   !    subroutine relax_iface(VF,Q,Peq,dVF,dQ)
+   !       import :: WP
+   !       real(WP), intent(in) :: VF
+   !       real(WP), dimension(:), intent(in) :: Q
+   !       real(WP), intent(inout) :: Peq
+   !       real(WP), intent(out), optional :: dVF
+   !       real(WP), dimension(:), intent(out), optional :: dQ
+   !    end subroutine relax_iface
+   ! end interface
+
+   !> Abstract interface for pressure relaxation callback
    abstract interface
       subroutine relax_iface(VF,Q)
          import :: WP
@@ -1791,6 +1803,94 @@ contains
       ! End timer
       this%wt_relax=this%wt_relax+(MPI_Wtime()-t0)
    end subroutine apply_relax
+
+   !> Apply relaxation to mixture cells
+   ! subroutine apply_relax(this,time)
+   !    use amrex_amr_module, only: amrex_mfiter,amrex_box
+   !    use mpi_f08, only: MPI_Wtime
+   !    implicit none
+   !    class(amrmpcomp), intent(inout) :: this
+   !    real(WP), intent(in) :: time
+   !    integer :: lvl,i,j,k,n
+   !    real(WP) :: t0,Peq,dVF,Peq_avg,VF_avg,dVF_avg
+   !    real(WP), dimension(7) :: dQ,Q_avg,dQ_avg
+   !    type(amrex_mfiter) :: mfi
+   !    type(amrex_box) :: bx
+   !    real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pQ,pCL,pCG
+   !    real(WP) :: dx,dy,dz
+   !    ! If no relaxation model was provided, return
+   !    if (.not.associated(this%relax)) return
+   !    ! Start timer
+   !    t0=MPI_Wtime()
+   !    ! Apply relaxation on finest level only (mixture cells are always at finest)
+   !    lvl=this%amr%maxlvl
+   !    dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
+   !    call this%amr%mfiter_build(lvl,mfi)
+   !    do while (mfi%next())
+   !       ! Get pointers to data
+   !       pVF  =>this%VF%mf(lvl)%dataptr(mfi)
+   !       pQ   =>this%Q%mf(lvl)%dataptr(mfi)
+   !       pCL  =>this%CL%dataptr(mfi)
+   !       pCG  =>this%CG%dataptr(mfi)
+   !       ! Loop over all cells
+   !       bx=mfi%growntilebox(this%nover)
+   !       ! Loop over valid cells
+   !       !bx=mfi%tilebox()
+   !       do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+   !          ! Only relax mixture cells
+   !          if (pVF(i,j,k,1).lt.VFlo.or.pVF(i,j,k,1).gt.VFhi) cycle
+   !          ! Apply relaxation
+
+   !          ! Get equilibrium pressure
+   !          Peq=-huge(1.0_WP); call this%relax(VF=pVF(i,j,k,1),Q=pQ(i,j,k,:),Peq=Peq)
+   !          if (Peq.eq.-huge(1.0_WP)) cycle
+   !          ! Get increments
+   !          call this%relax(VF=pVF(i,j,k,1),Q=pQ(i,j,k,:),Peq=Peq,dVF=dVF,dQ=dQ)
+   !          ! Diagnostic: check supercell feasibility
+   !          VF_avg=sum(pVF(i-1:i+1,j-1:j+1,k-1:k+1,1))/27.0_WP
+   !          do n=1,7; Q_avg(n)=sum(pQ(i-1:i+1,j-1:j+1,k-1:k+1,n))/27.0_WP; end do
+   !          Peq_avg=-huge(1.0_WP); call this%relax(VF=VF_avg,Q=Q_avg,Peq=Peq_avg)
+   !          if (Peq_avg.ne.-huge(1.0_WP)) then
+   !             call this%relax(VF=pVF(i,j,k,1),Q=pQ(i,j,k,:),Peq=Peq_avg,dVF=dVF_avg,dQ=dQ_avg)
+   !             if (pQ(i,j,k,3)+dQ_avg(3).le.0.0_WP.or.pQ(i,j,k,4)+dQ_avg(4).le.0.0_WP.or.pVF(i,j,k,1)+dVF_avg.le.0.0_WP.or.pVF(i,j,k,1)+dVF_avg.ge.1.0_WP) then
+   !                print '(A,3I5,6(A,ES10.3),4(A,L1))', ' SC ',i,j,k, &
+   !                & ' VF=',pVF(i,j,k,1),' Peq=',Peq,' Pavg=',Peq_avg, &
+   !                & ' dVF=',dVF_avg,' Q3n=',pQ(i,j,k,3)+dQ_avg(3),' Q4n=',pQ(i,j,k,4)+dQ_avg(4), &
+   !                & ' liqE=',pQ(i,j,k,3)+dQ_avg(3).gt.0.0_WP, &
+   !                & ' gasE=',pQ(i,j,k,4)+dQ_avg(4).gt.0.0_WP, &
+   !                & ' liqV=',pVF(i,j,k,1)+dVF_avg.gt.0.0_WP, &
+   !                & ' gasV=',pVF(i,j,k,1)+dVF_avg.lt.1.0_WP
+   !             end if
+   !          end if
+   !          ! Apply increments
+   !          pVF(i,j,k,1)=pVF(i,j,k,1)+dVF
+   !          pQ(i,j,k,3)=pQ(i,j,k,3)+dQ(3)
+   !          pQ(i,j,k,4)=pQ(i,j,k,4)+dQ(4)
+   !          ! Ensure consistency with modified VF
+   !          if (pVF(i,j,k,1).lt.VFlo) then
+   !             ! Pure liquid
+   !             pVF(i,j,k,1)=0.0_WP
+   !             pCL(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+   !             pCG(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+   !             pQ(i,j,k,1)=0.0_WP
+   !             pQ(i,j,k,3)=0.0_WP
+   !          else if (pVF(i,j,k,1).gt.VFhi) then
+   !             ! Pure gas
+   !             pVF(i,j,k,1)=1.0_WP
+   !             pCL(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+   !             pCG(i,j,k,1:3)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
+   !             pQ(i,j,k,2)=0.0_WP
+   !             pQ(i,j,k,4)=0.0_WP
+   !          end if
+   !       end do; end do; end do
+   !    end do
+   !    call this%amr%mfiter_destroy(mfi)
+   !    ! Sync and apply BC
+   !    call this%fill(lvl=this%amr%maxlvl,time=time)
+   !    call this%Q%fill(time=time)
+   !    ! End timer
+   !    this%wt_relax=this%wt_relax+(MPI_Wtime()-t0)
+   ! end subroutine apply_relax
    
    !> Add artificial bulk viscosity to this%beta
    subroutine add_viscartif(this,dt,Cartif)
