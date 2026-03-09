@@ -1095,17 +1095,18 @@ void amrlinop_set_coarse_fine_bc(void *linop_ptr, void *crse_mf_ptr,
 }
 
 // =============================================================================
-// Linear Operator Builders with Semi-Coarsening Support
-// Mirror AMReX's amrex_fi_new_poisson/abeclaplacian but add semi-coarsening
+// Linear Operator Builders
+// Mirror AMReX's amrex_fi_new_poisson/abeclaplacian with additional options:
+//   semicoarsen:      0=off, nonzero=on (anisotropic MG coarsening)
+//   hidden_direction: -1=none, 0/1/2=ignore that direction (quasi-2D)
 // =============================================================================
 
-// Build MLPoisson with optional semi-coarsening
-// semicoarsen: 0 = off, nonzero = on
+// Build MLPoisson
 void amrpoisson_build_c(amrex::MLLinOp *&linop, int nlevels,
                               const amrex::Geometry *geom[],
                               const amrex::BoxArray *ba[],
                               const amrex::DistributionMapping *dm[],
-                              int semicoarsen) {
+                              int semicoarsen, int hidden_direction) {
   amrex::LPInfo info;
   info.setAgglomeration(true);
   info.setConsolidation(true);
@@ -1113,6 +1114,9 @@ void amrpoisson_build_c(amrex::MLLinOp *&linop, int nlevels,
   if (semicoarsen != 0) {
     info.setSemicoarsening(true);
     info.setMaxSemicoarseningLevel(100);
+  }
+  if (hidden_direction >= 0) {
+    info.setHiddenDirection(hidden_direction);
   }
   amrex::Vector<amrex::Geometry> g;
   amrex::Vector<amrex::BoxArray> b;
@@ -1126,13 +1130,12 @@ void amrpoisson_build_c(amrex::MLLinOp *&linop, int nlevels,
   linop = static_cast<amrex::MLLinOp *>(poisson);
 }
 
-// Build MLABecLaplacian with optional semi-coarsening
-// semicoarsen: 0 = off, nonzero = on
+// Build MLABecLaplacian
 void amrabeclap_build_c(amrex::MLLinOp *&linop, int nlevels,
                               const amrex::Geometry *geom[],
                               const amrex::BoxArray *ba[],
                               const amrex::DistributionMapping *dm[],
-                              int semicoarsen) {
+                              int semicoarsen, int hidden_direction) {
   amrex::LPInfo info;
   info.setAgglomeration(true);
   info.setConsolidation(true);
@@ -1140,6 +1143,9 @@ void amrabeclap_build_c(amrex::MLLinOp *&linop, int nlevels,
   if (semicoarsen != 0) {
     info.setSemicoarsening(true);
     info.setMaxSemicoarseningLevel(100);
+  }
+  if (hidden_direction >= 0) {
+    info.setHiddenDirection(hidden_direction);
   }
   amrex::Vector<amrex::Geometry> g;
   amrex::Vector<amrex::BoxArray> b;

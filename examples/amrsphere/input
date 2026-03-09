@@ -1,7 +1,7 @@
 # Mesh parameters
 Base nx:   16
 Base ny:   16
-Base nz:   16
+Base nz:   1
 Max level: 5
 
 # Regridding parameters

@@ -55,8 +55,9 @@ module amrmg_class
       real(WP) :: res   = 0.0_WP  !< Final residual
       integer  :: niter = 0       !< Number of iterations
 
-      ! Semi-coarsening flag
+      ! Semi-coarsening and hidden direction flags
       logical :: semicoarsen = .false.
+      integer :: hidden_direction = -1  !< -1=none, 0=x, 1=y, 2=z
 
       ! Private internals
       class(amrgrid), pointer, private :: amr => null()
@@ -123,8 +124,10 @@ contains
          this%hi_bc(3) = amrmg_bc_neumann
       end if
 
-      ! Auto-detect semi-coarsening for single-cell directions
-      this%semicoarsen = any([amr%nx,amr%ny,amr%nz].eq.1)
+      ! Auto-detect hidden direction for single-cell directions
+      if (amr%nx.eq.1) this%hidden_direction = 0
+      if (amr%ny.eq.1) this%hidden_direction = 1
+      if (amr%nz.eq.1) this%hidden_direction = 2
       if (count([amr%nx,amr%ny,amr%nz].eq.1).gt.1) call die('[amrmg] Multiple single-cell directions not supported by AMReX MLMG')
 
       ! Initialize internal solution storage
@@ -135,6 +138,9 @@ contains
          call log('[amrmg] Initialized constant-coefficient solver')
       else
          call log('[amrmg] Initialized variable-coefficient solver')
+      end if
+      if (this%hidden_direction.ge.0) then
+         call log('[amrmg] Hidden direction enabled')
       end if
       if (this%semicoarsen) then
          call log('[amrmg] Semi-coarsening enabled')
@@ -174,7 +180,7 @@ contains
       select case (this%type)
 
        case (amrmg_cstcoef)
-         call amrpoisson_build(this%poisson, nlevs, geom, ba, dm, this%semicoarsen)
+         call amrpoisson_build(this%poisson, nlevs, geom, ba, dm, this%semicoarsen, this%hidden_direction)
          call this%poisson%set_domain_bc(this%lo_bc, this%hi_bc)
          call amrex_multigrid_build(this%multigrid, this%poisson)
          call this%multigrid%set_verbose(this%verbose)
@@ -184,7 +190,7 @@ contains
        case (amrmg_varcoef)
          varcoef_setup: block
             type(amrex_multifab) :: bcoef(3)
-            call amrabeclap_build(this%abeclap, nlevs, geom, ba, dm, this%semicoarsen)
+            call amrabeclap_build(this%abeclap, nlevs, geom, ba, dm, this%semicoarsen, this%hidden_direction)
             call this%abeclap%set_domain_bc(this%lo_bc, this%hi_bc)
             call this%abeclap%set_maxorder(this%maxorder)
             call this%abeclap%set_scalars(this%alpha, this%beta)
@@ -309,7 +315,7 @@ contains
          poisson_solve: block
             type(amrex_poisson) :: linop
             type(amrex_multigrid) :: mlmg
-            call amrpoisson_build(linop, 1, geom, ba, dm, this%semicoarsen)
+            call amrpoisson_build(linop, 1, geom, ba, dm, this%semicoarsen, this%hidden_direction)
             call linop%set_domain_bc(this%lo_bc, this%hi_bc)
             ! Set C/F BC if on refined level
             if (lev .gt. 0) call amrlinop_set_coarse_fine_bc(linop%p, phi_crse_mf%p, rref)
@@ -331,7 +337,7 @@ contains
             type(amrex_abeclaplacian) :: linop
             type(amrex_multigrid) :: mlmg
             type(amrex_multifab) :: bcoef(3)
-            call amrabeclap_build(linop, 1, geom, ba, dm, this%semicoarsen)
+            call amrabeclap_build(linop, 1, geom, ba, dm, this%semicoarsen, this%hidden_direction)
             call linop%set_domain_bc(this%lo_bc, this%hi_bc)
             call linop%set_maxorder(this%maxorder)
             call linop%set_scalars(this%alpha, this%beta)
