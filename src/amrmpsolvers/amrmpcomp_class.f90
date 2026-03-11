@@ -524,13 +524,10 @@ contains
       class(amrmpcomp), intent(inout) :: this
       integer, intent(in) :: lbase
       real(WP), intent(in) :: time
-      integer :: lvl
       ! Parent handles VF average-down + fill
       call this%amrvof%post_regrid(lbase,time)
       ! Average down conserved variables Q for C/F consistency
-      do lvl=this%amr%clvl()-1,lbase,-1
-         call this%Q%average_downto(lvl)
-      end do
+      call this%Q%average_down(lbase)
       ! Fill Q ghosts and rebuild primitives
       call this%Q%fill(time)
       call this%get_primitive(this%Q)
@@ -817,13 +814,13 @@ contains
 
    !> Calculate dQdt from passed Q
    subroutine get_dQdt(this,Q,dQdt,dt,time)
-       use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
-       use mpi_f08, only: MPI_Wtime
-       implicit none
-       class(amrmpcomp), intent(inout) :: this
-       type(amrdata), intent(inout) :: Q
-       type(amrdata), intent(inout) :: dQdt
-       real(WP), intent(in) :: dt,time
+      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+      use mpi_f08, only: MPI_Wtime
+      implicit none
+      class(amrmpcomp), intent(inout) :: this
+      type(amrdata), intent(inout) :: Q
+      type(amrdata), intent(inout) :: dQdt
+      real(WP), intent(in) :: dt,time
       real(WP) :: t0,t1
       type(amrex_multifab), dimension(0:this%amr%maxlvl) :: Fx,Fy,Fz
       type(amrex_multifab) :: Vx,Vy,Vz

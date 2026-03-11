@@ -73,7 +73,9 @@ module amrmg_class
       procedure :: setup
       procedure :: solve
       procedure :: solve_level
-      procedure :: get_fluxes
+      generic :: get_fluxes => get_fluxes_amrdata, get_fluxes_mfab
+      procedure, private :: get_fluxes_amrdata
+      procedure, private :: get_fluxes_mfab
       procedure :: destroy
       procedure :: print_short
       procedure :: print => print_long
@@ -221,33 +223,32 @@ contains
 
    !> Solve - uses stored operator and multigrid
    !> @param rhs Right-hand side field
-   !> @param phi Optional solution field (in: initial guess with BC in ghosts, out: solution)
-   subroutine solve(this, rhs, phi)
+   !> @param phi0 Optional initial guess
+   subroutine solve(this, rhs, phi0)
       use messager, only: die
       class(amrmg), intent(inout) :: this
       type(amrdata), intent(in) :: rhs
-      type(amrdata), intent(inout), optional :: phi
+      type(amrdata), intent(inout), optional :: phi0
+      type(amrex_multifab), dimension(:), allocatable :: sol,rhsmf
 
-      type(amrex_multifab), dimension(:), allocatable :: sol, rhsmf
+      if (this%type.eq.-1) call die('[amrmg solve] Solver not initialized')
+      if (.not.this%setup_done) call die('[amrmg solve] Solver not setup')
 
-      if (this%type .eq. -1) call die('[amrmg solve] Solver not initialized')
-      if (.not. this%setup_done) call die('[amrmg solve] Solver not setup')
-
-      ! Zero internal storage if not using user's phi
-      if (.not.present(phi)) call this%sol%setval(val=0.0_WP)
+      ! Set initial guess
+      if (present(phi0)) then
+         call this%sol%copy(src=phi0)
+      else
+         call this%sol%setval(val=0.0_WP)
+      end if
 
       ! Build solution/rhs arrays
       build_arrays: block
          integer :: lev
          allocate(sol(0:this%amr%clvl()))
          allocate(rhsmf(0:this%amr%clvl()))
-         do lev = 0, this%amr%clvl()
-            if (present(phi)) then
-               sol(lev) = phi%mf(lev)
-            else
-               sol(lev) = this%sol%mf(lev)
-            end if
-            rhsmf(lev) = rhs%mf(lev)
+         do lev=0,this%amr%clvl()
+            sol(lev)=this%sol%mf(lev)
+            rhsmf(lev)=rhs%mf(lev)
          end do
       end block build_arrays
 
@@ -256,18 +257,20 @@ contains
          integer :: lev
          select case (this%type)
           case (amrmg_cstcoef)
-            do lev = 0, this%amr%clvl()
-               call this%poisson%set_level_bc(lev, sol(lev))
+            do lev=0,this%amr%clvl()
+               call this%poisson%set_level_bc(lev,sol(lev))
             end do
           case (amrmg_varcoef)
-            do lev = 0, this%amr%clvl()
-               call this%abeclap%set_level_bc(lev, sol(lev))
+            do lev=0,this%amr%clvl()
+               call this%abeclap%set_level_bc(lev,sol(lev))
             end do
          end select
       end block set_bcs
 
       ! Solve and get iteration count
-      this%res = this%multigrid%solve(sol, rhsmf, this%tol_rel, this%tol_abs)
+      this%res=this%multigrid%solve(sol,rhsmf,this%tol_rel,this%tol_abs)
+
+      ! Extract number of iterations
       get_niters: block
          use amrex_interface, only: amrmlmg_get_niters
          this%niter = amrmlmg_get_niters(this%multigrid%p)
@@ -375,45 +378,69 @@ contains
       end block log_result
    end subroutine solve_level
 
-   !> Get face-centered fluxes using solver's C/F-consistent stencils
-   subroutine get_fluxes(this, flux_x, flux_y, flux_z, phi)
+   !> Get face-centered fluxes using solver's C/F-consistent stencils (amrdata version)
+   !> Always uses this%sol (the solution from the last solve call).
+   !> NOTE: Do NOT attempt to pass a different phi - MLMG boundary registers
+   !>       are tied to the solution that was just solved; using a different
+   !>       field will produce incorrect C/F flux values.
+   subroutine get_fluxes_amrdata(this, flux_x, flux_y, flux_z)
       use iso_c_binding, only: c_ptr
       use messager, only: die
       use amrex_interface, only: amrmlmg_get_fluxes
       class(amrmg), intent(in) :: this
       type(amrdata), intent(inout) :: flux_x, flux_y, flux_z
-      type(amrdata), intent(in), optional :: phi
-
       type(c_ptr), dimension(:), allocatable :: sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs
       integer :: lev, nlevs
-
       if (.not. this%setup_done) call die('[amrmg get_fluxes] Solver not setup')
-
       nlevs = this%amr%clvl() + 1
-
       ! Build pointer arrays
       allocate(sol_ptrs(0:this%amr%clvl()))
       allocate(fx_ptrs(0:this%amr%clvl()))
       allocate(fy_ptrs(0:this%amr%clvl()))
       allocate(fz_ptrs(0:this%amr%clvl()))
-
+      ! Always use this%sol - the solution from the last solve()
       do lev = 0, this%amr%clvl()
-         if (present(phi)) then
-            sol_ptrs(lev) = phi%mf(lev)%p
-         else
-            sol_ptrs(lev) = this%sol%mf(lev)%p
-         end if
+         sol_ptrs(lev) = this%sol%mf(lev)%p
          fx_ptrs(lev) = flux_x%mf(lev)%p
          fy_ptrs(lev) = flux_y%mf(lev)%p
          fz_ptrs(lev) = flux_z%mf(lev)%p
       end do
-
       ! Call C++ wrapper - works for both Poisson and ABecLaplacian
       call amrmlmg_get_fluxes(this%multigrid%p, sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs, nlevs)
-
-      ! Deallocate pointer arrays
       deallocate(sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs)
-   end subroutine get_fluxes
+   end subroutine get_fluxes_amrdata
+
+   !> Get face-centered fluxes using solver's C/F-consistent stencils (multifab array version)
+   !> Always uses this%sol (the solution from the last solve call).
+   !> NOTE: Do NOT attempt to pass a different phi - MLMG boundary registers
+   !>       are tied to the solution that was just solved; using a different
+   !>       field will produce incorrect C/F flux values.
+   subroutine get_fluxes_mfab(this, flux_x, flux_y, flux_z)
+      use iso_c_binding, only: c_ptr
+      use messager, only: die
+      use amrex_interface, only: amrmlmg_get_fluxes
+      class(amrmg), intent(in) :: this
+      type(amrex_multifab), dimension(0:), intent(inout) :: flux_x, flux_y, flux_z
+      type(c_ptr), dimension(:), allocatable :: sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs
+      integer :: lev, nlevs
+      if (.not. this%setup_done) call die('[amrmg get_fluxes] Solver not setup')
+      nlevs = this%amr%clvl() + 1
+      ! Build pointer arrays
+      allocate(sol_ptrs(0:this%amr%clvl()))
+      allocate(fx_ptrs(0:this%amr%clvl()))
+      allocate(fy_ptrs(0:this%amr%clvl()))
+      allocate(fz_ptrs(0:this%amr%clvl()))
+      ! Always use this%sol - the solution from the last solve()
+      do lev = 0, this%amr%clvl()
+         sol_ptrs(lev) = this%sol%mf(lev)%p
+         fx_ptrs(lev) = flux_x(lev)%p
+         fy_ptrs(lev) = flux_y(lev)%p
+         fz_ptrs(lev) = flux_z(lev)%p
+      end do
+      ! Call C++ wrapper - works for both Poisson and ABecLaplacian
+      call amrmlmg_get_fluxes(this%multigrid%p, sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs, nlevs)
+      deallocate(sol_ptrs, fx_ptrs, fy_ptrs, fz_ptrs)
+   end subroutine get_fluxes_mfab
 
    !> Destroy solver internals - call before setup when operator changes
    subroutine destroy(this)

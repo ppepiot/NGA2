@@ -130,7 +130,7 @@ contains
       ! Solve with zero initial guess
       call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
-      call solver%solve(phi=phi, rhs=rhs)
+      call solver%solve(rhs=rhs,phi0=phi)
       call tmr%stop()
       write(msg,'(a,es12.5,a,es12.5,a)') '  Solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
       call log(msg)
@@ -304,7 +304,7 @@ contains
       ! First solve
       call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
-      call solver%solve(phi=phi, rhs=rhs)
+      call solver%solve(rhs=rhs,phi0=phi)
       call tmr%stop()
       write(msg,'(a,es12.5,a,es12.5,a)') '  First solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
       call log(msg)
@@ -312,7 +312,7 @@ contains
       ! Second solve (reuse test)
       call phi%setval(val=0.0_WP, lvl=0)
       call tmr%reset(); call tmr%start()
-      call solver%solve(phi=phi, rhs=rhs)
+      call solver%solve(rhs=rhs,phi0=phi)
       call tmr%stop()
       write(msg,'(a,es12.5,a,es12.5,a)') '  Second solve (reuse): residual = ', solver%res, ', time = ', tmr%time, ' s'
       call log(msg)
@@ -497,7 +497,7 @@ contains
 
       ! Solve
       call tmr%reset(); call tmr%start()
-      call solver%solve(phi=phi, rhs=rhs)
+      call solver%solve(rhs=rhs,phi0=phi)
       call tmr%stop()
       write(msg,'(a,es12.5,a,es12.5,a)') '  Solve: residual = ', solver%res, ', time = ', tmr%time, ' s'
       call log(msg)
@@ -594,7 +594,7 @@ contains
       call log('  Step 1: Composite solve on all levels')
       call tmr%start()
       call solver%setup()
-      call solver%solve(phi=phi, rhs=rhs)
+      call solver%solve(rhs=rhs,phi0=phi)
       call tmr%stop()
       write(msg,'(a,es12.5,a,i0)') '    Composite solve: residual = ', solver%res, ', niter = ', solver%niter
       call log(msg)
