@@ -1076,38 +1076,32 @@ contains
             end do; end do; end do
             ! Fix non-periodic boundary conditions
             if (.not.this%amr%xper.and.bx%lo(1).eq.this%amr%geom(lvl)%domain%lo(1)) then
-               i=this%amr%geom(lvl)%domain%lo(1)
-               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)
+               i=this%amr%geom(lvl)%domain%lo(1); do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)
                   pUVW(i,j,k,1)=pUVW(i,j,k,1)+scale*0.5_WP*pFx(i+1,j,k,1)
                end do; end do
             end if
             if (.not.this%amr%xper.and.bx%hi(1).eq.this%amr%geom(lvl)%domain%hi(1)) then
-               i=this%amr%geom(lvl)%domain%hi(1)
-               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)
-               pUVW(i,j,k,1)=pUVW(i,j,k,1)+scale*0.5_WP*pFx(i,  j,k,1)
+               i=this%amr%geom(lvl)%domain%hi(1); do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)
+                  pUVW(i,j,k,1)=pUVW(i,j,k,1)+scale*0.5_WP*pFx(i,  j,k,1)
                end do; end do
             end if
             if (.not.this%amr%yper.and.bx%lo(2).eq.this%amr%geom(lvl)%domain%lo(2)) then
-               j=this%amr%geom(lvl)%domain%lo(2)
-               do k=bx%lo(3),bx%hi(3); do i=bx%lo(1),bx%hi(1)
+               j=this%amr%geom(lvl)%domain%lo(2); do k=bx%lo(3),bx%hi(3); do i=bx%lo(1),bx%hi(1)
                   pUVW(i,j,k,2)=pUVW(i,j,k,2)+scale*0.5_WP*pFy(i,j+1,k,1)
                end do; end do
             end if
             if (.not.this%amr%yper.and.bx%hi(2).eq.this%amr%geom(lvl)%domain%hi(2)) then
-               j=this%amr%geom(lvl)%domain%hi(2)
-               do k=bx%lo(3),bx%hi(3); do i=bx%lo(1),bx%hi(1)
+               j=this%amr%geom(lvl)%domain%hi(2); do k=bx%lo(3),bx%hi(3); do i=bx%lo(1),bx%hi(1)
                   pUVW(i,j,k,2)=pUVW(i,j,k,2)+scale*0.5_WP*pFy(i,j,  k,1)
                end do; end do
             end if
             if (.not.this%amr%zper.and.bx%lo(3).eq.this%amr%geom(lvl)%domain%lo(3)) then
-               k=this%amr%geom(lvl)%domain%lo(3)
-               do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               k=this%amr%geom(lvl)%domain%lo(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   pUVW(i,j,k,3)=pUVW(i,j,k,3)+scale*0.5_WP*pFz(i,j,k+1,1)
                end do; end do
             end if
             if (.not.this%amr%zper.and.bx%hi(3).eq.this%amr%geom(lvl)%domain%hi(3)) then
-               k=this%amr%geom(lvl)%domain%hi(3)
-               do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               k=this%amr%geom(lvl)%domain%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   pUVW(i,j,k,3)=pUVW(i,j,k,3)+scale*0.5_WP*pFz(i,j,k,  1)
                end do; end do
             end if

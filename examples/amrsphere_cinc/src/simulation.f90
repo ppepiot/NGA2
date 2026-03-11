@@ -276,7 +276,6 @@ contains
          call viz%add_scalar(fs%UVW,3,'W')
          call viz%add_scalar(fs%visc,1,'visc')
          call viz%add_scalar(fs%P,1,'pressure')
-         call viz%add_scalar(fs%div,1,'div')
          call viz%add_scalar(VF,1,'VF')
          ! Create visualization output event
          viz_evt=event(time=time,name='Visualization output')
