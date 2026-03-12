@@ -106,6 +106,7 @@ module amrmpcomp_class
       procedure :: tagging
       procedure :: get_cost
       ! Physics methods
+      procedure :: store_old
       procedure :: get_primitive
       procedure :: get_conserved
       procedure :: get_dQdt

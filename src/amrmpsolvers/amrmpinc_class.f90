@@ -84,6 +84,7 @@ module amrmpinc_class
       procedure :: average_down_velocity     !< Average down face velocity for C/F consistency
       procedure :: average_down_velocity_to  !< Average down face velocity for single level
       ! Utilities
+      procedure :: store_old                 !< Store current state to old state
       procedure :: get_div                   !< Compute divergence (assumes velocity ghosts filled)
       procedure :: interp_vel_to_face        !< Interpolate cell-centered velocity to face
       procedure :: prepare_psolver           !< Prepare pressure solver with new densities

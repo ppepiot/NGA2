@@ -172,7 +172,7 @@ contains
       type(amrex_distromap), intent(in) :: dm
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pU,pUVW
       real(WP), dimension(3) :: BL,BG  ! Dummy barycenters
       real(WP) :: dx,dy,dz,VF
       integer :: i,j,k
@@ -184,6 +184,8 @@ contains
       do while (mfi%next())
          ! Get pointers to data
          pVF=>solver%VF%mf(lvl)%dataptr(mfi)
+         pUVW=>solver%UVW%mf(lvl)%dataptr(mfi)
+         pU=>solver%U%mf(lvl)%dataptr(mfi)
          if (lvl.eq.solver%amr%maxlvl) then
             pCL=>solver%CL%dataptr(mfi)
             pCG=>solver%CG%dataptr(mfi)
@@ -202,6 +204,9 @@ contains
                pCL(i,j,k,:)=BL
                pCG(i,j,k,:)=BG
             end if
+            ! Initialize velocities to one
+            pUVW(i,j,k,1)=1.0_WP
+            pU(i,j,k,1)=1.0_WP
          end do; end do; end do
       end do
       call amrex_mfiter_destroy(mfi)
@@ -301,7 +306,7 @@ contains
          call fs%fill_velocity(time=time%t)
          ! Set viscosity: molecular + SGS
          call get_viscosity()
-         call fs%add_vreman(dt=time%dt)
+         !call fs%add_vreman(dt=time%dt)
          ! Compute Umag
          call Umag%get_magnitude(srcX=fs%UVW,srcY=fs%UVW,srcZ=fs%UVW,compX=1,compY=2,compZ=3)
       end block init_regridding
@@ -449,7 +454,7 @@ contains
 
          ! Update viscosity
          call get_viscosity()
-         call fs%add_vreman(dt=time%dt)
+         !call fs%add_vreman(dt=time%dt)
 
          ! Compute Umag
          call Umag%get_magnitude(srcX=fs%UVW,srcY=fs%UVW,srcZ=fs%UVW,compX=1,compY=2,compZ=3)
