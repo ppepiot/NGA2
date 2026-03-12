@@ -575,9 +575,8 @@ contains
          else
             ! Fresh start
             call amr%init_from_scratch(time=time%t)
-            ! Build PLIC and reset moments
+            ! Build PLIC
             call fs%build_plic(time%t)
-            call fs%reset_moments()
          end if
          ! Compute viscosities
          call get_viscosities()
