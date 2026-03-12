@@ -284,7 +284,7 @@ contains
       if (.not.amr%zper) then; this%visc%lo_bc(3,1)=amrex_bc_foextrap; this%visc%hi_bc(3,1)=amrex_bc_foextrap; end if
 
       ! Initialize pressure solver
-      call this%psolver%initialize(amr,type=amrmg_varcoef)
+      call this%psolver%initialize(amr,type=amrmg_varcoef); this%psolver%beta=-1.0_WP
 
       ! Register all 6 callbacks with amrgrid using concrete dispatchers
       select type (this)
@@ -355,6 +355,9 @@ contains
       call this%U%setval(val=0.0_WP,lvl=lvl)
       call this%V%setval(val=0.0_WP,lvl=lvl)
       call this%W%setval(val=0.0_WP,lvl=lvl)
+      call this%Uold%setval(val=0.0_WP,lvl=lvl)
+      call this%Vold%setval(val=0.0_WP,lvl=lvl)
+      call this%Wold%setval(val=0.0_WP,lvl=lvl)
       call this%UVW%setval(val=0.0_WP,lvl=lvl)
       call this%UVWold%setval(val=0.0_WP,lvl=lvl)
       call this%P%setval(val=0.0_WP,lvl=lvl)
@@ -1651,7 +1654,7 @@ contains
             call amrmfab_average_down_face(fmf=Fz(lvl),cmf=Fz(lvl-1),rr=[this%amr%rrefx(lvl-1),this%amr%rrefy(lvl-1),this%amr%rrefz(lvl-1)],cgeom=this%amr%geom(lvl-1))
          end do
       end block c_f_consistency
-      
+
       ! Phase 3: Compute divergence and source terms for all levels, update VF/bary at band
       divergence_and_sources: block
          type(amrex_mfiter) :: mfi

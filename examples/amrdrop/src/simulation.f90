@@ -297,6 +297,8 @@ contains
          ! Initialize face velocities
          call fs%build_subVF()
          call fs%interp_vel_to_face()
+         call fs%average_down_velocity()
+         call fs%fill_velocity(time=time%t)
          ! Set viscosity: molecular + SGS
          call get_viscosity()
          call fs%add_vreman(dt=time%dt)
