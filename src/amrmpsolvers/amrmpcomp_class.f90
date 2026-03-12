@@ -110,6 +110,7 @@ module amrmpcomp_class
       procedure :: get_primitive
       procedure :: get_conserved
       procedure :: get_dQdt
+      procedure :: build_plic
       procedure :: clean_Q
       procedure :: apply_relax
       procedure :: add_viscartif
