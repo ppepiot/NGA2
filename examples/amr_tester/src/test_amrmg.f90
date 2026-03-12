@@ -297,7 +297,7 @@ contains
 
       tmr = timer(comm=MPI_COMM_WORLD, name='amrmg_var')
       call tmr%start()
-      call solver%setup(bcoef_x=bcoef_x, bcoef_y=bcoef_y, bcoef_z=bcoef_z)
+      call solver%setup(bcoef_x=bcoef_x%mf, bcoef_y=bcoef_y%mf, bcoef_z=bcoef_z%mf)
       call tmr%stop()
       write(msg,'(a,es12.5,a)') '  Setup time: ', tmr%time, ' s'; call log(msg)
 

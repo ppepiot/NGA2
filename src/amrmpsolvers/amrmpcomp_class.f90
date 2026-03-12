@@ -1337,7 +1337,7 @@ contains
                bx=mfi%tilebox()
                do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   ! VF/barycenter update at band cells (finest level only)
-                  if (lvl.eq.this%amr%clvl()) then
+                  if (lvl.eq.this%amr%maxlvl) then
                      ! Work on band cells only
                      if (pBand(i,j,k,1).gt.0.0_WP) then
                         ! Old phasic moments

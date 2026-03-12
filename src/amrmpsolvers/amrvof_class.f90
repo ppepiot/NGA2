@@ -52,6 +52,9 @@ module amrvof_class
       ! PLIC: finest-level-only multifab, 4 components (nx, ny, nz, d)
       type(amrex_multifab) :: PLIC,PLICold
 
+      ! Subcell volume fractions
+      type(amrex_multifab) :: subVF
+
       ! Tagging parameters
       integer :: regrid_buffer=10  ! Number of cells to buffer around interface for tagging
 
@@ -102,6 +105,7 @@ module amrvof_class
       procedure :: build_polygons         !< Build polygons from PLIC planes
       procedure :: reset_moments          !< Recompute VF/barycenters from PLIC
       procedure :: build_band             !< Build transport band around interface
+      procedure :: build_subVF            !< Build sub-cell volume fractions
       ! Physics methods
       procedure :: advance_vof            !< Advect VF using staggered or collocated velocity
       procedure :: get_vof_cfl            !< Compute advective CFL at finest level
@@ -298,6 +302,7 @@ contains
       call amrex_multifab_destroy(this%CLold)
       call amrex_multifab_destroy(this%CGold)
       call amrex_multifab_destroy(this%PLICold)
+      call amrex_multifab_destroy(this%subVF)
       ! Reset surface mesh
       call this%smesh%reset()
       ! Nullify pointers
@@ -1138,6 +1143,74 @@ contains
          call band%fill_boundary(this%amr%geom(lvl))
       end do
    end subroutine build_band
+
+   !> Build sub-cell volume fractions
+   subroutine build_subVF(this)
+      use amrvof_geometry, only: cut_hex_vol
+      use amrex_amr_module, only: amrex_mfiter
+      use amrgrid_class, only: mfab_rebuild
+      implicit none
+      class(amrvof), intent(inout) :: this
+      integer :: lvl,i,j,k
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC,pSubVF
+      real(WP), dimension(3,8) :: hex
+      real(WP), dimension(4) :: plane
+      real(WP) :: vol_liq,vol_gas,half_vol,dx,dy,dz,xlo,xhi,ylo,yhi,zlo,zhi,xcc,ycc,zcc
+      real(WP), dimension(3) :: bary_liq,bary_gas
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      ! Only work at finest level
+      lvl=this%amr%maxlvl
+      dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
+      half_vol=0.5_WP*this%amr%cell_vol(lvl)
+      ! Rebuild subVF mfab and populate it
+      call mfab_rebuild(this%subVF,this%amr%get_boxarray(lvl),this%amr%get_distromap(lvl),nc=6,ng=this%nover)
+      call this%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         ! Get pointers to data
+         pPLIC =>this%PLIC%dataptr(mfi)
+         pSubVF=>this%subVF%dataptr(mfi)
+         ! Loop over tiles grown by nover
+         bx=mfi%growntilebox(this%nover)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            ! Fast-track pure cells
+            if      (pPLIC(i,j,k,4).ge.+1.0e9_WP) then; pSubVF(i,j,k,1:6)=1.0_WP; cycle
+            else if (pPLIC(i,j,k,4).le.-1.0e9_WP) then; pSubVF(i,j,k,1:6)=0.0_WP; cycle
+            end if
+            ! Precompute hex bounds
+            xlo=this%amr%xlo+real(i,WP)*dx; xhi=this%amr%xlo+real(i+1,WP)*dx; xcc=0.5_WP*(xlo+xhi)
+            ylo=this%amr%ylo+real(j,WP)*dy; yhi=this%amr%ylo+real(j+1,WP)*dy; ycc=0.5_WP*(ylo+yhi)
+            zlo=this%amr%zlo+real(k,WP)*dz; zhi=this%amr%zlo+real(k+1,WP)*dz; zcc=0.5_WP*(zlo+zhi)
+            ! Get plane from PLIC
+            plane=pPLIC(i,j,k,:)
+            ! SubVF(1)=x-lo half
+            hex(:,1)=[xlo,ylo,zlo]; hex(:,2)=[xcc,ylo,zlo]; hex(:,3)=[xcc,yhi,zlo]; hex(:,4)=[xlo,yhi,zlo]
+            hex(:,5)=[xlo,ylo,zhi]; hex(:,6)=[xcc,ylo,zhi]; hex(:,7)=[xcc,yhi,zhi]; hex(:,8)=[xlo,yhi,zhi]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,1)=vol_liq/half_vol
+            ! SubVF(2)=x-hi half
+            hex(:,1)=[xcc,ylo,zlo]; hex(:,2)=[xhi,ylo,zlo]; hex(:,3)=[xhi,yhi,zlo]; hex(:,4)=[xcc,yhi,zlo]
+            hex(:,5)=[xcc,ylo,zhi]; hex(:,6)=[xhi,ylo,zhi]; hex(:,7)=[xhi,yhi,zhi]; hex(:,8)=[xcc,yhi,zhi]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,2)=vol_liq/half_vol
+            ! SubVF(3)=y-lo half
+            hex(:,1)=[xlo,ylo,zlo]; hex(:,2)=[xhi,ylo,zlo]; hex(:,3)=[xhi,ycc,zlo]; hex(:,4)=[xlo,ycc,zlo]
+            hex(:,5)=[xlo,ylo,zhi]; hex(:,6)=[xhi,ylo,zhi]; hex(:,7)=[xhi,ycc,zhi]; hex(:,8)=[xlo,ycc,zhi]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,3)=vol_liq/half_vol
+            ! SubVF(4)=y-hi half
+            hex(:,1)=[xlo,ycc,zlo]; hex(:,2)=[xhi,ycc,zlo]; hex(:,3)=[xhi,yhi,zlo]; hex(:,4)=[xlo,yhi,zlo]
+            hex(:,5)=[xlo,ycc,zhi]; hex(:,6)=[xhi,ycc,zhi]; hex(:,7)=[xhi,yhi,zhi]; hex(:,8)=[xlo,yhi,zhi]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,4)=vol_liq/half_vol
+            ! SubVF(5)=z-lo half
+            hex(:,1)=[xlo,ylo,zlo]; hex(:,2)=[xhi,ylo,zlo]; hex(:,3)=[xhi,yhi,zlo]; hex(:,4)=[xlo,yhi,zlo]
+            hex(:,5)=[xlo,ylo,zcc]; hex(:,6)=[xhi,ylo,zcc]; hex(:,7)=[xhi,yhi,zcc]; hex(:,8)=[xlo,yhi,zcc]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,5)=vol_liq/half_vol
+            ! SubVF(6)=z-hi half
+            hex(:,1)=[xlo,ylo,zcc]; hex(:,2)=[xhi,ylo,zcc]; hex(:,3)=[xhi,yhi,zcc]; hex(:,4)=[xlo,yhi,zcc]
+            hex(:,5)=[xlo,ylo,zhi]; hex(:,6)=[xhi,ylo,zhi]; hex(:,7)=[xhi,yhi,zhi]; hex(:,8)=[xlo,yhi,zhi]
+            call cut_hex_vol(hex,plane,vol_liq,vol_gas,bary_liq,bary_gas); pSubVF(i,j,k,6)=vol_liq/half_vol
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+   end subroutine build_subVF
 
    ! ============================================================================
    ! PHYSICS METHODS

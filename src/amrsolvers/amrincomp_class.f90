@@ -7,7 +7,7 @@ module amrincomp_class
    use amrgrid_class,    only: amrgrid
    use amrdata_class,    only: amrdata
    use amrsolver_class,  only: amrsolver
-   use amrmg_class,      only: amrmg,amrmg_cstcoef
+   use amrmg_class,      only: amrmg
    use amrex_amr_module, only: amrex_box,amrex_boxarray,amrex_distromap,amrex_interp_face_divfree
    implicit none
    private
@@ -214,6 +214,7 @@ contains
    !> Initialize the incompressible solver
    subroutine initialize(this,amr,name)
       use amrex_amr_module, only: amrex_bc_foextrap
+      use amrmg_class,      only: amrmg_cstcoef
       implicit none
       class(amrincomp), target, intent(inout) :: this
       class(amrgrid), target, intent(in) :: amr

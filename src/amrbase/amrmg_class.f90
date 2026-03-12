@@ -156,8 +156,8 @@ contains
       use amrex_interface, only: amrpoisson_build, amrabeclap_build
       implicit none
       class(amrmg), intent(inout) :: this
-      type(amrdata), intent(in), optional :: acoef
-      type(amrdata), intent(in), optional :: bcoef_x, bcoef_y, bcoef_z
+      type(amrex_multifab), dimension(0:), intent(in), optional :: acoef
+      type(amrex_multifab), dimension(0:), intent(in), optional :: bcoef_x, bcoef_y, bcoef_z
 
       type(amrex_geometry), dimension(:), allocatable :: geom
       type(amrex_boxarray), dimension(:), allocatable :: ba
@@ -199,15 +199,15 @@ contains
             ! Set A coefficient
             if (present(acoef)) then
                do lev = 0, this%amr%clvl()
-                  call this%abeclap%set_acoeffs(lev, acoef%mf(lev))
+                  call this%abeclap%set_acoeffs(lev, acoef(lev))
                end do
             end if
             ! Set B coefficients
             if (present(bcoef_x) .and. present(bcoef_y) .and. present(bcoef_z)) then
                do lev = 0, this%amr%clvl()
-                  bcoef(1) = bcoef_x%mf(lev)
-                  bcoef(2) = bcoef_y%mf(lev)
-                  bcoef(3) = bcoef_z%mf(lev)
+                  bcoef(1) = bcoef_x(lev)
+                  bcoef(2) = bcoef_y(lev)
+                  bcoef(3) = bcoef_z(lev)
                   call this%abeclap%set_bcoeffs(lev, bcoef)
                end do
             end if
