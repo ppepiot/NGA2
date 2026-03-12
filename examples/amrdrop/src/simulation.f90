@@ -385,11 +385,8 @@ contains
          call time%adjust_dt()
          call time%increment()
 
-         ! Store old velocities
-         call fs%UVWold%copy(src=fs%UVW)
-         call fs%Uold%copy(src=fs%U)
-         call fs%Vold%copy(src=fs%V)
-         call fs%Wold%copy(src=fs%W)
+         ! Store old interface and velocities
+         call fs%store_old()
 
          ! Sub-iterations
          do while (time%it.le.time%itmax)

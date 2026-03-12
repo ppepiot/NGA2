@@ -1014,6 +1014,19 @@ contains
    ! UTILITIES
    ! ============================================================================
 
+   !> Copy current state to old state
+   subroutine store_old(this)
+      implicit none
+      class(amrmpinc), intent(inout) :: this
+      ! Store amrvof state
+      call this%amrvof%store_old()
+      ! Store velocity state
+      call this%UVWold%copy(src=this%UVW)
+      call this%Uold%copy(src=this%U)
+      call this%Vold%copy(src=this%V)
+      call this%Wold%copy(src=this%W)
+   end subroutine store_old
+
    !> Compute divergence of velocity into internal div field, update divmax
    !> Uses composite fine masking so covered coarse cells don't pollute divmax
    subroutine get_div(this)

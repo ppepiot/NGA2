@@ -680,6 +680,16 @@ contains
    ! PHYSICS METHODS
    ! ============================================================================
 
+   !> Copy current state to old state
+   subroutine store_old(this)
+      implicit none
+      class(amrmpcomp), intent(inout) :: this
+      ! Store interface state
+      call this%amrvof%store_old()
+      ! Store conserved variables
+      call this%Qold%copy(src=this%Q)
+   end subroutine store_old
+
    !> Calculate primitive variables from conserved variables
    !> Q layout: (1) VF*rhoL, (2) (1-VF)*rhoG, (3) VF*rhoL*IL, (4) (1-VF)*rhoG*IG, (5) rhoU, (6) rhoV, (7) rhoW
    subroutine get_primitive(this,Q)

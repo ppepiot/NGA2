@@ -732,7 +732,6 @@ contains
          call time%increment()
          
          ! Remember old state
-         call fs%Qold%copy(src=fs%Q)
          call fs%store_old()
          
          ! ===== RK2 Stage 1: dQdt = f(t, Q) =====
