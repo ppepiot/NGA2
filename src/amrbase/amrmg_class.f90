@@ -156,8 +156,8 @@ contains
       use amrex_interface, only: amrpoisson_build, amrabeclap_build
       implicit none
       class(amrmg), intent(inout) :: this
-      type(amrdata), intent(in), optional :: acoef
-      type(amrdata), intent(in), optional :: bcoef_x, bcoef_y, bcoef_z
+      type(amrex_multifab), dimension(0:), intent(in), optional :: acoef
+      type(amrex_multifab), dimension(0:), intent(in), optional :: bcoef_x, bcoef_y, bcoef_z
 
       type(amrex_geometry), dimension(:), allocatable :: geom
       type(amrex_boxarray), dimension(:), allocatable :: ba
