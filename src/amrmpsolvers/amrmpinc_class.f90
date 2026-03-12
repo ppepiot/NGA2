@@ -204,6 +204,7 @@ contains
       type(c_ptr), intent(in) :: tags
       type(amrmpinc), pointer :: this
       call c_f_pointer(ctx,this)
+      call this%tagging(lvl,time,tags)
       if (associated(this%user_mpinc_tagging)) call this%user_mpinc_tagging(lvl,time,tags)
    end subroutine amrmpinc_tagging
 

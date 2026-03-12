@@ -46,8 +46,8 @@ contains
       real(WP), dimension(3), intent(in) :: xyz
       real(WP), intent(in) :: t
       real(WP) :: G
-      G=sqrt(xyz(1)**2+xyz(2)**2+xyz(3)**2)-0.5_WP
-      if (amr%nz.eq.1) G=sqrt(xyz(1)**2+xyz(2)**2)-0.5_WP ! Enable 2D case
+      G=0.5_WP-sqrt(xyz(1)**2+xyz(2)**2+xyz(3)**2)
+      if (amr%nz.eq.1) G=0.5_WP-sqrt(xyz(1)**2+xyz(2)**2) ! Enable 2D case
    end function sphere_levelset
 
    !> Compute viscosity
@@ -221,13 +221,13 @@ contains
          amr%xlo=-05.0_WP; amr%xhi=+15.0_WP
          amr%ylo=-10.0_WP; amr%yhi=+10.0_WP
          amr%zlo=-10.0_WP; amr%zhi=+10.0_WP
+         amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
+         call param_read('Max level',amr%maxlvl)
          ! Handle 2D case
          if (amr%nz.eq.1) then
             amr%zlo=-0.5_WP*(amr%yhi-amr%ylo)/real(amr%ny*2**amr%maxlvl,WP)
             amr%zhi=+0.5_WP*(amr%yhi-amr%ylo)/real(amr%ny*2**amr%maxlvl,WP)
          end if
-         amr%xper=.false.; amr%yper=.true.; amr%zper=.true.
-         call param_read('Max level',amr%maxlvl)
          call amr%initialize()
       end block create_amrgrid
 
