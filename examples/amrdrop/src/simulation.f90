@@ -414,10 +414,10 @@ contains
             call fs%build_subVF()
 
             ! Interpolate velocity to the faces
-            call fs%interp_vel_to_face()
+            !call fs%interp_vel_to_face()
 
             ! Increment both velocities with current pressure term
-            call fs%correct_both_velocities(scale=time%dt,phi=fs%P)
+            !call fs%correct_both_velocities(scale=time%dt,phi=fs%P)
 
             ! Average down and fill ghosts
             call fs%UVW%average_down(); call fs%UVW%fill(time=time%t)
@@ -432,7 +432,7 @@ contains
             call fs%psolver%solve(rhs=fs%div)
 
             ! Correct both velocities with pressure increment
-            call fs%correct_both_velocities(scale=time%dt)
+            !call fs%correct_both_velocities(scale=time%dt)
 
             ! Add pressure increment
             call fs%P%add(src=fs%psolver%sol)

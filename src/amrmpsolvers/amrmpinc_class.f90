@@ -90,7 +90,8 @@ module amrmpinc_class
       procedure :: prepare_psolver           !< Prepare pressure solver with new densities
       procedure :: correct_both_velocities   !< Correct both face and cell-centered velocities
       ! Physics procedures
-      procedure :: get_dUVWdt                !< Compute 1/rho*d(mom)/dt
+      procedure :: get_dUVWdt                !< Compute d(UVW)/dt
+      procedure :: get_dmomdt                !< Compute d(mom)/dt
       procedure :: add_vreman                !< Add Vreman SGS eddy viscosity
       procedure :: get_cfl                   !< Compute CFL numbers
       procedure :: correct_outflow           !< Correct outflow for global mass conservation
@@ -1337,14 +1338,54 @@ contains
    ! PHYSICS METHODS
    ! ============================================================================
 
-   !> Compute momentum advection and viscous terms for all levels, returning 1/rho*d(mom)/dt
+   !> Compute momentum advection and viscous terms for all levels, returning d(UVW)/dt
    !> No pressure gradient, user can add it in the main loop
    !> Uses flux averaging at C/F interfaces for conservation
    subroutine get_dUVWdt(this,dUVWdt,dt,time)
-      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
       implicit none
       class(amrmpinc), intent(inout) :: this
       class(amrdata), intent(inout) :: dUVWdt                        ! Output: velocity RHS (cell-centered)
+      real(WP), intent(in) :: dt,time
+
+      ! Get dmomdt
+      call this%get_dmomdt(dmomdt=dUVWdt,dt=dt,time=time)
+
+      ! Transform dmomdt to dUVWdt
+      transform_to_velocity: block
+         use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+         type(amrex_mfiter) :: mfi
+         type(amrex_box) :: bx
+         integer :: lvl,i,j,k
+         real(WP) :: rho,rho_old
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pRhs,pVF,pUVWold,pVFold
+         do lvl=0,this%amr%clvl()
+            call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
+            do while (mfi%next())
+               pRhs   =>dUVWdt%mf(lvl)%dataptr(mfi)
+               pUVWold=>this%UVWold%mf(lvl)%dataptr(mfi)
+               pVFold =>this%VFold%mf(lvl)%dataptr(mfi)
+               pVF    =>this%VF%mf(lvl)%dataptr(mfi)
+               bx=mfi%tilebox()
+               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+                  rho    =this%rhoL*pVF   (i,j,k,1)+this%rhoG*(1.0_WP-pVF   (i,j,k,1))
+                  rho_old=this%rhoL*pVFold(i,j,k,1)+this%rhoG*(1.0_WP-pVFold(i,j,k,1))
+                  pRhs(i,j,k,:)=pRhs(i,j,k,:)/rho+(rho_old-rho)/(rho*dt)*pUVWold(i,j,k,:)
+               end do; end do; end do
+            end do
+            call this%amr%mfiter_destroy(mfi)
+         end do
+      end block transform_to_velocity
+
+   end subroutine get_dUVWdt
+
+   !> Compute momentum advection and viscous terms for all levels, returning d(mom)/dt
+   !> No pressure gradient, user can add it in the main loop
+   !> Uses flux averaging at C/F interfaces for conservation
+   subroutine get_dmomdt(this,dmomdt,dt,time)
+      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+      implicit none
+      class(amrmpinc), intent(inout) :: this
+      class(amrdata), intent(inout) :: dmomdt                        ! Output: momentum RHS (cell-centered)
       real(WP), intent(in) :: dt,time
       type(amrex_multifab), dimension(0:this%amr%maxlvl) :: Fx,Fy,Fz ! Flux mfabs
       type(amrex_multifab) :: Vx,Vy,Vz
@@ -1679,7 +1720,7 @@ contains
             call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
             do while (mfi%next())
                ! Get data pointers
-               pRhs =>dUVWdt%mf(lvl)%dataptr(mfi)
+               pRhs =>dmomdt%mf(lvl)%dataptr(mfi)
                pFx  =>Fx(lvl)%dataptr(mfi)
                pFy  =>Fy(lvl)%dataptr(mfi)
                pFz  =>Fz(lvl)%dataptr(mfi)
@@ -1745,28 +1786,6 @@ contains
 
       ! Sync and apply BC
       call this%fill(lvl=this%amr%maxlvl,time=time)
-
-      ! Divide by density to return dUVWdt
-      divide_by_density: block
-         type(amrex_mfiter) :: mfi
-         type(amrex_box) :: bx
-         integer :: lvl,i,j,k
-         real(WP) :: rho
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pRhs,pVF
-         do lvl=0,this%amr%clvl()
-            call this%amr%mfiter_build(lvl=lvl,mfi=mfi)
-            do while (mfi%next())
-               pRhs=>dUVWdt%mf(lvl)%dataptr(mfi)
-               pVF =>this%VF%mf(lvl)%dataptr(mfi)
-               bx=mfi%tilebox()
-               do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-                  rho=this%rhoL*pVF(i,j,k,1)+this%rhoG*(1.0_WP-pVF(i,j,k,1))
-                  pRhs(i,j,k,:)=pRhs(i,j,k,:)/rho
-               end do; end do; end do
-            end do
-            call this%amr%mfiter_destroy(mfi)
-         end do
-      end block divide_by_density
 
       ! Cleanup temporary mfabs
       cleanup: block
@@ -2055,7 +2074,7 @@ contains
          &            wyc2*(wxc1*pW(ipc+1,jpc  ,kpw  ,1)+wxc2*pW(ipc,jpc  ,kpw  ,1)))
       end function interp_velocity
 
-   end subroutine get_dUVWdt
+   end subroutine get_dmomdt
 
    !> Add Vreman SGS eddy viscosity to this%visc
    !> Assumes velocity ghosts are filled. User must reset visc

@@ -9,8 +9,8 @@ Regrid nsteps:    10
 Tagging Reynolds: 20
 
 # Flow parameters
-Density ratio :  1
-Reynolds number: 1e4
+Density ratio :  1000
+Reynolds number: 1e10!1e4
 Viscosity ratio: 1
 
 # Time integration
@@ -19,4 +19,4 @@ Max dt:      1e-2
 Max CFL:     0.9
 
 # Output
-Output period: 0.5e-3
+Output period: 0.5
