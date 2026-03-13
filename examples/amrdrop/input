@@ -10,7 +10,7 @@ Tagging Reynolds: 20
 
 # Flow parameters
 Density ratio :  1000
-Reynolds number: 1e10!1e4
+Reynolds number: 1e3
 Viscosity ratio: 1
 
 # Time integration

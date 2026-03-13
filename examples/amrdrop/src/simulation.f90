@@ -204,9 +204,6 @@ contains
                pCL(i,j,k,:)=BL
                pCG(i,j,k,:)=BG
             end if
-            ! Initialize velocities to one
-            pUVW(i,j,k,1)=1.0_WP
-            pU(i,j,k,1)=1.0_WP
          end do; end do; end do
       end do
       call amrex_mfiter_destroy(mfi)
@@ -306,7 +303,7 @@ contains
          call fs%fill_velocity(time=time%t)
          ! Set viscosity: molecular + SGS
          call get_viscosity()
-         !call fs%add_vreman(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
          ! Compute Umag
          call Umag%get_magnitude(srcX=fs%UVW,srcY=fs%UVW,srcZ=fs%UVW,compX=1,compY=2,compZ=3)
       end block init_regridding
@@ -414,10 +411,10 @@ contains
             call fs%build_subVF()
 
             ! Interpolate velocity to the faces
-            !call fs%interp_vel_to_face()
+            call fs%interp_vel_to_face()
 
             ! Increment both velocities with current pressure term
-            !call fs%correct_both_velocities(scale=time%dt,phi=fs%P)
+            call fs%correct_both_velocities(scale=time%dt,phi=fs%P)
 
             ! Average down and fill ghosts
             call fs%UVW%average_down(); call fs%UVW%fill(time=time%t)
@@ -432,7 +429,7 @@ contains
             call fs%psolver%solve(rhs=fs%div)
 
             ! Correct both velocities with pressure increment
-            !call fs%correct_both_velocities(scale=time%dt)
+            call fs%correct_both_velocities(scale=time%dt)
 
             ! Add pressure increment
             call fs%P%add(src=fs%psolver%sol)
@@ -454,7 +451,7 @@ contains
 
          ! Update viscosity
          call get_viscosity()
-         !call fs%add_vreman(dt=time%dt)
+         call fs%add_vreman(dt=time%dt)
 
          ! Compute Umag
          call Umag%get_magnitude(srcX=fs%UVW,srcY=fs%UVW,srcZ=fs%UVW,compX=1,compY=2,compZ=3)
