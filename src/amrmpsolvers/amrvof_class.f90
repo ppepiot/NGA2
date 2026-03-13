@@ -52,6 +52,9 @@ module amrvof_class
       ! PLIC: finest-level-only multifab, 4 components (nx, ny, nz, d)
       type(amrex_multifab) :: PLIC,PLICold
 
+      ! Curvature: finest-level-only multifab, 1 component
+      type(amrex_multifab) :: curv
+
       ! Subcell volume fractions
       type(amrex_multifab) :: subVF
 
@@ -303,6 +306,7 @@ contains
       call amrex_multifab_destroy(this%CGold)
       call amrex_multifab_destroy(this%PLICold)
       call amrex_multifab_destroy(this%subVF)
+      call amrex_multifab_destroy(this%curv)
       ! Reset surface mesh
       call this%smesh%reset()
       ! Nullify pointers
@@ -336,6 +340,7 @@ contains
          call mfab_rebuild(this%CLold  ,ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%CGold  ,ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%PLICold,ba,dm,nc=4,ng=this%nover)
+         call mfab_rebuild(this%curv   ,ba,dm,nc=1,ng=this%nover)
       end if
    end subroutine on_init
 
@@ -360,6 +365,7 @@ contains
          call mfab_rebuild(this%CLold,  ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%CGold,  ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%PLICold,ba,dm,nc=4,ng=this%nover)
+         call mfab_rebuild(this%curv   ,ba,dm,nc=1,ng=this%nover)
          ! Set to trivial values
          trivialize: block
             use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy
@@ -406,16 +412,17 @@ contains
          remake_finest: block
             use amrex_amr_module, only: amrex_multifab_build,amrex_multifab_destroy, &
             &                           amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy
-            type(amrex_multifab) :: CL_new,CG_new,PLIC_new
+            type(amrex_multifab) :: CL_new,CG_new,PLIC_new,curv_new
             type(amrex_mfiter) :: mfi
             type(amrex_box) :: bx
-            real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC
+            real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC,pCurv
             real(WP) :: dx,dy,dz
             integer :: i,j,k
             ! Build new mfabs
             call amrex_multifab_build(CL_new  ,ba,dm,nc=3,ng=this%nover)
             call amrex_multifab_build(CG_new  ,ba,dm,nc=3,ng=this%nover)
             call amrex_multifab_build(PLIC_new,ba,dm,nc=4,ng=this%nover)
+            call amrex_multifab_build(curv_new,ba,dm,nc=1,ng=this%nover)
             ! Set to trivial values
             dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
             call amrex_mfiter_build(mfi,ba,dm,tiling=.false.)
@@ -425,12 +432,14 @@ contains
                pCL  =>CL_new%dataptr(mfi)
                pCG  =>CG_new%dataptr(mfi)
                pPLIC=>PLIC_new%dataptr(mfi)
+               pCurv=>curv_new%dataptr(mfi)
                ! Get tilebox
                bx=mfi%tilebox()
                do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   pCL(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                   pCG(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                   pPLIC(i,j,k,:)=[0.0_WP,0.0_WP,0.0_WP,sign(1.0e10_WP,pVF(i,j,k,1)-0.5_WP)]
+                  pCurv(i,j,k,1)=0.0_WP
                end do; end do; end do
             end do
             call amrex_mfiter_destroy(mfi)
@@ -438,10 +447,12 @@ contains
             call CL_new%parallel_copy(this%CL,this%amr%geom(lvl))
             call CG_new%parallel_copy(this%CG,this%amr%geom(lvl))
             call PLIC_new%parallel_copy(this%PLIC,this%amr%geom(lvl))
+            call curv_new%parallel_copy(this%curv,this%amr%geom(lvl))
             ! Destroy old, assign new
             call amrex_multifab_destroy(this%CL  ); call this%CL%move(CL_new)
             call amrex_multifab_destroy(this%CG  ); call this%CG%move(CG_new)
             call amrex_multifab_destroy(this%PLIC); call this%PLIC%move(PLIC_new)
+            call amrex_multifab_destroy(this%curv); call this%curv%move(curv_new); call this%curv%fill_boundary(this%amr%geom(lvl))
             ! Rebuild old multifabs
             call mfab_rebuild(this%CLold,  ba,dm,nc=3,ng=this%nover)
             call mfab_rebuild(this%CGold,  ba,dm,nc=3,ng=this%nover)
@@ -465,6 +476,7 @@ contains
          call amrex_multifab_destroy(this%CLold)
          call amrex_multifab_destroy(this%CGold)
          call amrex_multifab_destroy(this%PLICold)
+         call amrex_multifab_destroy(this%curv)
       end if
    end subroutine on_clear
 
@@ -802,7 +814,7 @@ contains
       ! Perform PLICnet reconstruction
       call this%build_plicnet(time)
 
-      ! Build polygons from PLIC
+      ! Build polygons and curvature from PLIC
       call this%build_polygons()
 
       ! Reset moments from PLIC
@@ -952,7 +964,7 @@ contains
       this%wt_plicnet=this%wt_plicnet+(MPI_Wtime()-t0)
    end subroutine build_plicnet
 
-   !> Build polygons from PLIC planes
+   !> Build polygons and curvature from PLIC planes
    subroutine build_polygons(this)
       use mpi_f08, only: MPI_Wtime
       use amrvof_geometry, only: cut_hex_polygon
@@ -1026,6 +1038,8 @@ contains
          deallocate(polygon_local,poly_nv_local)
       end do
       call this%amr%mfiter_destroy(mfi)
+      ! Fill curvature boundary
+      call this%curv%fill_boundary(this%amr%geom(lvl))
       ! End timer
       this%wt_polygon=this%wt_polygon+(MPI_Wtime()-t0)
    end subroutine build_polygons
