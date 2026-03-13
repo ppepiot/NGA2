@@ -247,8 +247,9 @@ contains
       ! Create flow solver
       create_flow_solver: block
          use amrex_amr_module, only: amrex_bc_ext_dir,amrex_bc_foextrap
-         use amrdata_class, only: amrex_interp_face_linear
-         use amrmpinc_class, only: BC_GAS
+         use amrdata_class,    only: amrex_interp_face_linear
+         use amrmpinc_class,   only: BC_GAS
+         use amrmg_class,      only: amrmg_outer_pcg_mlmg
          ! Create flow solver
          call fs%initialize(amr,name='drop')
          ! Set initial conditions
@@ -259,11 +260,14 @@ contains
          fs%rhoG=1.0_WP
          call param_read('Density ratio',fs%rhoL)
          ! Set molecular viscosities
-         call param_read('Reynolds number',viscG_mol ); viscG_mol=1.0_WP/viscG_mol
+         call param_read('Reynolds number',viscG_mol); viscG_mol=1.0_WP/viscG_mol
          call param_read('Viscosity ratio',viscL_mol); viscL_mol=viscG_mol*viscL_mol
          ! Set pressure convergence
-         fs%psolver%max_iter=20
+         fs%psolver%outer_solver=amrmg_outer_pcg_mlmg
+         fs%psolver%max_iter=100
          fs%psolver%tol_rel=1.0e-5_WP
+         fs%psolver%tol_abs=1.0e-7_WP
+         fs%psolver%verbose=2
          ! Set boundary conditions
          fs%lo_bc(1)=BC_GAS
          fs%UVW%lo_bc(1,:)=amrex_bc_ext_dir

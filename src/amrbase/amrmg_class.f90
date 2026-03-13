@@ -23,6 +23,10 @@ module amrmg_class
    integer, parameter, public :: amrmg_bottom_hypre    = 3
    integer, parameter, public :: amrmg_bottom_petsc    = 4
 
+   ! Outer solver types
+   integer, parameter, public :: amrmg_outer_mlmg        = 0  !< Standard MLMG (default)
+   integer, parameter, public :: amrmg_outer_pcg_mlmg    = 1  !< PCG with MLMG as preconditioner
+
    ! Expose AMReX boundary condition types for user convenience
    integer, parameter, public :: amrmg_bc_interior    = amrex_lo_bogus      !< Interior (not at domain boundary)
    integer, parameter, public :: amrmg_bc_dirichlet   = amrex_lo_dirichlet  !< Dirichlet BC
@@ -45,6 +49,7 @@ module amrmg_class
       integer  :: max_iter = 200
       integer  :: verbose = 0
       integer  :: bottom_solver = amrmg_bottom_bicgstab
+      integer  :: outer_solver  = amrmg_outer_mlmg      !< Outer solver type
       integer  :: maxorder = 2  !< BC/interpolation order
 
       ! Boundary conditions (set from grid periodicity at init)
@@ -67,7 +72,12 @@ module amrmg_class
       type(amrex_abeclaplacian), private :: abeclap
       type(amrex_multigrid), private :: multigrid
       ! Internal solution storage for incremental solves
-      type(amrdata) :: sol  
+      type(amrdata) :: sol
+      ! PCG work arrays (only used when outer_solver == amrmg_outer_pcg_mlmg)
+      type(amrdata) :: pcg_r   !< Residual r = b - A*x
+      type(amrdata) :: pcg_z   !< Preconditioned residual z = M^{-1}*r
+      type(amrdata) :: pcg_p   !< Search direction p
+      type(amrdata) :: pcg_q   !< q = A*p
    contains
       procedure :: initialize
       procedure :: setup
@@ -134,6 +144,12 @@ contains
 
       ! Initialize internal solution storage
       call this%sol%initialize(amr,name='sol',ncomp=1,ng=1,interp=amrex_interp_none); call this%sol%register()
+
+      ! PCG work amrdata - unregistered
+      call this%pcg_r%initialize(amr,name='pcg_r',ncomp=1,ng=1,interp=amrex_interp_none)
+      call this%pcg_z%initialize(amr,name='pcg_z',ncomp=1,ng=1,interp=amrex_interp_none)
+      call this%pcg_p%initialize(amr,name='pcg_p',ncomp=1,ng=1,interp=amrex_interp_none)
+      call this%pcg_q%initialize(amr,name='pcg_q',ncomp=1,ng=1,interp=amrex_interp_none)
 
       ! Log setup info
       if (type .eq. amrmg_cstcoef) then
@@ -218,6 +234,16 @@ contains
          end block varcoef_setup
       end select
 
+      ! PCG work arrays: only allocate if using PCG outer solver
+      if (this%outer_solver.eq.amrmg_outer_pcg_mlmg) then
+         do lev=0,this%amr%clvl()
+            call this%pcg_r%reset_level(lev,ba(lev),dm(lev))
+            call this%pcg_z%reset_level(lev,ba(lev),dm(lev))
+            call this%pcg_p%reset_level(lev,ba(lev),dm(lev))
+            call this%pcg_q%reset_level(lev,ba(lev),dm(lev))
+         end do
+      end if
+
       this%setup_done = .true.
    end subroutine setup
 
@@ -268,13 +294,159 @@ contains
       end block set_bcs
 
       ! Solve and get iteration count
-      this%res=this%multigrid%solve(sol,rhsmf,this%tol_rel,this%tol_abs)
+      select case (this%outer_solver)
 
-      ! Extract number of iterations
-      get_niters: block
-         use amrex_interface, only: amrmlmg_get_niters
-         this%niter = amrmlmg_get_niters(this%multigrid%p)
-      end block get_niters
+       case (amrmg_outer_mlmg)
+         ! Standard MLMG solve
+         this%res=this%multigrid%solve(sol,rhsmf,this%tol_rel,this%tol_abs)
+         get_niters_mlmg: block
+            use amrex_interface, only: amrmlmg_get_niters
+            this%niter = amrmlmg_get_niters(this%multigrid%p)
+         end block get_niters_mlmg
+
+       case (amrmg_outer_pcg_mlmg)
+         ! PCG outer loop with 1 MLMG V-cycle as preconditioner
+         pcg_solve: block
+            use amrex_interface, only: amrmlmg_dot_composite
+            use iso_c_binding,   only: c_ptr
+            real(WP) :: rho, rho_new, alpha, beta, pq, rnorm, rnorm0, pcg_dummy
+            integer  :: iter, lev
+            type(amrex_multifab), dimension(:), allocatable :: resmf, zmf, pmf, qmf
+            type(c_ptr), dimension(:), allocatable :: mf1_ptrs, mf2_ptrs, ba_ptrs
+            integer, dimension(:), allocatable :: rr_flat
+            type(amrex_boxarray) :: ba_tmp
+            integer :: nlevs
+
+            nlevs = this%amr%clvl() + 1
+
+            ! Build helper multifab arrays for pcg vectors
+            allocate(resmf(0:this%amr%clvl()), zmf(0:this%amr%clvl()))
+            allocate(pmf(0:this%amr%clvl()),   qmf(0:this%amr%clvl()))
+            do lev=0,this%amr%clvl()
+               resmf(lev)=this%pcg_r%mf(lev)
+               zmf(lev)=this%pcg_z%mf(lev)
+               pmf(lev)=this%pcg_p%mf(lev)
+               qmf(lev)=this%pcg_q%mf(lev)
+            end do
+
+            ! Prepare pointer arrays for composite dot
+            allocate(mf1_ptrs(0:this%amr%clvl()), mf2_ptrs(0:this%amr%clvl()))
+            allocate(ba_ptrs(0:this%amr%clvl()))
+            allocate(rr_flat(3*nlevs))
+            do lev=0,this%amr%clvl()
+               ba_tmp = this%amr%get_boxarray(lev); ba_ptrs(lev) = ba_tmp%p
+               if (lev .lt. this%amr%clvl()) then
+                  rr_flat(3*lev+1) = this%amr%rrefx(lev)
+                  rr_flat(3*lev+2) = this%amr%rrefy(lev)
+                  rr_flat(3*lev+3) = this%amr%rrefz(lev)
+               else
+                  rr_flat(3*lev+1) = 1; rr_flat(3*lev+2) = 1; rr_flat(3*lev+3) = 1
+               end if
+            end do
+
+            ! --- Set MLMG to fixed 1 V-cycle for preconditioning ---
+            call this%multigrid%set_fixed_iter(1)
+
+            ! --- r = b - A*x0 (using comp_residual) ---
+            call this%multigrid%comp_residual(resmf, sol, rhsmf)
+
+            ! --- z = M^{-1} r (1 V-cycle): zero first, then set BCs, then solve ---
+            call this%pcg_z%setval(0.0_WP)
+            do lev=0,this%amr%clvl()
+               select case (this%type)
+                case (amrmg_cstcoef)
+                  call this%poisson%set_level_bc(lev, zmf(lev))
+                case (amrmg_varcoef)
+                  call this%abeclap%set_level_bc(lev, zmf(lev))
+               end select
+            end do
+            pcg_dummy = this%multigrid%solve(zmf, resmf, 0.0_WP, 0.0_WP)
+
+            ! --- p = z ---
+            call this%pcg_p%copy(src=this%pcg_z)
+
+            ! --- rho = <r, z> ---
+            do lev=0,this%amr%clvl()
+               mf1_ptrs(lev) = this%pcg_r%mf(lev)%p
+               mf2_ptrs(lev) = this%pcg_z%mf(lev)%p
+            end do
+            rho = amrmlmg_dot_composite(mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat, nlevs)
+
+            ! --- Initial residual norm for convergence test ---
+            do lev=0,this%amr%clvl()
+               mf1_ptrs(lev) = this%pcg_r%mf(lev)%p
+               mf2_ptrs(lev) = this%pcg_r%mf(lev)%p
+            end do
+            rnorm0 = sqrt(amrmlmg_dot_composite(mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat, nlevs))
+            if (rnorm0.eq.0.0_WP) then
+               this%res = 0.0_WP; this%niter = 0
+            else
+            pcg_iter: do iter = 1, this%max_iter
+               ! --- q = A*p: comp_residual with zero rhs, negate ---
+               call this%pcg_z%setval(0.0_WP)                      ! zero zmf to use as rhs=0
+               call this%multigrid%comp_residual(qmf, pmf, zmf)    ! qmf = 0 - A*pmf
+               call this%pcg_q%mult(-1.0_WP)                       ! qmf = A*p
+
+               ! --- alpha = rho / <p, q> ---
+               do lev=0,this%amr%clvl()
+                  mf1_ptrs(lev) = this%pcg_p%mf(lev)%p
+                  mf2_ptrs(lev) = this%pcg_q%mf(lev)%p
+               end do
+               pq = amrmlmg_dot_composite(mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat, nlevs)
+               if (abs(pq).lt.tiny(pq)) exit
+               alpha = rho / pq
+
+               ! --- x += alpha*p, r -= alpha*q ---
+               call this%sol%saxpy(a=alpha, src=this%pcg_p)
+               call this%pcg_r%saxpy(a=-alpha, src=this%pcg_q)
+
+               ! --- Check convergence ---
+               do lev=0,this%amr%clvl()
+                  mf1_ptrs(lev) = this%pcg_r%mf(lev)%p
+                  mf2_ptrs(lev) = this%pcg_r%mf(lev)%p
+               end do
+               rnorm = sqrt(amrmlmg_dot_composite(mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat, nlevs))
+               this%niter = iter
+               this%res = rnorm
+               if (this%verbose .gt. 1 .and. this%amr%amRoot) then
+                  write(*,'("  [PCG-MLMG] iter ",i0," res/res0 = ",es12.5)') iter, rnorm/rnorm0
+               end if
+               if (rnorm.le.this%tol_abs .or. rnorm/rnorm0.le.this%tol_rel) exit
+
+               ! --- z = M^{-1} r ---
+               call this%pcg_z%setval(0.0_WP)
+               do lev=0,this%amr%clvl()
+                  select case (this%type)
+                   case (amrmg_cstcoef)
+                     call this%poisson%set_level_bc(lev, zmf(lev))
+                   case (amrmg_varcoef)
+                     call this%abeclap%set_level_bc(lev, zmf(lev))
+                  end select
+               end do
+               pcg_dummy = this%multigrid%solve(zmf, resmf, 0.0_WP, 0.0_WP)
+
+               ! --- rho_new = <r, z> ---
+               do lev=0,this%amr%clvl()
+                  mf1_ptrs(lev) = this%pcg_r%mf(lev)%p
+                  mf2_ptrs(lev) = this%pcg_z%mf(lev)%p
+               end do
+               rho_new = amrmlmg_dot_composite(mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat, nlevs)
+               if (abs(rho).lt.tiny(rho)) exit
+               beta = rho_new / rho
+               rho  = rho_new
+
+               ! --- p = z + beta*p ---
+               call this%pcg_p%lincomb(a=1.0_WP, src1=this%pcg_z, b=beta, src2=this%pcg_p)
+            end do pcg_iter
+            end if  ! rnorm0 > 0
+
+            ! Restore MLMG to normal mode (set_fixed_iter(0) disables fixed-count mode)
+            call this%multigrid%set_fixed_iter(0)
+            call this%multigrid%set_max_iter(this%max_iter)
+            deallocate(resmf, zmf, pmf, qmf, mf1_ptrs, mf2_ptrs, ba_ptrs, rr_flat)
+         end block pcg_solve
+
+      end select
    end subroutine solve
 
    !> Level-by-level solve (for subcycling)
@@ -512,6 +684,10 @@ contains
       class(amrmg), intent(inout) :: this
       if (this%setup_done) call this%destroy()
       call this%sol%finalize()
+      call this%pcg_r%finalize()
+      call this%pcg_z%finalize()
+      call this%pcg_p%finalize()
+      call this%pcg_q%finalize()
       nullify(this%amr)
       this%type = -1
    end subroutine finalize

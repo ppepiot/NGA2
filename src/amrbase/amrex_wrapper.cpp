@@ -750,6 +750,37 @@ void amrmlmg_get_fluxes(void *mlmg, void **sol_mfs, void **flux_x,
   mg->getFluxes(fluxes, sol, amrex::MLMG::Location::FaceCenter);
 }
 
+// Composite dot product of two multi-level MultiFabs, excluding coarse cells
+// covered by finer levels (avoids double counting in AMR hierarchy).
+//   mf1_ptrs, mf2_ptrs - arrays of MultiFab pointers (one per level, 0-indexed)
+//   ba_ptrs            - array of fine BoxArray pointers (one per level, 0-indexed)
+//   ref_ratios         - flattened [3*nlevs] array of (rx,ry,rz) per level
+//   nlevs              - number of AMR levels
+// Returns sum over all valid (non-covered) cells of mf1*mf2.
+double amrmlmg_dot_composite(void **mf1_ptrs, void **mf2_ptrs,
+                              void **ba_fine_ptrs, int *ref_ratios, int nlevs) {
+  amrex::Real result = 0.0;
+  for (int lev = 0; lev < nlevs; ++lev) {
+    auto *mf1 = static_cast<amrex::MultiFab *>(mf1_ptrs[lev]);
+    auto *mf2 = static_cast<amrex::MultiFab *>(mf2_ptrs[lev]);
+    if (lev < nlevs - 1) {
+      // Build mask: 1 where valid (not covered by fine), 0 where covered
+      auto *ba_fine = static_cast<amrex::BoxArray *>(ba_fine_ptrs[lev + 1]);
+      amrex::IntVect rr(AMREX_D_DECL(ref_ratios[3*lev+0],
+                                     ref_ratios[3*lev+1],
+                                     ref_ratios[3*lev+2]));
+      // makeFineMask: 1=notcovered, 0=covered
+      amrex::iMultiFab mask = amrex::makeFineMask(*mf1, *ba_fine, rr, 1, 0);
+      // MultiFab::Dot(mask, x, xcomp, y, ycomp, ncomp, nghost)
+      result += amrex::MultiFab::Dot(mask, *mf1, 0, *mf2, 0, 1, 0);
+    } else {
+      // Finest level: all cells valid
+      result += amrex::MultiFab::Dot(*mf1, 0, *mf2, 0, 1, 0);
+    }
+  }
+  return static_cast<double>(result);
+}
+
 //=============================================================================
 // MultiFab Averaging Utilities (Unified API)
 // All 4 types (cell, face, edge, node) have the same signature pattern:

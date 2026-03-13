@@ -6,7 +6,7 @@ Max level: 5
 
 # Regridding parameters
 Regrid nsteps:    10
-Tagging Reynolds: 20
+Tagging Reynolds: 10
 
 # Flow parameters
 Density ratio :  1000
