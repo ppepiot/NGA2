@@ -573,6 +573,8 @@ contains
    subroutine store_old(this)
       implicit none
       class(amrvof), intent(inout) :: this
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Copy VF to VFold
       call this%VFold%copy(src=this%VF)
       ! Copy CL, CG, and PLIC
@@ -794,6 +796,9 @@ contains
       ! Start timer
       t0=MPI_Wtime()
 
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
+
       ! Perform PLICnet reconstruction
       call this%build_plicnet(time)
 
@@ -834,6 +839,8 @@ contains
       type(amrex_box) :: bx
       ! Start timer
       t0=MPI_Wtime()
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Only build at finest level
       lvl=this%amr%maxlvl
       ! Get cell size at this level
@@ -968,11 +975,13 @@ contains
       integer :: poly_nv
       ! Start timer
       t0=MPI_Wtime()
+      ! Reset polygon storage
+      call this%smesh%reset()
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Get level and cell size
       lvl=this%amr%maxlvl
       dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
-      ! Reset polygon storage
-      call this%smesh%reset()
       ! Compute new polygons
       call this%amr%mfiter_build(lvl,mfi,tiling=.false.)
       do while (mfi%next())
@@ -1036,6 +1045,8 @@ contains
       real(WP), dimension(3) :: bary_liq,bary_gas,cell_center
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Only work at finest level
       lvl=this%amr%maxlvl
       dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
@@ -1159,6 +1170,8 @@ contains
       real(WP), dimension(3) :: bary_liq,bary_gas
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Only work at finest level
       lvl=this%amr%maxlvl
       dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
@@ -1237,6 +1250,9 @@ contains
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pVFold   ! VFold used in tet2flux_plic
       ! Start full routine timer
       t0=MPI_Wtime()
+
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
 
       ! Level at which we're working
       lvl=this%amr%maxlvl
@@ -1854,6 +1870,8 @@ contains
       real(WP), intent(out) :: cfl
       real(WP) :: Umax,Vmax,Wmax,CFLx,CFLy,CFLz
       integer :: lvl
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Get finest level metrics
       lvl=this%amr%maxlvl
       ! Get max velocity norms
@@ -1880,7 +1898,10 @@ contains
       implicit none
       class(amrvof), intent(inout) :: this
       integer :: ierr
-      
+
+      ! Return if clvl<maxlvl
+      if (this%amr%clvl().lt.this%amr%maxlvl) return
+
       ! Get min/max at finest level and integral at level 0
       this%VFmin=this%VF%get_min(lvl=this%amr%maxlvl)
       this%VFmax=this%VF%get_max(lvl=this%amr%maxlvl)

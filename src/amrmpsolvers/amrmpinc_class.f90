@@ -1399,8 +1399,8 @@ contains
       logical :: crossed_plic ! Used in tet2flux/tet2flux_plic
 
       ! Build transport band at finest level to localize SL computation
-      call this%amr%mfab_build(lvl=this%amr%maxlvl,mfab=band,ncomp=1,nover=1)
-      call this%build_band(lvl=this%amr%maxlvl,VF=this%VFold%mf(this%amr%maxlvl),band=band,nband=2)
+      call this%amr%mfab_build(lvl=this%amr%clvl(),mfab=band,ncomp=1,nover=1)
+      call this%build_band(lvl=this%amr%clvl(),VF=this%VFold%mf(this%amr%clvl()),band=band,nband=2)
 
       ! Allocate all fluxes
       define_fluxes: block
@@ -1412,9 +1412,9 @@ contains
             call this%amr%mfab_build(lvl=lvl,mfab=Fz(lvl),ncomp=3,nover=0,atface=[.false.,.false.,.true. ]); call Fz(lvl)%setval(0.0_WP)
          end do
          ! Volume moment fluxes at finest level (8 components: Lvol,Gvol,Lbar,Gbar)
-         call this%amr%mfab_build(lvl=this%amr%maxlvl,mfab=Vx,ncomp=8,nover=0,atface=[.true. ,.false.,.false.]); call Vx%setval(0.0_WP)
-         call this%amr%mfab_build(lvl=this%amr%maxlvl,mfab=Vy,ncomp=8,nover=0,atface=[.false.,.true. ,.false.]); call Vy%setval(0.0_WP)
-         call this%amr%mfab_build(lvl=this%amr%maxlvl,mfab=Vz,ncomp=8,nover=0,atface=[.false.,.false.,.true. ]); call Vz%setval(0.0_WP)
+         call this%amr%mfab_build(lvl=this%amr%clvl(),mfab=Vx,ncomp=8,nover=0,atface=[.true. ,.false.,.false.]); call Vx%setval(0.0_WP)
+         call this%amr%mfab_build(lvl=this%amr%clvl(),mfab=Vy,ncomp=8,nover=0,atface=[.false.,.true. ,.false.]); call Vy%setval(0.0_WP)
+         call this%amr%mfab_build(lvl=this%amr%clvl(),mfab=Vz,ncomp=8,nover=0,atface=[.false.,.false.,.true. ]); call Vz%setval(0.0_WP)
       end block define_fluxes
 
       ! Phase 1a: Semi-Lagrangian fluxes at finest level
@@ -1431,6 +1431,8 @@ contains
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pBand,pVx,pVy,pVz,pFx,pFy,pFz,pUVW
          type(amrex_mfiter) :: mfi
          type(amrex_box) :: fbx,nbx
+         ! Skip if clvl < maxlvl
+         if (this%amr%clvl().lt.this%amr%maxlvl) exit semilagrangian_fluxes
          ! Get finest level info
          lvl=this%amr%maxlvl
          dx=this%amr%dx(lvl); dxi=1.0_WP/this%amr%dx(lvl)
@@ -1785,7 +1787,7 @@ contains
       end block divergence_and_sources
 
       ! Sync and apply BC
-      call this%fill(lvl=this%amr%maxlvl,time=time)
+      call this%fill(lvl=this%amr%clvl(),time=time)
 
       ! Cleanup temporary mfabs
       cleanup: block
