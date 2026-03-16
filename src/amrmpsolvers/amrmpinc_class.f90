@@ -75,26 +75,28 @@ module amrmpinc_class
       procedure :: tagging
       procedure :: get_cost
       ! Staggered velocity fills
-      procedure :: fill_velocity_lvl         !< Fill face velocity ghosts at single level
-      procedure :: fill_velocity             !< Fill face velocity ghosts on all levels
-      procedure :: fill_velocity_from_coarse !< Fill face velocity from coarse
-      procedure :: sync_velocity_lvl         !< Sync face velocity ghosts at single level
-      procedure :: sync_velocity             !< Sync face velocity ghosts on all levels
-      procedure :: fill_velocity_mfab        !< Fill dest MultiFabs for regridding
-      procedure :: average_down_velocity     !< Average down face velocity for C/F consistency
-      procedure :: average_down_velocity_to  !< Average down face velocity for single level
+      procedure :: fill_velocity_lvl          !< Fill face velocity ghosts at single level
+      procedure :: fill_velocity              !< Fill face velocity ghosts on all levels
+      procedure :: fill_velocity_from_coarse  !< Fill face velocity from coarse
+      procedure :: sync_velocity_lvl          !< Sync face velocity ghosts at single level
+      procedure :: sync_velocity              !< Sync face velocity ghosts on all levels
+      procedure :: fill_velocity_mfab         !< Fill dest MultiFabs for regridding
+      procedure :: average_down_velocity      !< Average down face velocity for C/F consistency
+      procedure :: average_down_velocity_to   !< Average down face velocity for single level
       ! Utilities
-      procedure :: store_old                 !< Store current state to old state
-      procedure :: get_div                   !< Compute divergence (assumes velocity ghosts filled)
-      procedure :: interp_vel_to_face        !< Interpolate cell-centered velocity to face
-      procedure :: prepare_psolver           !< Prepare pressure solver with new densities
-      procedure :: correct_both_velocities   !< Correct both face and cell-centered velocities
+      procedure :: store_old                  !< Store current state to old state
+      procedure :: get_div                    !< Compute divergence (assumes velocity ghosts filled)
+      procedure :: interp_vel_to_face         !< Interpolate cell-centered velocity to face
+      procedure :: prepare_psolver            !< Prepare pressure solver with new densities
+      procedure :: correct_both_velocities    !< Correct both face and cell-centered velocities
+      procedure :: add_surface_tension        !< Add surface tension increment to both velocities
+      procedure, private :: apply_face_fluxes !< Apply pre-built face fluxes to both face and cell-centered velocities
       ! Physics procedures
-      procedure :: get_dUVWdt                !< Compute d(UVW)/dt
-      procedure :: get_dmomdt                !< Compute d(mom)/dt
-      procedure :: add_vreman                !< Add Vreman SGS eddy viscosity
-      procedure :: get_cfl                   !< Compute CFL numbers
-      procedure :: correct_outflow           !< Correct outflow for global mass conservation
+      procedure :: get_dUVWdt                 !< Compute d(UVW)/dt
+      procedure :: get_dmomdt                 !< Compute d(mom)/dt
+      procedure :: add_vreman                 !< Add Vreman SGS eddy viscosity
+      procedure :: get_cfl                    !< Compute CFL numbers
+      procedure :: correct_outflow            !< Correct outflow for global mass conservation
       ! Print solver info
       procedure :: get_info
       procedure :: print => amrmpinc_print
@@ -1207,8 +1209,8 @@ contains
       type(amrex_multifab), dimension(:), allocatable :: Fx,Fy,Fz
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pP,pFx,pFy,pFz,pUVW,pVF,pSubVF
-      real(WP) :: dxi,dyi,dzi,VF_f,rho,rhoLo,rhoHi
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pP,pFx,pFy,pFz,pVF,pSubVF
+      real(WP) :: dxi,dyi,dzi,VF_f
       integer :: lvl,i,j,k
       ! Build temp face mfabs to store pressure fluxes
       allocate(Fx(0:this%amr%clvl()),Fy(0:this%amr%clvl()),Fz(0:this%amr%clvl()))
@@ -1250,13 +1252,113 @@ contains
          ! Use psolver's solution and its internal ghosts
          call this%psolver%get_fluxes(Fx,Fy,Fz)
       end if
-      ! Apply to face velocities and cell-centered in one pass
+      ! Delegate face+cell application to apply_face_fluxes method
+      call this%apply_face_fluxes(scale,Fx,Fy,Fz)
+      ! Destroy temps
       do lvl=0,this%amr%clvl()
-         ! Face: use flux directly
+         call this%amr%mfab_destroy(Fx(lvl))
+         call this%amr%mfab_destroy(Fy(lvl))
+         call this%amr%mfab_destroy(Fz(lvl))
+      end do
+   end subroutine correct_both_velocities
+
+   !> Add CSF surface-tension velocity increment
+   !> Builds face fluxes 1/rho*sigma*kappa*grad(VF) at maxlvl, avg_down, then calls apply_face_fluxes
+   subroutine add_surface_tension(this,scale)
+      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+      use amrex_interface, only: amrmfab_average_down_face
+      implicit none
+      class(amrmpinc), intent(inout) :: this
+      real(WP), intent(in) :: scale
+      type(amrex_multifab), dimension(:), allocatable :: STFx,STFy,STFz
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pSTFx,pSTFy,pSTFz,pVF,pSubVF,pCurv,pSD
+      real(WP) :: dxi,dyi,dzi,VF_f,mysurf,mycurv
+      integer :: lvl,i,j,k
+      ! Guard: no surface tension or clvl<maxlvl
+      if (this%sigma.eq.0.0_WP.or.this%amr%clvl().lt.this%amr%maxlvl) return
+      ! Build temp face flux mfabs
+      allocate(STFx(0:this%amr%clvl()),STFy(0:this%amr%clvl()),STFz(0:this%amr%clvl()))
+      do lvl=0,this%amr%clvl()
+         call this%amr%mfab_build(lvl,STFx(lvl),ncomp=1,nover=0,atface=[.true., .false.,.false.]); call STFx(lvl)%setval(0.0_WP)
+         call this%amr%mfab_build(lvl,STFy(lvl),ncomp=1,nover=0,atface=[.false.,.true., .false.]); call STFy(lvl)%setval(0.0_WP)
+         call this%amr%mfab_build(lvl,STFz(lvl),ncomp=1,nover=0,atface=[.false.,.false.,.true. ]); call STFz(lvl)%setval(0.0_WP)
+      end do
+      ! Compute ST face fluxes at finest level
+      lvl=this%amr%maxlvl
+      dxi=1.0_WP/this%amr%dx(lvl); dyi=1.0_WP/this%amr%dy(lvl); dzi=1.0_WP/this%amr%dz(lvl)
+      call this%amr%mfiter_build(lvl,mfi)
+      do while (mfi%next())
+         pVF   =>this%VF%mf(lvl)%dataptr(mfi)
+         pSubVF=>this%subVF%dataptr(mfi)
+         pCurv =>this%curv%dataptr(mfi)
+         pSD   =>this%SD%dataptr(mfi)
+         pSTFx =>STFx(lvl)%dataptr(mfi)
+         pSTFy =>STFy(lvl)%dataptr(mfi)
+         pSTFz =>STFz(lvl)%dataptr(mfi)
+         ! X-faces
+         bx=mfi%nodaltilebox(1)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            mycurv=0.0_WP
+            mysurf=sum(pSD(i-1:i,j,k,1)); if (mysurf.gt.0.0_WP) mycurv=sum(pSD(i-1:i,j,k,1)*pCurv(i-1:i,j,k,1))/mysurf
+            VF_f=0.5_WP*(pSubVF(i-1,j,k,2)+pSubVF(i,j,k,1))
+            pSTFx(i,j,k,1)=this%sigma*mycurv*(pVF(i,j,k,1)-pVF(i-1,j,k,1))*dxi/(this%rhoL*VF_f+this%rhoG*(1.0_WP-VF_f))
+         end do; end do; end do
+         ! Y-faces
+         bx=mfi%nodaltilebox(2)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            mycurv=0.0_WP
+            mysurf=sum(pSD(i,j-1:j,k,1)); if (mysurf.gt.0.0_WP) mycurv=sum(pSD(i,j-1:j,k,1)*pCurv(i,j-1:j,k,1))/mysurf
+            VF_f=0.5_WP*(pSubVF(i,j-1,k,4)+pSubVF(i,j,k,3))
+            pSTFy(i,j,k,1)=this%sigma*mycurv*(pVF(i,j,k,1)-pVF(i,j-1,k,1))*dyi/(this%rhoL*VF_f+this%rhoG*(1.0_WP-VF_f))
+         end do; end do; end do
+         ! Z-faces
+         bx=mfi%nodaltilebox(3)
+         do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+            mycurv=0.0_WP
+            mysurf=sum(pSD(i,j,k-1:k,1)); if (mysurf.gt.0.0_WP) mycurv=sum(pSD(i,j,k-1:k,1)*pCurv(i,j,k-1:k,1))/mysurf
+            VF_f=0.5_WP*(pSubVF(i,j,k-1,6)+pSubVF(i,j,k,5))
+            pSTFz(i,j,k,1)=this%sigma*mycurv*(pVF(i,j,k,1)-pVF(i,j,k-1,1))*dzi/(this%rhoL*VF_f+this%rhoG*(1.0_WP-VF_f))
+         end do; end do; end do
+      end do
+      call this%amr%mfiter_destroy(mfi)
+      ! Average down face fluxes from finest to coarser levels
+      do lvl=this%amr%clvl()-1,0,-1
+         call amrmfab_average_down_face(fmf=STFx(lvl+1),cmf=STFx(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_face(fmf=STFy(lvl+1),cmf=STFy(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
+         call amrmfab_average_down_face(fmf=STFz(lvl+1),cmf=STFz(lvl),rr=[this%amr%rrefx(lvl),this%amr%rrefy(lvl),this%amr%rrefz(lvl)],cgeom=this%amr%geom(lvl))
+      end do
+      ! Apply fluxes
+      call this%apply_face_fluxes(scale,STFx,STFy,STFz)
+      ! Destroy temps
+      do lvl=0,this%amr%clvl()
+         call this%amr%mfab_destroy(STFx(lvl))
+         call this%amr%mfab_destroy(STFy(lvl))
+         call this%amr%mfab_destroy(STFz(lvl))
+      end do
+      deallocate(STFx,STFy,STFz)
+   end subroutine add_surface_tension
+
+   !> Apply pre-built face fluxes to both face and cell-centered velocities
+   !> scale * Fx/Fy/Fz is saxpy'd onto U/V/W, then density-weighted to UVW
+   subroutine apply_face_fluxes(this,scale,Fx,Fy,Fz)
+      use amrex_amr_module, only: amrex_multifab,amrex_mfiter,amrex_box
+      implicit none
+      class(amrmpinc), intent(inout) :: this
+      real(WP), intent(in) :: scale
+      type(amrex_multifab), intent(in) :: Fx(0:),Fy(0:),Fz(0:)
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pFx,pFy,pFz,pUVW,pVF,pSubVF
+      real(WP) :: rho,rhoLo,rhoHi
+      integer :: lvl,i,j,k
+      do lvl=0,this%amr%clvl()
+         ! Face velocities
          call this%U%mf(lvl)%saxpy(scale,Fx(lvl),1,1,1,0)
          call this%V%mf(lvl)%saxpy(scale,Fy(lvl),1,1,1,0)
          call this%W%mf(lvl)%saxpy(scale,Fz(lvl),1,1,1,0)
-         ! Cell-center: density-weighted average flux to cell center
+         ! Cell-centred velocities: density-weighted average of face fluxes
          call this%amr%mfiter_build(lvl,mfi)
          do while (mfi%next())
             pUVW=>this%UVW%mf(lvl)%dataptr(mfi)
@@ -1265,22 +1367,21 @@ contains
             if (lvl.eq.this%amr%maxlvl) pSubVF=>this%subVF%dataptr(mfi)
             bx=mfi%tilebox()
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
-               ! Cell-centered density
                rho=this%rhoL*pVF(i,j,k,1)+this%rhoG*(1.0_WP-pVF(i,j,k,1))
-               ! X-flux weighted by rhoLo/rhoHi
+               ! X
                rhoLo=rho; if (lvl.eq.this%amr%maxlvl) rhoLo=this%rhoL*pSubVF(i,j,k,1)+this%rhoG*(1.0_WP-pSubVF(i,j,k,1))
                rhoHi=rho; if (lvl.eq.this%amr%maxlvl) rhoHi=this%rhoL*pSubVF(i,j,k,2)+this%rhoG*(1.0_WP-pSubVF(i,j,k,2))
                pUVW(i,j,k,1)=pUVW(i,j,k,1)+scale*0.5_WP*(rhoLo*pFx(i,j,k,1)+rhoHi*pFx(i+1,j,k,1))/rho
-               ! Y-flux weighted by rhoLo/rhoHi
+               ! Y
                rhoLo=rho; if (lvl.eq.this%amr%maxlvl) rhoLo=this%rhoL*pSubVF(i,j,k,3)+this%rhoG*(1.0_WP-pSubVF(i,j,k,3))
                rhoHi=rho; if (lvl.eq.this%amr%maxlvl) rhoHi=this%rhoL*pSubVF(i,j,k,4)+this%rhoG*(1.0_WP-pSubVF(i,j,k,4))
                pUVW(i,j,k,2)=pUVW(i,j,k,2)+scale*0.5_WP*(rhoLo*pFy(i,j,k,1)+rhoHi*pFy(i,j+1,k,1))/rho
-               ! Z-flux weighted by rhoLo/rhoHi
+               ! Z
                rhoLo=rho; if (lvl.eq.this%amr%maxlvl) rhoLo=this%rhoL*pSubVF(i,j,k,5)+this%rhoG*(1.0_WP-pSubVF(i,j,k,5))
                rhoHi=rho; if (lvl.eq.this%amr%maxlvl) rhoHi=this%rhoL*pSubVF(i,j,k,6)+this%rhoG*(1.0_WP-pSubVF(i,j,k,6))
                pUVW(i,j,k,3)=pUVW(i,j,k,3)+scale*0.5_WP*(rhoLo*pFz(i,j,k,1)+rhoHi*pFz(i,j,k+1,1))/rho
             end do; end do; end do
-            ! Fix non-periodic boundary conditions
+            ! Non-periodic boundary cells (only one face flux available)
             if (.not.this%amr%xper.and.bx%lo(1).eq.this%amr%geom(lvl)%domain%lo(1)) then
                i=this%amr%geom(lvl)%domain%lo(1); do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2)
                   rho=this%rhoL*pVF(i,j,k,1)+this%rhoG*(1.0_WP-pVF(i,j,k,1))
@@ -1326,13 +1427,7 @@ contains
          end do
          call this%amr%mfiter_destroy(mfi)
       end do
-      ! Destroy temps
-      do lvl=0,this%amr%clvl()
-         call this%amr%mfab_destroy(Fx(lvl))
-         call this%amr%mfab_destroy(Fy(lvl))
-         call this%amr%mfab_destroy(Fz(lvl))
-      end do
-   end subroutine correct_both_velocities
+   end subroutine apply_face_fluxes
 
    ! ============================================================================
    ! PHYSICS METHODS
@@ -2190,6 +2285,7 @@ contains
 
    !> Compute CFL numbers (convective and viscous)
    subroutine get_cfl(this,dt,cfl,cflc)
+      use mathtools, only: Pi
       implicit none
       class(amrmpinc), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -2200,6 +2296,7 @@ contains
       ! Reset CFLs
       this%CFLc_x=0.0_WP; this%CFLc_y=0.0_WP; this%CFLc_z=0.0_WP
       this%CFLv_x=0.0_WP; this%CFLv_y=0.0_WP; this%CFLv_z=0.0_WP
+      this%CFLst=0.0_WP
       ! Compute CFL at each level (finest level determines dt)
       do lvl=0,this%amr%clvl()
          Umax_lvl=this%U%norm0(lvl=lvl)
@@ -2238,8 +2335,10 @@ contains
          if (this%amr%ny.gt.1) this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt/this%amr%dy(lvl)**2)
          if (this%amr%nz.gt.1) this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt/this%amr%dz(lvl)**2)
       end do
+      ! Surface-tension CFL (capillary wave stability criterion)
+      if (this%sigma.gt.0.0_WP.and.this%amr%clvl().eq.this%amr%maxlvl) this%CFLst=dt/sqrt((this%rhoL+this%rhoG)*this%amr%min_meshsize(this%amr%maxlvl)**3/(4.0_WP*Pi*this%sigma))
       ! Compute max overall CFL
-      this%CFL=max(this%CFLc_x,this%CFLc_y,this%CFLc_z,this%CFLv_x,this%CFLv_y,this%CFLv_z)
+      this%CFL=max(this%CFLc_x,this%CFLc_y,this%CFLc_z,this%CFLv_x,this%CFLv_y,this%CFLv_z,this%CFLst)
       ! Return max overall CFL
       cfl=this%CFL
       ! Optionally return max convective CFL

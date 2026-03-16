@@ -52,8 +52,10 @@ module amrvof_class
       ! PLIC: finest-level-only multifab, 4 components (nx, ny, nz, d)
       type(amrex_multifab) :: PLIC,PLICold
 
-      ! Curvature: finest-level-only multifab, 1 component
+      ! Curvature
+      logical :: calculate_curv=.true.
       type(amrex_multifab) :: curv
+      type(amrex_multifab) :: SD
 
       ! Subcell volume fractions
       type(amrex_multifab) :: subVF
@@ -272,7 +274,12 @@ contains
       call this%VF%initialize   (amr,name='VF'   ,ncomp=1,ng=this%nover,interp=amrex_interp_pc); this%VF%parent   =>this
       call this%VFold%initialize(amr,name='VFold',ncomp=1,ng=this%nover,interp=amrex_interp_pc); this%VFold%parent=>this
       ! Initialize surface mesh for visualization
-      this%smesh%name=trim(this%name)//'_plic'
+      if (this%calculate_curv) then
+         this%smesh=surfmesh(nvar=1,name=trim(this%name)//'_plic')
+         this%smesh%varname(1)='curv'
+      else
+         this%smesh=surfmesh(nvar=0,name=trim(this%name)//'_plic')
+      end if
       ! Register callbacks with amrgrid
       if (.not.this%skip_registration) then
          select type (this)
@@ -307,8 +314,9 @@ contains
       call amrex_multifab_destroy(this%PLICold)
       call amrex_multifab_destroy(this%subVF)
       call amrex_multifab_destroy(this%curv)
-      ! Reset surface mesh
-      call this%smesh%reset()
+      call amrex_multifab_destroy(this%SD)
+      ! Finalize surface mesh
+      call this%smesh%finalize()
       ! Nullify pointers
       nullify(this%amr)
       nullify(this%user_vof_init)
@@ -340,7 +348,6 @@ contains
          call mfab_rebuild(this%CLold  ,ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%CGold  ,ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%PLICold,ba,dm,nc=4,ng=this%nover)
-         call mfab_rebuild(this%curv   ,ba,dm,nc=1,ng=this%nover)
       end if
    end subroutine on_init
 
@@ -365,7 +372,6 @@ contains
          call mfab_rebuild(this%CLold,  ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%CGold,  ba,dm,nc=3,ng=this%nover)
          call mfab_rebuild(this%PLICold,ba,dm,nc=4,ng=this%nover)
-         call mfab_rebuild(this%curv   ,ba,dm,nc=1,ng=this%nover)
          ! Set to trivial values
          trivialize: block
             use amrex_amr_module, only: amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy
@@ -412,17 +418,16 @@ contains
          remake_finest: block
             use amrex_amr_module, only: amrex_multifab_build,amrex_multifab_destroy, &
             &                           amrex_mfiter,amrex_mfiter_build,amrex_mfiter_destroy
-            type(amrex_multifab) :: CL_new,CG_new,PLIC_new,curv_new
+            type(amrex_multifab) :: CL_new,CG_new,PLIC_new
             type(amrex_mfiter) :: mfi
             type(amrex_box) :: bx
-            real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC,pCurv
+            real(WP), dimension(:,:,:,:), contiguous, pointer :: pVF,pCL,pCG,pPLIC
             real(WP) :: dx,dy,dz
             integer :: i,j,k
             ! Build new mfabs
             call amrex_multifab_build(CL_new  ,ba,dm,nc=3,ng=this%nover)
             call amrex_multifab_build(CG_new  ,ba,dm,nc=3,ng=this%nover)
             call amrex_multifab_build(PLIC_new,ba,dm,nc=4,ng=this%nover)
-            call amrex_multifab_build(curv_new,ba,dm,nc=1,ng=this%nover)
             ! Set to trivial values
             dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
             call amrex_mfiter_build(mfi,ba,dm,tiling=.false.)
@@ -432,14 +437,12 @@ contains
                pCL  =>CL_new%dataptr(mfi)
                pCG  =>CG_new%dataptr(mfi)
                pPLIC=>PLIC_new%dataptr(mfi)
-               pCurv=>curv_new%dataptr(mfi)
                ! Get tilebox
                bx=mfi%tilebox()
                do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
                   pCL(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                   pCG(i,j,k,:)=[this%amr%xlo+(real(i,WP)+0.5_WP)*dx,this%amr%ylo+(real(j,WP)+0.5_WP)*dy,this%amr%zlo+(real(k,WP)+0.5_WP)*dz]
                   pPLIC(i,j,k,:)=[0.0_WP,0.0_WP,0.0_WP,sign(1.0e10_WP,pVF(i,j,k,1)-0.5_WP)]
-                  pCurv(i,j,k,1)=0.0_WP
                end do; end do; end do
             end do
             call amrex_mfiter_destroy(mfi)
@@ -447,12 +450,10 @@ contains
             call CL_new%parallel_copy(this%CL,this%amr%geom(lvl))
             call CG_new%parallel_copy(this%CG,this%amr%geom(lvl))
             call PLIC_new%parallel_copy(this%PLIC,this%amr%geom(lvl))
-            call curv_new%parallel_copy(this%curv,this%amr%geom(lvl))
             ! Destroy old, assign new
             call amrex_multifab_destroy(this%CL  ); call this%CL%move(CL_new)
             call amrex_multifab_destroy(this%CG  ); call this%CG%move(CG_new)
             call amrex_multifab_destroy(this%PLIC); call this%PLIC%move(PLIC_new)
-            call amrex_multifab_destroy(this%curv); call this%curv%move(curv_new); call this%curv%fill_boundary(this%amr%geom(lvl))
             ! Rebuild old multifabs
             call mfab_rebuild(this%CLold,  ba,dm,nc=3,ng=this%nover)
             call mfab_rebuild(this%CGold,  ba,dm,nc=3,ng=this%nover)
@@ -476,7 +477,6 @@ contains
          call amrex_multifab_destroy(this%CLold)
          call amrex_multifab_destroy(this%CGold)
          call amrex_multifab_destroy(this%PLICold)
-         call amrex_multifab_destroy(this%curv)
       end if
    end subroutine on_clear
 
@@ -967,14 +967,15 @@ contains
    !> Build polygons and curvature from PLIC planes
    subroutine build_polygons(this)
       use mpi_f08, only: MPI_Wtime
-      use amrvof_geometry, only: cut_hex_polygon
-      use amrex_amr_module, only: amrex_mfiter
+      use amrvof_geometry, only: cut_hex_polygon,poly_area
+      use amrex_amr_module, only: amrex_mfiter,amrex_multifab_destroy
+      use amrgrid_class, only: mfab_rebuild
       implicit none
       class(amrvof), intent(inout) :: this
       integer :: lvl
       real(WP) :: dx,dy,dz,t0
       integer :: i,j,k
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pPLIC,pCurv,pSD
       real(WP), dimension(3) :: lo,hi
       real(WP), dimension(4) :: plane
       real(WP), dimension(3,8) :: hex
@@ -984,16 +985,25 @@ contains
       real(WP), dimension(:,:,:,:,:), allocatable :: polygon_local  ! (3, 6, ilo:ihi, jlo:jhi, klo:khi)
       integer, dimension(:,:,:), allocatable :: poly_nv_local       ! (ilo:ihi, jlo:jhi, klo:khi)
       real(WP), dimension(3,6) :: poly_verts
+      real(WP) :: maxcurv,mycurv,ivol
       integer :: poly_nv
       ! Start timer
       t0=MPI_Wtime()
-      ! Reset polygon storage
+      ! Reset polygon and curvature storage
       call this%smesh%reset()
+      call amrex_multifab_destroy(this%curv)
+      call amrex_multifab_destroy(this%SD)
       ! Return if clvl<maxlvl
       if (this%amr%clvl().lt.this%amr%maxlvl) return
       ! Get level and cell size
       lvl=this%amr%maxlvl
-      dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl)
+      dx=this%amr%dx(lvl); dy=this%amr%dy(lvl); dz=this%amr%dz(lvl); ivol=1.0_WP/this%amr%cell_vol(lvl)
+      maxcurv=1.0_WP/this%amr%min_meshsize(lvl)
+      ! Create new curv and SD mfabs
+      if (this%calculate_curv) then
+         call mfab_rebuild(this%curv,this%amr%get_boxarray(lvl),this%amr%get_distromap(lvl),nc=1,ng=this%nover)
+         call mfab_rebuild(this%SD  ,this%amr%get_boxarray(lvl),this%amr%get_distromap(lvl),nc=1,ng=this%nover)
+      end if
       ! Compute new polygons
       call this%amr%mfiter_build(lvl,mfi,tiling=.false.)
       do while (mfi%next())
@@ -1027,21 +1037,137 @@ contains
             if (poly_nv.ge.3) polygon_local(:,1:poly_nv,i,j,k)=poly_verts(:,1:poly_nv)
          end do; end do; end do
          ! ----- Step C: Compute curvature (valid cells, stencil access) -----
-         ! TODO: curvature = f(polygon_local stencil around i,j,k)
-         ! For now, skip curvature computation
+         if (this%calculate_curv) then
+            ! Get pointer to curvature data
+            pCurv=>this%curv%dataptr(mfi)
+            pSD  =>this%SD%dataptr(mfi)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               ! Skip cells with no interface
+               if (abs(pPLIC(i,j,k,4)).gt.1.0e+9_WP) cycle
+               ! Compute curvature
+               call paraboloid_integral_fit(i,j,k,mycurv)
+               ! Clip and store
+               pCurv(i,j,k,1)=max(min(mycurv,maxcurv),-maxcurv)
+               ! Compute surface area density
+               pSD(i,j,k,1)=ivol*poly_area(poly_nv_local(i,j,k),polygon_local(:,1:poly_nv_local(i,j,k),i,j,k))
+            end do; end do; end do
+         end if
          ! ----- Step D: Append to smesh (valid cells only) -----
          do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
             poly_nv=poly_nv_local(i,j,k)
-            if (poly_nv.ge.3) call this%smesh%add_polygon(polygon_local(:,1:poly_nv,i,j,k),poly_nv)
+            if (poly_nv.ge.3) then
+               if (this%calculate_curv) then
+                  call this%smesh%add_polygon(nv=poly_nv,verts=polygon_local(:,1:poly_nv,i,j,k),vardata=[pCurv(i,j,k,1)])
+               else
+                  call this%smesh%add_polygon(nv=poly_nv,verts=polygon_local(:,1:poly_nv,i,j,k))
+               end if
+            end if
          end do; end do; end do
          ! ----- Step E: Deallocate per-FAB storage -----
          deallocate(polygon_local,poly_nv_local)
       end do
       call this%amr%mfiter_destroy(mfi)
       ! Fill curvature boundary
-      call this%curv%fill_boundary(this%amr%geom(lvl))
+      if (this%calculate_curv) then
+         call this%curv%fill_boundary(this%amr%geom(lvl))
+         call this%SD%fill_boundary(this%amr%geom(lvl))
+      end if
       ! End timer
       this%wt_polygon=this%wt_polygon+(MPI_Wtime()-t0)
+
+   contains
+
+      !> Paraboloid integral fit for curvature at cell (i,j,k)
+      !> Fits F(t,s)=b1+b2*t+b3*s+b4*t^2+b5*t*s+b6*s^2 to the 5x5x5 stencil
+      !> via a weighted symmetric 6x6 least-squares system (symsolve).
+      !> Host-associated: polygon_local, poly_nv_local, pPLIC, maxcurv
+      subroutine paraboloid_integral_fit(i,j,k,mycurv)
+         use mathtools, only: normalize,cross_product,symsolve
+         implicit none
+         integer,  intent(in)  :: i,j,k
+         real(WP), intent(out) :: mycurv
+         ! Local basis vectors
+         real(WP), dimension(3) :: pref,nref,tref,sref
+         real(WP), dimension(3) :: ploc,nloc,vert1,vert2,buf
+         real(WP), dimension(3) :: reconst_plane_coeffs
+         integer :: nv,n,ii,jj,kk,ai,aj,isinf
+         real(WP), dimension(6) :: integrals
+         real(WP) :: xv,xvn,yv,yvn,ww,b_dot_sum
+         ! Symmetric 6x6 least-squares system
+         real(WP), dimension(6,6) :: A
+         real(WP), dimension(6)   :: b
+
+         ! Reference point: centroid of center polygon (vertex mean for convex polygon)
+         nv=poly_nv_local(i,j,k)
+         pref=sum(polygon_local(:,1:nv,i,j,k),dim=2)/real(nv,WP)
+
+         ! Local orthonormal basis from center cell PLIC normal
+         nref=pPLIC(i,j,k,1:3)
+         select case (maxloc(abs(nref),1))
+          case (1); tref=normalize([+nref(2),-nref(1),0.0_WP])
+          case (2); tref=normalize([0.0_WP,+nref(3),-nref(2)])
+          case (3); tref=normalize([-nref(3),0.0_WP,+nref(1)])
+         end select
+         sref=cross_product(nref,tref)
+
+         ! Accumulate weighted symmetric LS system over 5x5x5 stencil
+         A=0.0_WP; b=0.0_WP
+         do kk=k-2,k+2; do jj=j-2,j+2; do ii=i-2,i+2
+            ! Skip pure cells (no polygon)
+            nv=poly_nv_local(ii,jj,kk); if (nv.lt.3) cycle
+            ! Skip polygons with anti-aligned normal
+            nloc=pPLIC(ii,jj,kk,1:3); if (dot_product(nloc,nref).le.0.0_WP) cycle
+            ! Compute neighbor centroid and transform to local frame
+            ploc=sum(polygon_local(:,1:nv,ii,jj,kk),dim=2)/real(nv,WP)
+            buf=(ploc-pref)*maxcurv; ploc=[dot_product(buf,tref),dot_product(buf,sref),dot_product(buf,nref)]
+            buf=nloc;                nloc=[dot_product(buf,tref),dot_product(buf,sref),dot_product(buf,nref)]
+            ! Skip edge-on polygons (would divide by zero in plane coefficients)
+            if (abs(nloc(3)).lt.1.0e-10_WP) cycle
+            ! Plane coefficients: n = reconst_plane_coeffs(1) + reconst_plane_coeffs(2)*t + reconst_plane_coeffs(3)*s
+            reconst_plane_coeffs(1)=-dot_product(nloc,ploc)
+            reconst_plane_coeffs(2)= nloc(1)
+            reconst_plane_coeffs(3)= nloc(2)
+            reconst_plane_coeffs=reconst_plane_coeffs/(-nloc(3))
+            ! Area integrals over polygon edges (shoelace-based, in local t-s frame)
+            integrals=0.0_WP
+            do n=1,nv
+               vert1=polygon_local(:,n,ii,jj,kk)
+               vert2=polygon_local(:,modulo(n,nv)+1,ii,jj,kk)
+               buf=(vert1-pref)*maxcurv; vert1=[dot_product(buf,tref),dot_product(buf,sref),dot_product(buf,nref)]
+               buf=(vert2-pref)*maxcurv; vert2=[dot_product(buf,tref),dot_product(buf,sref),dot_product(buf,nref)]
+               xv=vert1(1); xvn=vert2(1); yv=vert1(2); yvn=vert2(2)
+               integrals=integrals+[ &
+               (xv*yvn-xvn*yv)/2.0_WP, &
+               (xv+xvn)*(xv*yvn-xvn*yv)/6.0_WP, &
+               (yv+yvn)*(xv*yvn-xvn*yv)/6.0_WP, &
+               (xv+xvn)*(xv**2+xvn**2)*(yvn-yv)/12.0_WP, &
+               (yvn-yv)*(3.0_WP*xv**2*yv+xv**2*yvn+2.0_WP*xv*xvn*yv+2.0_WP*xv*xvn*yvn+xvn**2*yv+3.0_WP*xvn**2*yvn)/24.0_WP, &
+               (xv-xvn)*(yv+yvn)*(yv**2+yvn**2)/12.0_WP]
+            end do
+            b_dot_sum=dot_product(reconst_plane_coeffs,integrals(1:3))
+            ! Quasi-Gaussian weight on normalized distance from reference centroid
+            ww=wgauss(sqrt(dot_product(ploc,ploc)),2.5_WP)
+            ! Accumulate upper triangle and RHS
+            do aj=1,6; do ai=1,6; A(ai,aj)=A(ai,aj)+ww*integrals(ai)*integrals(aj); end do; end do
+            b=b+ww*integrals*b_dot_sum
+         end do; end do; end do
+
+         ! Solve symmetric system
+         b=symsolve(A,b,info=isinf)
+         if (isinf.ne.0) then; mycurv=0.0_WP; return; end if
+
+         ! Mean curvature
+         mycurv=-maxcurv*((1.0_WP+b(2)**2)*(2.0_WP*b(6))-2.0_WP*b(2)*b(3)*b(5)+(1.0_WP+b(3)**2)*(2.0_WP*b(4)))/((1.0_WP+b(2)**2+b(3)**2)**(1.5_WP))
+
+      end subroutine paraboloid_integral_fit
+
+      ! Quasi-Gaussian weighting function (h=2.5 is a good default)
+      real(WP) function wgauss(d,h)
+         implicit none
+         real(WP), intent(in) :: d,h
+         if (d.lt.h) then; wgauss=(1.0_WP+4.0_WP*d/h)*(1.0_WP-d/h)**4; else; wgauss=0.0_WP; end if
+      end function wgauss
+
    end subroutine build_polygons
 
    !> Reset VF and barycenters from PLIC plane to ensure consistency

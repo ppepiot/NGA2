@@ -257,8 +257,9 @@ contains
          ! Use face-linear interp if 2D (divfree requires ratio=2 in all dirs)
          if (amr%nz.eq.1) fs%interp_vel=amrex_interp_face_linear
          ! Set densities
-         fs%rhoG=1.0_WP
-         call param_read('Density ratio',fs%rhoL)
+         fs%rhoG=1.0_WP; call param_read('Density ratio',fs%rhoL)
+         ! Set surface tension coefficient
+         call param_read('Weber number',fs%sigma); fs%sigma=1.0_WP/fs%sigma
          ! Set molecular viscosities
          call param_read('Reynolds number',viscG_mol); viscG_mol=1.0_WP/viscG_mol
          call param_read('Viscosity ratio',viscL_mol); viscL_mol=viscG_mol*viscL_mol
@@ -355,6 +356,7 @@ contains
          call cflfile%add_column(time%n,'Timestep')
          call cflfile%add_column(time%t,'Time')
          call cflfile%add_column(time%dt,'dt')
+         call cflfile%add_column(fs%CFLst,'CFLst')
          call cflfile%add_column(fs%CFLc_x,'CFLc_x')
          call cflfile%add_column(fs%CFLc_y,'CFLc_y')
          call cflfile%add_column(fs%CFLc_z,'CFLc_z')
@@ -416,6 +418,9 @@ contains
 
             ! Increment both velocities with current pressure term
             call fs%correct_both_velocities(scale=time%dt,phi=fs%P)
+
+            ! Add surface tension to both velocities
+            call fs%add_surface_tension(scale=time%dt)
 
             ! Average down and fill ghosts
             call fs%UVW%average_down(); call fs%UVW%fill(time=time%t)
