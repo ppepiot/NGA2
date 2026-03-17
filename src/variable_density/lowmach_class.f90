@@ -20,7 +20,8 @@ module lowmach_class
    integer, parameter, public :: neumann=3           !< Zero normal gradient
    integer, parameter, public :: convective=4        !< Convective outflow condition
    integer, parameter, public :: clipped_neumann=5   !< Clipped Neumann condition (outflow only)
-   
+   integer, parameter, public :: slip=6              !< Free-slip condition
+
    !> Boundary conditions for the low-Mach solver
    type :: bcond
       type(bcond), pointer :: next                        !< Linked list of bconds
@@ -130,6 +131,7 @@ module lowmach_class
       procedure :: get_gradu                              !< Calculate velocity gradient tensor
       procedure :: get_div_stress                         !< Calculate divergence of stress
       procedure :: get_vorticity                          !< Calculate vorticity tensor
+      procedure :: get_ugradu                             !< Calculate (u.grad)u vector
       procedure :: get_mfr                                !< Calculate outgoing MFR through each bcond
       procedure :: correct_mfr                            !< Correct for mfr mismatch to ensure global conservation
       procedure :: shift_p                                !< Shift pressure to have zero average
@@ -766,7 +768,7 @@ contains
       
       ! Point to pressure solver linsol object
       this%psolv=>pressure_solver
-
+      
       ! Set 7-pt stencil map for the pressure solver
       this%psolv%stc(1,:)=[ 0, 0, 0]
       this%psolv%stc(2,:)=[+1, 0, 0]
@@ -824,6 +826,11 @@ contains
          ! Initialize the implicit velocity solver
          call this%implicit%init()
          
+      else
+         
+         ! Point to implicit solver linsol object
+         this%implicit=>NULL()
+         
       end if
       
    end subroutine setup
@@ -874,7 +881,7 @@ contains
       
       ! Now adjust the metrics accordingly
       select case (new_bc%type)
-      case (dirichlet) !< Dirichlet is set one face (i.e., velocit component) at the time
+      case (dirichlet) !< Dirichlet is set one face (i.e., velocity component) at the time
          select case (new_bc%face)
          case ('x')
             do n=1,new_bc%itr%n_
@@ -896,6 +903,7 @@ contains
       case (neumann) !< Neumann has to be at existing wall or at domain boundary!
       case (clipped_neumann)
       case (convective)
+      case (slip)
       case default
          call die('[lowmach apply_bcond] Unknown bcond type')
       end select
@@ -958,7 +966,7 @@ contains
                ! This is done by the user directly
                ! Unclear whether we want to do this within the solver...
                
-            case (neumann,clipped_neumann) !< Apply Neumann condition to all three components
+            case (neumann,clipped_neumann,slip) !< Apply Neumann condition to all three components
                ! Handle index shift due to staggering
                stag=min(my_bc%dir,0)
                ! Implement based on bcond direction
@@ -1026,6 +1034,29 @@ contains
                      end do
                   end select
                end if
+               ! If needed, no penetration
+               if (my_bc%type.eq.slip) then
+                  select case (my_bc%face)
+                  case ('x')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%U(i,j,k)=0.0_WP
+                        this%rhoU(i,j,k)=0.0_WP
+                     end do
+                  case ('y')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%V(i,j,k)=0.0_WP
+                        this%rhoV(i,j,k)=0.0_WP
+                     end do
+                  case ('z')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%W(i,j,k)=0.0_WP
+                        this%rhoW(i,j,k)=0.0_WP
+                     end do
+                  end select
+               end if
             
             case (convective)   ! Not implemented yet!
                
@@ -1035,18 +1066,18 @@ contains
             
          end if
          
-         ! Sync full fields after each bcond - this should be optimized
-         call this%cfg%sync(this%U)
-         call this%cfg%sync(this%V)
-         call this%cfg%sync(this%W)
-         call this%cfg%sync(this%rhoU)
-         call this%cfg%sync(this%rhoV)
-         call this%cfg%sync(this%rhoW)
-         
          ! Move on to the next bcond
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields after all bcond
+      call this%cfg%sync(this%U)
+      call this%cfg%sync(this%V)
+      call this%cfg%sync(this%W)
+      call this%cfg%sync(this%rhoU)
+      call this%cfg%sync(this%rhoV)
+      call this%cfg%sync(this%rhoW)
       
    end subroutine apply_bcond
    
@@ -1060,6 +1091,9 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: drhoWdt !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k,ii,jj,kk
       real(WP), dimension(:,:,:), allocatable :: FX,FY,FZ
+      
+      ! Zero out drhoUVW/dt arrays
+      drhoUdt=0.0_WP; drhoVdt=0.0_WP; drhoWdt=0.0_WP
       
       ! Allocate flux arrays
       allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
@@ -1203,6 +1237,7 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: Pgrady !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: Pgradz !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
+      Pgradx=0.0_WP; Pgrady=0.0_WP; Pgradz=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -1224,9 +1259,9 @@ contains
       implicit none
       class(lowmach), intent(inout) :: this
       integer :: i,j,k
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
                this%U(i,j,k)=this%rhoU(i,j,k)/sum(this%itpr_x(:,i,j,k)*this%rho(i-1:i,j,k))
                this%V(i,j,k)=this%rhoV(i,j,k)/sum(this%itpr_y(:,i,j,k)*this%rho(i,j-1:j,k))
                this%W(i,j,k)=this%rhoW(i,j,k)/sum(this%itpr_z(:,i,j,k)*this%rho(i,j,k-1:k))
@@ -1245,9 +1280,9 @@ contains
       implicit none
       class(lowmach), intent(inout) :: this
       integer :: i,j,k
-      do k=this%cfg%kmin_,this%cfg%kmax_
-         do j=this%cfg%jmin_,this%cfg%jmax_
-            do i=this%cfg%imin_,this%cfg%imax_
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
                this%rhoU(i,j,k)=this%U(i,j,k)*sum(this%itpr_x(:,i,j,k)*this%rho(i-1:i,j,k))
                this%rhoV(i,j,k)=this%V(i,j,k)*sum(this%itpr_y(:,i,j,k)*this%rho(i,j-1:j,k))
                this%rhoW(i,j,k)=this%W(i,j,k)*sum(this%itpr_z(:,i,j,k)*this%rho(i,j,k-1:k))
@@ -1399,7 +1434,102 @@ contains
 	   deallocate(dudy,dudz,dvdx,dvdz,dwdx,dwdy)
       
    end subroutine get_strainrate
+   
+   
+   !> Calculate the (u.grad)u vector from U/V/W
+   subroutine get_ugradu(this,ugradu)
+      use messager, only: die
+      implicit none
+      class(lowmach), intent(inout) :: this
+      real(WP), dimension(1:,this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: ugradu  !< Needs to be (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      integer :: i,j,k
+      real(WP), dimension(:,:,:), allocatable :: dudy,dudz,dvdx,dvdz,dwdx,dwdy
+      real(WP) :: Ui,gradUx,gradUy,gradUz
+      real(WP) :: Vi,gradVx,gradVy,gradVz
+      real(WP) :: Wi,gradWx,gradWy,gradWz
+      
+      ! Check ugradu's first dimension
+      if (size(ugradu,dim=1).ne.3) call die('[lowmach get_ugradu] gradu should be of size (1:3,imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)')
+      
+      ! Allocate off-diagonal components of the velocity gradient
+      allocate(dudy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(dudz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(dvdx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(dvdz(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(dwdx(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      allocate(dwdy(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
+      
+      ! Calculate off-diagonal components of the velocity gradient at their natural locations with an extra cell for interpolation
+      do k=this%cfg%kmin_,this%cfg%kmax_+1
+         do j=this%cfg%jmin_,this%cfg%jmax_+1
+            do i=this%cfg%imin_,this%cfg%imax_+1
+               dudy(i,j,k)=sum(this%grdu_y(:,i,j,k)*this%U(i,j-1:j,k))
+               dudz(i,j,k)=sum(this%grdu_z(:,i,j,k)*this%U(i,j,k-1:k))
+               dvdx(i,j,k)=sum(this%grdv_x(:,i,j,k)*this%V(i-1:i,j,k))
+               dvdz(i,j,k)=sum(this%grdv_z(:,i,j,k)*this%V(i,j,k-1:k))
+               dwdx(i,j,k)=sum(this%grdw_x(:,i,j,k)*this%W(i-1:i,j,k))
+               dwdy(i,j,k)=sum(this%grdw_y(:,i,j,k)*this%W(i,j-1:j,k))
+            end do
+         end do
+      end do
+      
+      ! Assemble (u.grad)u at cell center
+      do k=this%cfg%kmin_,this%cfg%kmax_
+         do j=this%cfg%jmin_,this%cfg%jmax_
+            do i=this%cfg%imin_,this%cfg%imax_
+               ! Calculate velocity gradient directly or by interpolation
+               gradUx=sum(this%grdu_x(:,i,j,k)*this%U(i:i+1,j,k))
+               gradUy=0.25_WP*sum(dudy(i:i+1,j:j+1,k))
+               gradUz=0.25_WP*sum(dudz(i:i+1,j,k:k+1))
+               gradVx=0.25_WP*sum(dvdx(i:i+1,j:j+1,k))
+               gradVy=sum(this%grdv_y(:,i,j,k)*this%V(i,j:j+1,k))
+               gradVz=0.25_WP*sum(dvdz(i,j:j+1,k:k+1))
+               gradWx=0.25_WP*sum(dwdx(i:i+1,j,k:k+1))
+               gradWy=0.25_WP*sum(dwdy(i,j:j+1,k:k+1))
+               gradWz=sum(this%grdw_z(:,i,j,k)*this%W(i,j,k:k+1))
+               ! Interpolate velocity to cell center
+               Ui=0.5_WP*sum(this%U(i:i+1,j,k))
+               Vi=0.5_WP*sum(this%V(i,j:j+1,k))
+               Wi=0.5_WP*sum(this%W(i,j,k:k+1))
+               ! Assemble (u.grad)u
+               ugradu(1,i,j,k)=Ui*gradUx+Vi*gradUy+Wi*gradUz
+               ugradu(2,i,j,k)=Ui*gradVx+Vi*gradVy+Wi*gradVz
+               ugradu(3,i,j,k)=Ui*gradWx+Vi*gradWy+Wi*gradWz
+            end do
+         end do
+      end do
+      
+      ! Apply a Neumann condition in non-periodic directions
+      if (.not.this%cfg%xper) then
+         if (this%cfg%iproc.eq.1)            ugradu(:,this%cfg%imin-1,:,:)=ugradu(:,this%cfg%imin,:,:)
+         if (this%cfg%iproc.eq.this%cfg%npx) ugradu(:,this%cfg%imax+1,:,:)=ugradu(:,this%cfg%imax,:,:)
+      end if
+      if (.not.this%cfg%yper) then
+         if (this%cfg%jproc.eq.1)            ugradu(:,:,this%cfg%jmin-1,:)=ugradu(:,:,this%cfg%jmin,:)
+         if (this%cfg%jproc.eq.this%cfg%npy) ugradu(:,:,this%cfg%jmax+1,:)=ugradu(:,:,this%cfg%jmax,:)
+      end if
+      if (.not.this%cfg%zper) then
+         if (this%cfg%kproc.eq.1)            ugradu(:,:,:,this%cfg%kmin-1)=ugradu(:,:,:,this%cfg%kmin)
+         if (this%cfg%kproc.eq.this%cfg%npz) ugradu(:,:,:,this%cfg%kmax+1)=ugradu(:,:,:,this%cfg%kmax)
+      end if
+      
+      ! Ensure zero in walls
+      do k=this%cfg%kmino_,this%cfg%kmaxo_
+         do j=this%cfg%jmino_,this%cfg%jmaxo_
+            do i=this%cfg%imino_,this%cfg%imaxo_
+               if (this%mask(i,j,k).eq.1) ugradu(:,i,j,k)=0.0_WP
+            end do
+         end do
+      end do
+      
+      ! Sync it
+      call this%cfg%sync(ugradu)
+      
+      ! Deallocate velocity gradient storage
+      deallocate(dudy,dudz,dvdx,dvdz,dwdx,dwdy)
 
+   end subroutine get_ugradu
+   
    
    !> Calculate the velocity gradient tensor from U/V/W
    !> Note that gradu(i,j)=duj/dxi
@@ -1867,7 +1997,7 @@ contains
       type(bcond), pointer :: my_bc
       
       ! Evaluate MFR mismatch and velocity correction
-      call this%cfg%integrate(A=drhodt,integral=dMdt)
+      call this%cfg%integrate_without_vf(A=drhodt,integral=dMdt)
       call this%get_mfr()
       mfr_error=sum(this%mfr)+dMdt
       if (abs(mfr_error).lt.10.0_WP*epsilon(1.0_WP).or.abs(this%correctable_area).lt.10.0_WP*epsilon(1.0_WP)) return
@@ -1883,17 +2013,17 @@ contains
             ! Implement based on bcond direction, loop over all cell
             select case (my_bc%face)
             case ('x')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoU(i,j,k)=this%rhoU(i,j,k)+my_bc%rdir*mom_correction
                end do
             case ('y')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoV(i,j,k)=this%rhoV(i,j,k)+my_bc%rdir*mom_correction
                end do
             case ('z')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%rhoW(i,j,k)=this%rhoW(i,j,k)+my_bc%rdir*mom_correction
                end do
@@ -1905,6 +2035,11 @@ contains
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields
+      call this%cfg%sync(this%rhoU)
+      call this%cfg%sync(this%rhoV)
+      call this%cfg%sync(this%rhoW)
       
    end subroutine correct_mfr
    
@@ -1937,7 +2072,6 @@ contains
    
    !> Solve for implicit velocity residual
    subroutine solve_implicit(this,dt,resU,resV,resW)
-      use ils_class, only: amg
       implicit none
       class(lowmach), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -1946,6 +2080,23 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(inout) :: resW !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
       real(WP) :: rhoUp,rhoUm,rhoVp,rhoVm,rhoWp,rhoWm
+      
+      ! If no implicit solver available, just divide by density and return
+      if (.not.associated(this%implicit)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  resU(i,j,k)=resU(i,j,k)/sum(this%itpr_x(:,i,j,k)*this%rho(i-1:i,j,k))
+                  resV(i,j,k)=resV(i,j,k)/sum(this%itpr_y(:,i,j,k)*this%rho(i,j-1:j,k))
+                  resW(i,j,k)=resW(i,j,k)/sum(this%itpr_z(:,i,j,k)*this%rho(i,j,k-1:k))
+               end do
+            end do
+         end do
+         call this%cfg%sync(resU)
+         call this%cfg%sync(resV)
+         call this%cfg%sync(resW)
+         return
+      end if
       
       ! Solve implicit U problem
       do k=this%cfg%kmin_,this%cfg%kmax_
@@ -2117,11 +2268,6 @@ contains
       this%implicit%sol=0.0_WP
       call this%implicit%solve()
       resW=this%implicit%sol
-      
-      ! Sync up all residuals
-      call this%cfg%sync(resU)
-      call this%cfg%sync(resV)
-      call this%cfg%sync(resW)
       
    end subroutine solve_implicit
    

@@ -74,7 +74,7 @@ contains
       allocate(self%Rx(self%cfg%jmin_:self%cfg%jmax_,self%cfg%kmin_:self%cfg%kmax_,self%cfg%imin_:self%cfg%imax_))
       allocate(self%Ry(self%cfg%imin_:self%cfg%imax_,self%cfg%kmin_:self%cfg%kmax_,self%cfg%jmin_:self%cfg%jmax_))
       allocate(self%Rz(self%cfg%imin_:self%cfg%imax_,self%cfg%jmin_:self%cfg%jmax_,self%cfg%kmin_:self%cfg%kmax_))
-      allocate(self%stackmem((self%cfg%imaxo_-self%cfg%imino_)*(self%cfg%jmaxo_-self%cfg%jmino_)*(self%cfg%kmaxo_-self%cfg%kmino_),nst+1))
+      allocate(self%stackmem(self%cfg%nx_*self%cfg%ny_*self%cfg%nz_,self%ndiags-1))
       
    end function diag_from_args
    
@@ -468,25 +468,21 @@ contains
    !> TriDiagonal Solver - Serial Case - Not Periodic
    subroutine tridiagonal_serial(a,b,c,r,n,lot)
       implicit none
-      
       integer, intent(in) :: n,lot
       real(WP), intent(inout), dimension(lot,n) :: a,b,c,r
       real(WP), dimension(lot) :: const
       integer :: i
-      
       ! Forward elimination
       do i=2,n
-         const(:) = a(:,i)/(b(:,i-1)+tiny(1.0_WP))
+         const(:) = a(:,i)/(b(:,i-1)+epsilon(1.0_WP))
          b(:,i) = b(:,i) - c(:,i-1)*const(:)
          r(:,i) = r(:,i) - r(:,i-1)*const(:)
       end do
-      
       ! Back-substitution
       r(:,n) = r(:,n)/b(:,n)
       do i=n-1,1,-1
-         r(:,i) = (r(:,i) - c(:,i)*r(:,i+1))/(b(:,i)+tiny(1.0_WP))
+         r(:,i) = (r(:,i) - c(:,i)*r(:,i+1))/(b(:,i)+epsilon(1.0_WP))
       end do
-      
    end subroutine tridiagonal_serial
    
    
@@ -522,8 +518,8 @@ contains
       real(WP), dimension(:,:),   allocatable :: sendbuf
       real(WP), dimension(:,:),   allocatable :: recvbuf
       integer,  dimension(:),     allocatable :: ngroup
-      real(WP), dimension(:,:,:), allocatable :: AA
-      real(WP), dimension(:,:),   allocatable :: swap
+      real(WP), dimension(:,:,:), allocatable :: AA,AAbuf1
+      real(WP), dimension(:,:),   allocatable :: swap,AAbuf2
       
       ! Stuff
       integer :: i,igroup,j,k,m
@@ -750,10 +746,24 @@ contains
       
       ! Solve reduced systems
       if (.not.nper) then
-         call polydiagonal_serial(5, AA(:,3:4*proc-2,-5:+5), AA(:,3:4*proc-2,6), (2*proc-2)*2, nlot)
+         allocate(AAbuf1(nlot,3:4*proc-2,-5:+5))
+         AAbuf1=AA(:,3:4*proc-2,-5:+5)
+         allocate(AAbuf2(nlot,3:4*proc-2))
+         AAbuf2=AA(:,3:4*proc-2,6)
+         call polydiagonal_serial(5, AAbuf1, AAbuf2, (2*proc-2)*2, nlot)
+         AA(:,3:4*proc-2,-5:+5)=AAbuf1
+         AA(:,3:4*proc-2,6)=AAbuf2
+         deallocate(AAbuf1,AAbuf2)
       else
          if (proc.lt.3) stop 'Pentadiagonal solver needs more proc for this problem'
-         call polydiagonal_periodic_serial(5, AA(:,:,-5:+5), AA(:,:,6), (2*proc)*2, nlot, sendbuf)
+         allocate(AAbuf1(nlot,4*proc,-5:5))
+         AAbuf1=AA(:,:,-5:+5)
+         allocate(AAbuf2(nlot,4*proc))
+         AAbuf2=AA(:,:,6)
+         call polydiagonal_periodic_serial(5, AAbuf1, AAbuf2, (2*proc)*2, nlot, sendbuf)
+         AA(:,:,-5:+5)=AAbuf1
+         AA(:,:,6)=AAbuf2
+         deallocate(AAbuf1,AAbuf2)
       end if
       
       ! Move solution to beginning of recvbuf
@@ -823,6 +833,7 @@ contains
    
    ! ================================================= !
    ! PentaDiagonal Solver - Serial Case - Not periodic !
+   ! We probably need to replace tiny with epsilons    !
    ! ================================================= !
    subroutine pentadiagonal_serial(A,B,C,D,E,R,n,lot)
       implicit none

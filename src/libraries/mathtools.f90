@@ -11,6 +11,9 @@ module mathtools
    public :: normalize
    public :: qrotate
    public :: arctan
+   public :: eigensolve3
+   public :: quadrature_rule
+   public :: spherical_harmonic
    
    ! Trigonometric parameters
    real(WP), parameter :: Pi   =3.1415926535897932385_WP
@@ -48,7 +51,7 @@ contains
       real(WP), dimension(:,:), allocatable :: A,B
       integer :: i,j
       ! Allocate the work arrays
-      allocate(A(n,n),B(n,n))
+      allocate(A(n,n))
       ! Form the matrix
       do j=1,n
          do i=1,n
@@ -56,7 +59,7 @@ contains
          end do
       end do
       ! Invert it
-      call inverse_matrix(A,B,n)
+      B=inverse_matrix(A)
       ! Compute metrics
       coeff=0.0_WP
       do j=1,n
@@ -79,7 +82,7 @@ contains
       real(WP), dimension(:,:), allocatable :: A,B
       integer :: i,j
       ! Allocate the work arrays
-      allocate(A(n,n),B(n,n))
+      allocate(A(n,n))
       ! Form the matrix
       do j=1,n
          do i=1,n
@@ -87,7 +90,7 @@ contains
          end do
       end do
       ! Invert it
-      call inverse_matrix(A,B,n)
+      B=inverse_matrix(A)
       ! Compute metrics
       coeff=B(1,:)
       ! Deallocate the work arrays
@@ -95,32 +98,77 @@ contains
    end subroutine fd_itp_build
    
    
-   !> Inverse matrix using Gauss elimination
-   subroutine inverse_matrix(A,B,n)
-      implicit none
-      integer,  intent(in) :: n                    !< Matrix size
-      real(WP), intent(inout), dimension(n,n) :: A   !< Matrix to inverse - it is destroyed
-      real(WP), intent(out),   dimension(n,n) :: B   !< Matrix inverse
-      integer :: i,l
-      ! Zero out inverse
-      B=0.0_WP
-      ! Forward elimination
-      do i=1,n
-         B(i,i)=1.0_WP
-         B(i,:)=B(i,:)/A(i,i)
-         A(i,:)=A(i,:)/A(i,i)
-         do l=i+1,n
-            B(l,:)=B(l,:)-A(l,i)*B(i,:)
-            A(l,:)=A(l,:)-A(l,i)*A(i,:)
-         end do
-      end do
-      ! Backward substitution
-      do i=n,1,-1
-         do l=i+1,n
-            B(i,:)=B(i,:)-A(i,l)*B(l,:)
-         end do
-      end do
-   end subroutine inverse_matrix
+   ! function inverse_matrix(A) result(Ainv)
+   !    use messager, only: die
+   !    implicit none
+   !    real(WP), dimension(:,:), intent(in) :: A
+   !    real(WP), dimension(size(A,1),size(A,2)) :: Ainv
+   !    real(WP), dimension(size(A,1)) :: work
+   !    integer , dimension(size(A,1)) :: ipiv
+   !    integer :: n,info
+   !    external DGETRF
+   !    external DGETRI
+   !    ! Copy A over to Ainv to prevent it from being overwritten by LAPACK
+   !    Ainv=A
+   !    ! Store size
+   !    n=size(A,1)
+   !    ! Compute LU factorization of matrix A using partial pivoting with row interchanges
+   !    call DGETRF(n,n,Ainv,n,ipiv,info)
+   !    ! Error handling
+   !    if (info.ne.0) call die('[inverse_matrix] Matrix is numerically singular')
+   !    ! Compute inverse of matrix using LU factorization computed above
+   !    call DGETRI(n,Ainv,n,ipiv,work,n,info)
+   !    if (info.ne.0) call die('[inverse_matrix] Matrix inversion failed')
+   !  end function inverse_matrix
+   
+   
+   !> Computes the inverse of a square matrix A
+   function inverse_matrix(A) result(Ainv)
+     use messager,only:die
+     implicit none
+     real(WP),dimension(:,:),intent(in)::A
+     real(WP),dimension(size(A,1),size(A,2))::Ainv
+     real(WP),dimension(size(A,1),size(A,2))::A_
+     real(WP),dimension(size(A,2))::row_temp
+     integer::i,j,n,pivot
+     real(WP)::maxA,factor
+     n=size(A,1)
+     if (size(A,2).ne.n) call die('[inverse_matrix] Matrix is not square')
+     A_=A
+     Ainv=0.0_WP
+     do i=1,n
+        Ainv(i,i)=1.0_WP
+     end do
+     do i=1,n
+        pivot=i
+        maxA=abs(A_(i,i))
+        do j=i+1,n
+           if(abs(A_(j,i)).gt.maxA)then
+              maxA=abs(A_(j,i))
+              pivot=j
+           end if
+        end do
+        if (pivot.ne.i) then
+           row_temp=A_(i,:)
+           A_(i,:)=A_(pivot,:)
+           A_(pivot,:)=row_temp
+           row_temp=Ainv(i,:)
+           Ainv(i,:)=Ainv(pivot,:)
+           Ainv(pivot,:)=row_temp
+        end if
+        if (abs(A_(i,i)).lt.1.0e-12_WP) call die('[inverse_matrix] Matrix is numerically singular')
+        factor=A_(i,i)
+        A_(i,:)=A_(i,:)/factor
+        Ainv(i,:)=Ainv(i,:)/factor
+        do j=1,n
+           if (j.ne.i) then
+              factor=A_(j,i)
+              A_(j,:)=A_(j,:)-factor*A_(i,:)
+              Ainv(j,:)=Ainv(j,:)-factor*Ainv(i,:)
+           end if
+        end do
+     end do
+   end function inverse_matrix
    
    
    ! Returns normalized vector: w=v/|v|
@@ -147,11 +195,11 @@ contains
       w(3)= 2.0_WP*(q(2)*q(4)-q(1)*q(3))        *v(1)+&
       &     2.0_WP*(q(3)*q(4)+q(1)*q(2))        *v(2)+&
       &    (2.0_WP*(q(1)*q(1)+q(4)*q(4))-1.0_WP)*v(3)
-    end function qrotate
-
-    
-    ! Safe arctan
-    function arctan(dx,dy)
+   end function qrotate
+   
+   
+   ! Safe arctan
+   function arctan(dx,dy)
       implicit none
       real(WP), intent(in) :: dx,dy
       real(WP) :: arctan
@@ -162,10 +210,257 @@ contains
       end if
       if (dx.le.0.0_WP) then
          arctan = Pi+arctan
-      elseif (dy.le.0.0_WP .and. dx.gt.0.0_WP) then
+      else if (dy.le.0.0_WP .and. dx.gt.0.0_WP) then
          arctan = twoPi+arctan
       end if
-  end function arctan
+   end function arctan
+   
+   
+   !> Calculates the eigenvalues and normalized eigenvectors of a symmetric 3x3 matrix A using the QL algorithm
+   !> with implicit shifts, preceded by a Householder reduction to real tridiagonal form.
+   !> The function accesses only the diagonal and upper triangular parts of A
+   !> A: The symmetric input matrix
+   !> Q: Storage buffer for eigenvectors
+   !> W: Storage buffer for eigenvalues
+   subroutine eigensolve3(A,Q,W)
+      use messager, only: die
+      implicit none
+      real(WP), dimension(3,3), intent(in)  :: A
+      real(WP), dimension(3,3), intent(out) :: Q
+      real(WP), dimension(3)  , intent(out) :: W
+      real(WP), dimension(3) :: E(3)
+      real(WP) :: G,R,P,F,B,S,C,T
+      integer :: niter,l,m,i,j,k
+      ! Transform A to real tridiagonal form by the Householder method
+      call householder(A,Q,W,E)
+      ! Calculate eigensystem of the remaining real symmetric tridiagonal matrix with the QL method
+      outer: do l=1,2
+         niter=0
+         do i=1,50
+            ! Check for convergence and exit iteration loop if off-diagonal element E(l) is zero
+            cvg: do m=l,2
+               G=abs(W(m))+abs(W(m+1))
+               if (abs(E(m))+G.eq.G) exit cvg
+            end do cvg
+            if (m.eq.l) cycle outer
+            niter=niter+1
+            if (niter.ge.30) call die('[DSYEVQ3] Failed to converge')
+            G=(W(l+1)-W(l))/(2.0_WP*E(l))
+            R=sqrt(1.0_WP+G**2)
+            if (G.ge.0.0_WP) then
+               G=W(m)-W(l)+E(l)/(G+R)
+            else
+               G=W(m)-W(l)+E(l)/(G-R)
+            end if
+            S=1.0_WP
+            C=1.0_WP
+            P=0.0_WP
+            do j=m-1,l,-1
+               F=S*E(j)
+               B=C*E(j)
+               IF (abs(F).gt.abs(G)) then
+                  C=G/F
+                  R=sqrt(1.0_WP+C**2)
+                  E(j+1)=F*R
+                  S=1.0_WP/R
+                  C=C*S
+               else
+                  S=F/G
+                  R=sqrt(1.0_WP+S**2)
+                  E(j+1)=G*R
+                  C=1.0_WP/R
+                  S=S*C
+               end if
+               G=W(j+1)-P
+               R=(W(j)-G)*S+2.0_WP*C*B
+               P=S*R
+               W(j+1)=G+P
+               G=C*R-B
+               ! Form eigenvectors
+               do k=1,3
+                  T       =  Q(k,j+1)
+                  Q(k,j+1)=S*Q(k,j)+C*T
+                  Q(k,j)  =C*Q(k,j)-S*T
+               end do
+            end do
+            W(l)=W(l)-P
+            E(l)=G
+            E(m)=0.0_WP
+         end do
+      end do outer
+      
+   contains
+      
+      !> Reduces a symmetric 3x3 matrix to real tridiagonal form by applying (unitary) Householder transformations:
+      !>           [ D[1]  E[1]       ]
+      !>   A = Q . [ E[1]  D[2]  E[2] ] . Q^T
+      !>           [       E[2]  D[3] ]
+      !> The function accesses only the diagonal and upper triangular parts of A
+      subroutine householder(A,Q,D,E)
+         implicit none
+         real(WP), dimension(3,3), intent(in)  :: A
+         real(WP), dimension(3,3), intent(out) :: Q
+         real(WP), dimension(3)  , intent(out) :: D
+         real(WP), dimension(2)  , intent(out) :: E
+         real(WP), dimension(3) :: U,P
+         real(WP) :: OMEGA,F,K,H,G
+         integer :: i,j
+         ! Initialize Q to identity
+         Q=reshape([1.0_WP,0.0_WP,0.0_WP,0.0_WP,1.0_WP,0.0_WP,0.0_WP,0.0_WP,1.0_WP],shape(Q))
+         ! Bring first row and column to the desired form
+         H=A(1,2)**2+A(1,3)**2
+         G=sqrt(H); if (A(1,2).gt.0.0_WP) G=-G
+         E(1)=G
+         F   =G*A(1,2)
+         U(2)=A(1,2)-G
+         U(3)=A(1,3)
+         OMEGA=H-F
+         if (OMEGA.gt.0.0_WP) then
+            OMEGA=1.0_WP/OMEGA
+            K=0.0_WP
+            do i=2,3
+               F   =A(2,i)*U(2)+A(i,3)*U(3)
+               P(i)=OMEGA*F
+               K   =K+U(i)*F
+            end do
+            K=0.5_WP*K*OMEGA**2
+            do i=2,3
+               P(i)=P(i)-K*U(i)
+            end do
+            D(1)=A(1,1)
+            D(2)=A(2,2)-2.0_WP*P(2)*U(2)
+            D(3)=A(3,3)-2.0_WP*P(3)*U(3)
+            ! Store inverse Householder transformation in Q
+            do j=2,3
+               F=OMEGA*U(j)
+               do i=2,3
+                  Q(i,j)=Q(i,j)-F*U(i)
+               end do
+            end do
+            ! Calculate updated A(2,3) and store it in E(2)
+            E(2)=A(2,3)-P(2)*U(3)-U(2)*P(3)
+         else
+            do i=1,3
+               D(i)=A(i,i)
+            end do
+            E(2)=A(2,3)
+         end if
+      end subroutine householder
+   
+   end subroutine eigensolve3
+   
+   
+   !> Compute a nth order Clenshaw-Curtis quadrature rule on [0,1]
+   !> int(f(x)) in [0,1] is approximated by sum(w_i*f(x_i)) for i=1..N
+   subroutine quadrature_rule(n,x,w)
+      use messager, only: die
+      implicit none
+      integer, intent(in) :: n
+      real(WP), dimension(n) :: x,w
+      real(WP) :: b,theta
+      integer :: i,j
+      ! Ensure input is usable
+      if (n.lt.1) call die('[quadrature_rule] n must be at least 1')
+      ! Handle n=1 case
+      if (n.eq.1) then
+         x(1)=0.5_WP
+         w(1)=1.0_WP
+         return
+      end if
+      ! Calculate quadrature point in general case
+      do i=1,n
+         x(i)=cos(real(n-i,WP)*Pi/real(n-1,WP))
+      end do
+      x(1)=-1.0_WP; x(n)=+1.0_WP; if (mod(n,2).eq.1) x((n+1)/2)=0.0_WP
+      ! Calculate quadrature weight in general case
+      do i=1,n
+         theta=real(i-1,WP)*Pi/real(n-1,WP)
+         w(i)=1.0_WP
+         do j=1,(n-1)/2
+            if (2*j.eq.n-1) then
+               b=1.0_WP
+            else
+               b=2.0_WP
+            end if            
+            w(i)=w(i)-b*cos(2.0_WP*real(j,WP)*theta)/real(4*j*j-1,WP)
+         end do
+      end do
+      w=w/real(n-1,WP); w(2:n-1)=2.0_WP*w(2:n-1)
+      ! Rescale to be in [0,1]
+      x=0.5_WP*(1.0_WP+x); w=0.5_WP*w
+   end subroutine quadrature_rule
+   
+   
+   !> Computes spherical harmonics Y_l^m(theta,phi) for a given l and m at angles theta and phi
+   function spherical_harmonic(l,m,theta,phi) result(Ylm)
+      implicit none
+      integer , intent(in) :: l,m
+      real(WP), intent(in) :: theta,phi
+      real(WP) :: Ylm
+      real(WP) :: norm,plm
+      integer  :: mm,abs_m
+      ! Associated Legendre polynomial
+      abs_m=abs(m); plm=legendre_p(l,abs_m,cos(theta))
+      ! Normalization factor
+      norm=sqrt((2.0_WP*l+1.0_WP)/(4.0_WP*Pi)*real(factorial(l-abs_m),WP)/real(factorial(l+abs_m),WP))
+      ! Real-valued spherical harmonics
+      if (m.gt.0) then
+         Ylm=sqrt(2.0_WP)*norm*plm*cos(m*phi)
+      else if (m.lt.0) then
+         Ylm=sqrt(2.0_WP)*norm*plm*sin(abs(m)*phi)
+      else
+         Ylm=norm*plm
+      end if
+   contains
+      !> Computes factorial of n
+      function factorial(n) result(fact)
+         integer, intent(in) :: n
+         integer :: fact,j
+         fact=1
+         if (n.gt.0) then
+            do j=2,n
+               fact=fact*j
+            end do
+         end if
+      end function factorial
+      !> Computes the associated Legendre polynomial P_l0^m0(x)
+      function legendre_p(l0,m0,x) result(p)
+         implicit none
+         integer , intent(in) :: l0,m0
+         real(WP), intent(in) :: x
+         real(WP) :: p
+         integer  :: i
+         real(WP) :: pmm,pmmp1,pll,somx2
+         if (m0.lt.0.or.m0.gt.l0.or.abs(x).gt.1.0_WP) then
+            p=0.0_WP
+            return
+         end if
+         pmm=1.0_WP
+         if (m0.gt.0) then
+            somx2=sqrt((1.0_WP-x)*(1.0_WP+x))
+            do i=1,m0
+               pmm=-pmm*(2*i-1)*somx2
+            end do
+         end if
+         if (l0.eq.m0) then
+            p=pmm
+            return
+         else
+            pmmp1=x*(2*m0+1)*pmm
+            if (l0.eq.m0+1) then
+               p=pmmp1
+               return
+            else
+               do i=m0+2,l0
+                  pll=((2*i-1)*x*pmmp1-(i+m0-1)*pmm)/(i-m0)
+                  pmm=pmmp1
+                  pmmp1=pll
+               end do
+               p=pmmp1
+            end if
+         end if
+      end function legendre_p
+   end function spherical_harmonic
    
    
 end module mathtools

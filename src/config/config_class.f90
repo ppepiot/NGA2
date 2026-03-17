@@ -28,9 +28,12 @@ module config_class
       procedure :: calc_fluid_vol                              !< Compute fluid_vol after VF has been set
       procedure :: VF_extend                                   !< Extend VF array into the non-periodic domain overlaps
       procedure :: integrate                                   !< Integrate a variable on config while accounting for VF
+      procedure :: integrate_without_VF                        !< Integrate a variable on config while ignoring VF
       procedure :: set_scalar                                  !< Subroutine that extrapolates a provided scalar value at a point to a pgrid field
       procedure :: get_velocity                                !< Function that interpolates a provided velocity field staggered on the pgrid to a point
       procedure :: get_scalar                                  !< Function that interpolates a provided scalar field centered on the pgrid to a point
+      procedure :: maximum                                     !< Find global max of variable on config for VF>0
+      procedure :: finalize=>config_finalize                   !< Finalize config
    end type config
    
    
@@ -164,7 +167,7 @@ contains
                this%VF(:,:,k)=this%VF(:,:,this%kmin)
             end do
          else if (this%kproc.eq.this%npz) then
-            do j=this%kmax+1,this%kmaxo
+            do k=this%kmax+1,this%kmaxo
                this%VF(:,:,k)=this%VF(:,:,this%kmax)
             end do
          end if
@@ -190,6 +193,28 @@ contains
       end do
       call MPI_ALLREDUCE(buf,this%fluid_vol,1,MPI_REAL_WP,MPI_SUM,this%comm,ierr)
    end subroutine calc_fluid_vol
+   
+   
+   !> Find global max of variable on config for VF>0
+   subroutine maximum(this,A,globalmax)
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_MAX
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(config), intent(inout) :: this
+      real(WP), dimension(this%imino_:,this%jmino_:,this%kmino_:), intent(in) :: A      !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), intent(out) :: globalmax
+      integer :: i,j,k,ierr
+      real(WP) :: my_max
+      my_max=0.0_WP
+      do k=this%kmin_,this%kmax_
+         do j=this%jmin_,this%jmax_
+            do i=this%imin_,this%imax_
+               if (this%VF(i,j,k).gt.0.0_WP) my_max=max(my_max,A(i,j,k))
+            end do
+         end do
+      end do
+      call MPI_ALLREDUCE(my_max,globalmax,1,MPI_REAL_WP,MPI_MAX,this%comm,ierr)
+   end subroutine maximum
 
    
    !> Calculate the integral of a field on the config while accounting for VF
@@ -212,6 +237,28 @@ contains
       end do
       call MPI_ALLREDUCE(my_int,integral,1,MPI_REAL_WP,MPI_SUM,this%comm,ierr)
    end subroutine integrate
+
+
+   !> Calculate the integral of a field on the config while ignoring VF
+   subroutine integrate_without_VF(this,A,integral)
+      use mpi_f08,  only: MPI_ALLREDUCE,MPI_SUM
+      use parallel, only: MPI_REAL_WP
+      implicit none
+      class(config), intent(inout) :: this
+      real(WP), dimension(this%imino_:,this%jmino_:,this%kmino_:), intent(in) :: A      !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      real(WP), intent(out) :: integral
+      integer :: i,j,k,ierr
+      real(WP) :: my_int
+      my_int=0.0_WP
+      do k=this%kmin_,this%kmax_
+         do j=this%jmin_,this%jmax_
+            do i=this%imin_,this%imax_
+               my_int=my_int+this%vol(i,j,k)*A(i,j,k)
+            end do
+         end do
+      end do
+      call MPI_ALLREDUCE(my_int,integral,1,MPI_REAL_WP,MPI_SUM,this%comm,ierr)
+   end subroutine integrate_without_VF
    
    
    !> Subroutine that performs trilinear interpolation of provided scalar field S
@@ -314,9 +361,9 @@ contains
       do while (pos(3)-this%zm(k  ).lt.0.0_WP.and.k  .gt.this%kmino_); k=k-1; end do
       do while (pos(3)-this%zm(k+1).ge.0.0_WP.and.k+1.lt.this%kmaxo_); k=k+1; end do
       ! For exact conservation, all information needs to be placed *inside* the domain
-      if (.not.this%xper) i=max(this%imin,min(this%imax-1,i))
-      if (.not.this%yper) j=max(this%jmin,min(this%jmax-1,j))
-      if (.not.this%zper) k=max(this%kmin,min(this%kmax-1,k))
+      !if (.not.this%xper) i=max(this%imin,min(this%imax-1,i))
+      !if (.not.this%yper) j=max(this%jmin,min(this%jmax-1,j))
+      !if (.not.this%zper) k=max(this%kmin,min(this%kmax-1,k))
       ! Prepare tri-linear extrapolation coefficients
       wx1=(pos(1)-this%xm(i))/(this%xm(i+1)-this%xm(i)); wx2=1.0_WP-wx1
       wy1=(pos(2)-this%ym(j))/(this%ym(j+1)-this%ym(j)); wy2=1.0_WP-wy1
@@ -463,7 +510,7 @@ contains
       use, intrinsic :: iso_fortran_env, only: output_unit
       implicit none
       class(config), intent(in) :: this
-      call this%print
+      call this%pgrid%print
    end subroutine config_print
    
    
@@ -485,6 +532,17 @@ contains
          call geomfile%write(trim(adjustl(file))//'.geom')
       end block write_VF
    end subroutine config_write
+   
+   
+   !> Finalize config object
+   subroutine config_finalize(this)
+      implicit none
+      class(config), intent(inout) :: this
+      ! Deallocate arrays
+      deallocate(this%vol,this%meshsize,this%VF)
+      ! Destroy pgrid
+      call this%pgrid%finalize()
+   end subroutine config_finalize
    
    
 end module config_class

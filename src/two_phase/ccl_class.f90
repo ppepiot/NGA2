@@ -489,7 +489,7 @@ contains
                                  c22 = calculateCentroid(this%poly(2,ii,jj,kk))
                                  n22 = calculateNormal(this%poly(2,ii,jj,kk))
                                  is_contiguous = dot_product((c22-c2),n22).gt.0.0_WP ! .true. if liquid film
-                                 is_film = .true.
+                                 is_film = (dot_product(n22,n2).lt.this%dot_threshold)
                               else
                                  ! If neighbor is one-plane cell
                                  is_contiguous = (dot_product(c2-c1,n2).ge.0.0_WP).or.(dot_product(c1-c2,n1).ge.0.0_WP)
@@ -1548,22 +1548,22 @@ contains
          implicit none
          
          ! Allocate local and global perodicity arrays
-         allocate(this%per_(1:3,this%sync_offset+1:this%sync_offset+this%n_struct_max)); this%per_ = 0
-         allocate(this%per (1:3,this%cfg%nproc*this%n_struct_max)); this%per = 0
+         allocate(this%per_(this%sync_offset+1:this%sync_offset+this%n_struct_max,1:3)); this%per_ = 0
+         allocate(this%per (this%cfg%nproc*this%n_struct_max,1:3)); this%per = 0
          
          ! Fill per_ array
          do i=this%sync_offset+1,this%sync_offset+this%n_struct
-            this%per_(:,i) = this%struct_list(this%struct_map_(i))%per
+            this%per_(i,:) = this%struct_list(this%struct_map_(i))%per
          end do
          
          ! Communitcate per
-         call MPI_ALLGATHER(this%per_(1,:),this%n_struct_max,MPI_INTEGER,this%per(1,:),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
-         call MPI_ALLGATHER(this%per_(2,:),this%n_struct_max,MPI_INTEGER,this%per(2,:),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
-         call MPI_ALLGATHER(this%per_(3,:),this%n_struct_max,MPI_INTEGER,this%per(3,:),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
+         call MPI_ALLGATHER(this%per_(:,1),this%n_struct_max,MPI_INTEGER,this%per(:,1),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
+         call MPI_ALLGATHER(this%per_(:,2),this%n_struct_max,MPI_INTEGER,this%per(:,2),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
+         call MPI_ALLGATHER(this%per_(:,3),this%n_struct_max,MPI_INTEGER,this%per(:,3),this%n_struct_max,MPI_INTEGER,this%cfg%comm,ierr)
         
          ! Update parent per
          do i=1,this%cfg%nproc*this%n_struct_max
-            this%per(:,this%parent(i)) = max(this%per(:,this%parent(i)),this%per(:,i))
+            this%per(:,this%parent(i)) = max(this%per(:,this%parent(i)),this%per(i,:))
          end do
          
          do i=this%sync_offset+1,this%sync_offset+this%n_struct
@@ -1571,7 +1571,7 @@ contains
                ii = this%struct_list(this%struct_map_(i))%node(1,n)
                jj = this%struct_list(this%struct_map_(i))%node(2,n)
                kk = this%struct_list(this%struct_map_(i))%node(3,n)
-               this%idp(:,ii,jj,kk) = this%per(:,this%id(ii,jj,kk))
+               this%idp(:,ii,jj,kk) = this%per(this%id(ii,jj,kk),:)
             end do
          end do
          
@@ -2661,7 +2661,7 @@ contains
                ! Calculate edge normal
                c_local = Lbary(:,i,j,k)
                c_filter = [x_vol,y_vol,z_vol]/vol_total
-               this%film_edge_normal(:,i,j,k) = (c_local-c_filter)/norm2(c_local-c_filter)
+               this%film_edge_normal(:,i,j,k) = (c_local-c_filter)/(norm2(c_local-c_filter)+tiny(1.0_WP))
             end do
          else ! Gas film
             do n=1,this%film_list(this%film_map_(m))%nnode

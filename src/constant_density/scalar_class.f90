@@ -86,11 +86,11 @@ module scalar_class
    contains
       procedure :: print=>scalar_print                    !< Output solver to the screen
       procedure :: setup                                  !< Finish configuring the scalar solver
+      procedure, private :: init_metrics                  !< Initialize metrics
+      procedure, private :: adjust_metrics                !< Adjust metrics
       procedure :: add_bcond                              !< Add a boundary condition
       procedure :: get_bcond                              !< Get a boundary condition
       procedure :: apply_bcond                            !< Apply all boundary conditions
-      procedure :: init_metrics                           !< Initialize metrics
-      procedure :: adjust_metrics                         !< Adjust metrics
       procedure :: metric_reset                           !< Reset adaptive metrics like bquick
       procedure :: metric_adjust                          !< Adjust adaptive metrics like bquick
       procedure :: get_drhoSCdt                           !< Calculate drhoSC/dt
@@ -422,6 +422,11 @@ contains
          ! Initialize the implicit velocity solver
          call this%implicit%init()
          
+      else
+         
+         ! Point to implicit solver linsol object
+         this%implicit=>NULL()
+         
       end if
       
    end subroutine setup
@@ -540,13 +545,13 @@ contains
             
          end if
          
-         ! Sync full fields after each bcond - this should be optimized
-         call this%cfg%sync(this%SC)
-         
          ! Move on to the next bcond
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields after all bcond
+      call this%cfg%sync(this%SC)
       
    end subroutine apply_bcond
    
@@ -561,6 +566,8 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)  :: rhoW     !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
       real(WP), dimension(:,:,:), allocatable :: FX,FY,FZ
+      ! Zero out drhoSC/dt array
+      drhoSCdt=0.0_WP
       ! Allocate flux arrays
       allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
       allocate(FY(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
@@ -633,6 +640,13 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in)    :: rhoW  !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k,sti,std
       
+      ! If no implicit solver available, just divide by density and return
+      if (.not.associated(this%implicit)) then
+         resSC=resSC/this%rho
+         call this%cfg%sync(resSC)
+         return
+      end if
+
       ! Prepare convective operator
       this%implicit%opr(1,:,:,:)=this%rho; this%implicit%opr(2:,:,:,:)=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
@@ -684,9 +698,6 @@ contains
       call this%implicit%solve()
       resSC=this%implicit%sol
       
-      ! Sync up residual
-      call this%cfg%sync(resSC)
-      
    end subroutine solve_implicit
    
    
@@ -707,47 +718,32 @@ contains
    
    
    !> Adjust adaptive metrics like bquick
-   subroutine metric_adjust(this,SC,SCmin,SCmax)
+   subroutine metric_adjust(this,SC,flag)
       implicit none
       class(scalar), intent(inout) :: this
-      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: SC !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
-      real(WP), optional :: SCmin
-      real(WP), optional :: SCmax
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: SC   !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
+      logical , dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(in) :: flag !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
       select case (this%scheme)
       case (bquick)
-         if (present(SCmin)) then
-            do k=this%cfg%kmin_,this%cfg%kmax_+1
-               do j=this%cfg%jmin_,this%cfg%jmax_+1
-                  do i=this%cfg%imin_,this%cfg%imax_+1
-                     if (SC(i,j,k).lt.SCmin) then
-                        !this%itp_xp(i:i+1,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-                        !this%itp_xm(i:i+1,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-                        !this%itp_yp(i,j:j+1,k)=[0.0_WP,1.0_WP,0.0_WP]
-                        !this%itp_ym(i,j:j+1,k)=[0.0_WP,1.0_WP,0.0_WP]
-                        !this%itp_zp(i,j,k:k+1)=[0.0_WP,1.0_WP,0.0_WP]
-                        !this%itp_zm(i,j,k:k+1)=[0.0_WP,1.0_WP,0.0_WP]
-					      end if
-                  end do
+         do k=this%cfg%kmin_,this%cfg%kmax_+1
+            do j=this%cfg%jmin_,this%cfg%jmax_+1
+               do i=this%cfg%imin_,this%cfg%imax_+1
+                  if (any(flag(i-1:i,j,k))) then
+                     this%itp_xp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_xm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
+                  if (any(flag(i,j-1:j,k))) then
+                     this%itp_yp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_ym(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
+                  if (any(flag(i,j,k-1:k))) then
+                     this%itp_zp(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                     this%itp_zm(:,i,j,k)=[0.0_WP,1.0_WP,0.0_WP]
+                  end if
                end do
             end do
-         end if
-         if (present(SCmax)) then
-            do k=this%cfg%kmin_,this%cfg%kmax_+1
-               do j=this%cfg%jmin_,this%cfg%jmax_+1
-                  do i=this%cfg%imin_,this%cfg%imax_+1
-                     if (SC(i,j,k).gt.SCmax) then
-                        !this%itp_xp(i:i+1,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-					         !this%itp_xm(i:i+1,j,k)=[0.0_WP,1.0_WP,0.0_WP]
-					         !this%itp_yp(i,j:j+1,k)=[0.0_WP,1.0_WP,0.0_WP]
-					         !this%itp_ym(i,j:j+1,k)=[0.0_WP,1.0_WP,0.0_WP]
-					         !this%itp_zp(i,j,k:k+1)=[0.0_WP,1.0_WP,0.0_WP]
-					         !this%itp_zm(i,j,k:k+1)=[0.0_WP,1.0_WP,0.0_WP]
-				         end if
-                  end do
-               end do
-            end do
-         end if
+         end do
       end select
    end subroutine metric_adjust
    

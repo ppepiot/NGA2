@@ -12,25 +12,31 @@ module timetracker_class
    real(WP), parameter :: alpha = 0.7_WP
    !> Give ourselves 10 minutes to clean up
    real(WP), parameter :: wtsafe= 600.0_WP
+   !> Give ourselves a safety margin to avoid missing end of simulation due to round-off
+   real(WP), parameter :: dtsafe= 1.0e-6_WP
    
    
    !> Timetracker object
    type :: timetracker
       logical :: amRoot                                !< Timetracker needs to know who's the boss
       character(len=str_medium) :: name='UNNAMED_TIME' !< Name for timetracker
-      integer  ::  it, itmax                           !< Current and max sub-iteration
+      integer  ::  it, itmax, itmin                    !< Current and max sub-iteration and min sub-iteration
       integer  ::   n,  nmax                           !< Current and max timestep
       real(WP) ::   t,  tmax                           !< Current and max time
       real(WP) ::  dt, dtmax                           !< Current and max timestep size
       real(WP) :: cfl,cflmax                           !< Current and max CFL
       real(WP) ::  wt, wtmax                           !< Current and max wallclock time
       real(WP) :: told,dtold,tmid,dtmid                !< Old/mid time and timestep size
+      real(WP) :: relax                                !< Relaxation coefficient (nominally between 0 and 1, default is 1) to improve convergence of subiterations
+      logical  :: print_info=.true.                    !< Should I print time information?
    contains
       procedure :: increment                           !< Default method for incrementing time
       procedure :: adjust_dt                           !< Default method for adjusting timestep size
       procedure :: done                                !< Default termination check for time integration
       procedure :: print=>timetracker_print            !< Output timetracker info to screen
       procedure :: log  =>timetracker_log              !< Output timetracker info to log
+      procedure :: reset                               !< Reset timetracker to zero
+      procedure :: finalize=>timetracker_finalize      !< Finalize timetracker
    end type timetracker
    
    
@@ -44,23 +50,26 @@ contains
    
    
    !> Constructor for timetracker object
-   function constructor(amRoot,name) result(self)
+   function constructor(amRoot,name,print_info) result(self)
       implicit none
       type(timetracker) :: self
       logical, intent(in) :: amRoot
       character(len=*), optional :: name
+      logical, optional :: print_info
       self%amRoot=amRoot
-      if (present(name)) self%name=trim(adjustl(name))
-      self%n  =0;        self%nmax=huge(  self%nmax)
-      self%t  =0.0_WP;   self%tmax=huge(  self%tmax)
-      self%dt =0.0_WP;  self%dtmax=huge( self%dtmax)
-      self%cfl=0.0_WP; self%cflmax=huge(self%cflmax)
-      self%wt =0.0_WP;  self%wtmax=huge( self%wtmax)
-      self%told=0.0_WP
+      if (present(name))       self%name=trim(adjustl(name))
+      if (present(print_info)) self%print_info=print_info
+      self%n    =0;            self%nmax  =huge(self%nmax)
+      self%t    =0.0_WP;       self%tmax  =huge(self%tmax)
+      self%dt   =0.0_WP;       self%dtmax =huge(self%dtmax)
+      self%cfl  =0.0_WP;       self%cflmax=huge(self%cflmax)
+      self%wt   =0.0_WP;       self%wtmax =huge(self%wtmax)
+      self%told =0.0_WP
       self%dtold=0.0_WP
-      self%tmid=0.0_WP
+      self%tmid =0.0_WP
       self%dtmid=0.0_WP
-      self%it=1; self%itmax=1
+      self%it   =1;            self%itmax=1; self%itmin=0
+      self%relax=1.0_WP
    end function constructor
    
    
@@ -79,8 +88,10 @@ contains
       this%n=this%n+1
       this%wt=parallel_time()-wtinit
       ! If verbose run, log and or print info
-      if (verbose.gt.0) call this%log
-      if (verbose.gt.1) call this%print
+      if (this%print_info) then
+         if (verbose.ge.0) call this%log
+         if (verbose.ge.1) call this%print
+      end if
    end subroutine increment
    
    
@@ -111,7 +122,7 @@ contains
          done=.true.
          write(message,'(" Timetracker [",a,"] reached maximum number of iterations ")') trim(this%name); call log(message)
       end if
-      if (this%t.ge.this%tmax) then
+      if (this%t+dtsafe*this%dt.ge.this%tmax) then
          done=.true.
          write(message,'(" Timetracker [",a,"] reached maximum integration time ")') trim(this%name); call log(message)
       end if
@@ -122,6 +133,20 @@ contains
    end function done
    
    
+   !> Reset time to zero
+   subroutine reset(this)
+      implicit none
+      class(timetracker), intent(inout) :: this
+      this%n    =0
+      this%t    =0.0_WP
+      this%wt   =0.0_WP
+      this%told =0.0_WP
+      this%dtold=0.0_WP
+      this%tmid =0.0_WP
+      this%it=1
+   end subroutine reset
+
+
    !> Log timetracker info
    subroutine timetracker_log(this)
       use string,   only: str_long
@@ -146,16 +171,16 @@ contains
       use, intrinsic :: iso_fortran_env, only: output_unit
       implicit none
       class(timetracker), intent(in) :: this
-      if (this%amRoot) then
-         write(output_unit,'("Timetracker [",a,"] status")') trim(this%name)
-         write(output_unit,'(" >  it/ itmax = ",i0,"/",i0)')         this%it,this%itmax
-         write(output_unit,'(" >   n/  nmax = ",i0,"/",i0)')         this%n,this%nmax
-         write(output_unit,'(" >   t/  tmax = ",es12.5,"/",es12.5)') this%t,this%tmax
-         write(output_unit,'(" >  dt/ dtmax = ",es12.5,"/",es12.5)') this%dt,this%dtmax
-         write(output_unit,'(" > cfl/cflmax = ",es12.5,"/",es12.5)') this%cfl,this%cflmax
-         write(output_unit,'(" >  wt/ wtmax = ",es12.5,"/",es12.5)') this%wt,this%wtmax
-      end if
+      if (this%amRoot) write(output_unit,'("Timetracker [",a,"]:"," n=",i8," t=",es12.5)') trim(this%name),this%n,this%t
    end subroutine timetracker_print
    
    
+   !> Finalize timetracker
+   subroutine timetracker_finalize(this)
+      implicit none
+      class(timetracker), intent(inout) :: this
+      ! Nothing to deallocate here
+   end subroutine timetracker_finalize
+   
+
 end module timetracker_class

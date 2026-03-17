@@ -20,7 +20,8 @@ module incomp_class
    integer, parameter, public :: neumann=3           !< Zero normal gradient
    integer, parameter, public :: convective=4        !< Convective outflow condition
    integer, parameter, public :: clipped_neumann=5   !< Clipped Neumann condition (outflow only)
-   
+   integer, parameter, public :: slip=6              !< Free-slip condition
+
    !> Boundary conditions for the incompressible solver
    type :: bcond
       type(bcond), pointer :: next                        !< Linked list of bconds
@@ -811,6 +812,11 @@ contains
          ! Initialize the implicit velocity solver
          call this%implicit%init()
          
+      else
+         
+         ! Point to implicit solver linsol object
+         this%implicit=>NULL()
+         
       end if
       
    end subroutine setup
@@ -883,6 +889,7 @@ contains
       case (neumann) !< Neumann has to be at existing wall or at domain boundary!
       case (clipped_neumann)
       case (convective)
+      case (slip)
       case default
          call die('[incomp apply_bcond] Unknown bcond type')
       end select
@@ -945,7 +952,7 @@ contains
                ! This is done by the user directly
                ! Unclear whether we want to do this within the solver...
                
-            case (neumann,clipped_neumann) !< Apply Neumann condition to all 3 components
+            case (neumann,clipped_neumann,slip) !< Apply Neumann condition to all 3 components
                ! Handle index shift due to staggering
                stag=min(my_bc%dir,0)
                ! Implement based on bcond direction
@@ -995,6 +1002,26 @@ contains
                      end do
                   end select
                end if
+               ! If needed, no penetration
+               if (my_bc%type.eq.slip) then
+                  select case (my_bc%face)
+                  case ('x')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%U(i,j,k)=0.0_WP
+                     end do
+                  case ('y')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%V(i,j,k)=0.0_WP
+                     end do
+                  case ('z')
+                     do n=1,my_bc%itr%n_
+                        i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
+                        this%W(i,j,k)=0.0_WP
+                     end do
+                  end select
+               end if
                
             case (convective)   ! Not implemented yet!
                
@@ -1004,15 +1031,15 @@ contains
             
          end if
          
-         ! Sync full fields after each bcond - this should be optimized
-         call this%cfg%sync(this%U)
-         call this%cfg%sync(this%V)
-         call this%cfg%sync(this%W)
-         
          ! Move on to the next bcond
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields after all bcond
+      call this%cfg%sync(this%U)
+      call this%cfg%sync(this%V)
+      call this%cfg%sync(this%W)
       
    end subroutine apply_bcond
    
@@ -1026,6 +1053,9 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: drhoWdt !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k,ii,jj,kk
       real(WP), dimension(:,:,:), allocatable :: FX,FY,FZ
+      
+      ! Zero out drhoUVW/dt arrays
+      drhoUdt=0.0_WP; drhoVdt=0.0_WP; drhoWdt=0.0_WP
       
       ! Allocate flux arrays
       allocate(FX(this%cfg%imino_:this%cfg%imaxo_,this%cfg%jmino_:this%cfg%jmaxo_,this%cfg%kmino_:this%cfg%kmaxo_))
@@ -1141,10 +1171,12 @@ contains
    
    
    !> Calculate the velocity divergence based on U/V/W
-   subroutine get_div(this)
+   subroutine get_div(this,src)
       implicit none
       class(incomp), intent(inout) :: this
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), optional :: src !< Mass source term
       integer :: i,j,k
+      ! Calculate divergence of velocity
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -1154,6 +1186,16 @@ contains
             end do
          end do
       end do
+      ! If present, account for mass source
+      if (present(src)) then
+         do k=this%cfg%kmin_,this%cfg%kmax_
+            do j=this%cfg%jmin_,this%cfg%jmax_
+               do i=this%cfg%imin_,this%cfg%imax_
+                  this%div(i,j,k)=this%div(i,j,k)-src(i,j,k)
+               end do
+            end do
+         end do
+      end if
       ! Sync it
       call this%cfg%sync(this%div)
    end subroutine get_div
@@ -1168,6 +1210,7 @@ contains
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: Pgrady !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), intent(out) :: Pgradz !< Needs to be (imino_:imaxo_,jmino_:jmaxo_,kmino_:kmaxo_)
       integer :: i,j,k
+      Pgradx=0.0_WP; Pgrady=0.0_WP; Pgradz=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
          do j=this%cfg%jmin_,this%cfg%jmax_
             do i=this%cfg%imin_,this%cfg%imax_
@@ -1666,17 +1709,23 @@ contains
    
    
    !> Correct MFR through correctable bconds
-   subroutine correct_mfr(this)
+   subroutine correct_mfr(this,src)
       use mpi_f08, only: MPI_SUM
       implicit none
       class(incomp), intent(inout) :: this
-      real(WP) :: mfr_error,vel_correction
+      real(WP), dimension(this%cfg%imino_:,this%cfg%jmino_:,this%cfg%kmino_:), optional :: src !< Mass source term
+      real(WP) :: mfr_error,vel_correction,int
       integer :: i,j,k,n
       type(bcond), pointer :: my_bc
       
       ! Evaluate MFR mismatch and velocity correction
       call this%get_mfr()
       mfr_error=sum(this%mfr)
+      if (present(src)) then
+         ! Also account for provided source term
+         call this%cfg%integrate_without_VF(src,int)
+         mfr_error=mfr_error-int
+      end if
       if (abs(mfr_error).lt.10.0_WP*epsilon(1.0_WP).or.abs(this%correctable_area).lt.10.0_WP*epsilon(1.0_WP)) return
       vel_correction=-mfr_error/(this%rho*this%correctable_area)
       
@@ -1690,17 +1739,17 @@ contains
             ! Implement based on bcond direction, loop over all cell
             select case (my_bc%face)
             case ('x')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%U(i,j,k)=this%U(i,j,k)+my_bc%rdir*vel_correction
                end do
             case ('y')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%V(i,j,k)=this%V(i,j,k)+my_bc%rdir*vel_correction
                end do
             case ('z')
-               do n=1,my_bc%itr%no_
+               do n=1,my_bc%itr%n_
                   i=my_bc%itr%map(1,n); j=my_bc%itr%map(2,n); k=my_bc%itr%map(3,n)
                   this%W(i,j,k)=this%W(i,j,k)+my_bc%rdir*vel_correction
                end do
@@ -1712,6 +1761,11 @@ contains
          my_bc=>my_bc%next
          
       end do
+      
+      ! Sync full fields
+      call this%cfg%sync(this%U)
+      call this%cfg%sync(this%V)
+      call this%cfg%sync(this%W)
       
    end subroutine correct_mfr
    
@@ -1742,7 +1796,6 @@ contains
    
    !> Solve for implicit velocity residual
    subroutine solve_implicit(this,dt,resU,resV,resW)
-      use ils_class, only: amg
       implicit none
       class(incomp), intent(inout) :: this
       real(WP), intent(in) :: dt
@@ -1752,6 +1805,17 @@ contains
       integer :: i,j,k
       real(WP) :: rhoUp,rhoUm,rhoVp,rhoVm,rhoWp,rhoWm
       
+      ! If no implicit solver available, just divide by density and return
+      if (.not.associated(this%implicit)) then
+         resU=resU/this%rho
+         resV=resV/this%rho
+         resW=resW/this%rho
+         call this%cfg%sync(resU)
+         call this%cfg%sync(resV)
+         call this%cfg%sync(resW)
+         return
+      end if
+
       ! Solve implicit U problem
       this%implicit%opr(1,:,:,:)=this%rho; this%implicit%opr(2:,:,:,:)=0.0_WP
       do k=this%cfg%kmin_,this%cfg%kmax_
@@ -1901,11 +1965,6 @@ contains
       this%implicit%sol=0.0_WP
       call this%implicit%solve()
       resW=this%implicit%sol
-      
-      ! Sync up all residuals
-      call this%cfg%sync(resU)
-      call this%cfg%sync(resV)
-      call this%cfg%sync(resW)
       
    end subroutine solve_implicit
    
