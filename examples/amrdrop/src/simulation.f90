@@ -10,6 +10,8 @@ module simulation
    use event_class,       only: event
    use monitor_class,     only: monitor
    use messager,          only: log
+   use amrio_class,       only: amrio
+   use string,            only: str_medium
    implicit none
    private
 
@@ -35,6 +37,13 @@ module simulation
 
    ! Monitoring
    type(monitor) :: mfile,cflfile,gridfile
+
+   ! Restart data
+   type(amrio) :: io
+   type(event) :: save_evt
+   character(len=str_medium) :: restart_dir
+   logical :: restarted
+   real(WP) :: restart_time
 
    ! Physical parameters
    real(WP) :: viscL_mol,viscG_mol
@@ -233,6 +242,18 @@ contains
          call amr%initialize()
       end block create_amrgrid
 
+      ! Handle restart/saves here
+      handle_restart: block
+         integer :: restart_step
+         ! Initialize IO object
+         call io%initialize(amr=amr,nfiles=1)
+         ! Check if restarting
+         call param_read('Restart from',restart_dir,default='')
+         restarted=(len_trim(restart_dir).gt.0)
+         ! If restarting, read header
+         if (restarted) call io%read_header(dirname=trim(restart_dir),time=restart_time,step=restart_step)
+      end block handle_restart
+
       ! Initialize time integration
       initialize_time: block
          ! Create time tracker and initialize
@@ -242,6 +263,10 @@ contains
          call param_read('Max CFL',time%cflmax)
          time%dt=time%dtmax
          call param_read('Subiterations',time%itmax,default=2)
+         if (restarted) then
+            call io%get_scalar('dt',time%dt)
+            time%t=restart_time
+         end if
       end block initialize_time
       
       ! Create flow solver
@@ -294,21 +319,40 @@ contains
          ! Set case-specific tagging
          fs%user_mpinc_tagging=>my_tagger
          call param_read('Tagging Reynolds',Re_tag)
-         ! Create initial grid
-         call amr%init_from_scratch(time=time%t)
-         ! Build PLIC
-         call fs%build_plic(time%t)
-         ! Initialize face velocities
-         call fs%build_subVF()
-         call fs%interp_vel_to_face()
-         call fs%average_down_velocity()
-         call fs%fill_velocity(time=time%t)
+         ! Create initial grid from scratch or restore from checkpoint
+         if (restarted) then
+            ! Restore grid hierarchy from checkpoint
+            call amr%init_from_checkpoint(dirname=trim(restart_dir),time=time%t)
+            ! Restore solver state
+            call fs%restore_checkpoint(io=io,dirname=trim(restart_dir),time=time%t)
+         else
+            ! Create initial grid
+            call amr%init_from_scratch(time=time%t)
+            ! Build PLIC
+            call fs%build_plic(time%t)
+            ! Initialize face velocities
+            call fs%build_subVF()
+            call fs%interp_vel_to_face()
+            call fs%average_down_velocity()
+            call fs%fill_velocity(time=time%t)
+         end if
          ! Set viscosity: molecular + SGS
          call get_viscosity()
          call fs%add_vreman(dt=time%dt)
          ! Compute Umag
          call Umag%get_magnitude(srcX=fs%UVW,srcY=fs%UVW,srcZ=fs%UVW,compX=1,compY=2,compZ=3)
       end block init_regridding
+
+      ! Initialize checkpoint save event
+      init_checkpoint: block
+         ! Create checkpoint save event
+         save_evt=event(time=time,name='Checkpoint')
+         call param_read('Checkpoint period',save_evt%tper,default=-1.0_WP)
+         ! Let solver self-register for checkpointing
+         call fs%register_checkpoint(io)
+         ! Add dt to checkpoint save
+         call io%add_scalar(name='dt',value=time%dt)
+      end block init_checkpoint
 
       ! Initialize visualization
       create_visualization: block
@@ -469,6 +513,14 @@ contains
 
          ! Visualization output
          if (viz_evt%occurs()) call viz%write(time=time%t)
+
+         ! Checkpoint save
+         if (save_evt%occurs()) then
+            save_checkpoint: block
+               use string, only: rtoa
+               call io%write(dirname='restart/drop_'//trim(adjustl(rtoa(time%t))),time=time%t,step=time%n)
+            end block save_checkpoint
+         end if
          
       end do
 
@@ -489,6 +541,9 @@ contains
       ! Finalize visualization
       call viz%finalize()
       call viz_evt%finalize()
+      ! Finalize checkpoint
+      call save_evt%finalize()
+      call io%finalize()
       ! Finalize monitoring
       call mfile%finalize()
       call cflfile%finalize()
