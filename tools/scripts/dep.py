@@ -31,6 +31,7 @@ import preprocess
 IGNORES = [
     "iso_c_binding", "iso_fortran_env", "omp_lib", "mpi", "cudafor", "openacc",
     "hdf", "mpi_f08", "irl_fortran_interface", "amrex_amr_module",
+    "amrex_lo_bctypes_module", "amrex_linear_solver_module", "amrex_multifabutil_module",
     # SUNDIALS/CVODE Fortran interface (provided by libsundials_*)
     "fsundials_core_mod", "fcvode_mod", "fnvector_serial_mod",
     "fsunmatrix_dense_mod", "fsunlinsol_dense_mod",
