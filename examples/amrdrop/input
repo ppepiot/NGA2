@@ -9,9 +9,9 @@ Regrid nsteps:    10
 Tagging Reynolds: 10
 
 # Flow parameters
-Density ratio :  1000
-Weber number :   15
-Reynolds number: 1e3
+Density ratio:   1e3
+Weber number:    15
+Reynolds number: 2e3
 Viscosity ratio: 1
 
 # Time integration
@@ -20,4 +20,6 @@ Max dt:   1e-2
 Max CFL:  0.9
 
 # Output
-Output period: 0.5
+Output period:     0.5
+Checkpoint period: 10.0
+Restart from:      restart/drop_1.00000E+01
