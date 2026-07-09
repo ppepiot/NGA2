@@ -19,6 +19,11 @@
 .DS_Store
 *.dSYM/
 
+# Generated mechanism modules (produce on demand via yaml2nga / pdf_yaml2nga)
+**/pdf_mech.f90
+**/pdf_mech_reactions.txt
+
+
 # Temporary files/folders
 _*
 
