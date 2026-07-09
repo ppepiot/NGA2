@@ -23,6 +23,8 @@
 **/pdf_mech.f90
 **/pdf_mech_reactions.txt
 
+# Claude settings
+.claude/
 
 # Temporary files/folders
 _*
