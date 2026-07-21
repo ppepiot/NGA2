@@ -78,7 +78,8 @@ module amrmpcomp_class
       type(amrdata) :: C                 !< Speed of sound
       type(amrdata) :: visc              !< Dynamic viscosity
       type(amrdata) :: beta              !< Bulk viscosity
-      type(amrdata) :: diffL,diffG       !< Phasic heat diffusivities (liquid, gas)
+      type(amrdata) :: diffL,diffG       !< Phasic thermal conductivities lambda [W/(m.K)] (liquid, gas)
+      type(amrdata) :: diffYl,diffYg     !< Phasic species mass diffusivities rho*D [kg/(m.s)] (liquid, gas)
       real(WP) :: sigma                  !< Surface tension coefficient
 
       ! CFL numbers
@@ -353,23 +354,31 @@ contains
       call this%beta%initialize(amr,name='beta',ncomp=1,ng=this%nover); this%beta%parent=>this
       call this%diffL%initialize(amr,name='diffL',ncomp=1,ng=this%nover); this%diffL%parent=>this
       call this%diffG%initialize(amr,name='diffG',ncomp=1,ng=this%nover); this%diffG%parent=>this
+      call this%diffYl%initialize(amr,name='diffYl',ncomp=1,ng=this%nover); this%diffYl%parent=>this
+      call this%diffYg%initialize(amr,name='diffYg',ncomp=1,ng=this%nover); this%diffYg%parent=>this
       if (.not.amr%xper) then
          this%visc%lo_bc(1,1)=amrex_bc_foextrap; this%visc%hi_bc(1,1)=amrex_bc_foextrap
          this%beta%lo_bc(1,1)=amrex_bc_foextrap; this%beta%hi_bc(1,1)=amrex_bc_foextrap
          this%diffL%lo_bc(1,1)=amrex_bc_foextrap; this%diffL%hi_bc(1,1)=amrex_bc_foextrap
          this%diffG%lo_bc(1,1)=amrex_bc_foextrap; this%diffG%hi_bc(1,1)=amrex_bc_foextrap
+         this%diffYl%lo_bc(1,1)=amrex_bc_foextrap; this%diffYl%hi_bc(1,1)=amrex_bc_foextrap
+         this%diffYg%lo_bc(1,1)=amrex_bc_foextrap; this%diffYg%hi_bc(1,1)=amrex_bc_foextrap
       end if
       if (.not.amr%yper) then
          this%visc%lo_bc(2,1)=amrex_bc_foextrap; this%visc%hi_bc(2,1)=amrex_bc_foextrap
          this%beta%lo_bc(2,1)=amrex_bc_foextrap; this%beta%hi_bc(2,1)=amrex_bc_foextrap
          this%diffL%lo_bc(2,1)=amrex_bc_foextrap; this%diffL%hi_bc(2,1)=amrex_bc_foextrap
          this%diffG%lo_bc(2,1)=amrex_bc_foextrap; this%diffG%hi_bc(2,1)=amrex_bc_foextrap
+         this%diffYl%lo_bc(2,1)=amrex_bc_foextrap; this%diffYl%hi_bc(2,1)=amrex_bc_foextrap
+         this%diffYg%lo_bc(2,1)=amrex_bc_foextrap; this%diffYg%hi_bc(2,1)=amrex_bc_foextrap
       end if
       if (.not.amr%zper) then
          this%visc%lo_bc(3,1)=amrex_bc_foextrap; this%visc%hi_bc(3,1)=amrex_bc_foextrap
          this%beta%lo_bc(3,1)=amrex_bc_foextrap; this%beta%hi_bc(3,1)=amrex_bc_foextrap
          this%diffL%lo_bc(3,1)=amrex_bc_foextrap; this%diffL%hi_bc(3,1)=amrex_bc_foextrap
          this%diffG%lo_bc(3,1)=amrex_bc_foextrap; this%diffG%hi_bc(3,1)=amrex_bc_foextrap
+         this%diffYl%lo_bc(3,1)=amrex_bc_foextrap; this%diffYl%hi_bc(3,1)=amrex_bc_foextrap
+         this%diffYg%lo_bc(3,1)=amrex_bc_foextrap; this%diffYg%hi_bc(3,1)=amrex_bc_foextrap
       end if
 
       ! Initialize pressure solver if requested
@@ -414,6 +423,7 @@ contains
       call this%C%finalize()
       ! Physical properties
       call this%visc%finalize(); call this%beta%finalize(); call this%diffL%finalize(); call this%diffG%finalize()
+      call this%diffYl%finalize(); call this%diffYg%finalize()
       ! Nullify pointers
       nullify(this%user_init); nullify(this%user_tagging); nullify(this%user_bc); nullify(this%user_vofbc)
       nullify(this%liq); nullify(this%gas)
@@ -452,6 +462,8 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diffL%reset_level(lvl,ba,dm)
       call this%diffG%reset_level(lvl,ba,dm)
+      call this%diffYl%reset_level(lvl,ba,dm)
+      call this%diffYg%reset_level(lvl,ba,dm)
       ! Zero out everything
       call this%UVW%setval(val=0.0_WP,lvl=lvl)
       call this%RHOL%setval(val=0.0_WP,lvl=lvl); call this%RHOG%setval(val=0.0_WP,lvl=lvl)
@@ -467,6 +479,8 @@ contains
       call this%beta%setval(val=0.0_WP,lvl=lvl)
       call this%diffL%setval(val=0.0_WP,lvl=lvl)
       call this%diffG%setval(val=0.0_WP,lvl=lvl)
+      call this%diffYl%setval(val=0.0_WP,lvl=lvl)
+      call this%diffYg%setval(val=0.0_WP,lvl=lvl)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse using conservative interpolation
@@ -492,6 +506,8 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diffL%reset_level(lvl,ba,dm)
       call this%diffG%reset_level(lvl,ba,dm)
+      call this%diffYl%reset_level(lvl,ba,dm)
+      call this%diffYg%reset_level(lvl,ba,dm)
    end subroutine on_coarse
 
    !> Override on_remake: migrate data on regrid using conservative interpolation
@@ -517,6 +533,8 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diffL%reset_level(lvl,ba,dm)
       call this%diffG%reset_level(lvl,ba,dm)
+      call this%diffYl%reset_level(lvl,ba,dm)
+      call this%diffYg%reset_level(lvl,ba,dm)
    end subroutine on_remake
 
    !> Override on_clear: delete level
@@ -539,6 +557,8 @@ contains
       call this%beta%clear_level(lvl)
       call this%diffL%clear_level(lvl)
       call this%diffG%clear_level(lvl)
+      call this%diffYl%clear_level(lvl)
+      call this%diffYg%clear_level(lvl)
    end subroutine on_clear
 
    !> Override post_regrid: average down for C/F consistency
@@ -1449,12 +1469,12 @@ contains
       finitevolume_fluxes: block
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pFx,pFy,pFz,pBand
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pTL,pTG,pIL,pIG,pVF,pUVW,pPL,pPG
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVisc,pBeta,pDiffL,pDiffG,pYl,pYg
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pVisc,pBeta,pDiffL,pDiffG,pDiffYl,pDiffYg,pYl,pYg
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW ! Intentional masking
          real(WP), dimension(-2: 0) :: wenop
          real(WP), dimension(-1:+1) :: wenom
          real(WP), dimension(1:3,1:3) :: dUdx
-         real(WP) :: w,div,visc_f,beta_f,fluxY,condL,condG,fluxC
+         real(WP) :: w,div,visc_f,beta_f,fluxY,condL,condG,condYl,condYg,fluxC
          real(WP), dimension(this%liq%ns) :: ylf,hkL
          real(WP), dimension(this%gas%ns) :: ygf,hkG
          real(WP), parameter :: eps=1.0e-15_WP
@@ -1487,6 +1507,8 @@ contains
                pBeta=>this%beta%mf(lvl)%dataptr(mfi)
                pDiffL=>this%diffL%mf(lvl)%dataptr(mfi)
                pDiffG=>this%diffG%mf(lvl)%dataptr(mfi)
+               pDiffYl=>this%diffYl%mf(lvl)%dataptr(mfi)
+               pDiffYg=>this%diffYg%mf(lvl)%dataptr(mfi)
                pFx  =>Fx(lvl)%dataptr(mfi)
                pFy  =>Fy(lvl)%dataptr(mfi)
                pFz  =>Fz(lvl)%dataptr(mfi)
@@ -1560,8 +1582,17 @@ contains
                   pFx(i,j,k,6)=pFx(i,j,k,6)+visc_f*(dUdx(2,1)+dUdx(1,2))
                   pFx(i,j,k,7)=pFx(i,j,k,7)+visc_f*(dUdx(3,1)+dUdx(1,3))
                   ! Phasic face conductances: own-phase min aperture * face diffusivity / dx (zero when phase absent/invalid on either side)
-                  condL=0.0_WP; if (all(pVF(i-1:i,j,k,1).ge.VFlo).and.all(pTL(i-1:i,j,k,1).gt.0.0_WP)) condL=(       minval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffL(i-1:i,j,k,1))*dxi
-                  condG=0.0_WP; if (all(pVF(i-1:i,j,k,1).le.VFhi).and.all(pTG(i-1:i,j,k,1).gt.0.0_WP)) condG=(1.0_WP-maxval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffG(i-1:i,j,k,1))*dxi
+                  ! Heat: lambda [W/(m.K)]; species: rho*D [kg/(m.s)] (independent fields, no forced Le=1)
+                  condL=0.0_WP; condYl=0.0_WP
+                  if (all(pVF(i-1:i,j,k,1).ge.VFlo).and.all(pTL(i-1:i,j,k,1).gt.0.0_WP)) then
+                     condL =(       minval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffL (i-1:i,j,k,1))*dxi
+                     condYl=(       minval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffYl(i-1:i,j,k,1))*dxi
+                  end if
+                  condG=0.0_WP; condYg=0.0_WP
+                  if (all(pVF(i-1:i,j,k,1).le.VFhi).and.all(pTG(i-1:i,j,k,1).gt.0.0_WP)) then
+                     condG =(1.0_WP-maxval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffG (i-1:i,j,k,1))*dxi
+                     condYg=(1.0_WP-maxval(pVF(i-1:i,j,k,1)))*0.5_WP*sum(pDiffYg(i-1:i,j,k,1))*dxi
+                  end if
                   ! Phasic heat diffusion flux, content-limited: one face may drain at most 10%
                   ! of the donor (hotter) cell's phasic energy per stage (2*ndim faces then never
                   ! exceed ~60%) — extraction otherwise scales with dT*aperture, not content,
@@ -1574,21 +1605,21 @@ contains
                   if (fluxC.gt.0.0_WP) then; fluxC=min(fluxC, 0.1_WP*max(pQ(i  ,j,k,4),0.0_WP)/(dxi*dt))
                   else;                      fluxC=max(fluxC,-0.1_WP*max(pQ(i-1,j,k,4),0.0_WP)/(dxi*dt)); end if
                   pFx(i,j,k,4)=pFx(i,j,k,4)+fluxC
-                  ! Phasic species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
-                  if (this%liq%ns.gt.1.and.condL.gt.0.0_WP) then
+                  ! Phasic species diffusion flux (Fickian, rho*D) with interdiffusion enthalpy via EOS partial enthalpies
+                  if (this%liq%ns.gt.1.and.condYl.gt.0.0_WP) then
                      ylf(1:this%liq%ns-1)=0.5_WP*(pYl(i-1,j,k,:)+pYl(i,j,k,:)); ylf(this%liq%ns)=max(0.0_WP,1.0_WP-sum(ylf(1:this%liq%ns-1)))
                      call this%liq%get_hk_from_p_T(p=0.5_WP*sum(pPL(i-1:i,j,k,1)),T=0.5_WP*sum(pTL(i-1:i,j,k,1)),y=ylf,hk=hkL)
                      do n=1,this%liq%ns-1
-                        fluxY=condL*(pYl(i,j,k,n)-pYl(i-1,j,k,n))
+                        fluxY=condYl*(pYl(i,j,k,n)-pYl(i-1,j,k,n))
                         pFx(i,j,k,this%Yl_lo+n-1)=pFx(i,j,k,this%Yl_lo+n-1)+fluxY
                         pFx(i,j,k,3)=pFx(i,j,k,3)+fluxY*(hkL(n)-hkL(this%liq%ns))
                      end do
                   end if
-                  if (this%gas%ns.gt.1.and.condG.gt.0.0_WP) then
+                  if (this%gas%ns.gt.1.and.condYg.gt.0.0_WP) then
                      ygf(1:this%gas%ns-1)=0.5_WP*(pYg(i-1,j,k,:)+pYg(i,j,k,:)); ygf(this%gas%ns)=max(0.0_WP,1.0_WP-sum(ygf(1:this%gas%ns-1)))
                      call this%gas%get_hk_from_p_T(p=0.5_WP*sum(pPG(i-1:i,j,k,1)),T=0.5_WP*sum(pTG(i-1:i,j,k,1)),y=ygf,hk=hkG)
                      do n=1,this%gas%ns-1
-                        fluxY=condG*(pYg(i,j,k,n)-pYg(i-1,j,k,n))
+                        fluxY=condYg*(pYg(i,j,k,n)-pYg(i-1,j,k,n))
                         pFx(i,j,k,this%Yg_lo+n-1)=pFx(i,j,k,this%Yg_lo+n-1)+fluxY
                         pFx(i,j,k,4)=pFx(i,j,k,4)+fluxY*(hkG(n)-hkG(this%gas%ns))
                      end do
@@ -1661,8 +1692,17 @@ contains
                   pFy(i,j,k,6)=pFy(i,j,k,6)+visc_f*(dUdx(2,2)+dUdx(2,2))+(beta_f-2.0_WP/3.0_WP*visc_f)*div
                   pFy(i,j,k,7)=pFy(i,j,k,7)+visc_f*(dUdx(3,2)+dUdx(2,3))
                   ! Phasic face conductances: own-phase min aperture * face diffusivity / dx (zero when phase absent/invalid on either side)
-                  condL=0.0_WP; if (all(pVF(i,j-1:j,k,1).ge.VFlo).and.all(pTL(i,j-1:j,k,1).gt.0.0_WP)) condL=(       minval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffL(i,j-1:j,k,1))*dyi
-                  condG=0.0_WP; if (all(pVF(i,j-1:j,k,1).le.VFhi).and.all(pTG(i,j-1:j,k,1).gt.0.0_WP)) condG=(1.0_WP-maxval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffG(i,j-1:j,k,1))*dyi
+                  ! Heat: lambda [W/(m.K)]; species: rho*D [kg/(m.s)] (independent fields, no forced Le=1)
+                  condL=0.0_WP; condYl=0.0_WP
+                  if (all(pVF(i,j-1:j,k,1).ge.VFlo).and.all(pTL(i,j-1:j,k,1).gt.0.0_WP)) then
+                     condL =(       minval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffL (i,j-1:j,k,1))*dyi
+                     condYl=(       minval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffYl(i,j-1:j,k,1))*dyi
+                  end if
+                  condG=0.0_WP; condYg=0.0_WP
+                  if (all(pVF(i,j-1:j,k,1).le.VFhi).and.all(pTG(i,j-1:j,k,1).gt.0.0_WP)) then
+                     condG =(1.0_WP-maxval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffG (i,j-1:j,k,1))*dyi
+                     condYg=(1.0_WP-maxval(pVF(i,j-1:j,k,1)))*0.5_WP*sum(pDiffYg(i,j-1:j,k,1))*dyi
+                  end if
                   ! Phasic heat diffusion flux
                   ! Content-limited conduction (see x-direction comment)
                   fluxC=condL*(pTL(i,j,k,1)-pTL(i,j-1,k,1))
@@ -1673,21 +1713,21 @@ contains
                   if (fluxC.gt.0.0_WP) then; fluxC=min(fluxC, 0.1_WP*max(pQ(i,j  ,k,4),0.0_WP)/(dyi*dt))
                   else;                      fluxC=max(fluxC,-0.1_WP*max(pQ(i,j-1,k,4),0.0_WP)/(dyi*dt)); end if
                   pFy(i,j,k,4)=pFy(i,j,k,4)+fluxC
-                  ! Phasic species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
-                  if (this%liq%ns.gt.1.and.condL.gt.0.0_WP) then
+                  ! Phasic species diffusion flux (Fickian, rho*D) with interdiffusion enthalpy via EOS partial enthalpies
+                  if (this%liq%ns.gt.1.and.condYl.gt.0.0_WP) then
                      ylf(1:this%liq%ns-1)=0.5_WP*(pYl(i,j-1,k,:)+pYl(i,j,k,:)); ylf(this%liq%ns)=max(0.0_WP,1.0_WP-sum(ylf(1:this%liq%ns-1)))
                      call this%liq%get_hk_from_p_T(p=0.5_WP*sum(pPL(i,j-1:j,k,1)),T=0.5_WP*sum(pTL(i,j-1:j,k,1)),y=ylf,hk=hkL)
                      do n=1,this%liq%ns-1
-                        fluxY=condL*(pYl(i,j,k,n)-pYl(i,j-1,k,n))
+                        fluxY=condYl*(pYl(i,j,k,n)-pYl(i,j-1,k,n))
                         pFy(i,j,k,this%Yl_lo+n-1)=pFy(i,j,k,this%Yl_lo+n-1)+fluxY
                         pFy(i,j,k,3)=pFy(i,j,k,3)+fluxY*(hkL(n)-hkL(this%liq%ns))
                      end do
                   end if
-                  if (this%gas%ns.gt.1.and.condG.gt.0.0_WP) then
+                  if (this%gas%ns.gt.1.and.condYg.gt.0.0_WP) then
                      ygf(1:this%gas%ns-1)=0.5_WP*(pYg(i,j-1,k,:)+pYg(i,j,k,:)); ygf(this%gas%ns)=max(0.0_WP,1.0_WP-sum(ygf(1:this%gas%ns-1)))
                      call this%gas%get_hk_from_p_T(p=0.5_WP*sum(pPG(i,j-1:j,k,1)),T=0.5_WP*sum(pTG(i,j-1:j,k,1)),y=ygf,hk=hkG)
                      do n=1,this%gas%ns-1
-                        fluxY=condG*(pYg(i,j,k,n)-pYg(i,j-1,k,n))
+                        fluxY=condYg*(pYg(i,j,k,n)-pYg(i,j-1,k,n))
                         pFy(i,j,k,this%Yg_lo+n-1)=pFy(i,j,k,this%Yg_lo+n-1)+fluxY
                         pFy(i,j,k,4)=pFy(i,j,k,4)+fluxY*(hkG(n)-hkG(this%gas%ns))
                      end do
@@ -1760,8 +1800,17 @@ contains
                   pFz(i,j,k,6)=pFz(i,j,k,6)+visc_f*(dUdx(2,3)+dUdx(3,2))
                   pFz(i,j,k,7)=pFz(i,j,k,7)+visc_f*(dUdx(3,3)+dUdx(3,3))+(beta_f-2.0_WP/3.0_WP*visc_f)*div
                   ! Phasic face conductances: own-phase min aperture * face diffusivity / dx (zero when phase absent/invalid on either side)
-                  condL=0.0_WP; if (all(pVF(i,j,k-1:k,1).ge.VFlo).and.all(pTL(i,j,k-1:k,1).gt.0.0_WP)) condL=(       minval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffL(i,j,k-1:k,1))*dzi
-                  condG=0.0_WP; if (all(pVF(i,j,k-1:k,1).le.VFhi).and.all(pTG(i,j,k-1:k,1).gt.0.0_WP)) condG=(1.0_WP-maxval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffG(i,j,k-1:k,1))*dzi
+                  ! Heat: lambda [W/(m.K)]; species: rho*D [kg/(m.s)] (independent fields, no forced Le=1)
+                  condL=0.0_WP; condYl=0.0_WP
+                  if (all(pVF(i,j,k-1:k,1).ge.VFlo).and.all(pTL(i,j,k-1:k,1).gt.0.0_WP)) then
+                     condL =(       minval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffL (i,j,k-1:k,1))*dzi
+                     condYl=(       minval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffYl(i,j,k-1:k,1))*dzi
+                  end if
+                  condG=0.0_WP; condYg=0.0_WP
+                  if (all(pVF(i,j,k-1:k,1).le.VFhi).and.all(pTG(i,j,k-1:k,1).gt.0.0_WP)) then
+                     condG =(1.0_WP-maxval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffG (i,j,k-1:k,1))*dzi
+                     condYg=(1.0_WP-maxval(pVF(i,j,k-1:k,1)))*0.5_WP*sum(pDiffYg(i,j,k-1:k,1))*dzi
+                  end if
                   ! Phasic heat diffusion flux
                   ! Content-limited conduction (see x-direction comment)
                   fluxC=condL*(pTL(i,j,k,1)-pTL(i,j,k-1,1))
@@ -1772,21 +1821,21 @@ contains
                   if (fluxC.gt.0.0_WP) then; fluxC=min(fluxC, 0.1_WP*max(pQ(i,j,k  ,4),0.0_WP)/(dzi*dt))
                   else;                      fluxC=max(fluxC,-0.1_WP*max(pQ(i,j,k-1,4),0.0_WP)/(dzi*dt)); end if
                   pFz(i,j,k,4)=pFz(i,j,k,4)+fluxC
-                  ! Phasic species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
-                  if (this%liq%ns.gt.1.and.condL.gt.0.0_WP) then
+                  ! Phasic species diffusion flux (Fickian, rho*D) with interdiffusion enthalpy via EOS partial enthalpies
+                  if (this%liq%ns.gt.1.and.condYl.gt.0.0_WP) then
                      ylf(1:this%liq%ns-1)=0.5_WP*(pYl(i,j,k-1,:)+pYl(i,j,k,:)); ylf(this%liq%ns)=max(0.0_WP,1.0_WP-sum(ylf(1:this%liq%ns-1)))
                      call this%liq%get_hk_from_p_T(p=0.5_WP*sum(pPL(i,j,k-1:k,1)),T=0.5_WP*sum(pTL(i,j,k-1:k,1)),y=ylf,hk=hkL)
                      do n=1,this%liq%ns-1
-                        fluxY=condL*(pYl(i,j,k,n)-pYl(i,j,k-1,n))
+                        fluxY=condYl*(pYl(i,j,k,n)-pYl(i,j,k-1,n))
                         pFz(i,j,k,this%Yl_lo+n-1)=pFz(i,j,k,this%Yl_lo+n-1)+fluxY
                         pFz(i,j,k,3)=pFz(i,j,k,3)+fluxY*(hkL(n)-hkL(this%liq%ns))
                      end do
                   end if
-                  if (this%gas%ns.gt.1.and.condG.gt.0.0_WP) then
+                  if (this%gas%ns.gt.1.and.condYg.gt.0.0_WP) then
                      ygf(1:this%gas%ns-1)=0.5_WP*(pYg(i,j,k-1,:)+pYg(i,j,k,:)); ygf(this%gas%ns)=max(0.0_WP,1.0_WP-sum(ygf(1:this%gas%ns-1)))
                      call this%gas%get_hk_from_p_T(p=0.5_WP*sum(pPG(i,j,k-1:k,1)),T=0.5_WP*sum(pTG(i,j,k-1:k,1)),y=ygf,hk=hkG)
                      do n=1,this%gas%ns-1
-                        fluxY=condG*(pYg(i,j,k,n)-pYg(i,j,k-1,n))
+                        fluxY=condYg*(pYg(i,j,k,n)-pYg(i,j,k-1,n))
                         pFz(i,j,k,this%Yg_lo+n-1)=pFz(i,j,k,this%Yg_lo+n-1)+fluxY
                         pFz(i,j,k,4)=pFz(i,j,k,4)+fluxY*(hkG(n)-hkG(this%gas%ns))
                      end do
@@ -2812,7 +2861,7 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       integer :: lvl,i,j,k,ierr
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pUVW,pVisc,pBeta,pDiffL,pDiffG,pVF,pPL,pPG,pC,pTL,pTG,pRHOL,pRHOG,pIL,pIG,pYl,pYg
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pUVW,pVisc,pBeta,pDiffL,pDiffG,pDiffYl,pDiffYg,pVF,pPL,pPG,pC,pTL,pTG,pRHOL,pRHOG,pIL,pIG,pYl,pYg
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW
       real(WP) :: dxi,dyi,dzi,rho,viscmax,conv,pgrad,cvL,cvG,alpha_heat
       real(WP) :: Pmix_ip,Pmix_im,Pmix_jp,Pmix_jm,Pmix_kp,Pmix_km
@@ -2843,6 +2892,8 @@ contains
             pBeta=>this%beta%mf(lvl)%dataptr(mfi)
             pDiffL=>this%diffL%mf(lvl)%dataptr(mfi)
             pDiffG=>this%diffG%mf(lvl)%dataptr(mfi)
+            pDiffYl=>this%diffYl%mf(lvl)%dataptr(mfi)
+            pDiffYg=>this%diffYg%mf(lvl)%dataptr(mfi)
             pVF  =>this%VF%mf(lvl)%dataptr(mfi)
             pPL  =>this%PL%mf(lvl)%dataptr(mfi)
             pPG  =>this%PG%mf(lvl)%dataptr(mfi)
@@ -2861,6 +2912,7 @@ contains
                ! Get density
                rho=max(pQ(i,j,k,1)+pQ(i,j,k,2),this%rho_floor)
                ! Heat-diffusion CFL: thermal diffusivity alpha=lambda/(rho*cv), phasic in pure cells (matches conduction flux)
+               ! Species-diffusion CFL: mass diffusivity D=(rho*D)/rho, folded into the same limit
                alpha_heat=0.0_WP
                if (pVF(i,j,k,1).gt.VFhi.and.pRHOL(i,j,k,1).gt.0.0_WP) then
                   ! Pure liquid: alpha_L=lambda/(rhoL*cvL)
@@ -2868,12 +2920,14 @@ contains
                   yL(this%liq%ns)=max(0.0_WP,1.0_WP-sum(yL(1:this%liq%ns-1)))
                   cvL=this%liq%get_cv_from_rho_e(pRHOL(i,j,k,1),pIL(i,j,k,1),yL)
                   alpha_heat=pDiffL(i,j,k,1)/max(pRHOL(i,j,k,1)*cvL,tiny(1.0_WP))
+                  alpha_heat=max(alpha_heat,pDiffYl(i,j,k,1)/max(pRHOL(i,j,k,1),tiny(1.0_WP)))
                else if (pVF(i,j,k,1).lt.VFlo.and.pRHOG(i,j,k,1).gt.0.0_WP) then
                   ! Pure gas: alpha_G=lambda/(rhoG*cvG)
                   if (this%gas%ns.gt.1) yG(1:this%gas%ns-1)=pYg(i,j,k,:)
                   yG(this%gas%ns)=max(0.0_WP,1.0_WP-sum(yG(1:this%gas%ns-1)))
                   cvG=this%gas%get_cv_from_rho_e(pRHOG(i,j,k,1),pIG(i,j,k,1),yG)
                   alpha_heat=pDiffG(i,j,k,1)/max(pRHOG(i,j,k,1)*cvG,tiny(1.0_WP))
+                  alpha_heat=max(alpha_heat,pDiffYg(i,j,k,1)/max(pRHOG(i,j,k,1),tiny(1.0_WP)))
                end if
                ! Viscous CFL
                viscmax=max(pVisc(i,j,k,1)/rho,pBeta(i,j,k,1)/rho,alpha_heat)

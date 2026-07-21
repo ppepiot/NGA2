@@ -1,0 +1,74 @@
+# ============================================================================
+# thermo0D: 0D constant-volume reactor
+# Default IC: half liquid water (NASG) + half pure nitrogen (ideal gas).
+# Heat is added at a constant specific rate [J/(kg.s)] to each phase; total
+# volume is fixed. For mixtures, p or pT relaxation equalizes the phases.
+# Set Liquid volume fraction = 1 for pure liquid, = 0 for pure N2.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Phase fraction (by volume). 0.5 = half liquid water / half pure N2.
+# ----------------------------------------------------------------------------
+Liquid volume fraction: 0.5
+
+# ----------------------------------------------------------------------------
+# Liquid NASG parameters — Le Métayer & Saurel (2016) Table V (SI water,
+# roughly 300–500 K). Swap to the Pelanti/relax1D set if desired:
+#   Gamma: 1.1173   Pinf: 5.0017e8   Cv: 3.8212e3
+#   b: 7.2341e-4    q: -1.1711e6     qp: 0
+# ----------------------------------------------------------------------------
+Gamma: 1.19
+Pinf:  7.028e8
+b:     6.61e-4
+Cv:    3610.0
+q:    -1.177788e6
+qp:    0.0
+
+# ----------------------------------------------------------------------------
+# Gas: pure nitrogen (calorically perfect ideal gas)
+# R_N2 = 296.8 J/(kg.K) -> Cv = R/(gamma-1) = 742 at gamma = 1.4
+# ----------------------------------------------------------------------------
+Gas Gamma: 1.4
+Gas Cv:    742.0
+Gas q:     0.0
+Gas qp:    0.0
+
+# ----------------------------------------------------------------------------
+# Reactor geometry and initial state (room T/P for both phases by default).
+# Optional per-phase overrides: Liquid pressure/temperature, Gas pressure/temperature.
+# ----------------------------------------------------------------------------
+Volume:      1.0
+Pressure:    101325.0
+Temperature: 298.15
+#Liquid pressure:    101325.0
+#Liquid temperature: 298.15
+#Gas pressure:       101325.0
+#Gas temperature:    298.15
+
+# ----------------------------------------------------------------------------
+# Mixture relaxation after each heat step (ignored for pure liquid or pure gas):
+#   none  - frozen volume fraction (phases heat independently)
+#   p     - mechanical (equal pressure)
+#   pT    - mechanical + thermal (equal P and T)
+# ----------------------------------------------------------------------------
+Relaxation type: pT
+
+# ----------------------------------------------------------------------------
+# Heat addition: de_k/dt = Heating rate  [J/(kg.s)] on each present phase
+# ----------------------------------------------------------------------------
+Heating rate: 1.0e4
+End time:     200.0
+Time step:    0.1
+
+# ----------------------------------------------------------------------------
+# Critical-condition flags (IAPWS water; applied to liquid when present).
+# Packing warn fraction compares liquid b*rho to the NASG clamp.
+# ----------------------------------------------------------------------------
+Critical temperature:  647.096
+Critical pressure:     2.2064e7
+Packing warn fraction: 0.9
+Stop at critical:      .false.
+
+# Output
+Output file:  data/thermo.csv
+Output every: 1
