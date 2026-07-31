@@ -1,15 +1,7 @@
-!> GID -> LID hash for fast resolution of bond endpoints during force evaluation.
-!>
-!> Used by amrpd's compute_dilatation and compute_force kernels: after each
-!> fill_neighbors_radius call, walk the tile's (owned + ghost) particles and
-!> build the hash; then each bond looks up its two endpoints by their GID
-!> (packed (id, cpu) as a unique int64 key via amrpd_get_particle_idcpu).
-!>
-!> Implementation: sorted-array + binary search. Build O(N log N), lookup
-!> O(log N), where N is the tile-local particle count (owned + ghost). Cheap
-!> enough that the hash is rebuilt per tile per force evaluation; no need to
-!> cache across timesteps.
-module amrpd_hash_class
+!> GID -> LID hash (sorted array + binary search; build O(N log N), lookup
+!> O(log N)). Used by pdsolver for owned-node gid resolution and halo-plan
+!> construction.
+module pdhash_class
    use iso_c_binding, only: c_int64_t
    implicit none
    private
@@ -160,4 +152,4 @@ contains
       call quicksort_pair(keys,vals,i,hi)
    end subroutine quicksort_pair
 
-end module amrpd_hash_class
+end module pdhash_class

@@ -3,7 +3,7 @@ module simulation
    use precision,           only: WP,I8
    use amrgrid_class,       only: amrgrid
    use amrcomp_class,       only: amrcomp
-   use amrpd_class,         only: amrpd,part,PART_MOVES,PART_INTEGRATES,PART_BONDS,PART_IS_DEAD,AMRPD_OPEN
+   use amrpd_class,         only: amrpd,part,PART_MOVES,PART_INTEGRATES,PART_BONDS,PART_IS_DEAD
    use amrpdviz_class,      only: amrpdviz
    use amrviz_class,        only: amrviz
    use amrdata_class,       only: amrdata
@@ -25,7 +25,7 @@ module simulation
    type(amrdata) :: dQdt
    type(amrdata) :: Umag,Mach
 
-   !> Peridynamics solid and its mesh-deposited velocity field
+   !> Peridynamics solid: an amrpd IS a pdsolver plus its grid face
    type(amrpd), target :: pd
    type(amrpdviz) :: pviz
    type(amrdata) :: Usolid          !< Solid velocity on the AMR mesh (3 comp)
@@ -431,7 +431,6 @@ contains
          ! Solid spacing dp; horizon defaults to 3.0125*dp (Peridigm convention)
          call param_read('Element size',      elem_size)
          call param_read('Horizon',           pd%delta,default=3.0125_WP*elem_size)
-         pd%search_radius=1.5_WP*pd%delta
          pd%dV=elem_size**3
          ! Beam geometry
          call param_read('Beam length',   beam_L,    default=1.0_WP)
@@ -439,8 +438,6 @@ contains
          call param_read('Beam angle',    beam_angle,default=75.0_WP)
          ! Gravity off by default (body driven by the flow)
          call param_read('Gravity',pd%gravity,default=[0.0_WP,0.0_WP,0.0_WP])
-         ! Open domain BCs (y/z periodicity is handled by AMReX)
-         pd%lo_bc=AMRPD_OPEN; pd%hi_bc=AMRPD_OPEN
          ! Refine the AMR mesh wherever the solid volume fraction exceeds VF_tag
          call param_read('Tagging VF',pd%VF_tag,default=0.1_WP)
          ! Coupling-direction switches (absent -> fully coupled)
@@ -483,8 +480,9 @@ contains
          call pd%update_VF()
          call amr%regrid(baselvl=0,time=time%t)
          call pd%get_info()
-         ! Build the initial bond network on the final AMR hierarchy
-         call pd%bond_init()
+         ! Hand the seeded body to the solver: families detected natively
+         ! from the reference configuration
+         call pd%handoff()
          call pd%update_VF()
          ! Initial solid-velocity deposit (body at rest -> Usolid=0) and fluid VF
          call deposit_solid_velocity()
@@ -534,6 +532,7 @@ contains
          call fs%get_info()
          call fs%get_cfl(dt=time%dt,cfl=time%cfl)
          call pd%get_info()
+         call pd%get_cfl(dt=time%dt,cfl=time%cfl)
          call get_force()
          ! Create simulation monitor
          mfile=monitor(amRoot=amr%amRoot,name='simulation')
@@ -700,19 +699,22 @@ contains
          if (couple_f2s) call get_fluid_force()
 
          ! Sub-cycle the solid over the fluid step with F_fluid held fixed.
-         ! n_sub = ceil(single-step pd CFL / cflmax) keeps each sub-step stable.
+         ! n_sub = ceil(single-step PD CFL / cflmax) keeps each sub-step stable.
          pd_subcycle: block
             real(WP) :: dt_sub
             integer :: i_sub
+            ! Deliver F_fluid to the solver, subcycle, pull state back onto
+            ! the grid face for regrid tagging + deposits
+            call pd%exchange_solid()
             call pd%get_cfl(dt=time%dt,cfl=cfl_pd)
             n_sub=1
             if (cfl_pd.gt.time%cflmax) n_sub=ceiling(cfl_pd/time%cflmax)
             dt_sub=time%dt/real(n_sub,WP)
-            do i_sub=1,n_sub
-               call pd%advance(dt_sub)
-            end do
-            ! Refresh monitored pd CFLs to the actual (stable) sub-step values
+            do i_sub=1,n_sub; call pd%advance(dt_sub); end do
             call pd%get_cfl(dt=dt_sub,cfl=cfl_pd)
+            call pd%exchange_solid()
+            call pd%redistribute()
+            call pd%update_VF()
          end block pd_subcycle
 
          ! Regrid if event triggers
@@ -855,8 +857,6 @@ contains
       implicit none
       ! Finalize time
       call time%finalize()
-      ! Finalize grid
-      call amr%finalize()
       call regrid_evt%finalize()
       ! Finalize solvers
       call fs%finalize()
@@ -879,6 +879,9 @@ contains
       call consfile%finalize()
       call gridfile%finalize()
       call pdfile%finalize()
+      ! Finalize grid LAST: amrgrid auto-finalizes AMReX once its last
+      ! instance dies, so all AMReX-holding objects must be gone first
+      call amr%finalize()
    end subroutine simulation_final
 
    !> Refresh fluid volume fraction VFf = clip(1 - pd%VF, 0, 1) with ghosts filled
