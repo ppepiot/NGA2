@@ -1,0 +1,86 @@
+# ============================================================================
+# relax1D: 1D two-phase tube, NASG water (left) / moist air (right)
+# Smoke-test / regression input for the relaxation-propagation study:
+# mechanical (p) relaxation in the interfacial cell, wave propagation into
+# both phases. Runs in ~1 s serial.
+# ============================================================================
+
+# AMR grid (quasi-1D: 400 cells in x, 1 cell in y and z, no refinement)
+Base nx:   400
+Base ny:   1
+Base nz:   1
+Max level: 0
+
+# ----------------------------------------------------------------------------
+# Liquid EOS: Noble-Abel stiffened gas for water.
+# Parameter set from the Pelanti-style liquid/vapor fit used by the
+# NGA2_SH cavitation case (valid for water roughly between 300 and 500 K).
+# qL/qpL (energy/entropy reference shifts) only matter once phase change
+# (pTg) is activated, but we carry them from the start so the same input
+# drives all three relaxation models.
+# ----------------------------------------------------------------------------
+GammaL: 1.1173
+PinfL:  5.0017e8
+CvL:    3.8212e3
+bL:     7.2341e-4
+qL:    -1.1711e6
+qpL:    0
+
+# Water vapor (gas species 1, transported in Q(8))
+GammaV: 1.4963
+CvV:    9.2906e2
+qV:     2.1442e6
+qpV:    1.9413e4
+
+# Air (gas species 2, recovered by closure Ya = 1 - Yv)
+GammaA: 1.4
+CvA:    718.0
+qA:     0
+qpA:    0
+
+# ----------------------------------------------------------------------------
+# Initial states: (p,T) per side; densities are derived through each EOS
+# so the initial data sit exactly on the EOS surface.
+# Pressure ratio 100:1 -> the interfacial cell is strongly out of mechanical
+# equilibrium at t=0, mimicking the post-impact state of a Sembian-type case.
+# ----------------------------------------------------------------------------
+# Gas side (right, x >= x_int): moist air
+Gas pressure:            1.0e5
+Gas temperature:         354.0
+Gas vapor mass fraction: 0.01
+
+# Liquid side (left, x < x_int): compressed water
+Liquid pressure:    1.0e7
+Liquid temperature: 354.0
+
+# Interface location
+Interface location: 0.0
+
+# ----------------------------------------------------------------------------
+# Relaxation: 'p' = mechanical only (smoke test), 'pT' adds thermal,
+# 'pTg' adds chemical/phase change (vapor mass transfer).
+# Relax start time delays the first relaxation call (0 = relax from step 1).
+# ----------------------------------------------------------------------------
+Relaxation type:  p
+Relax start time: 0
+
+# ----------------------------------------------------------------------------
+# Molecular transport. Physical values for water/moist air at ~350 K.
+#   thermal conductivity  lam_K   = mu_K*cp_K/Pr_K
+#   vapor diffusivity     (rho D) = mu_G/Sc_V
+# Setting a Prandtl/Schmidt number (or viscosity) to 0 disables that term.
+# ----------------------------------------------------------------------------
+Liquid viscosity:      3.5e-4     # mu_L [Pa.s], water at 350 K
+Gas viscosity:         2.0e-5     # mu_G [Pa.s], air at 350 K
+Liquid Prandtl number: 2.2        # -> lam_L ~ 0.68 W/(m.K)
+Gas Prandtl number:    0.71       # -> lam_G ~ 0.028 W/(m.K)
+Vapor Schmidt number:  0.62       # -> D_v ~ 3e-5 m2/s at 1 bar
+Artificial viscosity Cartif: 5.0  # 0 disables shock-capturing AV
+
+# Time integration (c_liq ~ 1400 m/s, dx = 7.5e-3 m -> acoustic dt ~ 4e-6 s)
+Max dt:   2.0e-6
+Max CFL:  0.8
+Max time: 3.0e-4
+
+# Output
+Output period: 1.5e-5
