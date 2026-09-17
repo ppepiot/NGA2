@@ -37,6 +37,9 @@ module material_class
       procedure(get_T_from_rho_e_iface),  deferred :: get_T_from_rho_e
       procedure(get_c_from_rho_e_iface),  deferred :: get_c_from_rho_e
       procedure(get_cv_from_rho_e_iface), deferred :: get_cv_from_rho_e
+      !> Combined (rho,e) -> (p,T,c) flash. The default calls the three deferred (rho,e) accessors; materials
+      !> with an iterative T(rho,e) (e.g. nasa7mix) override it with a single solve warm-started from Tguess.
+      procedure :: get_pTc_from_rho_e => material_get_pTc_from_rho_e
    end type material
 
    abstract interface
@@ -179,5 +182,19 @@ module material_class
          class(material), intent(inout) :: this
       end subroutine finalize_iface
    end interface
+
+contains
+
+   !> Default (rho,e) -> (p,T,c): three independent deferred calls (Tguess is not used here)
+   subroutine material_get_pTc_from_rho_e(this,rho,e,y,p,T,c,Tguess)
+      class(material), intent(in) :: this
+      real(WP), intent(in) :: rho,e
+      real(WP), dimension(:), intent(in) :: y
+      real(WP), intent(out) :: p,T,c
+      real(WP), intent(in), optional :: Tguess
+      p=this%get_p_from_rho_e(rho=rho,e=e,y=y)
+      c=this%get_c_from_rho_e(rho=rho,e=e,y=y)
+      T=this%get_T_from_rho_e(rho=rho,e=e,y=y)
+   end subroutine material_get_pTc_from_rho_e
 
 end module material_class

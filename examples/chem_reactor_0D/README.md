@@ -8,8 +8,8 @@ Internal prefixes for homogeneous reactor variants:
 
 | Prefix | Variant | Description |
 |--------|---------|-------------|
-| `hr_ib_` | Isobaric | Constant pressure (current) |
-| `hr_ic_` | Isochoric | Constant volume (future) |
+| `hr_ib_` | Isobaric | Constant pressure (`Reactor : isobar`, default) |
+| `hr_ic_` | Isochoric | Constant volume (`Reactor : isochor`) |
 
 ## Features
 
@@ -49,20 +49,36 @@ chem_reactor_0D/
 ```bash
 cd examples/chem_reactor_0D
 
-# Generate from a mechanism (e.g. Nakamura ammonia, gri30)
-python ../../tools/scripts/chemistry/yaml2nga.py \
-    ../../tools/scripts/chemistry/kinetics/Nakamura.yaml \
-    src/chem_data_fc.f90
-```
-
-Or with gri30:
-```bash
+# Generate from a mechanism (e.g. gri30)
 python ../../tools/scripts/chemistry/yaml2nga.py \
     ../../tools/scripts/chemistry/kinetics/gri30.yaml \
     src/chem_data_fc.f90
 ```
 
-This creates `src/chem_data_fc.f90` and `src/chem_data_reactions.txt`.
+This creates `src/chem_data_fc.f90` and `src/chem_data_reactions.txt`. The generator
+rejects anything it cannot convert faithfully (unknown units, unsupported reaction
+types, unbalanced reactions, ...) instead of guessing; fix the YAML if it complains.
+Reverse rates of reversible reactions are computed at run time from detailed balance
+(k_r = k_f/K_c), so equilibrium is exactly consistent with the NASA7 thermodynamics.
+`--fit-reverse [--fit-range TMIN TMAX]` instead fits 1/K_c of every reversible reaction to
+an Arrhenius form over the given range (default 300–3000 K) and evaluates reverse rates
+exactly like forward ones; the generator prints the fit-error statistics and writes the
+per-reaction error to `chem_data_reactions.txt` (gri30: worst 15% over 300–3000 K, 4%
+over 600–2800 K; equilibrium is then only approximately reproduced). Since the generated
+module caches all temperature-only rate data, the fit saves only the NASA7 evaluation
+(a few percent); it is kept for cases that require an Arrhenius reverse form.
+
+### Performance notes
+
+The generated module evaluates all rate-coefficient exponentials with a vectorizable
+`exp` and caches everything that depends on temperature only (Arrhenius and three-body
+rates, falloff limits and Troe centering, reverse-rate factors, NASA7 polynomials), keyed
+on the exact T (and P for PLOG). Calls at a repeated temperature — Newton iterations and
+the composition columns of a finite-difference Jacobian — cost about a third of a full
+evaluation (gri30: ~0.8 µs vs ~1.7 µs per `fcmech_get_ydot`, 2.7 µs before). The reactor
+supplies its own finite-difference Jacobian (`hr_fd_jacobian`) that exploits this and
+uses a central difference for the temperature column, and prints CVODE statistics and
+the integration-loop time at the end of a run.
 
 ### 2. Build
 
@@ -131,7 +147,7 @@ Initial Y O2 : 0.2
 Initial Y N2 : 0.75
 ```
 
-`Initial Y <species>` for each species. Sum must be 1.0.
+`Initial Y <species>` for each non-zero species; the values are normalized to sum to 1.
 
 ### Command-line input
 
@@ -160,10 +176,20 @@ Requires: `numpy`, `matplotlib`
 
 YAML mechanisms are in `tools/scripts/chemistry/kinetics/`:
 
-- `gri30.yaml` — GRI-Mech 3.0 (CH4/hydrocarbon)
-- `Nakamura.yaml` — Ammonia (NH3)
+- `gri30.yaml` — GRI-Mech 3.0 (CH4/hydrocarbon), detailed and thermodynamically closed. What
+  `src/chem_data_fc.f90` ships with, and what any case where **auto-ignition drives the dynamics**
+  should use (this reactor, and `examples/amrcomp_flame` `input_ignition`).
+- `FM/CH4.Igni73.yaml` — skeletal CH4 (28 species, 97 reactions), converted from FlameMaster with
+  `FM2yaml.py`. Reduced for **flame propagation**: laminar flame speed within 8% of gri30, ~5x cheaper
+  per rate evaluation and ~3.6x less stiff, so it is the mechanism for the CH4 flame and jet cases.
+  Do **not** use it where ignition timing matters: its constant-volume ignition delay is 1.3x gri30 at
+  1200 K, 4.3x at 1800 K and 5.1x at 2000 K. Also note that 95 of its 97 reactions are irreversible
+  (FlameMaster supplies explicit forward/backward Arrhenius pairs), so it does not relax to
+  thermodynamic equilibrium and is not meant for long-time post-flame states.
 - `h2o2.yaml` — H2/O2
-- `ONE.yaml` — Minimal single reaction
+- `FM/*.yaml` — other FlameMaster mechanisms converted with `FM2yaml.py`
+
+Any Cantera-format YAML mechanism can be used.
 
 ## Build Options
 
@@ -192,4 +218,5 @@ make PRECISION=DOUBLE COMP=intel CVODE_DIR=/path/to/sundials
 ## See Also
 
 - `tools/scripts/chemistry/yaml2nga.py` — YAML → chem_data_fc converter
-- `tools/scripts/finite_chemistry/V2/` — Cantera comparison utilities
+- `tools/scripts/chemistry/check_diffusion.py`, `cantera_thermo_ref.py`, `cantera_freeflame.py` — Cantera comparison utilities
+- `examples/amrcomp_flame` — the same `fcmech` module coupled to the AMR compressible solver (explicit chemistry)

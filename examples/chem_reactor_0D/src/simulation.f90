@@ -19,13 +19,88 @@ module hr_ic_cvode_data
    real(WP), save :: hr_ic_rho = 0.0_WP
 end module hr_ic_cvode_data
 
+!> Finite-difference dense Jacobian for CVODE, shared by the isobaric and isochoric reactors.
+!> State y = [Y_1..Y_nS, T]. The nS composition columns perturb one mass fraction at fixed temperature, so
+!> fcmech reuses its cached rate coefficients (only the falloff blending and the rate/production algebra are
+!> redone); the temperature column, the only one that changes k(T), uses a central difference with a
+!> larger step (optimal for second-order differences). This replaces CVODE's internal difference quotient,
+!> which perturbs every column with the same one-sided formula.
+module hr_fd_jacobian
+   use precision, only: WP
+   use fcmech, only: nS
+   use fsundials_core_mod
+   use fnvector_serial_mod
+   use fsunmatrix_dense_mod
+   use, intrinsic :: ISO_C_BINDING
+   implicit none
+
+   !> Interface of the CVODE RHS callbacks below
+   abstract interface
+      integer(c_int) function rhs_iface(t, sunvec_y, sunvec_f, user_data) bind(C)
+         import :: c_int, c_double, c_ptr, N_Vector
+         real(c_double), value :: t
+         type(N_Vector)        :: sunvec_y
+         type(N_Vector)        :: sunvec_f
+         type(c_ptr), value    :: user_data
+      end function rhs_iface
+   end interface
+
+   contains
+
+   !> J(:,j) = d f/d y_j by finite differences; tmp1/tmp2 are CVODE scratch vectors, fy the RHS at y.
+   integer(c_int) function fd_jacobian(rhs, t, sunvec_y, sunvec_f, sunmat_J, user_data, tmp1, tmp2) result(ierr)
+      procedure(rhs_iface)   :: rhs
+      real(c_double), intent(in) :: t
+      type(N_Vector)         :: sunvec_y, sunvec_f, tmp1, tmp2
+      type(SUNMatrix)        :: sunmat_J
+      type(c_ptr)            :: user_data
+      real(c_double), pointer :: y(:), fy(:), yp(:), fp(:), Jac(:, :)
+      real(WP), parameter :: sqrt_eps = sqrt(epsilon(1.0_WP))
+      real(WP), parameter :: cbrt_eps = epsilon(1.0_WP)**(1.0_WP/3.0_WP)
+      real(WP), parameter :: Y_scale = 1.0e-6_WP  ! perturbation floor for (nearly) absent species
+      real(WP) :: yj, dy
+      integer :: j, n
+      n = nS + 1
+      y => FN_VGetArrayPointer(sunvec_y)
+      fy => FN_VGetArrayPointer(sunvec_f)
+      yp => FN_VGetArrayPointer(tmp1)
+      fp => FN_VGetArrayPointer(tmp2)
+      Jac(1:n, 1:n) => FSUNDenseMatrix_Data(sunmat_J)
+      yp(1:n) = y(1:n)
+      ! Composition columns: one-sided differences at fixed T (rate coefficients come from the fcmech cache)
+      do j = 1, nS
+         yj = real(y(j), WP)
+         dy = sqrt_eps*max(abs(yj), Y_scale)
+         yp(j) = real(yj + dy, c_double)
+         ierr = rhs(t, tmp1, tmp2, user_data)
+         if (ierr .ne. 0) return
+         Jac(1:n, j) = (fp(1:n) - fy(1:n))/real(dy, c_double)
+         yp(j) = real(yj, c_double)
+      end do
+      ! Temperature column: central difference
+      yj = real(y(n), WP)
+      dy = cbrt_eps*max(abs(yj), 1.0_WP)
+      yp(n) = real(yj + dy, c_double)
+      ierr = rhs(t, tmp1, tmp2, user_data)
+      if (ierr .ne. 0) return
+      Jac(1:n, n) = fp(1:n)
+      yp(n) = real(yj - dy, c_double)
+      ierr = rhs(t, tmp1, tmp2, user_data)
+      if (ierr .ne. 0) return
+      Jac(1:n, n) = (Jac(1:n, n) - fp(1:n))/real(2.0_WP*dy, c_double)
+      yp(n) = real(yj, c_double)
+   end function fd_jacobian
+end module hr_fd_jacobian
+
 !> Module containing the RHS function for CVODE: dy/dt = f(t,y) (isobaric).
 module hr_ib_rhs_mod
    use precision, only: WP
    use fcmech
    use hr_ib_cvode_data
+   use hr_fd_jacobian
    use fsundials_core_mod
    use fnvector_serial_mod
+   use fsunmatrix_dense_mod
    use, intrinsic :: ISO_C_BINDING
    implicit none
 
@@ -40,23 +115,42 @@ module hr_ib_rhs_mod
       type(c_ptr), value    :: user_data
       real(c_double), pointer :: yval(:), fval(:)
       real(WP), dimension(nS) :: h, cp, ydot
-      real(WP) :: Cp_mix, W_mix
+      real(WP) :: Cp_mix
       ierr = 0_c_int
       ! Get pointers to CVODE state and output arrays
       yval => FN_VGetArrayPointer(sunvec_y)
       fval => FN_VGetArrayPointer(sunvec_f)
-      ! Mixture molar mass: 1/W_mix = sum(Y_i/W_i)
-      W_mix = 1.0_WP / sum(real(yval(1:nS), WP) / W_sp(1:nS))
+      ! Unphysical trial state (CVODE may probe T <= 0): recoverable error, CVODE retries with a smaller step
+      if (yval(nS + 1) .le. 0.0_c_double) then
+         ierr = 1_c_int
+         return
+      end if
       ! Enthalpy and Cp from NASA polynomials (h, cp in J/mol, J/(mol·K))
       call fcmech_get_thermodata(h, cp, real(yval(nS + 1), WP))
       ! Cp_mix in J/(kg·K): sum(Y_i * cp_i/W_i) for mass-based mixture Cp
       Cp_mix = sum(real(yval(1:nS), WP) * cp(1:nS) / W_sp(1:nS))
+      if (Cp_mix .le. 0.0_WP) then
+         ierr = 1_c_int
+         return
+      end if
       ! Mass-based production rates: dY_i/dt = ydot_i (1/s)
       call fcmech_get_ydot(hr_ib_P, real(yval(nS + 1), WP), real(yval(1:nS), WP), ydot)
       fval(1:nS) = real(ydot(1:nS), c_double)
       ! Adiabatic: dT/dt = -sum(h_i/W_i * dY_i/dt) / Cp_mix, with Cp_mix in J/(kg·K)
       fval(nS+1) = real(-sum(h(1:nS) * ydot(1:nS) / W_sp(1:nS)) / Cp_mix, c_double)
    end function hr_ib_rhs_wrapper
+
+   !> CVODE Jacobian callback (isobaric): finite differences of hr_ib_rhs_wrapper
+   integer(c_int) function hr_ib_jac_wrapper(t, sunvec_y, sunvec_f, sunmat_J, user_data, tmp1, tmp2, tmp3) &
+      result(ierr) bind(C, name='hr_ib_jac_wrapper')
+      real(c_double), value :: t
+      type(N_Vector)        :: sunvec_y
+      type(N_Vector)        :: sunvec_f
+      type(SUNMatrix)       :: sunmat_J
+      type(c_ptr), value    :: user_data
+      type(N_Vector)        :: tmp1, tmp2, tmp3
+      ierr = fd_jacobian(hr_ib_rhs_wrapper, t, sunvec_y, sunvec_f, sunmat_J, user_data, tmp1, tmp2)
+   end function hr_ib_jac_wrapper
 end module hr_ib_rhs_mod
 
 !> Module containing the RHS function for CVODE: dy/dt = f(t,y) (isochoric).
@@ -64,8 +158,10 @@ module hr_ic_rhs_mod
    use precision, only: WP
    use fcmech
    use hr_ic_cvode_data
+   use hr_fd_jacobian
    use fsundials_core_mod
    use fnvector_serial_mod
+   use fsunmatrix_dense_mod
    use, intrinsic :: ISO_C_BINDING
    implicit none
 
@@ -83,6 +179,11 @@ module hr_ic_rhs_mod
       ierr = 0_c_int
       yval => FN_VGetArrayPointer(sunvec_y)
       fval => FN_VGetArrayPointer(sunvec_f)
+      ! Unphysical trial state (CVODE may probe T <= 0): recoverable error, CVODE retries with a smaller step
+      if (yval(nS + 1) .le. 0.0_c_double) then
+         ierr = 1_c_int
+         return
+      end if
       W_mix = 1.0_WP / sum(real(yval(1:nS), WP) / W_sp(1:nS))
       call fcmech_get_thermodata(h, cp, real(yval(nS + 1), WP))
       Cp_mix = sum(real(yval(1:nS), WP) * cp(1:nS) / W_sp(1:nS))
@@ -92,9 +193,24 @@ module hr_ic_rhs_mod
       fval(1:nS) = real(ydot(1:nS), c_double)
       ! Adiabatic isochoric: dT/dt = -sum((h_i - R*T)/W_i * ydot_i) / Cv_mix
       Cv_mix = Cp_mix - Rcst / W_mix
-      if (Cv_mix .lt. 1.0e-30_WP) Cv_mix = 1.0_WP
+      if (Cv_mix .le. 0.0_WP) then
+         ierr = 1_c_int
+         return
+      end if
       fval(nS+1) = real(-sum((h(1:nS) - Rcst * real(yval(nS + 1), WP)) * ydot(1:nS) / W_sp(1:nS)) / Cv_mix, c_double)
    end function hr_ic_rhs_wrapper
+
+   !> CVODE Jacobian callback (isochoric): finite differences of hr_ic_rhs_wrapper
+   integer(c_int) function hr_ic_jac_wrapper(t, sunvec_y, sunvec_f, sunmat_J, user_data, tmp1, tmp2, tmp3) &
+      result(ierr) bind(C, name='hr_ic_jac_wrapper')
+      real(c_double), value :: t
+      type(N_Vector)        :: sunvec_y
+      type(N_Vector)        :: sunvec_f
+      type(SUNMatrix)       :: sunmat_J
+      type(c_ptr), value    :: user_data
+      type(N_Vector)        :: tmp1, tmp2, tmp3
+      ierr = fd_jacobian(hr_ic_rhs_wrapper, t, sunvec_y, sunvec_f, sunmat_J, user_data, tmp1, tmp2)
+   end function hr_ic_jac_wrapper
 end module hr_ic_rhs_mod
 
 !> Main program: 0D adiabatic chemistry reactor (isobaric or isochoric).
@@ -120,9 +236,10 @@ program chem_reactor_0D
    ! State vector size: Y(1:nS) = mass fractions, T = temperature; nT = nS+1
    integer, parameter :: nT = nS + 1
 
-   ! CVODE tolerances and step limits
-   real(C_DOUBLE), parameter :: cvode_rtol = 1.0e-12_WP
-   real(C_DOUBLE), parameter :: cvode_atol = 1.0e-15_WP
+   ! CVODE tolerances and step limits (1e-8/1e-14: ignition delay and final state unchanged to 9 digits
+   ! w.r.t. 1e-12/1e-15, at half the number of steps)
+   real(C_DOUBLE), parameter :: cvode_rtol = 1.0e-8_WP
+   real(C_DOUBLE), parameter :: cvode_atol = 1.0e-14_WP
    real(C_DOUBLE), parameter :: cvode_init_step = 1.0e-12_C_DOUBLE
    real(C_DOUBLE), parameter :: cvode_min_step = 1.0e-18_C_DOUBLE
 
@@ -152,6 +269,8 @@ program chem_reactor_0D
    real(C_DOUBLE) :: tret(1)
    integer(C_INT) :: ierr
    integer(C_LONG) :: flag
+   integer(C_LONG) :: cv_nst(1), cv_nfe(1), cv_nje(1)
+   integer :: clk0, clk1, clk_rate
 
    ! =======================================
    ! NGA2 initialization ====================
@@ -189,14 +308,14 @@ program chem_reactor_0D
          if (trim(adjustl(species_names(i))) .eq. 'O2') iO2 = i
          if (trim(adjustl(species_names(i))) .eq. 'N2') iN2 = i
       end do
+      if (ifuel .le. 0 .or. iO2 .le. 0 .or. iN2 .le. 0) &
+         call die('[chem_reactor_0D] Fuel, O2, or N2 not found in mechanism')
       ! Air mass fractions from mechanism molar masses (matches Cantera)
       W_O2_air = W_sp(iO2)
       W_N2_air = W_sp(iN2)
       W_air = 0.21_WP * W_O2_air + 0.79_WP * W_N2_air
       Y_O2_air = 0.21_WP * W_O2_air / W_air
       Y_N2_air = 0.79_WP * W_N2_air / W_air
-      if (ifuel .le. 0 .or. iO2 .le. 0 .or. iN2 .le. 0) &
-         call die('[chem_reactor_0D] Fuel, O2, or N2 not found in mechanism')
       ! (F/A)_st from species composition: n_O2_st = (2*n_C + n_H/2 - n_O)/2 moles O2 per mole fuel
       if (nA .le. 0) &
          call die('[chem_reactor_0D] Mechanism has no atom data; cannot compute F/A_st from composition')
@@ -233,6 +352,8 @@ program chem_reactor_0D
          end if
       end do
       Ysum = sum(Y0)
+      if (Ysum .le. 0.0_WP) &
+         call die('[chem_reactor_0D] No initial composition: provide Fuel + Equivalence ratio, or Initial Y <species> entries')
       Y0 = Y0 / Ysum
    end if
 
@@ -312,6 +433,13 @@ program chem_reactor_0D
    if (.not. associated(sunlinsol_LS)) call die('[chem_reactor_0D] FSUNLinSol_Dense failed')
    ierr = FCVodeSetLinearSolver(cvode_mem, sunlinsol_LS, sunmat_A)
    if (ierr .ne. 0) call die('[chem_reactor_0D] FCVodeSetLinearSolver failed')
+   ! Our finite-difference Jacobian (composition columns at fixed T reuse fcmech's cached rate coefficients)
+   if (reactor_type .eq. 1) then
+      ierr = FCVodeSetJacFn(cvode_mem, c_funloc(hr_ib_jac_wrapper))
+   else
+      ierr = FCVodeSetJacFn(cvode_mem, c_funloc(hr_ic_jac_wrapper))
+   end if
+   if (ierr .ne. CV_SUCCESS) call die('[chem_reactor_0D] FCVodeSetJacFn failed')
 
    ierr = FCVodeSetMaxNumSteps(cvode_mem, 500000_C_LONG)
    if (ierr .ne. CV_SUCCESS) call die('[chem_reactor_0D] FCVodeSetMaxNumSteps failed')
@@ -339,6 +467,7 @@ program chem_reactor_0D
    ! Integrate: advance to each output time; CVODE uses adaptive internal stepping
    ! Do NOT modify ydata before CVODE step: Cantera integrates the ODE as-is without
    ! clipping/renormalization. Pre-step modification caused divergence from Cantera.
+   call system_clock(clk0)
    time = 0.0_WP
    do while (time .lt. time_end)
       time = min(time + dt, time_end)
@@ -373,6 +502,17 @@ program chem_reactor_0D
          write (iu, '(1X,ES18.10,1X,ES18.10,1X,ES18.10)') T, P, rho
       end if
    end do
+
+   ! Integrator statistics
+   call system_clock(clk1, clk_rate)
+   if (amRoot) then
+      ierr = FCVodeGetNumSteps(cvode_mem, cv_nst)
+      ierr = FCVodeGetNumRhsEvals(cvode_mem, cv_nfe)
+      ierr = FCVodeGetNumJacEvals(cvode_mem, cv_nje)
+      write (*, '(A,I0,A,I0,A,I0,A,F8.3,A)') '[chem_reactor_0D] CVODE: ', cv_nst(1), ' steps, ', cv_nfe(1), &
+         ' RHS evaluations, ', cv_nje(1), ' Jacobians, ', real(clk1 - clk0, WP)/real(clk_rate, WP), &
+         ' s in the integration loop (incl. output)'
+   end if
 
    ! Free CVODE and SUNDIALS resources
    call FCVodeFree(cvode_mem)

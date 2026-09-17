@@ -244,9 +244,10 @@ contains
          if (this%maxlvl.lt.0) call die('[amrgrid initialize] maxlvl must be >= 0')
          call pp%add   ('max_level'      ,this%maxlvl)
          call pp%add   ('blocking_factor',this%nbloc)
-         if (this%nx.eq.1) call pp%add('blocking_factor_x',1)
-         if (this%ny.eq.1) call pp%add('blocking_factor_y',1)
-         if (this%nz.eq.1) call pp%add('blocking_factor_z',1)
+         ! Collapsed directions (fewer base cells than the blocking factor) use their own cell count
+         if (this%nx.lt.this%nbloc) call pp%add('blocking_factor_x',this%nx)
+         if (this%ny.lt.this%nbloc) call pp%add('blocking_factor_y',this%ny)
+         if (this%nz.lt.this%nbloc) call pp%add('blocking_factor_z',this%nz)
          call pp%add   ('n_proper'       ,this%nproper)
          call pp%add   ('max_grid_size'  ,this%nmax)
          if (.not.allocated(this%rrefx)) this%rrefx=[2]

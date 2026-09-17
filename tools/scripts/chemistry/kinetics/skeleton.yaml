@@ -1,0 +1,76 @@
+description: |-
+  Minimal placeholder mechanism -- NOT a combustion mechanism.
+
+  Its only purpose is to let the chemistry examples compile before a real mechanism has been
+  generated: the fcmech module it produces has the full interface but carries only inert air species
+  and a single recombination step, so any case that looks up a fuel dies immediately with a clear
+  error instead of running plausible-looking nonsense. Generate a real module over it with, from an
+  example directory:
+    python3 ../../tools/scripts/chemistry/yaml2nga.py <mechanism>.yaml src/chem_data_fc.f90
+
+generator: hand-written (species data taken from gri30.yaml)
+
+units: {length: cm, quantity: mol, activation-energy: cal/mol}
+
+phases:
+- name: gas
+  thermo: ideal-gas
+  elements: [O, N]
+  species: [O2, O, N2]
+  kinetics: gas
+  transport: mixture-averaged
+  reactions: all
+  state:
+    T: 300.0
+    P: 1.01325e+05
+
+species:
+- name: O2
+  composition: {O: 2}
+  thermo:
+    model: NASA7
+    temperature-ranges: [200, 1000, 3500]
+    data:
+    - [3.78245636, -0.00299673416, 9.84730201e-06, -9.68129509e-09, 3.24372837e-12, -1063.94356, 3.65767573]
+    - [3.28253784, 0.00148308754, -7.57966669e-07, 2.09470555e-10, -2.16717794e-14, -1088.45772, 5.45323129]
+  transport:
+    model: gas
+    geometry: linear
+    diameter: 3.46
+    well-depth: 107.4
+    polarizability: 1.6
+    rotational-relaxation: 3.8
+- name: O
+  composition: {O: 1}
+  thermo:
+    model: NASA7
+    temperature-ranges: [200, 1000, 3500]
+    data:
+    - [3.1682671, -0.00327931884, 6.64306396e-06, -6.12806624e-09, 2.11265971e-12, 29122.2592, 2.05193346]
+    - [2.56942078, -8.59741137e-05, 4.19484589e-08, -1.00177799e-11, 1.22833691e-15, 29217.5791, 4.78433864]
+  transport:
+    model: gas
+    geometry: atom
+    diameter: 2.75
+    well-depth: 80
+- name: N2
+  composition: {N: 2}
+  thermo:
+    model: NASA7
+    temperature-ranges: [300, 1000, 5000]
+    data:
+    - [3.298677, 0.0014082404, -3.963222e-06, 5.641515e-09, -2.444854e-12, -1020.8999, 3.950372]
+    - [2.92664, 0.0014879768, -5.68476e-07, 1.0097038e-10, -6.753351e-15, -922.7977, 5.980528]
+  transport:
+    model: gas
+    geometry: linear
+    diameter: 3.62
+    well-depth: 97.53
+    polarizability: 1.76
+    rotational-relaxation: 4
+
+reactions:
+- equation: 2 O + M <=> O2 + M   # one reaction, so the module has a rate to evaluate
+  type: three-body
+  rate-constant: {A: 1.2e+17, b: -1.0, Ea: 0.0}
+  efficiencies: {N2: 1.0, O2: 1.0}

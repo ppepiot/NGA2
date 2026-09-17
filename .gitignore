@@ -19,9 +19,18 @@
 .DS_Store
 *.dSYM/
 
-# Generated mechanism modules (produce on demand via yaml2nga / pdf_yaml2nga)
+# Generated kinetics modules and their reaction indices. These are produced for one specific mechanism
+# by tools/scripts/chemistry/yaml2nga.py (or pdf_yaml2nga.py) and must never be committed: a mechanism
+# checked into an example silently becomes the default and goes stale.
+#   python3 tools/scripts/chemistry/yaml2nga.py <mechanism>.yaml <example>/src/chem_data_fc.f90
+# For build completeness the examples fall back, through VPATH, to the minimal placeholder module in
+# tools/scripts/chemistry/skeleton/ -- that one IS tracked and is the only chem_data_* file in the repo.
+**/chem_data_fc.f90
+**/chem_data_reactions.txt
 **/pdf_mech.f90
 **/pdf_mech_reactions.txt
+!tools/scripts/chemistry/skeleton/chem_data_fc.f90
+!tools/scripts/chemistry/skeleton/chem_data_reactions.txt
 
 # Claude settings
 .claude/
@@ -99,3 +108,5 @@ examples/*/input*~
 !examples/compressible_taylor_green/dns.tke
 !examples/compressible_taylor_green/plot.me
 !examples/amrcomp_drop/scripts
+.vscode
+thoughts

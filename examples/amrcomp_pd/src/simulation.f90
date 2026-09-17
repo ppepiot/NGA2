@@ -449,7 +449,7 @@ contains
       create_workspace: block
          use amrdata_class, only: interp_none
          use amrex_amr_module, only: amrex_bc_foextrap
-         call dQdt%initialize(amr,name='dQdt',ncomp=5,ng=0,interp=interp_none); call dQdt%register()
+         call dQdt%initialize(amr,name='dQdt',ncomp=fs%nQ,ng=0,interp=interp_none); call dQdt%register()
          call Umag%initialize(amr,name='Umag',ncomp=1,ng=0,interp=interp_none); call Umag%register()
          call Mach%initialize(amr,name='Mach',ncomp=1,ng=0,interp=interp_none); call Mach%register()
          ! Solid velocity on the mesh (ghosts for the IB face interpolation).

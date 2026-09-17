@@ -271,9 +271,13 @@ contains
          allocate(this%time(this%ntime))
          this%time(1)=time
       else
+         ! Find the last stored output strictly earlier than the current time, so that a restart which
+         ! rewinds in time overwrites the files it supersedes. The tolerance has to be relative: an
+         ! absolute one silently collapses every output onto the same file when the output period is
+         ! smaller than it, which is easy to hit in combustion runs (periods of microseconds or less).
          n=1
          rewind: do i=this%ntime,1,-1
-            if (this%time(i).lt.time-1.0e-6_WP) then
+            if (this%time(i).lt.time-1.0e-9_WP*max(abs(time),abs(this%time(i)),tiny(1.0_WP))) then
                n=i+1; exit rewind
             end if
          end do rewind

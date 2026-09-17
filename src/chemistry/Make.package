@@ -1,0 +1,11 @@
+# Finite-rate chemistry library. Every file here uses the generated kinetics module `fcmech`
+# (src/chem_data_fc.f90 of the example, produced by tools/scripts/chemistry/yaml2nga.py), so this
+# directory is only included by chemistry examples. amrchem couples the chemistry to the AMR
+# compressible solver and is built only with AMReX.
+f90EXE_sources += fctransport_class.f90
+ifeq ($(USE_AMREX),TRUE)
+  f90EXE_sources += amrchem_class.f90
+endif
+
+INCLUDE_LOCATIONS += $(NGA_HOME)/src/chemistry
+VPATH_LOCATIONS   += $(NGA_HOME)/src/chemistry

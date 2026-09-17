@@ -1,0 +1,70 @@
+# Methane/air slot burner at phi = 1 (paper Fig. 6, the DNS case).
+# Reference: L. Selle, T. Poinsot, B. Ferret, Combust. Flame 158 (2011) 146-154, Fig. 6.
+# Slot width h = 10 mm, fresh gas at 300 K and 1 atm, water-cooled lips, air co-flow, lateral
+# symmetry, outlet at the top (paper Fig. 6a). Mean consumption speed from s_L = U h / L_f (Eq. 1).
+# Mechanism: kinetics/FM/CH4.Igni73.yaml. Generate the kinetics module with:
+#   python3 ../../tools/scripts/chemistry/yaml2nga.py ../../tools/scripts/chemistry/kinetics/FM/CH4.Igni73.yaml src/chem_data_fc.f90
+# Cantera/Igni73 freely-propagating reference at this condition (mixture-averaged transport):
+#   S_L = 0.4033 m/s, delta_L = 0.4139 mm, T_b = 2257.5 K, rho_u = 1.12253 kg/m3
+#   Eq. (1) then predicts L_f = 47.1 mm, i.e. a flame tip at y = 23.0 mm
+#   finest cell dx = 39.1 um, i.e. 10.6 cells across delta_L
+
+# Grid: x transverse (slot centred on x = 0), y vertical, z collapsed to a 2D plane
+Base nx:   128
+Base ny:   192
+Base nz:   2
+Lx:        0.04
+Ly:        0.06
+Max level: 3
+Regrid nsteps: 50
+Tag grad : 0.03
+
+# Burner (paper Section 2)
+Slot width : 1.0e-2
+Lip thickness : 1.0e-3
+Lip temperature : 350.0
+Bulk velocity : 1.9
+Coflow velocity : 0.095
+Poiseuille inlet : .false.
+Initial flame height : 0.023017
+
+# Mixture
+Fuel : CH4
+Equivalence ratio : 1.0
+Temperature : 300.0
+Pressure : 101325.0
+Closure species : N2
+Burnt temperature : 2257.477
+Burnt Y N2 : 7.24814566e-01
+Burnt Y O2 : 4.61729352e-03
+Burnt Y H : 7.84799474e-06
+Burnt Y OH : 1.45413035e-03
+Burnt Y O : 7.60267857e-05
+Burnt Y H2 : 1.90131209e-04
+Burnt Y H2O : 1.21879219e-01
+Burnt Y HO2 : 8.53614007e-08
+Burnt Y H2O2 : 3.39375386e-08
+Burnt Y CO : 6.53806684e-03
+Burnt Y CO2 : 1.40422599e-01
+
+# Transport 
+Transport model : mixavg
+Prandtl number : 0.68
+Lewis number : 1.0
+Use SGS : .false.
+
+# Chemistry
+Chemical CFL : 1.0
+Chemistry T min : 0.0
+
+# Time integration
+Use projection : .false.
+Subiterations : 2
+Max dt :   1.0e-7
+Max CFL :  0.8
+Max time : 2.0e-2
+
+# Output
+# 'Output period' is elapsed simulated time, so at dt ~ 6.7 ns the first file after t=0
+# lands 298 steps in. Add 'Output nsteps : N' to also dump every N steps, whichever comes first.
+Output period : 2.0e-6

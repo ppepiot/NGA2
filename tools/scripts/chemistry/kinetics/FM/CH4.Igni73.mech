@@ -1,0 +1,179 @@
+#
+#	Skeleton CH4 mechanism taken from
+#	"Reduced Kinetic Mechanisms for Applications in Combustion Systems",
+#	Lecture Notes in Physics m15 (N. Peters, B. Rogg, Eds.), Springer 1993.
+#
+
+Let allowed atoms be C, H, O, N.	# so we can catch some typos easier
+Let additional species be N2.		# declaration for inert species (required for third
+					# body concentrations and code generator for transport
+					# equations)
+Let temperature exponent be n_k.	# ScanMan knows how to do arithmetic with units...
+Let order of reaction be n.
+
+Let units for A be [ cm^(3(n-1)) / ( s * mole^(n-1) * K^n_k ) ] .
+Let units for E be [ kJ / mole ]. 
+
+# H2/O2 Reactions
+1f: O2 + H -> OH + O		{ a = 2.e14	n = 0		E = 70.3	}
+1b: OH + O -> O2 + H		{ a = 1.568e13	n = 0		E = 3.52	}
+2f: H2 + O -> OH + H		{ a = 5.06e4	n = 2.67	E = 26.3	}
+2b: OH + H -> H2 + O		{ a = 2.222e4	n = 2.67	E = 18.29	}
+3f: H2 + OH -> H2O + H		{ a = 1.e8	n = 1.6		E = 13.8	}
+3b: H2O + H -> H2 + OH		{ a = 4.312e8	n = 1.6		E = 76.46	}
+4f: OH + OH -> H2O + O		{ a = 1.5e9	n = 1.14	E = 0.42	}
+4b: H2O + O -> OH + OH		{ a = 1.473e10	n = 1.14	E = 71.09	}
+
+# HO2 Formation/Consumption
+5f: O2 + H + M' -> HO2 + M'	{ a = 2.3e18	n = -0.8	E = 0		}
+5b: HO2 + M' -> O2 + H + M'	{ a = 3.19e18	n = -0.8	E = 195.39	}
+6:  HO2 + H -> OH + OH		{ a = 1.5e14	n = 0		E = 4.2		}
+7:  HO2 + H -> H2 + O2		{ a = 2.5e13	n = 0		E = 2.9		}
+8:  HO2 + OH -> H2O + O2	{ a = 6.e13	n = 0		E = 0		}
+9:  HO2 + H -> H2O + O		{ a = 3.e13	n = 0		E = 7.2		}
+10: HO2 + O -> OH + O2		{ a = 1.8e13	n  = 0		E = -1.7	}
+
+# H2O2 Formation/Consumption
+11:  HO2 + HO2 -> H2O2 + O2	{ a = 2.5e11	n = 0		E = -5.2	}
+12f: OH + OH + M' -> H2O2 + M'	{ a = 3.25e22	n = -2		E = 0		}
+12b: H2O2 + M' -> OH + OH + M'	{ a = 1.692e24	n = -2		E = 202.29	}
+13:  H2O2 + H -> H2O + OH	{ a = 1.e13	n = 0		E = 15		}
+14f: H2O2 + OH -> H2O + HO2	{ a = 5.4e12	n = 0		E = 4.2		}
+14b: H2O + HO2 -> H2O2 + OH	{ a = 1.802e13	n = 0		E = 134.75	}
+
+# Recombination
+15: H + H + M' -> H2 + M'	{ a = 1.8e18	n = -1		E = 0		}
+16: OH + H + M' -> H2O + M'	{ a = 2.2e22	n = -2		E = 0		}
+17: O + O + M' -> O2 + M'	{ a = 2.9e17	n = -1		E = 0		}
+
+# CO/CO2 Mechanism
+18f:CO + OH -> CO2 + H		{ a = 4.4e6	n = 1.5		E = -3.1	}
+18b:CO2 + H -> CO + OH		{ a = 4.956e8	n = 1.5		E = 89.76	}
+
+# CH Consumption
+19: CH + O2 -> CHO + O		{ a = 3e13	n = 0		E = 0		}
+20: CO2 + CH -> CHO + CO	{ a = 3.4e12	n = 0		E = 2.9		}
+
+# CHO Consumption
+21: CHO + H -> CO + H2		{ a = 2.e14	n = 0		E = 0		}
+22: CHO + OH -> CO + H2O	{ a = 1.e14	n = 0		E = 0		}
+23: CHO + O2 -> CO + HO2	{ a = 3.e12	n = 0		E = 0		}
+24f:CHO + M' -> CO + H + M'	{ a = 7.1e14	n = 0		E = 70.3	}
+24b:CO + H + M' -> CHO + M'	{ a = 1.136e15	n = 0		E = 9.97	}
+
+# CH2 Consumption
+25f: CH2 + H -> CH + H2		{ a = 8.4e9	n = 1.5		E = 1.4		}
+25b: CH + H2 -> CH2 + H		{ a = 5.83e9	n = 1.5		E = 13.08	}
+26:  CH2 + O -> CO + H + H	{ a = 8.e13	n = 0		E = 0		}
+27:  CH2 + O2 -> CO + OH + H	{ a = 6.5e12	n = 0		E = 6.3		}
+28:  CH2 + O2 -> CO2 + H + H	{ a = 6.5e12	n = 0		E = 6.3		}
+
+# CH2O Consumption
+29: CH2O + H -> CHO + H2	{ a = 2.5e13	n = 0		E = 16.7	}
+30: CH2O + O -> CHO + OH	{ a = 3.5e13	n = 0		E = 14.6	}
+31: CH2O + OH -> CHO + H2O	{ a = 3.e13	n = 0		E = 5		}
+32: CH2O + M' -> CHO + H + M'	{ a = 1.4e17	n = 0		E = 320		}
+
+# CH3 Consumption
+33f:CH3 + H -> CH2 + H2		{ a = 1.8e14	n = 0		E = 63		}
+33b:CH2 + H2 -> CH3 + H		{ a = 3.68e13	n = 0		E = 44.3	}
+34: CH3 + H           -> CH4                   { ai = 2.108E+14   ni = 0    Ei = 0 
+                                                 a = 6.257E+23   n = -1.8    E = 0 
+                                                 fca = 0.577000 fcta = 2370.00 }
+35: CH3 + O -> CH2O + H		{ a = 7.e13	n = 0		E = 0		}
+36f: CH3 + CH3         -> C2H6                  { ai = 1.813E+13   ni = 0    Ei = 0 
+                                                 a = 1.272E+41   n = -7    E = 11.56 
+												fca = 0.380000 fcta = 73.0000  
+												fcb = 0.620000 fctb = 1180.00 }
+37: CH3 + O2 -> CH2O + OH	{ a = 3.4e11	n = 0		E = 37.4	}
+
+# CH4 Consumption
+38f: CH4 + H -> CH3 + H2	{ a = 2.2e4	n = 3		E = 36.6	}
+38b: CH3 + H2 -> CH4 + H	{ a = 8.391e2	n = 3		E = 34.56	}
+39:  CH4 + O -> CH3 + OH	{ a = 1.2e7	n = 2.1		E = 31.9	}
+40f: CH4 + OH -> CH3 + H2O	{ a = 1.6e6	n = 2.1		E = 10.3	}
+40b: CH3 + H2O -> CH4 + OH	{ a = 2.631e5	n = 2.1		E = 70.92	}
+# Following reaction from Baulch et al., Comb. Flame 98:59-79, 1994
+a40f:CH4 + O2 -> CH3 + HO2	{ a = 3.970E+13	n = 0	E = 238.04	}
+
+# C2H Consumption
+41f:C2H + H2 -> C2H2 + H	{ a = 1.1e13	n = 0		E = 12		}
+41b:C2H2 + H -> C2H + H2	{ a = 5.27e13	n = 0		E = 119.95	}
+42: C2H + O2 -> CHCO + O	{ a = 5.e13	n = 0		E = 6.3		}
+
+# CHCO Consumption
+43f:CHCO + H -> CH2 + CO	{ a = 3.e13	n = 0		E = 0		}
+43b:CH2 + CO -> CHCO + H	{ a = 2.361e12	n = 0		E = -29.39	}
+44: CHCO + O -> CO + CO + H	{ a = 1.e14	n = 0		E = 0		}
+
+# C2H2 Consumption
+45: C2H2 + O -> CH2 + CO	{ a = 4.1e8	n = 1.5		E = 7.1		}
+46: C2H2 + O -> CHCO + H	{ a = 4.3e14	n = 0		E = 50.7	}
+47f:C2H2 + OH -> C2H + H2O	{ a = 1.e13	n = 0		E = 29.3	}
+47b:C2H + H2O -> C2H2 + OH	{ a = 9.e12	n = 0		E = -15.98	}
+48: C2H2 + CH -> C3H3		{ a = 3.e13	n = 0		E = 0		}
+
+# C2H3 Consumption
+49: C2H3 + H -> C2H2 + H2	{ a = 3.e13	n = 0		E = 0		}
+50: C2H3 + O2 -> C2H2 + HO2	{ a = 5.4e11	n = 0		E = 0		}
+51f:C2H3 -> C2H2 + H 		{ ai = 2.e14	a = 1.187e42	ni = 0
+				  n = -7.5	Ei = 166.29	E = 190.4	
+				  fcc = 0.350000
+				}
+51b:C2H2 + H -> C2H3 		{ a = 6.245e41	ai = 1.053e14	n = -7.5
+				  ni = 0	E = 27.5	Ei = 3.39	
+		  		  fcc = 0.350000
+				}
+
+# C2H4 Consumption
+52f:C2H4 + H -> C2H3 + H2	{ a = 1.5e14	n = 0		E = 42.7	}
+52b:C2H3 + H2 -> C2H4 + H	{ a = 9.605e12	n = 0		E = 32.64	}
+53: C2H4 + O -> CH3 + CO + H	{ a = 1.6e9	n = 1.2		E = 3.1		}
+54f:C2H4 + OH -> C2H3 + H2O	{ a = 3.e13	n = 0 		E = 12.6	}
+54b:C2H3 + H2O -> C2H4 + OH	{ a = 8.283e12	n = 0		E = 65.2	}
+55: C2H4 + M' -> C2H2 + H2 + M'	{ a = 2.5e17	n = 0		E = 319.8	}
+
+# C2H5 Consumption
+56f:C2H5 + H -> CH3 + CH3	{ a = 3.e13	n = 0		E = 0		}
+56b:CH3 + CH3 -> C2H5 + H	{ a = 3.457e12	n = 0		E = 49.68	}
+57: C2H5 + O2 -> C2H4 + HO2	{ a = 2.e12	n = 0		E = 20.9	}
+58f:C2H5 -> C2H4 + H 		{ ai = 1.3e13	a = 1.e16	ni = 0
+				  n = 0		Ei = 167	E = 126	
+				  fcc = 0.411000 fctc = 73.4000 
+												 fca = 1.0 fcta = 422.800
+				}
+58b:C2H4 + H -> C2H5 		{ a = 1.595e16	ai = 2.073e13	n = 0
+				  ni = 0	E = -27.39	Ei = 13.61
+				  fcc = 0.411000 fctc = 73.4000 
+				 fca = 1.0 fcta = 422.800}
+
+# C2H6 Consumption
+59: C2H6 + H -> C2H5 + H2	{ a = 5.4e2	n = 3.5		E = 21.8	}
+60: C2H6 + O -> C2H5 + OH	{ a = 3.e7	n = 2		E = 21.4	}
+61: C2H6 + OH -> C2H5 + H2O	{ a = 6.3e6	n = 2		E = 2.7		}
+
+# C3H3 Consumption
+62: C3H3 + O2 -> CHCO + CH2O	{ a = 6.e12	n = 0		E = 0		}
+63: C3H3 + O -> C2H3 + CO	{ a = 3.8e13	n = 0		E = 0		}
+64f:C3H4 -> C3H3 + H		{ a = 5.e14	n = 0		E = 370		}
+64b:C3H3 + H -> C3H4		{ a = 1.7e13	n = 0		E = 19.88	}
+
+# C3H4 Consumption
+65: C3H4 + O -> C2H2 + CH2O	{ a = 1.e12	n = 0		E = 0		}
+66: C3H4 + O -> C2H3 + CHO	{ a = 1.e12	n = 0		E = 0		}
+67: C3H4 + OH -> C2H3 + CH2O	{ a = 1.e12	n = 0		E = 0		}
+68: C3H4 + OH -> C2H4 + CHO	{ a = 1.e12	n = 0		E = 0		}
+
+# C3H5 Consumption
+69f:C3H5 -> C3H4 + H		{ a = 3.98e13	n = 0		E = 293.1	}
+69b:C3H4 + H -> C3H5		{ a = 1.267e13	n = 0		E = 32.48	}
+70: C3H5 + H -> C3H4 + H2	{ a = 1.e13	n = 0		E = 0		}
+
+# C3H6 Consumption
+71f:C3H6 -> C2H3 + CH3		{ a = 3.15e15	n = 0		E = 359.3	}
+71b:C2H3 + CH3 -> C3H6		{ a = 2.511e12	n = 0		E = -34.69	}
+72: C3H6 + H -> C3H5 + H2	{ a = 5.e12	n = 0		E = 6.3		}
+
+
+Let [M']  = 6.5 [CH4] + 6.5 [H2O] + 1.5 [CO2] + 0.75 [CO] + 
+		0.4 [O2] + 0.4 [N2] + 1.0 [OTHER]

@@ -46,7 +46,8 @@ module amrcomp_class
       ! Physical properties
       type(amrdata) :: visc              !< Dynamic viscosity
       type(amrdata) :: beta              !< Bulk viscosity
-      type(amrdata) :: diff              !< Heat diffusivity
+      type(amrdata) :: diff              !< Thermal conductivity lambda [W/(m K)]
+      type(amrdata) :: diffY             !< Species mass diffusivity rho*D [kg/(m s)] (mixtures only)
 
       ! CFL numbers
       real(WP) :: CFLp=0.0_WP                                !< Pressure+convection
@@ -268,6 +269,14 @@ contains
          this%diff%lo_bc(3,1)=amrex_bc_foextrap; this%diff%hi_bc(3,1)=amrex_bc_foextrap
       end if
 
+      ! Species mass diffusivity (Neumann BCs), mixtures only
+      if (this%mat%ns.gt.1) then
+         call this%diffY%initialize(amr,name='diffY',ncomp=1,ng=this%nover); this%diffY%parent=>this
+         if (.not.amr%xper) then; this%diffY%lo_bc(1,1)=amrex_bc_foextrap; this%diffY%hi_bc(1,1)=amrex_bc_foextrap; end if
+         if (.not.amr%yper) then; this%diffY%lo_bc(2,1)=amrex_bc_foextrap; this%diffY%hi_bc(2,1)=amrex_bc_foextrap; end if
+         if (.not.amr%zper) then; this%diffY%lo_bc(3,1)=amrex_bc_foextrap; this%diffY%hi_bc(3,1)=amrex_bc_foextrap; end if
+      end if
+
       ! Initialize pressure solver if requested
       if (this%use_projection) call this%psolver%initialize(amr=amr,type=amrmg_varcoef)
 
@@ -300,6 +309,7 @@ contains
       call this%beta%finalize()
       call this%diff%finalize()
       if (this%mat%ns.gt.1) call this%Y%finalize()
+      if (this%mat%ns.gt.1) call this%diffY%finalize()
       if (allocated(this%Ymin)) deallocate(this%Ymin)
       if (allocated(this%Ymax)) deallocate(this%Ymax)
       if (this%use_projection) call this%psolver%finalize()
@@ -335,6 +345,7 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diff%reset_level(lvl,ba,dm)
       if (this%mat%ns.gt.1) call this%Y%reset_level(lvl,ba,dm)
+      if (this%mat%ns.gt.1) call this%diffY%reset_level(lvl,ba,dm)
       ! Zero out
       call this%UVW%setval(val=0.0_WP,lvl=lvl)
       call this%I%setval(val=0.0_WP,lvl=lvl)
@@ -345,6 +356,7 @@ contains
       call this%beta%setval(val=0.0_WP,lvl=lvl)
       call this%diff%setval(val=0.0_WP,lvl=lvl)
       if (this%mat%ns.gt.1) call this%Y%setval(val=0.0_WP,lvl=lvl)
+      if (this%mat%ns.gt.1) call this%diffY%setval(val=0.0_WP,lvl=lvl)
    end subroutine on_init
 
    !> Override on_coarse: create new fine level from coarse using conservative interpolation
@@ -367,6 +379,7 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diff%reset_level(lvl,ba,dm)
       if (this%mat%ns.gt.1) call this%Y%reset_level(lvl,ba,dm)
+      if (this%mat%ns.gt.1) call this%diffY%reset_level(lvl,ba,dm)
    end subroutine on_coarse
 
    !> Override on_remake: migrate data on regrid using conservative interpolation
@@ -389,6 +402,7 @@ contains
       call this%beta%reset_level(lvl,ba,dm)
       call this%diff%reset_level(lvl,ba,dm)
       if (this%mat%ns.gt.1) call this%Y%reset_level(lvl,ba,dm)
+      if (this%mat%ns.gt.1) call this%diffY%reset_level(lvl,ba,dm)
    end subroutine on_remake
 
    !> Override on_clear: delete level
@@ -408,6 +422,7 @@ contains
       call this%beta%clear_level(lvl)
       call this%diff%clear_level(lvl)
       if (this%mat%ns.gt.1) call this%Y%clear_level(lvl)
+      if (this%mat%ns.gt.1) call this%diffY%clear_level(lvl)
    end subroutine on_clear
 
    !> Override post_regrid: average down for C/F consistency
@@ -719,7 +734,7 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pUVW,pI,pP,pT,pC,pY
-      real(WP) :: irho
+      real(WP) :: irho,ysum,Told
       real(WP), dimension(this%mat%ns) :: y
       ! Check passed Q is as expected
       if (Q%ncomp.ne.this%nQ) call die('[amrcomp get_primitive] Q has wrong number of components')
@@ -739,6 +754,8 @@ contains
             ! Loop over grown tiles
             bx=mfi%growntilebox(this%nover)
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               ! Guard against non-finite conserved state (reports the location instead of failing in the EOS)
+               if (pQ(i,j,k,1).ne.pQ(i,j,k,1).or.pQ(i,j,k,5).ne.pQ(i,j,k,5)) call bad_state()
                ! Compute velocity from momentum
                irho=1.0_WP/max(pQ(i,j,k,1),this%rho_floor)
                pUVW(i,j,k,1)=pQ(i,j,k,2)*irho
@@ -746,22 +763,30 @@ contains
                pUVW(i,j,k,3)=pQ(i,j,k,4)*irho
                ! Compute internal energy per unit mass
                pI(i,j,k,1)=pQ(i,j,k,5)*irho
-               ! Composition: cache first ns-1 species (clipped to [0,1]), close ns-th (clipped to [0,1])
+               ! Composition: cache the first ns-1 species clipped to [0,1] (renormalized if their sum exceeds
+               ! unity), then close the ns-th species; Q itself is never modified here
                if (this%mat%ns.gt.1) then
                   pY(i,j,k,:)=max(0.0_WP,min(pQ(i,j,k,this%Y_lo:this%Y_hi)*irho,1.0_WP))
+                  ysum=sum(pY(i,j,k,:)); if (ysum.gt.1.0_WP) pY(i,j,k,:)=pY(i,j,k,:)/ysum
                   y(1:this%mat%ns-1)=pY(i,j,k,:)
                end if
                y(this%mat%ns)=max(0.0_WP,1.0_WP-sum(y(1:this%mat%ns-1)))
-               ! Compute pressure via EoS: P = P(rho, I)
-               pP(i,j,k,1)=this%mat%get_p_from_rho_e(rho=pQ(i,j,k,1),e=pI(i,j,k,1),y=y)
-               ! Compute speed of sound via EoS from (rho,e) -- avoids the ill-conditioned (p,rho) flash
-               pC(i,j,k,1)=this%mat%get_c_from_rho_e(rho=pQ(i,j,k,1),e=pI(i,j,k,1),y=y)
-               ! Compute temperature via EoS from (rho,e)
-               pT(i,j,k,1)=this%mat%get_T_from_rho_e(rho=pQ(i,j,k,1),e=pI(i,j,k,1),y=y)
+               ! Pressure, speed of sound and temperature from (rho,e) in a single flash (the well-conditioned
+               ! state the solver holds), warm-started from the previous temperature for iterative materials
+               Told=pT(i,j,k,1)
+               call this%mat%get_pTc_from_rho_e(rho=pQ(i,j,k,1),e=pI(i,j,k,1),y=y,p=pP(i,j,k,1),T=pT(i,j,k,1),c=pC(i,j,k,1),Tguess=Told)
             end do; end do; end do
          end do
          call this%amr%mfiter_destroy(mfi)
       end do
+   contains
+      subroutine bad_state()
+         use string, only: str_long
+         character(len=str_long) :: msg
+         write(msg,'(a,i0,a,3(i0,1x),a,3(i0,1x),a,3(i0,1x),a,es12.5,a,es12.5)') '[amrcomp get_primitive] non-finite state at level ',lvl, &
+         &  ' cell ',i,j,k,' in grown tile lo=',bx%lo,' hi=',bx%hi,': rho=',pQ(i,j,k,1),' rhoe=',pQ(i,j,k,5)
+         call die(trim(msg))
+      end subroutine bad_state
    end subroutine get_primitive
 
    !> Calculate dQdt from passed Q without pressure term (user can add it via add_pressure)
@@ -792,7 +817,7 @@ contains
          real(WP), dimension(-1:+1) :: wenom
          real(WP), dimension(1:3,1:3) :: gradU
          real(WP), dimension(this%mat%ns) :: yf,hkm
-         real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW,pQ,pUVW,pI,pT,pVisc,pBeta,pDiff,pY,pP
+         real(WP), dimension(:,:,:,:), contiguous, pointer :: pU,pV,pW,pQ,pUVW,pI,pT,pVisc,pBeta,pDiff,pDiffY,pY,pP
          real(WP), dimension(:,:,:,:), contiguous, pointer :: pFx,pFy,pFz
          real(WP), parameter :: eps=1.0e-15_WP
          ! Traverse levels
@@ -820,6 +845,7 @@ contains
                pFy=>Fy(lvl)%dataptr(mfi)
                pFz=>Fz(lvl)%dataptr(mfi)
                if (this%mat%ns.gt.1) pY=>this%Y%mf(lvl)%dataptr(mfi)
+               if (this%mat%ns.gt.1) pDiffY=>this%diffY%mf(lvl)%dataptr(mfi)
                ! X-fluxes
                fbx=mfi%nodaltilebox(1)
                do k=fbx%lo(3),fbx%hi(3); do j=fbx%lo(2),fbx%hi(2); do i=fbx%lo(1),fbx%hi(1)
@@ -861,12 +887,12 @@ contains
                   pFx(i,j,k,4)=pFx(i,j,k,4)+0.5_WP*sum(pVisc(i-1:i,j,k,1))*(gradU(3,1)+gradU(1,3))
                   ! Heat diffusion flux
                   pFx(i,j,k,5)=pFx(i,j,k,5)+0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pT(i,j,k,1)-pT(i-1,j,k,1))
-                  ! Species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
+                  ! Fickian species diffusion flux (rho*D) with interdiffusion enthalpy via EOS partial enthalpies
                   if (this%mat%ns.gt.1) then
                      yf(1:this%mat%ns-1)=0.5_WP*(pY(i-1,j,k,:)+pY(i,j,k,:)); yf(this%mat%ns)=max(0.0_WP,1.0_WP-sum(yf(1:this%mat%ns-1)))
                      call this%mat%get_hk_from_p_T(p=0.5_WP*sum(pP(i-1:i,j,k,1)),T=0.5_WP*sum(pT(i-1:i,j,k,1)),y=yf,hk=hkm)
                      do n=1,this%mat%ns-1
-                        fluxY=0.5_WP*sum(pDiff(i-1:i,j,k,1))*dxi*(pY(i,j,k,n)-pY(i-1,j,k,n))
+                        fluxY=0.5_WP*sum(pDiffY(i-1:i,j,k,1))*dxi*(pY(i,j,k,n)-pY(i-1,j,k,n))
                         pFx(i,j,k,this%Y_lo+n-1)=pFx(i,j,k,this%Y_lo+n-1)+fluxY
                         pFx(i,j,k,5)=pFx(i,j,k,5)+fluxY*(hkm(n)-hkm(this%mat%ns))
                      end do
@@ -913,12 +939,12 @@ contains
                   pFy(i,j,k,4)=pFy(i,j,k,4)+0.5_WP*sum(pVisc(i,j-1:j,k,1))*(gradU(3,2)+gradU(2,3))
                   ! Heat diffusion flux
                   pFy(i,j,k,5)=pFy(i,j,k,5)+0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pT(i,j,k,1)-pT(i,j-1,k,1))
-                  ! Species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
+                  ! Fickian species diffusion flux (rho*D) with interdiffusion enthalpy via EOS partial enthalpies
                   if (this%mat%ns.gt.1) then
                      yf(1:this%mat%ns-1)=0.5_WP*(pY(i,j-1,k,:)+pY(i,j,k,:)); yf(this%mat%ns)=max(0.0_WP,1.0_WP-sum(yf(1:this%mat%ns-1)))
                      call this%mat%get_hk_from_p_T(p=0.5_WP*sum(pP(i,j-1:j,k,1)),T=0.5_WP*sum(pT(i,j-1:j,k,1)),y=yf,hk=hkm)
                      do n=1,this%mat%ns-1
-                        fluxY=0.5_WP*sum(pDiff(i,j-1:j,k,1))*dyi*(pY(i,j,k,n)-pY(i,j-1,k,n))
+                        fluxY=0.5_WP*sum(pDiffY(i,j-1:j,k,1))*dyi*(pY(i,j,k,n)-pY(i,j-1,k,n))
                         pFy(i,j,k,this%Y_lo+n-1)=pFy(i,j,k,this%Y_lo+n-1)+fluxY
                         pFy(i,j,k,5)=pFy(i,j,k,5)+fluxY*(hkm(n)-hkm(this%mat%ns))
                      end do
@@ -965,12 +991,12 @@ contains
                   pFz(i,j,k,4)=pFz(i,j,k,4)+0.5_WP*sum(pVisc(i,j,k-1:k,1))*(gradU(3,3)+gradU(3,3))+0.5_WP*(sum(pBeta(i,j,k-1:k,1))-2.0_WP/3.0_WP*sum(pVisc(i,j,k-1:k,1)))*div
                   ! Heat diffusion flux
                   pFz(i,j,k,5)=pFz(i,j,k,5)+0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pT(i,j,k,1)-pT(i,j,k-1,1))
-                  ! Species diffusion flux (Le=1) with interdiffusion enthalpy via EOS partial enthalpies
+                  ! Fickian species diffusion flux (rho*D) with interdiffusion enthalpy via EOS partial enthalpies
                   if (this%mat%ns.gt.1) then
                      yf(1:this%mat%ns-1)=0.5_WP*(pY(i,j,k-1,:)+pY(i,j,k,:)); yf(this%mat%ns)=max(0.0_WP,1.0_WP-sum(yf(1:this%mat%ns-1)))
                      call this%mat%get_hk_from_p_T(p=0.5_WP*sum(pP(i,j,k-1:k,1)),T=0.5_WP*sum(pT(i,j,k-1:k,1)),y=yf,hk=hkm)
                      do n=1,this%mat%ns-1
-                        fluxY=0.5_WP*sum(pDiff(i,j,k-1:k,1))*dzi*(pY(i,j,k,n)-pY(i,j,k-1,n))
+                        fluxY=0.5_WP*sum(pDiffY(i,j,k-1:k,1))*dzi*(pY(i,j,k,n)-pY(i,j,k-1,n))
                         pFz(i,j,k,this%Y_lo+n-1)=pFz(i,j,k,this%Y_lo+n-1)+fluxY
                         pFz(i,j,k,5)=pFz(i,j,k,5)+fluxY*(hkm(n)-hkm(this%mat%ns))
                      end do
@@ -1121,7 +1147,7 @@ contains
       type(amrex_mfiter) :: mfi
       type(amrex_box) :: bx
       integer :: lvl,i,j,k,ierr
-      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pP,pUVW,pVisc,pBeta,pDiff,pT,pC,pY,pI
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pP,pUVW,pVisc,pBeta,pDiff,pDiffY,pT,pC,pY,pI
       real(WP) :: dxi,dyi,dzi,rho,conv,pgrad,viscmax,cv,alpha_heat
       real(WP), dimension(this%mat%ns) :: y
       ! Get convective CFL from parent
@@ -1150,6 +1176,7 @@ contains
             pC=>this%C%mf(lvl)%dataptr(mfi)
             pI=>this%I%mf(lvl)%dataptr(mfi)
             if (this%mat%ns.gt.1) pY=>this%Y%mf(lvl)%dataptr(mfi)
+            if (this%mat%ns.gt.1) pDiffY=>this%diffY%mf(lvl)%dataptr(mfi)
             ! Loop over interior tiles
             bx=mfi%tilebox()
             do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
@@ -1157,10 +1184,11 @@ contains
                ! Heat-diffusion CFL: thermal diffusivity alpha=lambda/(rho*cv)
                if (this%mat%ns.gt.1) y(1:this%mat%ns-1)=pY(i,j,k,:)
                y(this%mat%ns)=max(0.0_WP,1.0_WP-sum(y(1:this%mat%ns-1)))
-               cv=this%mat%get_cv_from_rho_e(rho,pI(i,j,k,1),y)
+               cv=this%mat%get_cv_from_rho_T(rho=rho,T=pT(i,j,k,1),y=y)
                alpha_heat=pDiff(i,j,k,1)/max(rho*cv,tiny(1.0_WP))
-               ! Viscous-like CFL
+               ! Viscous-like CFL: shear, bulk, heat and species diffusion
                viscmax=max(pVisc(i,j,k,1)/rho,pBeta(i,j,k,1)/rho,alpha_heat)
+               if (this%mat%ns.gt.1) viscmax=max(viscmax,pDiffY(i,j,k,1)/rho)
                if (this%amr%nx.gt.1) this%CFLv_x=max(this%CFLv_x,4.0_WP*viscmax*dt*dxi**2)
                if (this%amr%ny.gt.1) this%CFLv_y=max(this%CFLv_y,4.0_WP*viscmax*dt*dyi**2)
                if (this%amr%nz.gt.1) this%CFLv_z=max(this%CFLv_z,4.0_WP*viscmax*dt*dzi**2)
