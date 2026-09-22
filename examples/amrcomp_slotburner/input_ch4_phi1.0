@@ -47,6 +47,19 @@ Burnt Y H2O2 : 3.39375386e-08
 Burnt Y CO : 6.53806684e-03
 Burnt Y CO2 : 1.40422599e-01
 
+# Damping layer in front of the artificial far boundaries. Every non-periodic face reflects: ext_dir at
+# the inlet pins the pressure, reflect_* on the sides are rigid walls, foextrap at the top is zero-gradient.
+# amrcomp has no characteristic (NSCBC) treatment, so this only absorbs part of what would bounce back.
+Sponge length : 1.0e-2
+Side sponge length : 5.0e-3
+Sponge strength : 0.5
+
+# Inflow. 'Inlet smoothing' has to resolve the lip profile on the BASE grid, not just the finest level;
+# the default is now max(0.02*h, 3*dx_base) = 9.4e-4 m here. 'Inflow ramp time' > 0 starts the domain
+# quiescent and brings the mass flux in over that time, trading a longer transient for a gentler start.
+Inlet smoothing : 1.0e-3
+Inflow ramp time : 0.0
+
 # Transport 
 Transport model : mixavg
 Prandtl number : 0.68

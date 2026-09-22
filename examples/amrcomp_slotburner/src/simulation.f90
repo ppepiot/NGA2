@@ -67,6 +67,10 @@ module simulation
    real(WP) :: delta_in=2.0e-4_WP           !< Smoothing thickness of the inlet profiles [m]
    logical  :: poiseuille=.false.           !< Parabolic rather than plug velocity profile across the slot
    real(WP) :: Lf_init=0.02_WP              !< Height of the initial flame cone [m]
+   real(WP) :: t_ramp=0.0_WP                !< Inflow ramp time (0: full mass flux from t = 0) [s]
+   real(WP) :: L_spg=0.0_WP                 !< Damping-layer thickness at the top outflow [m]
+   real(WP) :: L_spg_side=0.0_WP            !< Damping-layer thickness at each lateral boundary [m]
+   real(WP) :: spg_coeff=0.5_WP             !< Damping-layer strength: nu = spg_coeff * c * dx
    real(WP) :: delta_flame=5.0e-4_WP        !< Thickness of the initial flame front [m]
 
    !> Tagging thresholds
@@ -167,6 +171,21 @@ contains
       step=0.5_WP*(1.0_WP+tanh(4.0_WP*(x-x0)/delta))
    end function step
 
+   !> Fraction of the cooled lip at transverse position x: 1 over the rim, 0 in the slot and the co-flow
+   real(WP) function lip_frac(x)
+      real(WP), intent(in) :: x
+      real(WP) :: ax
+      ax=abs(x)
+      lip_frac=step(ax-0.5_WP*h_slot,0.0_WP,delta_in)*step(0.5_WP*h_slot+w_lip-ax,0.0_WP,delta_in)
+   end function lip_frac
+
+   !> Inflow ramp factor: 0 at t = 0 rising to 1 over t_ramp, or 1 throughout when no ramp is requested
+   real(WP) function ramp(t)
+      real(WP), intent(in) :: t
+      ramp=1.0_WP
+      if (t_ramp.gt.0.0_WP) ramp=1.0_WP-exp(-3.0_WP*t/t_ramp)
+   end function ramp
+
    !> Inlet state at transverse position x (paper Fig. 1b and Section 2): premixed reactants over the slot
    !> |x| < h/2, a no-slip band at the water-cooled lip temperature over the lip, and air co-flow beyond.
    subroutine inlet_state(x,T,Yf,v)
@@ -178,7 +197,7 @@ contains
       ! Slot indicator: 1 inside the slot, 0 outside
       s=step(0.5_WP*h_slot-ax,0.0_WP,delta_in)
       ! Lip indicator: 1 over the cooled rim, 0 in the slot and in the co-flow
-      sl=step(ax-0.5_WP*h_slot,0.0_WP,delta_in)*step(0.5_WP*h_slot+w_lip-ax,0.0_WP,delta_in)
+      sl=lip_frac(x)
       ! Transverse velocity profile in the slot
       prof=1.0_WP
       if (poiseuille) prof=max(0.0_WP,1.5_WP*(1.0_WP-(2.0_WP*x/h_slot)**2))
@@ -201,7 +220,7 @@ contains
       type(amrex_box) :: bx
       real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ
       real(WP), dimension(nS) :: Yf,Ym
-      real(WP) :: x,y,sflame,sjet,T,rho,v
+      real(WP) :: x,y,sflame,sjet,slip,T,rho,v
       integer :: i,j,k,n
       call amrex_mfiter_build(mfi,ba,dm,tiling=.true.)
       do while (mfi%next())
@@ -223,10 +242,17 @@ contains
             T =T_u+(T_b-T_u)*sflame*sjet
             Yf=Y_u+(Y_b-Y_u)*sflame
             Yf=Yf*sjet+Y_co*(1.0_WP-sjet)
+            ! Near the inlet, impose the same cooled no-slip lip the boundary condition will apply, decaying
+            ! with height. Without this the initial field carries flow and fresh-gas temperature across the
+            ! lip while the boundary sets u = 0 and T = T_lip there, and that mismatch fires an acoustic
+            ! pulse at t = 0 exactly where the oscillations are seen.
+            slip=lip_frac(x)*exp(-(y/max(delta_in,2.0_WP*solver%amr%dx(lvl)))**2)
+            T=T+(T_lip-T)*slip
             do n=1,nS; Ym(n)=Yf(perm(n)); end do
             rho=gas%get_rho_from_p_T(p=P0,T=T,y=Ym)
             ! Keep the mass flux of the slot stream: the burnt gas accelerates by the expansion ratio
             v=(u_bulk*rho_u/rho)*sjet+u_co*(1.0_WP-sjet)
+            v=v*(1.0_WP-slip)*ramp(0.0_WP)
             call fill_Q(pQ(i,j,k,:),T,Yf,0.0_WP,v,0.0_WP)
          end do; end do; end do
       end do
@@ -252,6 +278,7 @@ contains
          ! Cell-centred x for Q and for the tangential components; the V face sits at the same x
          x=solver%amr%xlo+(real(i,WP)+0.5_WP)*solver%amr%dx(lvl)
          call inlet_state(x,T,Yf,v)
+         v=v*ramp(time)
          select case (comp)
          case ('U','W'); p(i,j,k,1)=0.0_WP
          case ('V');     p(i,j,k,1)=v
@@ -386,6 +413,55 @@ contains
       end function material_of
    end subroutine get_conservation
 
+   !> Damping layer at the artificial far boundaries (top outflow and, optionally, the lateral symmetry
+   !> planes). Every non-periodic face of this set-up reflects: ext_dir at the inlet pins the pressure,
+   !> reflect_* on the sides are rigid walls and foextrap at the top is zero-gradient, not characteristic.
+   !> Nothing here makes them non-reflecting -- that needs NSCBC -- but raising the viscosities over a layer
+   !> in front of them absorbs part of what would otherwise bounce back. The bulk viscosity is the term that
+   !> acts on the dilatational (acoustic) field, so it is raised alongside the shear viscosity.
+   !>
+   !> nu is set from the local sound speed and cell size, NOT from 1/dt: a dt-based coefficient pins the
+   !> viscous CFL at a fixed value and drives the time step geometrically to zero whenever Max CFL is set
+   !> below it.
+   subroutine apply_sponge()
+      use amrex_amr_module, only: amrex_mfiter,amrex_box
+      type(amrex_mfiter) :: mfi
+      type(amrex_box) :: bx
+      real(WP), dimension(:,:,:,:), contiguous, pointer :: pQ,pC,pT,pVisc,pBeta,pDiff,pDiffY
+      real(WP) :: x,y,f,nu,rho
+      integer :: lvl,i,j,k
+      if (L_spg.le.0.0_WP.and.L_spg_side.le.0.0_WP) return
+      do lvl=0,amr%clvl()
+         call amr%mfiter_build(lvl,mfi)
+         do while (mfi%next())
+            bx=mfi%growntilebox(fs%nover)
+            pQ    =>fs%Q%mf(lvl)%dataptr(mfi)
+            pC    =>fs%C%mf(lvl)%dataptr(mfi)
+            pT    =>fs%T%mf(lvl)%dataptr(mfi)
+            pVisc =>fs%visc%mf(lvl)%dataptr(mfi)
+            pBeta =>fs%beta%mf(lvl)%dataptr(mfi)
+            pDiff =>fs%diff%mf(lvl)%dataptr(mfi)
+            pDiffY=>fs%diffY%mf(lvl)%dataptr(mfi)
+            do k=bx%lo(3),bx%hi(3); do j=bx%lo(2),bx%hi(2); do i=bx%lo(1),bx%hi(1)
+               x=amr%xlo+(real(i,WP)+0.5_WP)*amr%dx(lvl)
+               y=amr%ylo+(real(j,WP)+0.5_WP)*amr%dy(lvl)
+               ! Quadratic ramp, zero at the start of the layer so the layer itself does not reflect
+               f=0.0_WP
+               if (L_spg.gt.0.0_WP)      f=max(f,max(0.0_WP,(y-(amr%yhi-L_spg))/L_spg)**2)
+               if (L_spg_side.gt.0.0_WP) f=max(f,max(0.0_WP,(abs(x)-(0.5_WP*(amr%xhi-amr%xlo)-L_spg_side))/L_spg_side)**2)
+               if (f.le.0.0_WP) cycle
+               rho=max(pQ(i,j,k,1),fs%rho_floor)
+               nu=spg_coeff*f*pC(i,j,k,1)*amr%dx(lvl)
+               pVisc (i,j,k,1)=pVisc (i,j,k,1)+rho*nu
+               pBeta (i,j,k,1)=pBeta (i,j,k,1)+rho*nu
+               pDiff (i,j,k,1)=pDiff (i,j,k,1)+rho*nu*chem%tr%get_cp(pT(i,j,k,1),Y_u)
+               pDiffY(i,j,k,1)=pDiffY(i,j,k,1)+rho*nu
+            end do; end do; end do
+         end do
+         call amr%mfiter_destroy(mfi)
+      end do
+   end subroutine apply_sponge
+
    !> Transport coefficients (and SGS if requested)
    subroutine update_transport()
       if (use_sgs) then
@@ -393,6 +469,7 @@ contains
       else
          call chem%update_properties(fs=fs,dt=time%dt)
       end if
+      call apply_sponge()
    end subroutine update_transport
 
    !> Initialization
@@ -570,7 +647,13 @@ contains
          call param_read('Lip temperature',T_lip,default=350.0_WP)
          call param_read('Bulk velocity',u_bulk)
          call param_read('Coflow velocity',u_co,default=0.05_WP*u_bulk)
-         call param_read('Inlet smoothing',delta_in,default=0.02_WP*h_slot)
+         ! The inlet profile has to be resolved on the BASE grid, not just on the finest level: a sub-cell
+         ! step in velocity and temperature at the lip is a strong acoustic source right at the inlet.
+         call param_read('Inlet smoothing',delta_in,default=max(0.02_WP*h_slot,3.0_WP*amr%dx(0)))
+         call param_read('Inflow ramp time',t_ramp,default=0.0_WP)
+         call param_read('Sponge length',L_spg,default=0.0_WP)
+         call param_read('Side sponge length',L_spg_side,default=0.0_WP)
+         call param_read('Sponge strength',spg_coeff,default=0.5_WP)
          call param_read('Poiseuille inlet',poiseuille,default=.false.)
          call param_read('Initial flame height',Lf_init,default=2.0_WP*h_slot)
          call param_read('Initial flame thickness',delta_flame,default=0.05_WP*h_slot)
